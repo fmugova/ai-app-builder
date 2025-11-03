@@ -5,9 +5,10 @@ import { prisma } from "@/lib/db"
 import Stripe from "stripe"
 
 export async function POST(req: Request) {
+  // Stripe requires the raw text body for signature verification
   const body = await req.text()
-  const headersList = await getHeaders()
-const signature = headersList.get("stripe-signature")!
+  const headersList = getHeaders()
+  const signature = headersList.get("stripe-signature")!
 
   let event: Stripe.Event
 
@@ -33,36 +34,45 @@ const signature = headersList.get("stripe-signature")!
         const plan = session.metadata?.plan as keyof typeof PLANS
 
         if (!userId || !plan) {
-          throw new Error("Missing metadata")
+          throw new Error("Missing metadata in checkout session")
         }
 
         const planConfig = PLANS[plan]
+
+        // Fetch line items to get price ID if not expanded in webhook
+        const lineItems = await stripe.checkout.sessions.listLineItems(session.id)
+        const priceId = lineItems.data[0]?.price?.id
+
+        // Retrieve subscription to get accurate current_period_end
+        const subscription = session.subscription
+          ? await stripe.subscriptions.retrieve(session.subscription as string)
+          : null
 
         await prisma.subscription.upsert({
           where: { userId },
           update: {
             stripeCustomerId: session.customer as string,
             stripeSubscriptionId: session.subscription as string,
-            stripePriceId: session.line_items?.data[0]?.price?.id,
+            stripePriceId: priceId ?? null,
             plan: plan.toLowerCase(),
             status: "active",
             generationsLimit: planConfig.generationsLimit,
             generationsUsed: 0,
-            stripeCurrentPeriodEnd: session.expires_at 
-              ? new Date(session.expires_at * 1000)
+            stripeCurrentPeriodEnd: subscription
+              ? new Date(subscription.current_period_end * 1000)
               : null,
           },
           create: {
             userId,
             stripeCustomerId: session.customer as string,
             stripeSubscriptionId: session.subscription as string,
-            stripePriceId: session.line_items?.data[0]?.price?.id,
+            stripePriceId: priceId ?? null,
             plan: plan.toLowerCase(),
             status: "active",
             generationsLimit: planConfig.generationsLimit,
             generationsUsed: 0,
-            stripeCurrentPeriodEnd: session.expires_at 
-              ? new Date(session.expires_at * 1000)
+            stripeCurrentPeriodEnd: subscription
+              ? new Date(subscription.current_period_end * 1000)
               : null,
           },
         })
@@ -137,10 +147,12 @@ const signature = headersList.get("stripe-signature")!
 
         break
       }
+
+      default:
+        console.log(`Unhandled event type: ${event.type}`)
     }
 
     return NextResponse.json({ received: true })
-
   } catch (error) {
     console.error("Webhook handler error:", error)
     return NextResponse.json(
