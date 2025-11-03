@@ -4,6 +4,8 @@ import { stripe, PLANS } from "@/lib/stripe"
 import { prisma } from "@/lib/db"
 import Stripe from "stripe"
 
+export const runtime = "nodejs" // ✅ Prisma requires Node.js runtime
+
 export async function POST(req: Request) {
   // Stripe requires the raw text body for signature verification
   const body = await req.text()
