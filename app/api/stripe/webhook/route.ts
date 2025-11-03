@@ -1,22 +1,24 @@
 import { NextResponse } from "next/server"
-import { headers } from "next/headers"
-import { headers as getHeaders } from "next/headers"
+import { headers } from "next/headers" // Correct, synchronous import
 import { stripe, PLANS } from "@/lib/stripe"
 import { prisma } from "@/lib/db"
 import Stripe from "stripe"
 
-const body = await req.arrayBuffer()
-  const buffer = Buffer.from(body)export async function POST(req: Request) {
-  const body = await req.text()
+export async function POST(req: Request) {
+  // CRITICAL FIX: Stripe requires the raw body as a Buffer, not a parsed string.
+  // Using req.text() will cause signature verification to fail.
+  const body = await req.arrayBuffer()
+  const buffer = Buffer.from(body)
+
+  // This is the correct way to get the signature. It's synchronous.
   const signature = headers().get("stripe-signature")!
-  const headersList = await getHeaders()
-const signature = headersList.get("stripe-signature")!
 
   let event: Stripe.Event
 
   try {
+    // Pass the raw buffer to constructEvent, not the text body
     event = stripe.webhooks.constructEvent(
-      body,
+      buffer,
       signature,
       process.env.STRIPE_WEBHOOK_SECRET!
     )
@@ -39,6 +41,12 @@ const signature = headersList.get("stripe-signature")!
           throw new Error("Missing metadata")
         }
 
+        // LOGIC FIX: Retrieve the subscription to get the correct end date.
+        // session.expires_at is for the checkout session, not the subscription.
+        const subscription = await stripe.subscriptions.retrieve(
+          session.subscription as string
+        )
+
         const planConfig = PLANS[plan]
 
         await prisma.subscription.upsert({
@@ -51,9 +59,10 @@ const signature = headersList.get("stripe-signature")!
             status: "active",
             generationsLimit: planConfig.generationsLimit,
             generationsUsed: 0,
-            stripeCurrentPeriodEnd: session.expires_at 
-              ? new Date(session.expires_at * 1000)
-              : null,
+            // Use the correct date from the retrieved subscription
+            stripeCurrentPeriodEnd: new Date(
+              subscription.current_period_end * 1000
+            ),
           },
           create: {
             userId,
@@ -64,9 +73,10 @@ const signature = headersList.get("stripe-signature")!
             status: "active",
             generationsLimit: planConfig.generationsLimit,
             generationsUsed: 0,
-            stripeCurrentPeriodEnd: session.expires_at 
-              ? new Date(session.expires_at * 1000)
-              : null,
+            // Use the correct date from the retrieved subscription
+            stripeCurrentPeriodEnd: new Date(
+              subscription.current_period_end * 1000
+            ),
           },
         })
 
@@ -78,13 +88,16 @@ const signature = headersList.get("stripe-signature")!
         const subscriptionId = invoice.subscription as string
 
         if (subscriptionId) {
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+          const subscription =
+            await stripe.subscriptions.retrieve(subscriptionId)
 
           await prisma.subscription.update({
             where: { stripeSubscriptionId: subscriptionId },
             data: {
               status: "active",
-              stripeCurrentPeriodEnd: new Date(subscription.current_period_end * 1000),
+              stripeCurrentPeriodEnd: new Date(
+                subscription.current_period_end * 1000
+              ),
               generationsUsed: 0,
             },
           })
@@ -117,7 +130,7 @@ const signature = headersList.get("stripe-signature")!
           data: {
             status: "canceled",
             plan: "free",
-            generationsLimit: 3,
+            generationsLimit: 3, // Assuming 3 is your free tier limit
             stripePriceId: null,
             stripeCurrentPeriodEnd: null,
           },
@@ -134,7 +147,9 @@ const signature = headersList.get("stripe-signature")!
           data: {
             status: subscription.status,
             stripePriceId: subscription.items.data[0].price.id,
-            stripeCurrentPeriodEnd: new Date(subscription.current_period_end * 1000),
+            stripeCurrentPeriodEnd: new Date(
+              subscription.current_period_end * 1000
+            ),
           },
         })
 
@@ -143,7 +158,6 @@ const signature = headersList.get("stripe-signature")!
     }
 
     return NextResponse.json({ received: true })
-
   } catch (error) {
     console.error("Webhook handler error:", error)
     return NextResponse.json(
@@ -151,3 +165,4 @@ const signature = headersList.get("stripe-signature")!
       { status: 500 }
     )
   }
+}
