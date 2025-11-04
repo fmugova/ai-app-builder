@@ -1,24 +1,19 @@
 import { NextResponse } from "next/server"
-import { headers } from "next/headers" // Correct, synchronous import
+import { headers as getHeaders } from "next/headers"
 import { stripe, PLANS } from "@/lib/stripe"
 import { prisma } from "@/lib/db"
 import Stripe from "stripe"
 
 export async function POST(req: Request) {
-  // CRITICAL FIX: Stripe requires the raw body as a Buffer, not a parsed string.
-  // Using req.text() will cause signature verification to fail.
-  const body = await req.arrayBuffer()
-  const buffer = Buffer.from(body)
-
-  // This is the correct way to get the signature. It's synchronous.
-  const signature = headers().get("stripe-signature")!
+  const body = await req.text()
+  const headersList = await getHeaders()
+  const signature = headersList.get("stripe-signature")!
 
   let event: Stripe.Event
 
   try {
-    // Pass the raw buffer to constructEvent, not the text body
     event = stripe.webhooks.constructEvent(
-      buffer,
+      body,
       signature,
       process.env.STRIPE_WEBHOOK_SECRET!
     )
@@ -41,12 +36,6 @@ export async function POST(req: Request) {
           throw new Error("Missing metadata")
         }
 
-        // LOGIC FIX: Retrieve the subscription to get the correct end date.
-        // session.expires_at is for the checkout session, not the subscription.
-        const subscription = await stripe.subscriptions.retrieve(
-          session.subscription as string
-        )
-
         const planConfig = PLANS[plan]
 
         await prisma.subscription.upsert({
@@ -59,10 +48,9 @@ export async function POST(req: Request) {
             status: "active",
             generationsLimit: planConfig.generationsLimit,
             generationsUsed: 0,
-            // Use the correct date from the retrieved subscription
-            stripeCurrentPeriodEnd: new Date(
-              subscription.current_period_end * 1000
-            ),
+            stripeCurrentPeriodEnd: session.expires_at 
+              ? new Date(session.expires_at * 1000)
+              : null,
           },
           create: {
             userId,
@@ -73,10 +61,9 @@ export async function POST(req: Request) {
             status: "active",
             generationsLimit: planConfig.generationsLimit,
             generationsUsed: 0,
-            // Use the correct date from the retrieved subscription
-            stripeCurrentPeriodEnd: new Date(
-              subscription.current_period_end * 1000
-            ),
+            stripeCurrentPeriodEnd: session.expires_at 
+              ? new Date(session.expires_at * 1000)
+              : null,
           },
         })
 
@@ -88,16 +75,13 @@ export async function POST(req: Request) {
         const subscriptionId = invoice.subscription as string
 
         if (subscriptionId) {
-          const subscription =
-            await stripe.subscriptions.retrieve(subscriptionId)
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId)
 
           await prisma.subscription.update({
             where: { stripeSubscriptionId: subscriptionId },
             data: {
               status: "active",
-              stripeCurrentPeriodEnd: new Date(
-                subscription.current_period_end * 1000
-              ),
+              stripeCurrentPeriodEnd: new Date(subscription.current_period_end * 1000),
               generationsUsed: 0,
             },
           })
@@ -130,7 +114,7 @@ export async function POST(req: Request) {
           data: {
             status: "canceled",
             plan: "free",
-            generationsLimit: 3, // Assuming 3 is your free tier limit
+            generationsLimit: 3,
             stripePriceId: null,
             stripeCurrentPeriodEnd: null,
           },
@@ -147,9 +131,7 @@ export async function POST(req: Request) {
           data: {
             status: subscription.status,
             stripePriceId: subscription.items.data[0].price.id,
-            stripeCurrentPeriodEnd: new Date(
-              subscription.current_period_end * 1000
-            ),
+            stripeCurrentPeriodEnd: new Date(subscription.current_period_end * 1000),
           },
         })
 
@@ -158,6 +140,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ received: true })
+
   } catch (error) {
     console.error("Webhook handler error:", error)
     return NextResponse.json(
