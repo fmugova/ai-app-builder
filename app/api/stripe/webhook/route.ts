@@ -4,6 +4,9 @@ import { stripe, PLANS } from "@/lib/stripe";
 import { prisma } from "@/lib/db";
 import Stripe from "stripe";
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /* -------------------------------------------------------------
    POST – Stripe webhook handler
    ------------------------------------------------------------- */
@@ -12,8 +15,9 @@ export async function POST(req: Request) {
   const body = await req.arrayBuffer();
   const buffer = Buffer.from(body);
 
-  /* 2. Stripe signature (synchronous) */
-  const signature = headers().get("stripe-signature");
+  /* 2. Stripe signature */
+  const headersList = await headers();
+  const signature = headersList.get("stripe-signature");
   if (!signature) {
     return NextResponse.json(
       { error: "Missing stripe-signature header" },
@@ -54,7 +58,7 @@ export async function POST(req: Request) {
         // Retrieve the **subscription** (not the checkout session) for the correct period end
         const subscription = await stripe.subscriptions.retrieve(
           session.subscription as string
-        );
+        ) as Stripe.Subscription;
 
         await prisma.subscription.upsert({
           where: { userId },
@@ -67,7 +71,7 @@ export async function POST(req: Request) {
             generationsLimit: planConfig.generationsLimit,
             generationsUsed: 0,
             stripeCurrentPeriodEnd: new Date(
-              subscription.current_period_end * 1000
+              (subscription as any).current_period_end * 1000
             ),
           },
           create: {
@@ -80,7 +84,7 @@ export async function POST(req: Request) {
             generationsLimit: planConfig.generationsLimit,
             generationsUsed: 0,
             stripeCurrentPeriodEnd: new Date(
-              subscription.current_period_end * 1000
+              (subscription as any).current_period_end * 1000
             ),
           },
         });
@@ -90,19 +94,19 @@ export async function POST(req: Request) {
       /* ------------------- invoice.payment_succeeded ------------------- */
       case "invoice.payment_succeeded": {
         const invoice = event.data.object as Stripe.Invoice;
-        const subscriptionId = invoice.subscription as string | null;
+        const subscriptionId = (invoice as any).subscription as string | null;
 
         if (subscriptionId) {
           const subscription = await stripe.subscriptions.retrieve(
             subscriptionId
-          );
+          ) as Stripe.Subscription;
 
           await prisma.subscription.update({
             where: { stripeSubscriptionId: subscriptionId },
             data: {
               status: "active",
               stripeCurrentPeriodEnd: new Date(
-                subscription.current_period_end * 1000
+                (subscription as any).current_period_end * 1000
               ),
               generationsUsed: 0,
             },
@@ -114,7 +118,7 @@ export async function POST(req: Request) {
       /* ------------------- invoice.payment_failed ------------------- */
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
-        const subscriptionId = invoice.subscription as string | null;
+        const subscriptionId = (invoice as any).subscription as string | null;
 
         if (subscriptionId) {
           await prisma.subscription.update({
@@ -154,7 +158,7 @@ export async function POST(req: Request) {
             status: subscription.status,
             stripePriceId: subscription.items.data[0].price.id,
             stripeCurrentPeriodEnd: new Date(
-              subscription.current_period_end * 1000
+              (subscription as any).current_period_end * 1000
             ),
           },
         });
