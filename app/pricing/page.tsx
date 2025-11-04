@@ -17,7 +17,7 @@ const PLANS = {
   PRO: {
     name: 'Pro',
     price: 19,
-    priceId: process.env.STRIPE_PRO_PRICE_ID,
+    priceId: process.env.STRIPE_PRO_PRICE_ID || null,
     features: [
       '100 AI generations per month',
       'Unlimited saved projects',
@@ -30,7 +30,7 @@ const PLANS = {
   ENTERPRISE: {
     name: 'Enterprise',
     price: 99,
-    priceId: process.env.STRIPE_ENTERPRISE_PRICE_ID,
+    priceId: process.env.STRIPE_ENTERPRISE_PRICE_ID || null,
     features: [
       'Unlimited AI generations',
       'Unlimited saved projects',
