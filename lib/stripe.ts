@@ -48,7 +48,7 @@ export const PLANS = {
       'Team collaboration'
     ]
   }
-} as const
+}
 
 export type PlanType = keyof typeof PLANS
 
