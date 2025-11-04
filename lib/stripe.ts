@@ -1,7 +1,8 @@
 import Stripe from 'stripe'
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2024-11-20.acacia' as any,
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2023-10-16',
+  typescript: true,
 })
 
 export const PLANS = {
@@ -20,7 +21,7 @@ export const PLANS = {
   PRO: {
     name: 'Pro',
     price: 19,
-    priceId: process.env.STRIPE_PRO_PRICE_ID || null,
+    priceId: process.env.STRIPE_PRO_PRICE_ID,
     generationsLimit: 100,
     features: [
       '100 AI generations per month',
@@ -34,7 +35,7 @@ export const PLANS = {
   ENTERPRISE: {
     name: 'Enterprise',
     price: 99,
-    priceId: process.env.STRIPE_ENTERPRISE_PRICE_ID || null,
+    priceId: process.env.STRIPE_ENTERPRISE_PRICE_ID,
     generationsLimit: -1,
     features: [
       'Unlimited AI generations',
