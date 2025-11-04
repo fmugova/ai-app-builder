@@ -59,9 +59,10 @@ export async function POST(req: Request) {
         await prisma.subscription.upsert({
           where: { userId },
           update: {
+            stripeCustomerId: session.customer as string,
             stripeSubscriptionId: subscription.id,
             stripePriceId: subscription.items.data[0].price.id,
-            plan,
+            plan: plan.toLowerCase(),
             status: "active",
             generationsLimit: planConfig.generationsLimit,
             generationsUsed: 0,
@@ -71,9 +72,10 @@ export async function POST(req: Request) {
           },
           create: {
             userId,
+            stripeCustomerId: session.customer as string,
             stripeSubscriptionId: subscription.id,
             stripePriceId: subscription.items.data[0].price.id,
-            plan,
+            plan: plan.toLowerCase(),
             status: "active",
             generationsLimit: planConfig.generationsLimit,
             generationsUsed: 0,
@@ -85,8 +87,8 @@ export async function POST(req: Request) {
         break;
       }
 
-      /* -------------------------- invoice.paid -------------------------- */
-      case "invoice.paid": {
+      /* ------------------- invoice.payment_succeeded ------------------- */
+      case "invoice.payment_succeeded": {
         const invoice = event.data.object as Stripe.Invoice;
         const subscriptionId = invoice.subscription as string | null;
 
@@ -109,6 +111,22 @@ export async function POST(req: Request) {
         break;
       }
 
+      /* ------------------- invoice.payment_failed ------------------- */
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const subscriptionId = invoice.subscription as string | null;
+
+        if (subscriptionId) {
+          await prisma.subscription.update({
+            where: { stripeSubscriptionId: subscriptionId },
+            data: {
+              status: "past_due",
+            },
+          });
+        }
+        break;
+      }
+
       /* ------------------- customer.subscription.deleted ------------------- */
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
@@ -117,7 +135,7 @@ export async function POST(req: Request) {
           where: { stripeSubscriptionId: subscription.id },
           data: {
             status: "canceled",
-            plan: "FREE",
+            plan: "free",
             generationsLimit: PLANS.FREE.generationsLimit,
             stripePriceId: null,
             stripeCurrentPeriodEnd: null,
