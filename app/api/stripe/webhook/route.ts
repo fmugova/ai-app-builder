@@ -70,9 +70,9 @@ export async function POST(req: Request) {
 
       case "invoice.payment_succeeded": {
         const invoice = event.data.object as Stripe.Invoice
-        const subscriptionId = invoice.subscription
+        const subscriptionId = invoice.subscription as string | undefined
 
-        if (subscriptionId && typeof subscriptionId === 'string') {
+        if (subscriptionId) {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId)
 
           await prisma.subscription.update({
