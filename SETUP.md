@@ -100,6 +100,63 @@ npm run dev
 
 Visit [http://localhost:3000](http://localhost:3000)
 
+## Deploying to Vercel
+
+### 1. Set up a PostgreSQL Database
+
+You need a PostgreSQL database for production. Options:
+- [Vercel Postgres](https://vercel.com/docs/storage/vercel-postgres)
+- [Neon](https://neon.tech/)
+- [Supabase](https://supabase.com/)
+- [Railway](https://railway.app/)
+
+### 2. Configure Environment Variables in Vercel
+
+In your Vercel project dashboard:
+
+1. Go to **Settings** → **Environment Variables**
+2. Add all variables from `.env.example`:
+
+```
+DATABASE_URL=postgresql://...
+NEXTAUTH_SECRET=<your-secret>
+NEXTAUTH_URL=https://your-app.vercel.app
+ANTHROPIC_API_KEY=sk-ant-...
+STRIPE_SECRET_KEY=sk_...
+STRIPE_PRO_PRICE_ID=price_...
+STRIPE_ENTERPRISE_PRICE_ID=price_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+**Important:**
+- `NEXTAUTH_SECRET` - Generate with: `openssl rand -base64 32`
+- `NEXTAUTH_URL` - Must match your Vercel deployment URL
+- `DATABASE_URL` - Must be accessible from Vercel
+
+### 3. Deploy
+
+Push your code to GitHub, then:
+- Connect your repository to Vercel
+- Vercel will automatically run migrations during build
+- The build script runs: `prisma migrate deploy` automatically
+
+### 4. Verify Deployment
+
+After deployment:
+1. Check build logs for migration success
+2. Try creating an account at `/auth/signup`
+3. Check Vercel logs if errors occur
+
+### Updating Stripe Webhooks for Production
+
+1. Go to [Stripe Dashboard Webhooks](https://dashboard.stripe.com/webhooks)
+2. Create a new webhook endpoint:
+   - URL: `https://your-app.vercel.app/api/stripe/webhook`
+   - Events: Select all subscription and invoice events
+3. Copy the webhook signing secret
+4. Update `STRIPE_WEBHOOK_SECRET` in Vercel environment variables
+5. Redeploy
+
 ## Troubleshooting
 
 ### "Something went wrong" during signup

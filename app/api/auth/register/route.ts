@@ -55,8 +55,15 @@ export async function POST(req: Request) {
 
   } catch (error) {
     console.error("Registration error:", error)
+
+    // Provide more detailed error for debugging
+    const errorMessage = error instanceof Error ? error.message : "Something went wrong"
+
     return NextResponse.json(
-      { error: "Something went wrong" },
+      {
+        error: "Registration failed",
+        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+      },
       { status: 500 }
     )
   }
