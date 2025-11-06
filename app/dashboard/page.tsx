@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Sparkles, LogOut, CreditCard, Plus, Loader2 } from 'lucide-react'
+import { Sparkles, LogOut, CreditCard, Plus, Loader2, Folder, Calendar, Code2 } from 'lucide-react'
 
 export default function Dashboard() {
   const router = useRouter()
   const [subscription, setSubscription] = useState<any>(null)
+  const [projects, setProjects] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
     fetchData()
@@ -16,10 +16,18 @@ export default function Dashboard() {
 
   const fetchData = async () => {
     try {
-      const res = await fetch('/api/user/subscription')
-      if (res.ok) {
-        const data = await res.json()
+      // Fetch subscription
+      const subRes = await fetch('/api/user/subscription')
+      if (subRes.ok) {
+        const data = await subRes.json()
         setSubscription(data.subscription)
+      }
+
+      // Fetch projects
+      const projRes = await fetch('/api/projects')
+      if (projRes.ok) {
+        const data = await projRes.json()
+        setProjects(data.projects || [])
       }
     } catch (error) {
       console.error('Failed to fetch data:', error)
@@ -30,6 +38,22 @@ export default function Dashboard() {
 
   const handleSignOut = async () => {
     window.location.href = '/api/auth/signout'
+  }
+
+  const deleteProject = async (projectId: string) => {
+    if (!confirm('Delete this project?')) return
+
+    try {
+      const res = await fetch(`/api/projects?id=${projectId}`, {
+        method: 'DELETE',
+      })
+
+      if (res.ok) {
+        setProjects(projects.filter(p => p.id !== projectId))
+      }
+    } catch (error) {
+      alert('Failed to delete project')
+    }
   }
 
   if (loading) {
@@ -46,6 +70,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Header */}
       <header className="bg-white border-b border-gray-200">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -73,6 +98,7 @@ export default function Dashboard() {
       </header>
 
       <div className="container mx-auto px-4 py-8">
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white p-6 rounded-xl shadow-md">
             <div className="flex items-center justify-between mb-2">
@@ -105,39 +131,102 @@ export default function Dashboard() {
 
           <div className="bg-white p-6 rounded-xl shadow-md">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-600">Quick Actions</h3>
-              <Plus className="w-5 h-5 text-green-600" />
+              <h3 className="text-sm font-medium text-gray-600">Total Projects</h3>
+              <Folder className="w-5 h-5 text-green-600" />
             </div>
-            <button
-              onClick={() => router.push('/builder')}
-              className="mt-2 w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition"
-            >
-              New Project
-            </button>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-md p-8">
-          <div className="text-center py-12">
-            <Sparkles className="w-16 h-16 text-purple-600 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Ready to Build Something Amazing?
-            </h2>
-            <p className="text-gray-600 mb-6">
-              Start a new project or continue where you left off
+            <p className="text-2xl font-bold text-gray-900">
+              {projects.length}
             </p>
             <button
               onClick={() => router.push('/builder')}
-              className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition inline-flex items-center gap-2"
+              className="mt-4 text-sm text-green-600 hover:text-green-700 font-semibold"
             >
-              <Plus className="w-5 h-5" />
-              Create New Project
+              Create New →
             </button>
           </div>
         </div>
 
+        {/* My Projects Section */}
+        <div className="bg-white rounded-xl shadow-md p-6 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center">
+              <Folder className="w-6 h-6 mr-2 text-purple-600" />
+              My Projects
+            </h2>
+            <button
+              onClick={() => router.push('/builder')}
+              className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition inline-flex items-center gap-2"
+            >
+              <Plus className="w-5 h-5" />
+              New Project
+            </button>
+          </div>
+
+          {projects.length === 0 ? (
+            <div className="text-center py-12">
+              <Folder className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">No projects yet</h3>
+              <p className="text-gray-600 mb-6">Create your first AI-powered app!</p>
+              <button
+                onClick={() => router.push('/builder')}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition inline-flex items-center gap-2"
+              >
+                <Plus className="w-5 h-5" />
+                Create First Project
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {projects.map((project) => (
+                <div
+                  key={project.id}
+                  className="border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow cursor-pointer group"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <h3 className="font-bold text-gray-900 text-lg mb-1 group-hover:text-purple-600 transition">
+                        {project.name}
+                      </h3>
+                      <p className="text-sm text-gray-600 line-clamp-2 mb-3">
+                        {project.description}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center text-xs text-gray-500 mb-4">
+                    <Calendar className="w-4 h-4 mr-1" />
+                    {new Date(project.createdAt).toLocaleDateString()}
+                    <span className="mx-2">•</span>
+                    <span className="capitalize">{project.type}</span>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => router.push(`/builder?project=${project.id}`)}
+                      className="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition text-sm font-medium flex items-center justify-center"
+                    >
+                      <Code2 className="w-4 h-4 mr-1" />
+                      Open
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        deleteProject(project.id)
+                      }}
+                      className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition text-sm font-medium"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Usage Warning */}
         {subscription && subscription.generationsUsed >= subscription.generationsLimit && subscription.generationsLimit !== -1 && (
-          <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-xl p-6">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
             <h3 className="font-bold text-yellow-900 mb-2">Generation Limit Reached</h3>
             <p className="text-yellow-800 mb-4">
               You've used all your generations for this month. Upgrade to continue building!
