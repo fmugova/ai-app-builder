@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Sparkles, Code, Globe, Loader2, Download, Copy, Check, Save, MessageSquare, Send, X, ArrowLeft, LogOut } from 'lucide-react'
-import { saveProject as saveProjectToHistory } from '@/utils/projectHistory'
+import { saveProject as saveProjectToHistory, getProject } from '@/utils/projectHistory'
 
 const projectTypes = [
   { id: 'landing', name: 'Landing Page', icon: Globe, desc: 'Marketing or product landing page' },
@@ -35,7 +35,8 @@ const templates = [
 
 export default function Builder() {
   const router = useRouter()
-  
+  const searchParams = useSearchParams()
+
   const [step, setStep] = useState('input')
   const [projectType, setProjectType] = useState('')
   const [description, setDescription] = useState('')
@@ -49,6 +50,33 @@ export default function Builder() {
   const [chatLoading, setChatLoading] = useState(false)
   const [usage, setUsage] = useState<any>(null)
   const [projectName, setProjectName] = useState('')
+
+  // Load existing project if project ID is in URL
+  useEffect(() => {
+    const projectId = searchParams.get('project')
+    if (projectId) {
+      const project = getProject(projectId)
+      if (project) {
+        // Extract project type from the project type name
+        const typeMapping: Record<string, string> = {
+          'Landing Page': 'landing',
+          'Web App': 'webapp',
+          'Dashboard': 'dashboard',
+          'Portfolio': 'portfolio'
+        }
+
+        setProjectName(project.name)
+        setProjectType(typeMapping[project.type] || 'webapp')
+        setDescription(project.description || '')
+        setGeneratedCode(project.code || '')
+
+        // If there's code, go directly to preview
+        if (project.code) {
+          setStep('preview')
+        }
+      }
+    }
+  }, [searchParams])
 
   const generateApp = async () => {
     if (!description.trim()) {

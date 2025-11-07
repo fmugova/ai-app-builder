@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Moon, Sun, Sparkles, TrendingUp, Clock, Zap, LogOut, ChevronDown } from "lucide-react";
+import { getRecentProjects } from "@/utils/projectHistory";
 
 interface Project {
   id: string;
@@ -46,11 +47,8 @@ export default function EnhancedDashboard({
 
   // Load recent projects from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem("recentProjects");
-    if (saved) {
-      const projects = JSON.parse(saved);
-      setRecentProjects(projects.slice(0, 5)); // Show last 5 projects
-    }
+    const projects = getRecentProjects();
+    setRecentProjects(projects);
   }, []);
 
   const toggleDarkMode = () => {
@@ -257,9 +255,10 @@ export default function EnhancedDashboard({
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {recentProjects.map((project) => (
-                <div
+                <button
                   key={project.id}
-                  className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 transition-all cursor-pointer group"
+                  onClick={() => window.location.href = `/builder?project=${project.id}`}
+                  className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 transition-all cursor-pointer group text-left"
                 >
                   <div className="flex items-start justify-between mb-2">
                     <h4 className="font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
@@ -272,7 +271,7 @@ export default function EnhancedDashboard({
                   <p className="text-xs text-gray-500 dark:text-gray-500">
                     {new Date(project.createdAt).toLocaleDateString()}
                   </p>
-                </div>
+                </button>
               ))}
             </div>
           </div>
