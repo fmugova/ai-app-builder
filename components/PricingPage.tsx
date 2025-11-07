@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Check, Sparkles, Zap, Rocket, Crown } from "lucide-react";
+import { Check, Sparkles, Zap, Rocket, Crown, ArrowLeft } from "lucide-react";
 
 interface PricingTier {
   name: string;
@@ -75,20 +75,43 @@ export default function PricingPage() {
   ];
 
   const handleSelectPlan = (tier: string) => {
-    // Replace with your actual checkout/contact logic
     if (tier === "Business") {
       window.location.href = "mailto:sales@buildflow.ai?subject=Business Plan Inquiry";
     } else if (tier === "Pro") {
-      // Redirect to checkout or payment page
-      console.log("Redirect to Pro checkout");
+      // Redirect to builder to start creating with Pro trial
+      window.location.href = "/builder";
     } else {
-      // Free plan - just sign up
-      console.log("Redirect to sign up");
+      // Free plan - redirect to builder to get started
+      window.location.href = "/builder";
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
+      {/* Navigation Bar */}
+      <nav className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            {/* Logo */}
+            <a href="/dashboard" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
+              <Sparkles className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+              <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
+                Buildflow
+              </span>
+            </a>
+
+            {/* Back to Dashboard */}
+            <a
+              href="/dashboard"
+              className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              Back to Dashboard
+            </a>
+          </div>
+        </div>
+      </nav>
+
       {/* Header */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16 text-center">
         <div className="inline-flex items-center space-x-2 bg-blue-100 dark:bg-blue-900/30 px-4 py-2 rounded-full mb-6">
