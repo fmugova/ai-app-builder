@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Sparkles, Code, Globe, Loader2, Download, Copy, Check, Save, MessageSquare, Send, X, ArrowLeft } from 'lucide-react'
+import { saveProject as saveProjectToHistory } from '@/utils/projectHistory'
 
 const projectTypes = [
   { id: 'landing', name: 'Landing Page', icon: Globe, desc: 'Marketing or product landing page' },
@@ -79,7 +80,24 @@ export default function Builder() {
       setUsage(data.usage)
       setChatMessages([])
       setStep('preview')
-      setProjectName(`${projectType} - ${new Date().toLocaleDateString()}`)
+      
+      const generatedProjectName = `${projectTypes.find(t => t.id === projectType)?.name} - ${new Date().toLocaleDateString()}`
+      setProjectName(generatedProjectName)
+      
+      // 🆕 AUTO-SAVE TO PROJECT HISTORY
+      try {
+        const savedProject = saveProjectToHistory({
+          name: generatedProjectName,
+          type: projectTypes.find(t => t.id === projectType)?.name as any || 'Web App',
+          description: description.substring(0, 200), // First 200 chars
+          code: data.code,
+        })
+        console.log('✅ Project auto-saved to history:', savedProject.id)
+      } catch (saveError) {
+        console.error('Failed to save to history:', saveError)
+        // Don't stop the flow if history save fails
+      }
+      
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate code')
       setStep('input')
@@ -117,6 +135,20 @@ export default function Builder() {
       setGeneratedCode(data.code)
       setUsage(data.usage)
       setChatMessages(prev => [...prev, { role: 'assistant', content: 'Code updated successfully! ✨' }])
+      
+      // 🆕 UPDATE PROJECT HISTORY AFTER REFINEMENT
+      try {
+        saveProjectToHistory({
+          name: projectName,
+          type: projectTypes.find(t => t.id === projectType)?.name as any || 'Web App',
+          description: description.substring(0, 200),
+          code: data.code,
+        })
+        console.log('✅ Project updated in history after refinement')
+      } catch (saveError) {
+        console.error('Failed to update history:', saveError)
+      }
+      
     } catch (err) {
       setChatMessages(prev => [...prev, { 
         role: 'assistant', 
@@ -131,6 +163,7 @@ export default function Builder() {
     if (!generatedCode) return
 
     try {
+      // Save to your database
       const res = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -144,7 +177,15 @@ export default function Builder() {
 
       if (!res.ok) throw new Error('Save failed')
 
-      alert('Project saved successfully!')
+      // 🆕 ALSO SAVE TO LOCAL HISTORY
+      saveProjectToHistory({
+        name: projectName,
+        type: projectTypes.find(t => t.id === projectType)?.name as any || 'Web App',
+        description: description.substring(0, 200),
+        code: generatedCode,
+      })
+
+      alert('Project saved successfully! 💾')
     } catch (err) {
       alert('Failed to save project')
     }
