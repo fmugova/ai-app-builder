@@ -12,7 +12,7 @@ export interface Project {
   templateUsed?: string;
 }
 
-const STORAGE_KEY = "shipfast_projects";
+const STORAGE_KEY = "buildflow_projects";
 const RECENT_PROJECTS_KEY = "recentProjects";
 
 /**

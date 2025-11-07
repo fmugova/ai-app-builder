@@ -65,9 +65,9 @@ export default function EnhancedDashboard({
 
   const handleNewProject = () => {
     setIsLoading(true);
-    // Simulate navigation - replace with your actual navigation logic
+    // Navigate to builder page
     setTimeout(() => {
-      window.location.href = "/new-project";
+      window.location.href = "/builder";
     }, 500);
   };
 
@@ -127,9 +127,9 @@ export default function EnhancedDashboard({
             >
               ×
             </button>
-            <h2 className="text-2xl font-bold mb-2">Welcome to ShipFast! 🚀</h2>
+            <h2 className="text-2xl font-bold mb-2">Welcome to Buildflow! 🚀</h2>
             <p className="text-white/90">
-              Create production-ready code in minutes. Start building your next project now.
+              Create production-ready code in minutes with AI-powered generation, automatic saving, and project history. Start building your next project now.
             </p>
           </div>
         )}
