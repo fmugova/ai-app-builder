@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Moon, Sun, Sparkles, TrendingUp, Clock, Zap } from "lucide-react";
+import { Moon, Sun, Sparkles, TrendingUp, Clock, Zap, LogOut, ChevronDown } from "lucide-react";
 
 interface Project {
   id: string;
@@ -31,6 +31,7 @@ export default function EnhancedDashboard({
   const [isLoading, setIsLoading] = useState(false);
   const [recentProjects, setRecentProjects] = useState<Project[]>([]);
   const [showWelcome, setShowWelcome] = useState(true);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   // Load theme preference
   useEffect(() => {
@@ -71,6 +72,17 @@ export default function EnhancedDashboard({
     }, 500);
   };
 
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/signout", {
+        method: "POST",
+      });
+      window.location.href = "/auth/signin";
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+
   const generationsRemaining = generationsLimit - generationsUsed;
   const usagePercentage = (generationsUsed / generationsLimit) * 100;
 
@@ -103,13 +115,42 @@ export default function EnhancedDashboard({
                   <Moon className="w-5 h-5 text-gray-600" />
                 )}
               </button>
-              <div className="flex items-center space-x-3">
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  Welcome back!
-                </span>
-                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold">
-                  {user?.name?.[0]?.toUpperCase() || "U"}
-                </div>
+
+              {/* User Menu */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center space-x-3 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg px-3 py-2 transition-colors"
+                >
+                  <span className="text-sm text-gray-600 dark:text-gray-400 hidden sm:block">
+                    {user?.name || "Welcome back!"}
+                  </span>
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold">
+                    {user?.name?.[0]?.toUpperCase() || "U"}
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-gray-600 dark:text-gray-400 hidden sm:block" />
+                </button>
+
+                {/* Dropdown Menu */}
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-2 z-50">
+                    <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {user?.name || "User"}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {user?.email || "user@buildflow.ai"}
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Sign Out
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

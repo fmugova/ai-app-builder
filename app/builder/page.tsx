@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Sparkles, Code, Globe, Loader2, Download, Copy, Check, Save, MessageSquare, Send, X, ArrowLeft } from 'lucide-react'
+import { Sparkles, Code, Globe, Loader2, Download, Copy, Check, Save, MessageSquare, Send, X, ArrowLeft, LogOut } from 'lucide-react'
 import { saveProject as saveProjectToHistory } from '@/utils/projectHistory'
 
 const projectTypes = [
@@ -217,6 +217,17 @@ export default function Builder() {
     setProjectName('')
   }
 
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/signout", {
+        method: "POST",
+      });
+      window.location.href = "/auth/signin";
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+
   if (step === 'generating') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex items-center justify-center p-4">
@@ -282,6 +293,13 @@ export default function Builder() {
                 className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition flex items-center gap-2"
               >
                 <Download className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition flex items-center gap-2"
+                title="Sign Out"
+              >
+                <LogOut className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -370,8 +388,15 @@ export default function Builder() {
               AI App Builder
             </h1>
           </div>
-          
-          <div className="w-32"></div>
+
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            title="Sign Out"
+          >
+            <LogOut className="w-5 h-5" />
+            <span className="hidden sm:inline">Sign Out</span>
+          </button>
         </div>
 
         {!projectType ? (
