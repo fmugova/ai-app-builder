@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Sparkles, Code, Globe, Loader2, Download, Copy, Check, Save, MessageSquare, Send, X, ArrowLeft, LogOut } from 'lucide-react'
 import { saveProject as saveProjectToHistory, getProject } from '@/utils/projectHistory'
@@ -33,7 +33,7 @@ const templates = [
   },
 ]
 
-export default function Builder() {
+function BuilderContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -108,10 +108,10 @@ export default function Builder() {
       setUsage(data.usage)
       setChatMessages([])
       setStep('preview')
-      
+
       const generatedProjectName = `${projectTypes.find(t => t.id === projectType)?.name} - ${new Date().toLocaleDateString()}`
       setProjectName(generatedProjectName)
-      
+
       // 🆕 AUTO-SAVE TO PROJECT HISTORY
       try {
         const savedProject = saveProjectToHistory({
@@ -125,7 +125,7 @@ export default function Builder() {
         console.error('Failed to save to history:', saveError)
         // Don't stop the flow if history save fails
       }
-      
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate code')
       setStep('input')
@@ -163,7 +163,7 @@ export default function Builder() {
       setGeneratedCode(data.code)
       setUsage(data.usage)
       setChatMessages(prev => [...prev, { role: 'assistant', content: 'Code updated successfully! ✨' }])
-      
+
       // 🆕 UPDATE PROJECT HISTORY AFTER REFINEMENT
       try {
         saveProjectToHistory({
@@ -176,11 +176,11 @@ export default function Builder() {
       } catch (saveError) {
         console.error('Failed to update history:', saveError)
       }
-      
+
     } catch (err) {
-      setChatMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: `Error: ${err instanceof Error ? err.message : 'Update failed'}` 
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `Error: ${err instanceof Error ? err.message : 'Update failed'}`
       }])
     } finally {
       setChatLoading(false)
@@ -258,9 +258,9 @@ export default function Builder() {
 
   if (step === 'generating') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 flex items-center justify-center p-4">
         <div className="text-center">
-          <Loader2 className="w-16 h-16 text-purple-600 animate-spin mx-auto mb-4" />
+          <Loader2 className="w-16 h-16 text-primary-600 animate-spin mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Creating Your {projectType}...</h2>
           <p className="text-gray-600">Claude is writing beautiful code for you</p>
         </div>
@@ -280,13 +280,13 @@ export default function Builder() {
               >
                 <ArrowLeft className="w-5 h-5 text-gray-600" />
               </button>
-              <Sparkles className="w-6 h-6 text-purple-600" />
+              <Sparkles className="w-6 h-6 text-primary-600" />
               <div>
                 <input
                   type="text"
                   value={projectName}
                   onChange={(e) => setProjectName(e.target.value)}
-                  className="text-xl font-bold text-gray-800 border-0 focus:outline-none focus:ring-2 focus:ring-purple-500 rounded px-2"
+                  className="text-xl font-bold text-gray-800 border-0 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded px-2"
                 />
                 {usage && (
                   <p className="text-xs text-gray-500">
@@ -298,14 +298,14 @@ export default function Builder() {
             <div className="flex gap-2">
               <button
                 onClick={() => setShowChat(!showChat)}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition flex items-center gap-2"
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition flex items-center gap-2"
               >
                 <MessageSquare className="w-4 h-4" />
                 AI Chat
               </button>
               <button
                 onClick={saveProject}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-2"
+                className="px-4 py-2 bg-success-600 text-white rounded-lg hover:bg-success-700 transition flex items-center gap-2"
               >
                 <Save className="w-4 h-4" />
                 Save
@@ -324,14 +324,14 @@ export default function Builder() {
               </button>
               <button
                 onClick={handleLogout}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition flex items-center gap-2"
+                className="px-4 py-2 bg-error-600 text-white rounded-lg hover:bg-error-700 transition flex items-center gap-2"
                 title="Sign Out"
               >
                 <LogOut className="w-4 h-4" />
               </button>
             </div>
           </div>
-          
+
           <div className="flex-1 overflow-auto p-4">
             <div className="bg-gray-900 rounded-lg p-6 overflow-auto">
               <pre className="text-sm text-green-400 font-mono whitespace-pre-wrap break-words">
@@ -349,7 +349,7 @@ export default function Builder() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="flex-1 overflow-auto p-4 space-y-3">
               {chatMessages.length === 0 ? (
                 <div className="text-center text-gray-500 mt-8">
@@ -359,7 +359,7 @@ export default function Builder() {
                 </div>
               ) : (
                 chatMessages.map((msg, i) => (
-                  <div key={i} className={`p-3 rounded-lg ${msg.role === 'user' ? 'bg-purple-100 ml-4' : 'bg-gray-100 mr-4'}`}>
+                  <div key={i} className={`p-3 rounded-lg ${msg.role === 'user' ? 'bg-primary-100 ml-4' : 'bg-gray-100 mr-4'}`}>
                     <p className="text-sm text-gray-800">{msg.content}</p>
                   </div>
                 ))
@@ -380,13 +380,13 @@ export default function Builder() {
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
                   placeholder="Ask for changes..."
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-purple-500"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500"
                   disabled={chatLoading}
                 />
                 <button
                   onClick={sendChatMessage}
                   disabled={chatLoading || !chatInput.trim()}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50"
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition disabled:opacity-50"
                 >
                   <Send className="w-4 h-4" />
                 </button>
@@ -399,7 +399,7 @@ export default function Builder() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 p-4">
       <div className="max-w-6xl mx-auto">
         <div className="mb-8 flex items-center justify-between">
           <button
@@ -409,17 +409,17 @@ export default function Builder() {
             <ArrowLeft className="w-5 h-5" />
             Back to Dashboard
           </button>
-          
+
           <div className="flex items-center gap-3">
-            <Sparkles className="w-10 h-10 text-purple-600" />
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+            <Sparkles className="w-10 h-10 text-primary-600" />
+            <h1 className="text-3xl font-bold text-gradient">
               AI App Builder
             </h1>
           </div>
 
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-error-600 hover:bg-error-50 rounded-lg transition-colors"
             title="Sign Out"
           >
             <LogOut className="w-5 h-5" />
@@ -439,9 +439,9 @@ export default function Builder() {
                   <button
                     key={type.id}
                     onClick={() => setProjectType(type.id)}
-                    className="bg-white p-6 rounded-xl shadow-md hover:shadow-xl transition-all border-2 border-transparent hover:border-purple-500 text-left group"
+                    className="bg-white p-6 rounded-xl shadow-md hover:shadow-xl transition-all border-2 border-transparent hover:border-primary-500 text-left group"
                   >
-                    <Icon className="w-10 h-10 text-purple-600 mb-3 group-hover:scale-110 transition-transform" />
+                    <Icon className="w-10 h-10 text-primary-600 mb-3 group-hover:scale-110 transition-transform" />
                     <h3 className="text-xl font-bold text-gray-800 mb-2">{type.name}</h3>
                     <p className="text-gray-600">{type.desc}</p>
                   </button>
@@ -459,7 +459,7 @@ export default function Builder() {
                       setProjectType(template.type)
                       setDescription(template.description)
                     }}
-                    className="bg-gradient-to-br from-purple-50 to-blue-50 p-4 rounded-lg text-left hover:shadow-lg transition border-2 border-transparent hover:border-purple-500"
+                    className="bg-gradient-to-br from-primary-50 to-secondary-50 p-4 rounded-lg text-left hover:shadow-lg transition border-2 border-transparent hover:border-primary-500"
                   >
                     <h4 className="font-bold text-gray-800 mb-2">{template.name}</h4>
                     <p className="text-sm text-gray-600 line-clamp-2">{template.description}</p>
@@ -491,11 +491,11 @@ export default function Builder() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Example: Create a modern fitness tracking dashboard with a dark theme. Include charts for workout progress, a calendar view for scheduled workouts, and cards showing weekly stats. Use blue and purple accents..."
-              className="w-full h-48 p-4 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none resize-none text-gray-800"
+              className="w-full h-48 p-4 border-2 border-gray-300 rounded-lg focus:border-primary-500 focus:outline-none resize-none text-gray-800"
             />
 
             {error && (
-              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+              <div className="mt-4 p-4 bg-error-50 border border-error-200 rounded-lg text-error-700">
                 {error}
               </div>
             )}
@@ -503,7 +503,7 @@ export default function Builder() {
             <button
               onClick={generateApp}
               disabled={loading}
-              className="mt-6 w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-4 rounded-lg font-semibold text-lg hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="mt-6 w-full gradient-primary text-white py-4 rounded-lg font-semibold text-lg hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
             >
               {loading ? (
                 <>
@@ -521,5 +521,24 @@ export default function Builder() {
         )}
       </div>
     </div>
+  )
+}
+
+function BuilderLoading() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 flex items-center justify-center">
+      <div className="text-center">
+        <Loader2 className="w-12 h-12 text-primary-600 animate-spin mx-auto mb-4" />
+        <p className="text-gray-600">Loading builder...</p>
+      </div>
+    </div>
+  )
+}
+
+export default function Builder() {
+  return (
+    <Suspense fallback={<BuilderLoading />}>
+      <BuilderContent />
+    </Suspense>
   )
 }
