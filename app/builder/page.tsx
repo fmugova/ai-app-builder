@@ -247,10 +247,8 @@ function BuilderContent() {
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/auth/signout", {
-        method: "POST",
-      });
-      window.location.href = "/auth/signin";
+      const { handleSignOut } = await import("@/app/actions/auth");
+      await handleSignOut();
     } catch (error) {
       console.error("Logout failed:", error);
     }
