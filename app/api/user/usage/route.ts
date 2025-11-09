@@ -1,7 +1,7 @@
 export const runtime = 'nodejs'; // Force Node.js runtime instead of Edge
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/db';
 
 export async function GET() {
   try {
