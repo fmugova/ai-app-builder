@@ -15,7 +15,7 @@ import {
 interface AnalyticsData {
   totalProjects: number;
   totalGenerations: number;
-  avgGenerationsPerDay: number;
+  avgGenerationsPerDay: number | string;  // Can be number or string from API
   mostUsedProjectType: string;
   dailyActivity: Array<{ date: string; count: number }>;
   projectsByType: Array<{ type: string; count: number }>;
@@ -114,6 +114,11 @@ export default function AnalyticsDashboard({ userId }: AnalyticsDashboardProps) 
 
   const maxActivity = Math.max(...analytics.dailyActivity.map((d) => d.count));
 
+  // Format avgGenerationsPerDay properly
+  const formattedAvg = typeof analytics.avgGenerationsPerDay === 'number' 
+    ? analytics.avgGenerationsPerDay.toFixed(1)
+    : analytics.avgGenerationsPerDay;
+
   return (
     <div className="space-y-6">
       {/* Time Range Selector */}
@@ -161,7 +166,7 @@ export default function AnalyticsDashboard({ userId }: AnalyticsDashboardProps) 
           <div className="flex items-center justify-between mb-2">
             <TrendingUp className="w-8 h-8 opacity-80" />
             <span className="text-2xl font-bold">
-              {analytics.avgGenerationsPerDay.toFixed(1)}
+              {formattedAvg}
             </span>
           </div>
           <p className="text-green-100 text-sm font-medium">Avg. per Day</p>
