@@ -1,33 +1,29 @@
+/* Tailwind directives */
+/* @import directives must come first */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Custom animations */
-@keyframes slide-up {
-  from {
-    transform: translateY(100%);
-    opacity: 0;
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
   }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
 }
 
-.animate-slide-up {
-  animation: slide-up 0.3s ease-out;
-}
-
-/* Dark mode support */
-.dark {
-  color-scheme: dark;
-}
-
-/* Ensure proper styling */
-* {
-  box-sizing: border-box;
-}
-
-html {
-  scroll-behavior: smooth;
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
 }
