@@ -1,3 +1,4 @@
+export const runtime = 'nodejs'; // Force Node.js runtime instead of Edge
 import { NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/db"

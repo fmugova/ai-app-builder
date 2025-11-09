@@ -2,6 +2,9 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 
+// Force Node.js runtime (required for bcryptjs used in auth)
+export const runtime = 'nodejs'
+
 export async function GET(req: Request) {
   try {
     const session = await auth()
