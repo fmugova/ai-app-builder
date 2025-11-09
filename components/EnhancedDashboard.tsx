@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { 
-  Moon, Sun, Sparkles, TrendingUp, Clock, Zap, 
-  Trash2, Share2, Edit, BarChart3, Shield, 
-  Eye, History, CheckSquare, Square, Trash, X
+import { signOut } from "next-auth/react";
+import {
+  Moon, Sun, Sparkles, TrendingUp, Clock, Zap,
+  Trash2, Share2, Edit, BarChart3, Shield,
+  Eye, History, CheckSquare, Square, Trash, X, LogOut
 } from "lucide-react";
 import ProjectSharingModal from "./ProjectSharingModal";
 import VersionHistoryModal from "./VersionHistoryModal";
@@ -226,7 +227,16 @@ export default function EnhancedDashboard({
                   <Moon className="w-5 h-5 text-gray-600" />
                 )}
               </button>
-              
+
+              <button
+                onClick={() => signOut({ callbackUrl: '/' })}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
+                title="Logout"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">Logout</span>
+              </button>
+
               <div className="flex items-center space-x-3">
                 <div className="text-right">
                   <p className="text-sm font-medium text-gray-900 dark:text-white">
