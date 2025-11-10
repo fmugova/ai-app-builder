@@ -10,7 +10,7 @@ export default function SignIn() {
           <Link href="/" className="inline-flex items-center gap-2 mb-6">
             <Sparkles className="w-10 h-10 text-purple-600" />
             <span className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-              AI App Builder
+              BuildFlow
             </span>
           </Link>
           <h1 className="text-2xl font-bold text-gray-900 mt-4">Welcome Back</h1>

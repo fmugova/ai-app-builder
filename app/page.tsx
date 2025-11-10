@@ -9,7 +9,7 @@ export default function Home() {
           <div className="flex items-center gap-2">
             <Sparkles className="w-8 h-8 text-purple-600" />
             <span className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-              AI App Builder
+              BuildFlow
             </span>
           </div>
           <div className="flex items-center gap-4">
@@ -144,7 +144,7 @@ export default function Home() {
 
       <footer className="container mx-auto px-4 py-8 border-t border-gray-200">
         <div className="text-center text-gray-600">
-          <p>© 2025 AI App Builder. All rights reserved.</p>
+          <p>© 2025 BuildFlow. All rights reserved.</p>
         </div>
       </footer>
     </div>

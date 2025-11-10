@@ -194,7 +194,7 @@ export default function EnhancedDashboard({
             <div className="flex items-center space-x-2">
               <Sparkles className="w-8 h-8 text-blue-600 dark:text-blue-400" />
               <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
-                AI App Builder
+                BuildFlow
               </span>
             </div>
 
@@ -302,7 +302,7 @@ export default function EnhancedDashboard({
             >
               ×
             </button>
-            <h2 className="text-2xl font-bold mb-2">Welcome to AI App Builder! 🚀</h2>
+            <h2 className="text-2xl font-bold mb-2">Welcome to BuildFlow! 🚀</h2>
             <p className="text-white/90">
               Create production-ready code in minutes. Start building your next project now.
             </p>
@@ -604,7 +604,7 @@ export default function EnhancedDashboard({
       {/* Footer */}
       <footer className="border-t border-gray-200 dark:border-gray-800 mt-12 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm text-gray-600 dark:text-gray-400">
-          <p>AI App Builder - Build Beautiful Apps with AI</p>
+          <p>BuildFlow - Build Beautiful Apps with AI</p>
         </div>
       </footer>
     </div>

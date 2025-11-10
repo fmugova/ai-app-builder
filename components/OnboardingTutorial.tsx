@@ -17,7 +17,7 @@ export default function OnboardingTutorial() {
 
   useEffect(() => {
     // Check if user has completed onboarding
-    const completed = localStorage.getItem("shipfast_onboarding_completed");
+    const completed = localStorage.getItem("buildflow_onboarding_completed");
     if (!completed) {
       // Show onboarding after a brief delay
       setTimeout(() => setIsOpen(true), 1000);
@@ -28,7 +28,7 @@ export default function OnboardingTutorial() {
 
   const steps: OnboardingStep[] = [
     {
-      title: "Welcome to ShipFast! 🚀",
+      title: "Welcome to BuildFlow! 🚀",
       description: "Build and deploy production-ready code in minutes. Let's get you started with a quick tour.",
       icon: <Sparkles className="w-12 h-12 text-white" />,
     },
@@ -64,7 +64,7 @@ export default function OnboardingTutorial() {
   };
 
   const handleComplete = () => {
-    localStorage.setItem("shipfast_onboarding_completed", "true");
+    localStorage.setItem("buildflow_onboarding_completed", "true");
     setHasCompletedOnboarding(true);
     setIsOpen(false);
   };

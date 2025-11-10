@@ -367,7 +367,7 @@ export default function Builder() {
           <div className="flex items-center gap-3">
             <Sparkles className="w-10 h-10 text-purple-600" />
             <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-              AI App Builder
+              BuildFlow
             </h1>
           </div>
           
