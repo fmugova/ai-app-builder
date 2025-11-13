@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { hash } from "bcryptjs";
+import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(req: Request) {
@@ -34,25 +34,14 @@ export async function POST(req: Request) {
     }
 
     // Hash password
-    const hashedPassword = await hash(password, 12);
+    const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create user with subscription data
+    // Create user
     const user = await prisma.user.create({
       data: {
         email,
         name: name || email.split("@")[0],
         password: hashedPassword,
-      },
-    });
-
-    // Create default subscription (Free tier)
-    await prisma.subscription.create({
-      data: {
-        userId: user.id,
-        plan: "FREE",
-        status: "active",
-        currentPeriodStart: new Date(),
-        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
       },
     });
 
