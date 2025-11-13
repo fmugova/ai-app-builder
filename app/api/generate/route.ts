@@ -1,141 +1,130 @@
-export const runtime = 'nodejs'; // Force Node.js runtime instead of Edge
-import { NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
-import { prisma } from "@/lib/db"
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { prisma } from "@/lib/prisma";
+import Anthropic from "@anthropic-ai/sdk";
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
 
 export async function POST(req: Request) {
   try {
-    const session = await auth()
+    const session = await getServerSession(authOptions);
 
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const subscription = await prisma.subscription.findUnique({
-      where: { userId: session.user.id }
-    })
+    const { prompt, type } = await req.json();
 
-    if (!subscription) {
+    if (!prompt) {
       return NextResponse.json(
-        { error: "No subscription found" },
+        { error: "Prompt is required" },
         { status: 400 }
-      )
+      );
     }
 
-    if (subscription.generationsLimit !== -1 && 
-        subscription.generationsUsed >= subscription.generationsLimit) {
-      return NextResponse.json(
-        { 
-          error: "Generation limit reached",
-          limit: subscription.generationsLimit,
-          used: subscription.generationsUsed,
-          plan: subscription.plan
+    // Get user with subscription and count recent generations
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      include: {
+        subscription: true,
+        generations: {
+          where: {
+            createdAt: {
+              gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days
+            },
+          },
         },
-        { status: 403 }
-      )
-    }
-
-    const { projectType, description, existingCode, refinement } = await req.json()
-
-    if (!projectType || !description) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      )
-    }
-
-    let prompt = ""
-    if (existingCode && refinement) {
-      prompt = `You are helping refine a React component. Here's the current code:
-
-\`\`\`jsx
-${existingCode}
-\`\`\`
-
-User request: ${refinement}
-
-Please provide the complete updated React component code. Return ONLY the code, no explanations. Start directly with imports.`
-    } else {
-      prompt = `Create a complete, production-ready ${projectType} based on this description: ${description}
-
-Requirements:
-- Use React with hooks for interactivity
-- Use Tailwind CSS for styling with modern, beautiful design
-- Make it fully functional, not a placeholder
-- Include smooth animations and transitions
-- Ensure responsive design for all screen sizes
-- Use modern UI patterns and best practices
-- Make it visually impressive with attention to detail
-- Add meaningful interactivity and user feedback
-- CRITICAL: Never use localStorage or sessionStorage - use React state only
-
-Return ONLY the complete React component code, nothing else. Start directly with imports.`
-    }
-
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY!,
-        'anthropic-version': '2023-06-01'
       },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
-        messages: [
-          { role: 'user', content: prompt }
-        ],
-      }),
-    })
+    });
 
-    if (!response.ok) {
-      throw new Error(`Anthropic API error: ${response.statusText}`)
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const data = await response.json()
-    
-    if (!data.content || !data.content[0] || !data.content[0].text) {
-      throw new Error('No code generated')
+    // Define limits per plan
+    const planLimits: Record<string, number> = {
+      FREE: 3,
+      PRO: 999999, // Unlimited
+      BUSINESS: 999999, // Unlimited
+    };
+
+    const plan = user.subscription?.plan || "FREE";
+    const limit = planLimits[plan] || 3;
+    const used = user.generations.length;
+
+    // Check if user has exceeded their limit
+    if (used >= limit) {
+      return NextResponse.json(
+        {
+          error: "Generation limit reached",
+          message: `You have reached your monthly limit of ${limit} generations. Please upgrade your plan.`,
+          limit,
+          used,
+        },
+        { status: 429 }
+      );
     }
 
-    let code = data.content[0].text
-    code = code.replace(/```(?:jsx|javascript|react)?\n?/g, '').replace(/```$/g, '').trim()
+    // Generate code with Claude
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 4096,
+      messages: [
+        {
+          role: "user",
+          content: `Generate a complete, production-ready ${type} based on this description: ${prompt}
+          
+          Requirements:
+          - Use modern React with TypeScript
+          - Include Tailwind CSS for styling
+          - Make it responsive and beautiful
+          - Add proper error handling
+          - Include comments explaining the code
+          - Make it a complete, working component
+          
+          Return ONLY the complete code, no explanations before or after.`,
+        },
+      ],
+    });
 
-    await prisma.subscription.update({
-      where: { userId: session.user.id },
-      data: {
-        generationsUsed: subscription.generationsUsed + 1
-      }
-    })
+    const generatedCode = message.content[0].type === "text" 
+      ? message.content[0].text 
+      : "";
 
+    // Save generation to database
     await prisma.generation.create({
       data: {
-        userId: session.user.id,
-        projectType,
-        description,
-        tokensUsed: data.usage?.output_tokens || 0
-      }
-    })
+        userId: user.id,
+        prompt,
+        response: generatedCode,
+        type: type || "web-app",
+      },
+    });
 
-    return NextResponse.json({ 
-      code,
+    return NextResponse.json({
+      code: generatedCode,
       usage: {
-        used: subscription.generationsUsed + 1,
-        limit: subscription.generationsLimit,
-        remaining: subscription.generationsLimit === -1 
-          ? -1 
-          : subscription.generationsLimit - (subscription.generationsUsed + 1)
-      }
-    })
-
+        used: used + 1,
+        limit,
+        remaining: limit - (used + 1),
+      },
+    });
   } catch (error) {
-    console.error("Generation error:", error)
+    console.error("Generation error:", error);
+    
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to generate code" },
+      { error: "Failed to generate code" },
       { status: 500 }
-    )
+    );
   }
 }
