@@ -148,3 +148,4 @@ model AnalyticsEvent {
   @@index([createdAt])
   @@index([event])
 }
+
