@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -7,12 +7,37 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+async function getUserFromSession() {
+  try {
+    const cookieStore = await cookies();  // ← Added await
+    const sessionToken = cookieStore.get("next-auth.session-token") || 
+                         cookieStore.get("__Secure-next-auth.session-token");
+    
+    if (!sessionToken) {
+      return null;
+    }
+
+    const session = await prisma.session.findUnique({
+      where: { sessionToken: sessionToken.value },
+      include: { user: true },
+    });
+
+    if (!session || session.expires < new Date()) {
+      return null;
+    }
+
+    return session.user;
+  } catch (error) {
+    console.error("Error getting user from session:", error);
+    return null;
+  }
+}
+
 export async function POST(req: Request) {
   try {
-    // Get session - adjust this based on your auth setup
-    const session = await getServerSession();
+    const user = await getUserFromSession();
 
-    if (!session?.user?.email) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -25,37 +50,34 @@ export async function POST(req: Request) {
       );
     }
 
-    // Get user with subscription and count recent generations
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+    const userWithData = await prisma.user.findUnique({
+      where: { id: user.id },
       include: {
         subscription: true,
         generations: {
           where: {
             createdAt: {
-              gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days
+              gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
             },
           },
         },
       },
     });
 
-    if (!user) {
+    if (!userWithData) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Define limits per plan
     const planLimits: Record<string, number> = {
       FREE: 3,
-      PRO: 999999, // Unlimited
-      BUSINESS: 999999, // Unlimited
+      PRO: 999999,
+      BUSINESS: 999999,
     };
 
-    const plan = user.subscription?.plan || "FREE";
+    const plan = userWithData.subscription?.plan || "FREE";
     const limit = planLimits[plan] || 3;
-    const used = user.generations.length;
+    const used = userWithData.generations.length;
 
-    // Check if user has exceeded their limit
     if (used >= limit) {
       return NextResponse.json(
         {
@@ -68,7 +90,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Generate code with Claude
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 4096,
@@ -94,10 +115,9 @@ export async function POST(req: Request) {
       ? message.content[0].text 
       : "";
 
-    // Save generation to database
     await prisma.generation.create({
       data: {
-        userId: user.id,
+        userId: userWithData.id,
         prompt,
         response: generatedCode,
         type: type || "web-app",
