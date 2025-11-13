@@ -356,7 +356,7 @@ export default function EnhancedDashboard() {
         {/* Analytics Dashboard */}
         {showAnalytics && (
           <div className="mb-8">
-            <AnalyticsDashboard userId={session?.user?.email} />
+            <AnalyticsDashboard userId={session?.user?.email || undefined} />
           </div>
         )}
 
