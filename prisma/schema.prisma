@@ -20,12 +20,25 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts      Account[]
-  sessions      Session[]
-  projects      Project[]
-  generations   Generation[]
-  subscription  Subscription?
+  // Teacher-specific fields
+  school        String?
+  subjectsTaught String?   @db.Text // JSON array of subjects
+  yearGroups    String?   @db.Text // JSON array of year groups
+
+  accounts        Account[]
+  sessions        Session[]
+  projects        Project[]
+  generations     Generation[]
+  subscription    Subscription?
   analyticsEvents AnalyticsEvent[]
+
+  // Teacher-specific relations
+  students        Student[]
+  timetableEntries TimetableEntry[]
+  lessonPlans     LessonPlan[]
+  communications  Communication[]
+  tasks           Task[]
+  interventions   Intervention[]
 
   @@index([email])
 }
@@ -147,5 +160,197 @@ model AnalyticsEvent {
   @@index([userId])
   @@index([createdAt])
   @@index([event])
+}
+
+// ============================================
+// TEACHER'S DIGITAL PLANNER MODELS
+// ============================================
+
+model Student {
+  id              String   @id @default(cuid())
+  userId          String
+  name            String
+  yearGroup       Int
+  subjects        String   @db.Text // JSON array of subjects
+  senStatus       Boolean  @default(false)
+  ealStatus       Boolean  @default(false)
+  pupilPremium    Boolean  @default(false)
+  priorAttainment String?  // e.g., "KS2 Level 5"
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assessments    Assessment[]
+  communications Communication[]
+  interventions  InterventionStudent[]
+
+  @@index([userId])
+  @@index([yearGroup])
+}
+
+model TimetableEntry {
+  id           String   @id @default(cuid())
+  userId       String
+  day          String   // Monday, Tuesday, etc.
+  period       Int
+  startTime    String   // "09:00"
+  endTime      String   // "10:00"
+  subject      String
+  yearGroup    String   // "Year 11"
+  classCode    String   // "11MA1"
+  room         String?
+  studentCount Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([day])
+}
+
+model Assessment {
+  id              String   @id @default(cuid())
+  studentId       String
+  subject         String
+  assessmentType  String   // "Mock 1", "Mock 2", "Topic Test", etc.
+  date            DateTime
+  score           Float?   // Raw score
+  grade           String?  // GCSE grade (1-9) or A-Level (A*, A, B, etc.)
+  targetGrade     String?
+  predictedGrade  String?
+  topicBreakdown  String?  @db.Text // JSON object of topic scores
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([subject])
+  @@index([date])
+}
+
+model LessonPlan {
+  id          String   @id @default(cuid())
+  userId      String
+  subject     String
+  topic       String
+  yearGroup   String
+  classCode   String?
+  date        DateTime?
+  duration    Int?     // minutes
+  objectives  String   @db.Text // JSON array
+  activities  String   @db.Text // JSON array
+  resources   String?  @db.Text // JSON array
+  differentiation String? @db.Text
+  assessment  String?  @db.Text
+  homework    String?  @db.Text
+  reflection  String?  @db.Text
+  specPoints  String?  @db.Text // Specification points covered
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([subject])
+  @@index([date])
+}
+
+model Communication {
+  id              String   @id @default(cuid())
+  userId          String
+  studentId       String?
+  type            String   // "email", "phone", "meeting", etc.
+  category        String   // "academic", "pastoral", "behavioral", "achievement"
+  subject         String?
+  content         String   @db.Text
+  date            DateTime @default(now())
+  followUpDate    DateTime?
+  followUpCompleted Boolean @default(false)
+  responseReceived Boolean @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  student Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([studentId])
+  @@index([type])
+  @@index([category])
+  @@index([date])
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  description String?  @db.Text
+  category    String   // "Planning", "Marking", "Administrative", "CPD", "Pastoral"
+  priority    String   // "Urgent", "Important", "Normal", "Low"
+  dueDate     DateTime?
+  completed   Boolean  @default(false)
+  completedAt DateTime?
+  recurring   Boolean  @default(false)
+  recurringPattern String? // "weekly", "monthly", etc.
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([dueDate])
+  @@index([completed])
+  @@index([category])
+}
+
+model Intervention {
+  id                String   @id @default(cuid())
+  userId            String
+  name              String
+  focusArea         String   // "Algebra", "Exam Technique", etc.
+  subject           String
+  yearGroup         String
+  targetGrade       String?  // e.g., "4/5 borderline"
+  startDate         DateTime
+  endDate           DateTime?
+  schedule          String?  @db.Text // Weekly schedule description
+  resources         String?  @db.Text // JSON array of resource links
+  objectives        String?  @db.Text // JSON array
+  sessionNotes      String?  @db.Text // JSON array of session logs
+  effectivenessScore Float?  // 0-100
+  status            String   @default("active") // "active", "completed", "paused"
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  students InterventionStudent[]
+
+  @@index([userId])
+  @@index([subject])
+  @@index([status])
+  @@index([startDate])
+}
+
+model InterventionStudent {
+  id             String   @id @default(cuid())
+  interventionId String
+  studentId      String
+  preScore       Float?   // Baseline assessment score
+  postScore      Float?   // Post-intervention score
+  attendance     Float?   // Percentage attendance
+  notes          String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  intervention Intervention @relation(fields: [interventionId], references: [id], onDelete: Cascade)
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([interventionId, studentId])
+  @@index([interventionId])
+  @@index([studentId])
 }
 

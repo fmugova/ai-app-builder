@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Sparkles, Code, Zap, Shield, Users, ArrowRight } from 'lucide-react'
+import { Sparkles, Code, Zap, Shield, Users, ArrowRight, GraduationCap, BarChart3, BookOpen } from 'lucide-react'
 
 export default function Home() {
   return (
@@ -128,12 +128,48 @@ export default function Home() {
       </section>
 
       <section className="container mx-auto px-4 py-20">
+        <div className="bg-gradient-to-r from-green-600 to-teal-600 rounded-2xl p-12 text-white mb-12">
+          <div className="flex items-center justify-center mb-4">
+            <GraduationCap className="w-12 h-12 mr-4" />
+            <h2 className="text-4xl font-bold">Teacher's Digital Planner</h2>
+          </div>
+          <p className="text-xl mb-8 opacity-90 text-center max-w-3xl mx-auto">
+            A comprehensive productivity and student data analysis platform for UK secondary school teachers.
+            Track student progress, generate AI-powered lesson plans, analyze GCSE/A-Level data, and plan interventions.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="bg-white/10 backdrop-blur rounded-lg p-6">
+              <BarChart3 className="w-8 h-8 mb-3" />
+              <h3 className="font-semibold mb-2">Data Analysis & KPIs</h3>
+              <p className="text-sm opacity-90">Track progress, identify at-risk students, analyze performance gaps</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur rounded-lg p-6">
+              <BookOpen className="w-8 h-8 mb-3" />
+              <h3 className="font-semibold mb-2">AI Lesson Planning</h3>
+              <p className="text-sm opacity-90">Generate curriculum-aligned lesson plans with differentiation</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur rounded-lg p-6">
+              <Sparkles className="w-8 h-8 mb-3" />
+              <h3 className="font-semibold mb-2">Intervention Planning</h3>
+              <p className="text-sm opacity-90">AI-powered intervention strategies and effectiveness tracking</p>
+            </div>
+          </div>
+          <div className="text-center">
+            <Link
+              href="/teacher"
+              className="inline-block bg-white text-green-600 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-gray-100 transition"
+            >
+              Access Teacher Dashboard
+            </Link>
+          </div>
+        </div>
+
         <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-12 text-center text-white">
           <h2 className="text-4xl font-bold mb-4">Ready to Build Something Amazing?</h2>
           <p className="text-xl mb-8 opacity-90">
             Join thousands of developers building faster with AI
           </p>
-          <Link 
+          <Link
             href="/auth/signup"
             className="inline-block bg-white text-purple-600 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-gray-100 transition"
           >
