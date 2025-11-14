@@ -1,47 +1,22 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import Anthropic from "@anthropic-ai/sdk";
+import { prisma } from "@/lib/prisma";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-async function getUserFromSession() {
+export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies();  // ← Added await
-    const sessionToken = cookieStore.get("next-auth.session-token") || 
-                         cookieStore.get("__Secure-next-auth.session-token");
-    
-    if (!sessionToken) {
-      return null;
-    }
+    const session = await getServerSession(authOptions);
 
-    const session = await prisma.session.findUnique({
-      where: { sessionToken: sessionToken.value },
-      include: { user: true },
-    });
-
-    if (!session || session.expires < new Date()) {
-      return null;
-    }
-
-    return session.user;
-  } catch (error) {
-    console.error("Error getting user from session:", error);
-    return null;
-  }
-}
-
-export async function POST(req: Request) {
-  try {
-    const user = await getUserFromSession();
-
-    if (!user) {
+    if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { prompt, type } = await req.json();
+    const { prompt, projectId } = await request.json();
 
     if (!prompt) {
       return NextResponse.json(
@@ -50,98 +25,97 @@ export async function POST(req: Request) {
       );
     }
 
-    const userWithData = await prisma.user.findUnique({
-      where: { id: user.id },
+    // Get user with subscription
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
       include: {
         subscription: true,
-        generations: {
-          where: {
-            createdAt: {
-              gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-            },
-          },
+      },
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Count user's generations in the last 30 days
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const generationCount = await prisma.generation.count({
+      where: {
+        userId: user.id,
+        createdAt: {
+          gte: thirtyDaysAgo,
         },
       },
     });
 
-    if (!userWithData) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    const planLimits: Record<string, number> = {
+    // Check usage limits based on plan
+    const limits: Record<string, number> = {
       FREE: 3,
       PRO: 999999,
-      BUSINESS: 999999,
+      ENTERPRISE: 999999,
     };
 
-    const plan = userWithData.subscription?.plan || "FREE";
-    const limit = planLimits[plan] || 3;
-    const used = userWithData.generations.length;
+    const userPlan = user.subscription?.plan || "FREE";
+    const limit = limits[userPlan] || 3;
 
-    if (used >= limit) {
+    if (generationCount >= limit) {
       return NextResponse.json(
         {
           error: "Generation limit reached",
-          message: `You have reached your monthly limit of ${limit} generations. Please upgrade your plan.`,
           limit,
-          used,
+          used: generationCount,
         },
         { status: 429 }
       );
     }
 
+    // Generate code with Claude
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 4096,
       messages: [
         {
           role: "user",
-          content: `Generate a complete, production-ready ${type} based on this description: ${prompt}
-          
-          Requirements:
-          - Use modern React with TypeScript
-          - Include Tailwind CSS for styling
-          - Make it responsive and beautiful
-          - Add proper error handling
-          - Include comments explaining the code
-          - Make it a complete, working component
-          
-          Return ONLY the complete code, no explanations before or after.`,
+          content: `You are an expert React developer. Generate a complete, production-ready React component based on this description:
+
+${prompt}
+
+Requirements:
+- Use modern React with hooks
+- Include proper TypeScript types
+- Add Tailwind CSS for styling
+- Make it responsive and accessible
+- Include comments explaining key parts
+- Return ONLY the JSX code, no explanations
+
+Component code:`,
         },
       ],
     });
 
-    const generatedCode = message.content[0].type === "text" 
-      ? message.content[0].text 
-      : "";
+    const generatedCode =
+      message.content[0].type === "text" ? message.content[0].text : "";
 
-    await prisma.generation.create({
+    // Save generation to database
+    const generation = await prisma.generation.create({
       data: {
-        userId: userWithData.id,
+        userId: user.id,
         prompt,
-        response: generatedCode,
-        type: type || "web-app",
+        code: generatedCode,
+        projectId: projectId || null,
       },
     });
 
     return NextResponse.json({
       code: generatedCode,
+      generationId: generation.id,
       usage: {
-        used: used + 1,
+        used: generationCount + 1,
         limit,
-        remaining: limit - (used + 1),
       },
     });
   } catch (error) {
     console.error("Generation error:", error);
-    
-    if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      );
-    }
-
     return NextResponse.json(
       { error: "Failed to generate code" },
       { status: 500 }
