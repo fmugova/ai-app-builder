@@ -2,204 +2,193 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Check, ArrowLeft, Zap } from "lucide-react";
-import { useSession } from "next-auth/react";
+import { Check, ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 const plans = [
   {
     name: "Free",
-    price: "$0",
-    period: "forever",
-    description: "Perfect for trying out BuildFlow",
+    price: "0",
+    description: "Perfect for trying out the platform",
     features: [
-      "3 generations per month",
-      "Basic project types",
-      "Export code",
+      "3 AI generations per month",
+      "Basic templates",
       "Community support",
+      "Export code"
     ],
     cta: "Get Started",
-    highlighted: false,
-    priceId: null,
+    highlighted: false
   },
   {
     name: "Pro",
-    price: "$29",
-    period: "per month",
-    description: "For serious builders and teams",
+    price: "29",
+    description: "Best for professional developers",
     features: [
-      "Unlimited generations",
-      "All project types",
+      "Unlimited AI generations",
+      "All premium templates",
       "Priority support",
-      "Advanced features",
-      "Version history",
-      "Project sharing",
-      "Analytics dashboard",
+      "Advanced customization",
+      "Export to GitHub",
+      "Team collaboration"
     ],
-    cta: "Start Pro Trial",
-    highlighted: true,
-    priceId: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID,
+    cta: "Start Free Trial",
+    highlighted: true
   },
   {
-    name: "Business",
-    price: "Custom",
-    period: "contact sales",
-    description: "For enterprise teams",
+    name: "Enterprise",
+    price: "99",
+    description: "For teams and organizations",
     features: [
       "Everything in Pro",
-      "Custom integrations",
       "Dedicated support",
-      "SLA guarantee",
-      "Team management",
-      "White-label options",
+      "Custom integrations",
+      "SSO & advanced security",
+      "Priority feature requests",
+      "SLA guarantee"
     ],
     cta: "Contact Sales",
-    highlighted: false,
-    priceId: null,
-  },
+    highlighted: false
+  }
 ];
 
 export default function PricingPage() {
-  const { data: session } = useSession();
   const router = useRouter();
-  const [loading, setLoading] = useState<string | null>(null);
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
 
-  const handlePlanClick = async (plan: typeof plans[0]) => {
-    if (!session) {
-      router.push("/auth/signin?callbackUrl=/pricing");
-      return;
-    }
-
-    if (plan.name === "Free") {
+  const handleSubscribe = (planName: string) => {
+    if (planName === "Free") {
       router.push("/dashboard");
-      return;
-    }
-
-    if (plan.name === "Business") {
-      window.location.href = "mailto:sales@buildflow.com?subject=Enterprise Plan Inquiry";
-      return;
-    }
-
-    if (plan.priceId) {
-      try {
-        setLoading(plan.name);
-        const response = await fetch("/api/stripe/checkout", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ priceId: plan.priceId }),
-        });
-
-        if (response.ok) {
-          const { url } = await response.json();
-          window.location.href = url;
-        } else {
-          alert("Failed to start checkout. Please try again.");
-        }
-      } catch (error) {
-        console.error("Checkout error:", error);
-        alert("An error occurred. Please try again.");
-      } finally {
-        setLoading(null);
-      }
+    } else {
+      router.push("/auth/signin?callbackUrl=/dashboard");
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
-      <div className="container mx-auto px-4 py-16">
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center gap-2 mb-8 px-4 py-2 text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          Back to Dashboard
-        </Link>
-
-        <div className="text-center mb-16">
-          <h1 className="text-5xl font-bold text-gray-900 dark:text-white mb-4">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-12">
+          <Link href="/" className="inline-flex items-center text-blue-600 hover:text-blue-700 mb-6">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Home
+          </Link>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">
             Choose Your Plan
           </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            Start building amazing apps with BuildFlow. Upgrade anytime.
+          <p className="text-xl text-gray-600 mb-8">
+            Start building amazing apps with AI assistance
           </p>
+
+          <div className="inline-flex items-center bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setBillingCycle("monthly")}
+              className={`px-6 py-2 rounded-md transition-all ${
+                billingCycle === "monthly"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-600"
+              }`}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setBillingCycle("annual")}
+              className={`px-6 py-2 rounded-md transition-all ${
+                billingCycle === "annual"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-600"
+              }`}
+            >
+              Annual
+              <span className="ml-2 text-xs text-green-600 font-semibold">
+                Save 20%
+              </span>
+            </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl mx-auto">
+        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {plans.map((plan) => (
             <div
               key={plan.name}
-              className={`relative rounded-2xl p-8 ${
-                plan.highlighted
-                  ? "bg-gradient-to-br from-purple-500 to-blue-600 text-white ring-4 ring-purple-500 ring-offset-4 dark:ring-offset-gray-900 scale-105"
-                  : "bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700"
+              className={`relative bg-white rounded-2xl shadow-lg overflow-hidden transition-transform hover:scale-105 ${
+                plan.highlighted ? "ring-2 ring-blue-500" : ""
               }`}
             >
               {plan.highlighted && (
-                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <span className="bg-yellow-400 text-purple-900 px-4 py-1 rounded-full text-sm font-bold">
-                    Most Popular
-                  </span>
+                <div className="absolute top-0 right-0 bg-blue-500 text-white px-4 py-1 text-sm font-semibold rounded-bl-lg">
+                  Most Popular
                 </div>
               )}
 
-              <div className="mb-6">
-                <h3 className={`text-2xl font-bold mb-2 ${plan.highlighted ? "text-white" : "text-gray-900 dark:text-white"}`}>
+              <div className="p-8">
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">
                   {plan.name}
                 </h3>
-                <div className="flex items-baseline">
-                  <span className={`text-5xl font-bold ${plan.highlighted ? "text-white" : "text-gray-900 dark:text-white"}`}>
-                    {plan.price}
+                <p className="text-gray-600 mb-6">{plan.description}</p>
+
+                <div className="mb-6">
+                  <span className="text-5xl font-bold text-gray-900">
+                    ${billingCycle === "annual" && plan.price !== "0" 
+                      ? Math.round(parseFloat(plan.price) * 0.8) 
+                      : plan.price}
                   </span>
-                  <span className={`ml-2 ${plan.highlighted ? "text-white/80" : "text-gray-600 dark:text-gray-400"}`}>
-                    /{plan.period}
+                  <span className="text-gray-600 ml-2">
+                    {plan.price === "0" ? "forever" : `/${billingCycle === "monthly" ? "mo" : "yr"}`}
                   </span>
                 </div>
-                <p className={`mt-4 ${plan.highlighted ? "text-white/90" : "text-gray-600 dark:text-gray-400"}`}>
-                  {plan.description}
-                </p>
+
+                <button
+                  onClick={() => handleSubscribe(plan.name)}
+                  className={`w-full py-3 px-6 rounded-lg font-semibold transition-all ${
+                    plan.highlighted
+                      ? "bg-blue-600 text-white hover:bg-blue-700"
+                      : "bg-gray-100 text-gray-900 hover:bg-gray-200"
+                  }`}
+                >
+                  {plan.cta}
+                </button>
+
+                <ul className="mt-8 space-y-4">
+                  {plan.features.map((feature, index) => (
+                    <li key={index} className="flex items-start">
+                      <Check className="w-5 h-5 text-green-500 mr-3 flex-shrink-0 mt-0.5" />
+                      <span className="text-gray-700">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-
-              <ul className="space-y-4 mb-8">
-                {plan.features.map((feature, index) => (
-                  <li key={index} className="flex items-start gap-3">
-                    <Check className={`w-5 h-5 mt-0.5 flex-shrink-0 ${plan.highlighted ? "text-white" : "text-purple-600 dark:text-purple-400"}`} />
-                    <span className={plan.highlighted ? "text-white" : "text-gray-700 dark:text-gray-300"}>
-                      {feature}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-
-              <button
-                onClick={() => handlePlanClick(plan)}
-                disabled={loading === plan.name}
-                className={`w-full py-4 px-6 rounded-xl font-semibold transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed ${
-                  plan.highlighted
-                    ? "bg-white text-purple-600 hover:bg-gray-100"
-                    : "bg-purple-600 text-white hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600"
-                }`}
-              >
-                {loading === plan.name ? "Processing..." : plan.cta}
-              </button>
             </div>
           ))}
         </div>
 
-        <div className="mt-20 text-center">
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-3xl p-12 max-w-4xl mx-auto">
-            <h2 className="text-3xl font-bold text-white mb-4">
-              Ready to build something amazing?
-            </h2>
-            <p className="text-white/90 text-lg mb-8">
-              Join thousands of developers building with BuildFlow
-            </p>
-            <button
-              onClick={() => handlePlanClick(plans[1])}
-              disabled={loading === "Pro"}
-              className="bg-white text-purple-600 px-8 py-4 rounded-xl font-semibold text-lg hover:bg-gray-100 transition-all transform hover:scale-105 disabled:opacity-50"
-            >
-              {loading === "Pro" ? "Processing..." : "Start Free Trial"}
-            </button>
+        <div className="mt-20 max-w-3xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-8">
+            Frequently Asked Questions
+          </h2>
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg p-6 shadow-sm">
+              <h3 className="font-semibold text-lg mb-2">
+                Can I change plans later?
+              </h3>
+              <p className="text-gray-600">
+                Yes! You can upgrade or downgrade your plan at any time.
+              </p>
+            </div>
+            <div className="bg-white rounded-lg p-6 shadow-sm">
+              <h3 className="font-semibold text-lg mb-2">
+                What payment methods do you accept?
+              </h3>
+              <p className="text-gray-600">
+                We accept all major credit cards, PayPal, and bank transfers for Enterprise plans.
+              </p>
+            </div>
+            <div className="bg-white rounded-lg p-6 shadow-sm">
+              <h3 className="font-semibold text-lg mb-2">
+                Is there a free trial?
+              </h3>
+              <p className="text-gray-600">
+                Yes! Pro plan includes a 14-day free trial. No credit card required.
+              </p>
+            </div>
           </div>
         </div>
       </div>
