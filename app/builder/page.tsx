@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Sparkles, Code, Globe, Loader2, Download, Copy, Check, Save, MessageSquare, Send, X, ArrowLeft } from 'lucide-react'
 import { saveProject as saveProjectToHistory } from '@/utils/projectHistory'
@@ -33,7 +33,8 @@ const templates = [
   },
 ]
 
-export default function Builder() {
+// Separate component that uses useSearchParams - must be wrapped in Suspense
+function BuilderContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const editProjectId = searchParams.get('edit')
@@ -69,7 +70,6 @@ export default function Builder() {
       
       const project = await res.json()
       
-      // Set all the state based on the loaded project
       setProjectName(project.name)
       setDescription(project.description || '')
       setProjectType(project.type || 'webapp')
@@ -101,7 +101,7 @@ export default function Builder() {
         body: JSON.stringify({ 
           projectType, 
           description,
-          prompt: description // Add prompt field for the API
+          prompt: description
         }),
       })
 
@@ -122,7 +122,6 @@ export default function Builder() {
       const generatedProjectName = `${projectTypes.find(t => t.id === projectType)?.name} - ${new Date().toLocaleDateString()}`
       setProjectName(generatedProjectName)
       
-      // Auto-save to project history
       try {
         const savedProject = saveProjectToHistory({
           name: generatedProjectName,
@@ -174,7 +173,6 @@ export default function Builder() {
       setUsage(data.usage)
       setChatMessages(prev => [...prev, { role: 'assistant', content: 'Code updated successfully! ✨' }])
       
-      // Update project history after refinement
       try {
         saveProjectToHistory({
           name: projectName,
@@ -223,7 +221,6 @@ export default function Builder() {
         setCurrentProjectId(savedProject.id)
       }
 
-      // Also save to local history
       saveProjectToHistory({
         name: projectName,
         type: projectTypes.find(t => t.id === projectType)?.name as any || 'Web App',
@@ -262,7 +259,7 @@ export default function Builder() {
     setChatMessages([])
     setProjectName('')
     setCurrentProjectId(null)
-    router.push('/builder') // Clear URL params
+    router.push('/builder')
   }
 
   if (loading && editProjectId) {
@@ -528,5 +525,18 @@ export default function Builder() {
         )}
       </div>
     </div>
+  )
+}
+
+// Main component with Suspense boundary
+export default function Builder() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex items-center justify-center">
+        <Loader2 className="w-16 h-16 text-purple-600 animate-spin" />
+      </div>
+    }>
+      <BuilderContent />
+    </Suspense>
   )
 }
