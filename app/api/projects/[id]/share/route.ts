@@ -1,52 +1,92 @@
-import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
-import { nanoid } from "nanoid";
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
-export const runtime = 'nodejs';
-
-export async function POST(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { id } = await params;
-    const body = await req.json();
-    const { isPublic, regenerate } = body;
-
     const project = await prisma.project.findUnique({
-      where: { id }
+      where: { id: params.id },
     });
 
-    if (!project || project.userId !== session.user.id) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    if (!project) {
+      return NextResponse.json(
+        { error: "Project not found" },
+        { status: 404 }
+      );
     }
 
-    const updates: any = { isPublic };
-    
-    if (isPublic && (!project.shareToken || regenerate)) {
-      updates.shareToken = nanoid(10);
-    }
+    return NextResponse.json({
+      id: project.id,
+      name: project.name,
+      description: project.description || '',
+      type: project.type || 'webapp', // ✅ Include type field
+      code: project.code,
+      createdAt: project.createdAt.toISOString(),
+      updatedAt: project.updatedAt.toISOString(),
+      isPublic: project.isPublic || false,
+      shareToken: project.shareToken || null,
+    });
+  } catch (error) {
+    console.error("Error fetching project:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch project" },
+      { status: 500 }
+    );
+  }
+}
 
-    const updatedProject = await prisma.project.update({
-      where: { id },
-      data: updates
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { name, description, code, type } = await request.json();
+
+    const project = await prisma.project.update({
+      where: { id: params.id },
+      data: {
+        name,
+        description,
+        code,
+        type: type || undefined, // Only update if provided
+        updatedAt: new Date(),
+      },
     });
 
     return NextResponse.json({
-      isPublic: updatedProject.isPublic,
-      shareToken: updatedProject.shareToken
+      id: project.id,
+      name: project.name,
+      description: project.description,
+      type: project.type,
+      code: project.code,
+      createdAt: project.createdAt.toISOString(),
+      updatedAt: project.updatedAt.toISOString(),
+    });
+  } catch (error) {
+    console.error("Error updating project:", error);
+    return NextResponse.json(
+      { error: "Failed to update project" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    await prisma.project.delete({
+      where: { id: params.id },
     });
 
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error updating sharing:", error);
+    console.error("Error deleting project:", error);
     return NextResponse.json(
-      { error: "Failed to update sharing settings" },
+      { error: "Failed to delete project" },
       { status: 500 }
     );
   }

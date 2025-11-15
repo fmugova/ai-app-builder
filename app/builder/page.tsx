@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Sparkles, Code, Globe, Loader2, Download, Copy, Check, Save, MessageSquare, Send, X, ArrowLeft } from 'lucide-react'
 import { saveProject as saveProjectToHistory } from '@/utils/projectHistory'
 
@@ -35,6 +35,8 @@ const templates = [
 
 export default function Builder() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const editProjectId = searchParams.get('edit')
   
   const [step, setStep] = useState('input')
   const [projectType, setProjectType] = useState('')
@@ -49,6 +51,38 @@ export default function Builder() {
   const [chatLoading, setChatLoading] = useState(false)
   const [usage, setUsage] = useState<any>(null)
   const [projectName, setProjectName] = useState('')
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
+
+  // Load project for editing
+  useEffect(() => {
+    if (editProjectId) {
+      loadProjectForEdit(editProjectId)
+    }
+  }, [editProjectId])
+
+  const loadProjectForEdit = async (projectId: string) => {
+    try {
+      setLoading(true)
+      const res = await fetch(`/api/projects/${projectId}`)
+      
+      if (!res.ok) throw new Error('Failed to load project')
+      
+      const project = await res.json()
+      
+      // Set all the state based on the loaded project
+      setProjectName(project.name)
+      setDescription(project.description || '')
+      setProjectType(project.type || 'webapp')
+      setGeneratedCode(project.code)
+      setCurrentProjectId(projectId)
+      setStep('preview')
+    } catch (err) {
+      console.error('Error loading project:', err)
+      setError('Failed to load project for editing')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const generateApp = async () => {
     if (!description.trim()) {
@@ -64,13 +98,17 @@ export default function Builder() {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectType, description }),
+        body: JSON.stringify({ 
+          projectType, 
+          description,
+          prompt: description // Add prompt field for the API
+        }),
       })
 
       const data = await res.json()
 
       if (!res.ok) {
-        if (res.status === 403) {
+        if (res.status === 429) {
           throw new Error(`Generation limit reached! Upgrade your plan to continue. (${data.used}/${data.limit} used)`)
         }
         throw new Error(data.error || 'Generation failed')
@@ -84,18 +122,17 @@ export default function Builder() {
       const generatedProjectName = `${projectTypes.find(t => t.id === projectType)?.name} - ${new Date().toLocaleDateString()}`
       setProjectName(generatedProjectName)
       
-      // 🆕 AUTO-SAVE TO PROJECT HISTORY
+      // Auto-save to project history
       try {
         const savedProject = saveProjectToHistory({
           name: generatedProjectName,
           type: projectTypes.find(t => t.id === projectType)?.name as any || 'Web App',
-          description: description.substring(0, 200), // First 200 chars
+          description: description.substring(0, 200),
           code: data.code,
         })
         console.log('✅ Project auto-saved to history:', savedProject.id)
       } catch (saveError) {
         console.error('Failed to save to history:', saveError)
-        // Don't stop the flow if history save fails
       }
       
     } catch (err) {
@@ -122,7 +159,8 @@ export default function Builder() {
           projectType,
           description,
           existingCode: generatedCode,
-          refinement: chatInput
+          refinement: chatInput,
+          prompt: chatInput
         }),
       })
 
@@ -136,7 +174,7 @@ export default function Builder() {
       setUsage(data.usage)
       setChatMessages(prev => [...prev, { role: 'assistant', content: 'Code updated successfully! ✨' }])
       
-      // 🆕 UPDATE PROJECT HISTORY AFTER REFINEMENT
+      // Update project history after refinement
       try {
         saveProjectToHistory({
           name: projectName,
@@ -163,9 +201,11 @@ export default function Builder() {
     if (!generatedCode) return
 
     try {
-      // Save to your database
-      const res = await fetch('/api/projects', {
-        method: 'POST',
+      const method = currentProjectId ? 'PUT' : 'POST'
+      const url = currentProjectId ? `/api/projects/${currentProjectId}` : '/api/projects'
+      
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: projectName,
@@ -177,7 +217,13 @@ export default function Builder() {
 
       if (!res.ok) throw new Error('Save failed')
 
-      // 🆕 ALSO SAVE TO LOCAL HISTORY
+      const savedProject = await res.json()
+      
+      if (!currentProjectId) {
+        setCurrentProjectId(savedProject.id)
+      }
+
+      // Also save to local history
       saveProjectToHistory({
         name: projectName,
         type: projectTypes.find(t => t.id === projectType)?.name as any || 'Web App',
@@ -215,6 +261,20 @@ export default function Builder() {
     setError('')
     setChatMessages([])
     setProjectName('')
+    setCurrentProjectId(null)
+    router.push('/builder') // Clear URL params
+  }
+
+  if (loading && editProjectId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <Loader2 className="w-16 h-16 text-purple-600 animate-spin mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Loading Project...</h2>
+          <p className="text-gray-600">Getting your code ready to edit</p>
+        </div>
+      </div>
+    )
   }
 
   if (step === 'generating') {
@@ -367,7 +427,7 @@ export default function Builder() {
           <div className="flex items-center gap-3">
             <Sparkles className="w-10 h-10 text-purple-600" />
             <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-              AI App Builder
+              BuildFlow
             </h1>
           </div>
           
