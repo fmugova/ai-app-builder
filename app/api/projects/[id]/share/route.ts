@@ -1,92 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { randomBytes } from "crypto";
 
-export async function GET(
+export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const project = await prisma.project.findUnique({
-      where: { id: params.id },
-    });
+    const params = await context.params; // ✅ Await params in Next.js 16
+    const { isPublic } = await request.json();
 
-    if (!project) {
-      return NextResponse.json(
-        { error: "Project not found" },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({
-      id: project.id,
-      name: project.name,
-      description: project.description || '',
-      type: project.type || 'webapp', // ✅ Include type field
-      code: project.code,
-      createdAt: project.createdAt.toISOString(),
-      updatedAt: project.updatedAt.toISOString(),
-      isPublic: project.isPublic || false,
-      shareToken: project.shareToken || null,
-    });
-  } catch (error) {
-    console.error("Error fetching project:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch project" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const { name, description, code, type } = await request.json();
+    // Generate share token if making public
+    const shareToken = isPublic ? randomBytes(16).toString("hex") : null;
 
     const project = await prisma.project.update({
       where: { id: params.id },
       data: {
-        name,
-        description,
-        code,
-        type: type || undefined, // Only update if provided
-        updatedAt: new Date(),
+        isPublic,
+        shareToken,
       },
     });
 
     return NextResponse.json({
-      id: project.id,
-      name: project.name,
-      description: project.description,
-      type: project.type,
-      code: project.code,
-      createdAt: project.createdAt.toISOString(),
-      updatedAt: project.updatedAt.toISOString(),
+      project: {
+        id: project.id,
+        name: project.name,
+        description: project.description,
+        type: project.type,
+        code: project.code,
+        isPublic: project.isPublic,
+        shareToken: project.shareToken,
+        createdAt: project.createdAt.toISOString(),
+        updatedAt: project.updatedAt.toISOString(),
+      },
     });
   } catch (error) {
-    console.error("Error updating project:", error);
+    console.error("Error toggling share:", error);
     return NextResponse.json(
-      { error: "Failed to update project" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    await prisma.project.delete({
-      where: { id: params.id },
-    });
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Error deleting project:", error);
-    return NextResponse.json(
-      { error: "Failed to delete project" },
+      { error: "Failed to update share settings" },
       { status: 500 }
     );
   }
