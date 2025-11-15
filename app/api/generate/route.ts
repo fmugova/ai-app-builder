@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 
@@ -10,13 +8,7 @@ const anthropic = new Anthropic({
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { prompt, projectId } = await request.json();
+    const { prompt, projectId, userEmail } = await request.json();
 
     if (!prompt) {
       return NextResponse.json(
@@ -25,51 +17,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get user with subscription
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: {
-        subscription: true,
-      },
-    });
+    let user = userEmail
+      ? await prisma.user.findUnique({
+          where: { email: userEmail },
+          include: { subscription: true },
+        })
+      : null;
 
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    // Count user's generations in the last 30 days
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const generationCount = await prisma.generation.count({
-      where: {
-        userId: user.id,
-        createdAt: {
-          gte: thirtyDaysAgo,
-        },
-      },
-    });
-
-    // Check usage limits based on plan
+    const userPlan = user?.subscription?.plan || "FREE";
     const limits: Record<string, number> = {
       FREE: 3,
       PRO: 999999,
       ENTERPRISE: 999999,
     };
-
-    const userPlan = user.subscription?.plan || "FREE";
     const limit = limits[userPlan] || 3;
 
-    if (generationCount >= limit) {
-      return NextResponse.json(
-        {
-          error: "Generation limit reached",
-          limit,
-          used: generationCount,
+    let generationCount = 0;
+    if (user) {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      generationCount = await prisma.generation.count({
+        where: {
+          userId: user.id,
+          createdAt: { gte: thirtyDaysAgo },
         },
-        { status: 429 }
-      );
+      });
+
+      if (generationCount >= limit) {
+        return NextResponse.json(
+          {
+            error: "Generation limit reached",
+            limit,
+            used: generationCount,
+          },
+          { status: 429 }
+        );
+      }
     }
 
-    // Generate code with Claude
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 4096,
@@ -96,19 +80,19 @@ Component code:`,
     const generatedCode =
       message.content[0].type === "text" ? message.content[0].text : "";
 
-    // Save generation to database
-    const generation = await prisma.generation.create({
-      data: {
-        userId: user.id,
-        prompt,
-        code: generatedCode,
-        projectId: projectId || null,
-      },
-    });
+    if (user) {
+      await prisma.generation.create({
+        data: {
+          userId: user.id,
+          prompt,
+          response: generatedCode,  // 
+          type: "COMPONENT",  // ✅ Required field
+        },
+      });
+    }
 
     return NextResponse.json({
       code: generatedCode,
-      generationId: generation.id,
       usage: {
         used: generationCount + 1,
         limit,
