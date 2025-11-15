@@ -3,8 +3,6 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   try {
-    // For now, return all projects since we don't have auth
-    // In production, you'd filter by user
     const projects = await prisma.project.findMany({
       orderBy: { createdAt: 'desc' },
       select: {
@@ -21,7 +19,6 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Ensure all projects have required fields with defaults
     const formattedProjects = projects.map(project => ({
       id: project.id,
       name: project.name || 'Untitled Project',
@@ -55,17 +52,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // For now, create with a placeholder user
-    // In production, get user from session
-    const placeholderUserId = "demo-user";
+    // Try to get or create a demo user
+    const demoEmail = "demo@buildflow.app";
+    let user = await prisma.user.findUnique({
+      where: { email: demoEmail },
+    });
+
+    // If demo user doesn't exist, create it
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email: demoEmail,
+          name: "Demo User",
+          // password is optional, so we don't need to include it
+        },
+      });
+    }
 
     const project = await prisma.project.create({
       data: {
         name,
         description: description || '',
         code,
-        type: type || 'webapp', // ✅ Added type field
-        userId: placeholderUserId,
+        type: type || 'webapp',
+        userId: user.id,
         isPublic: false,
       },
     });
@@ -84,7 +94,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Error creating project:", error);
     return NextResponse.json(
-      { error: "Failed to create project" },
+      { error: "Failed to create project", details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
