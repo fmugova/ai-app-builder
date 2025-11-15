@@ -45,7 +45,8 @@ interface Project {
 }
 
 export default function EnhancedDashboard() {
-  const { data: session } = useSession();
+  const sessionHook = useSession();
+  const session = sessionHook?.data || null;
   const router = useRouter();
   
   // State management
@@ -94,7 +95,7 @@ export default function EnhancedDashboard() {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 30000); // Refresh every 30 seconds
+    const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -114,7 +115,7 @@ export default function EnhancedDashboard() {
     };
 
     fetchUsage();
-    const interval = setInterval(fetchUsage, 15000); // Refresh every 15 seconds
+    const interval = setInterval(fetchUsage, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -250,6 +251,9 @@ export default function EnhancedDashboard() {
   const remainingGenerations = generationsLimit - generationsUsed;
   const usagePercentage = (generationsUsed / generationsLimit) * 100;
 
+  const userName = session?.user?.name || session?.user?.email?.split('@')[0] || 'User';
+  const userEmail = session?.user?.email || '';
+
   return (
     <div className={`min-h-screen transition-colors duration-200 ${
       isDarkMode ? "dark bg-gray-900" : "bg-gradient-to-br from-blue-50 via-white to-purple-50"
@@ -295,7 +299,7 @@ export default function EnhancedDashboard() {
               >
                 <User className="w-5 h-5" />
                 <span className="hidden md:block font-medium">
-                  {session?.user?.name || session?.user?.email?.split('@')[0] || 'User'}
+                  {userName}
                 </span>
                 <ChevronDown className="w-4 h-4" />
               </button>
@@ -309,10 +313,10 @@ export default function EnhancedDashboard() {
                   <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-2 z-50">
                     <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                       <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                        {session?.user?.name || 'User'}
+                        {userName}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                        {session?.user?.email}
+                        {userEmail}
                       </p>
                     </div>
 
@@ -356,7 +360,7 @@ export default function EnhancedDashboard() {
         {/* Analytics Dashboard */}
         {showAnalytics && (
           <div className="mb-8">
-            <AnalyticsDashboard userId={session?.user?.email || undefined} />
+            <AnalyticsDashboard userId={userEmail || undefined} />
           </div>
         )}
 
