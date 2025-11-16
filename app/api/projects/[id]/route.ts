@@ -1,97 +1,30 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authConfig } from "@/lib/auth";
+import { prisma } from "@/lib/db";
+
+export const runtime = 'nodejs';
 
 export async function GET(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const params = await context.params; // ✅ Await params in Next.js 16
+    const session = await getServerSession(authConfig);
     
-    const project = await prisma.project.findUnique({
-      where: { id: params.id },
-    });
-
-    if (!project) {
-      return NextResponse.json(
-        { error: "Project not found" },
-        { status: 404 }
-      );
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    return NextResponse.json({
-      id: project.id,
-      name: project.name,
-      description: project.description || '',
-      type: project.type || 'webapp',
-      code: project.code,
-      createdAt: project.createdAt.toISOString(),
-      updatedAt: project.updatedAt.toISOString(),
-      isPublic: project.isPublic || false,
-      shareToken: project.shareToken || null,
-    });
-  } catch (error) {
-    console.error("Error fetching project:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch project" },
-      { status: 500 }
-    );
-  }
-}
+    const { id } = await params;
 
-export async function PUT(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
-  try {
-    const params = await context.params; // ✅ Await params in Next.js 16
-    const { name, description, code, type } = await request.json();
-
-    const project = await prisma.project.update({
-      where: { id: params.id },
-      data: {
-        name,
-        description,
-        code,
-        type: type || undefined,
-        updatedAt: new Date(),
-      },
-    });
-
-    return NextResponse.json({
-      id: project.id,
-      name: project.name,
-      description: project.description,
-      type: project.type,
-      code: project.code,
-      createdAt: project.createdAt.toISOString(),
-      updatedAt: project.updatedAt.toISOString(),
-    });
-  } catch (error) {
-    console.error("Error updating project:", error);
-    return NextResponse.json(
-      { error: "Failed to update project" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function DELETE(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
-  try {
-    const params = await context.params; // ✅ Await params in Next.js 16
+    // Your versions logic here using id...
     
-    await prisma.project.delete({
-      where: { id: params.id },
-    });
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ versions: [] });
   } catch (error) {
-    console.error("Error deleting project:", error);
+    console.error("Versions error:", error);
     return NextResponse.json(
-      { error: "Failed to delete project" },
+      { error: "Failed to fetch versions" },
       { status: 500 }
     );
   }
