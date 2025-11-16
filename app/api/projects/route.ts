@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authConfig } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(authConfig);
     
     // If no session, return empty projects
     if (!session?.user?.email) {
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
     // Get ONLY this user's projects
     const projects = await prisma.project.findMany({
-      where: { userId: user.id },  // ← FILTER BY USER
+      where: { userId: user.id },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -76,7 +76,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Test database connection first
     try {
       await prisma.$connect();
       console.log("✅ Database connected");
@@ -91,12 +90,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get session to determine which user is saving
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(authConfig);
     let userId: string;
 
     if (session?.user?.email) {
-      // Logged-in user - use their ID
       const user = await prisma.user.findUnique({
         where: { email: session.user.email },
       });
@@ -111,7 +108,6 @@ export async function POST(request: NextRequest) {
       userId = user.id;
       console.log("✅ Saving for logged-in user:", user.email);
     } else {
-      // Not logged in - use demo user
       console.log("👤 No session, using demo user...");
       
       const demoEmail = "demo@buildflow.app";
@@ -135,7 +131,6 @@ export async function POST(request: NextRequest) {
 
     console.log("💾 Creating project with userId:", userId);
 
-    // Create the project
     const project = await prisma.project.create({
       data: {
         name,

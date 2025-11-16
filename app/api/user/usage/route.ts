@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authConfig } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(authConfig);
     
     if (!session?.user?.email) {
       return NextResponse.json(
@@ -14,7 +14,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get user
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
     });
@@ -26,14 +25,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get project count
     const projectCount = await prisma.project.count({
       where: { userId: user.id },
     });
 
-    // Return usage data
     return NextResponse.json({
-      generationsUsed: 0, // You can track this in a separate table
+      generationsUsed: 0,
       generationsLimit: 3,
       projectsCreated: projectCount,
       plan: "free",
