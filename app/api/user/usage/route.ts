@@ -1,36 +1,47 @@
-export const runtime = 'nodejs'; // Force Node.js runtime instead of Edge
-import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // Get the current user session
-    const session = await auth();
+    const session = await getServerSession(authOptions);
     
-    if (!session?.user) {
+    if (!session?.user?.email) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { error: "Unauthorized" },
         { status: 401 }
       );
     }
 
-    // TODO: Replace this with your actual database query
-    // For now, return mock data
-    const userData = {
-      user: {
-        name: session.user.name || 'User',
-        email: session.user.email || 'user@example.com',
-      },
-      plan: 'Free', // TODO: Get from database
-      used: 0,      // TODO: Get actual usage from database
-      limit: 3,     // Free plan limit
-    };
+    // Get user
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+    });
 
-    return NextResponse.json(userData);
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    // Get project count
+    const projectCount = await prisma.project.count({
+      where: { userId: user.id },
+    });
+
+    // Return usage data
+    return NextResponse.json({
+      generationsUsed: 0, // You can track this in a separate table
+      generationsLimit: 3,
+      projectsCreated: projectCount,
+      plan: "free",
+    });
   } catch (error) {
-    console.error('Error fetching user usage:', error);
+    console.error("Error fetching usage:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: "Failed to fetch usage" },
       { status: 500 }
     );
   }

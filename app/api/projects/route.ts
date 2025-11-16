@@ -1,9 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    
+    // If no session, return empty projects
+    if (!session?.user?.email) {
+      return NextResponse.json({ projects: [] });
+    }
+
+    // Get the user
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+    });
+
+    if (!user) {
+      return NextResponse.json({ projects: [] });
+    }
+
+    // Get ONLY this user's projects
     const projects = await prisma.project.findMany({
+      where: { userId: user.id },  // ← FILTER BY USER
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -44,60 +64,76 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    console.log("Received save request:", { name: body.name, type: body.type });
+    console.log("📝 Received save request:", { name: body.name, type: body.type });
     
     const { name, description, type, code } = body;
 
     if (!name || !code) {
-      console.error("Missing required fields:", { hasName: !!name, hasCode: !!code });
+      console.error("❌ Missing required fields:", { hasName: !!name, hasCode: !!code });
       return NextResponse.json(
         { error: "Name and code are required" },
         { status: 400 }
       );
     }
 
-    console.log("Looking for demo user...");
-    
-    // Try to get or create a demo user
-    const demoEmail = "demo@buildflow.app";
-    let user;
-    
+    // Test database connection first
     try {
-      user = await prisma.user.findUnique({
-        where: { email: demoEmail },
-      });
-      console.log("User lookup result:", user ? "Found" : "Not found");
-    } catch (findError) {
-      console.error("Error finding user:", findError);
-      throw findError;
+      await prisma.$connect();
+      console.log("✅ Database connected");
+    } catch (connError) {
+      console.error("❌ Database connection failed:", connError);
+      return NextResponse.json(
+        { 
+          error: "Database connection failed", 
+          details: "Please check your DATABASE_URL environment variable",
+        },
+        { status: 500 }
+      );
     }
 
-    // If demo user doesn't exist, create it
-    if (!user) {
-      console.log("Creating new demo user...");
-      try {
-        user = await prisma.user.create({
+    // Get session to determine which user is saving
+    const session = await getServerSession(authOptions);
+    let userId: string;
+
+    if (session?.user?.email) {
+      // Logged-in user - use their ID
+      const user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+      });
+      
+      if (!user) {
+        return NextResponse.json(
+          { error: "User not found" },
+          { status: 404 }
+        );
+      }
+      
+      userId = user.id;
+      console.log("✅ Saving for logged-in user:", user.email);
+    } else {
+      // Not logged in - use demo user
+      console.log("👤 No session, using demo user...");
+      
+      const demoEmail = "demo@buildflow.app";
+      let demoUser = await prisma.user.findUnique({
+        where: { email: demoEmail },
+      });
+      
+      if (!demoUser) {
+        demoUser = await prisma.user.create({
           data: {
             email: demoEmail,
             name: "Demo User",
+            password: "demo123",
           },
         });
-        console.log("Demo user created successfully:", user.id);
-      } catch (createError) {
-        console.error("Error creating user:", createError);
-        // If user creation fails due to unique constraint (race condition),
-        // try to fetch again
-        user = await prisma.user.findUnique({
-          where: { email: demoEmail },
-        });
-        
-        if (!user) {
-          throw new Error("Failed to create or find demo user");
-        }
+        console.log("✅ Demo user created");
       }
+      
+      userId = demoUser.id;
     }
 
-    console.log("Creating project with userId:", user.id);
+    console.log("💾 Creating project with userId:", userId);
 
     // Create the project
     const project = await prisma.project.create({
@@ -106,12 +142,12 @@ export async function POST(request: NextRequest) {
         description: description || '',
         code,
         type: type || 'webapp',
-        userId: user.id,
+        userId: userId,
         isPublic: false,
       },
     });
 
-    console.log("Project created successfully:", project.id);
+    console.log("✅ Project created successfully:", project.id);
 
     return NextResponse.json({
       id: project.id,
@@ -124,21 +160,14 @@ export async function POST(request: NextRequest) {
       isPublic: project.isPublic,
       shareToken: project.shareToken,
     });
-  } catch (error) {
-    console.error("Error creating project - Full details:", error);
     
-    // Return detailed error for debugging
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const errorStack = error instanceof Error ? error.stack : '';
-    
-    console.error("Error message:", errorMessage);
-    console.error("Error stack:", errorStack);
+  } catch (error: any) {
+    console.error("❌ Unexpected error:", error);
     
     return NextResponse.json(
       { 
         error: "Failed to create project", 
-        details: errorMessage,
-        timestamp: new Date().toISOString()
+        details: error.message || 'Unknown error',
       },
       { status: 500 }
     );
