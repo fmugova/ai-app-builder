@@ -65,6 +65,21 @@ function BuilderContent() {
     try {
       setLoading(true);
       
+      // Type mapping helper - converts display names to IDs
+      const getProjectTypeId = (typeName: string) => {
+        const typeMap: { [key: string]: string } = {
+          'Landing Page': 'landing',
+          'Web App': 'webapp',
+          'Dashboard': 'dashboard',
+          'Portfolio': 'portfolio',
+          'landing': 'landing',
+          'webapp': 'webapp',
+          'dashboard': 'dashboard',
+          'portfolio': 'portfolio'
+        };
+        return typeMap[typeName] || 'webapp';
+      };
+      
       // Try sessionStorage first (instant load)
       const storedProject = sessionStorage.getItem('editingProject');
       if (storedProject) {
@@ -73,7 +88,7 @@ function BuilderContent() {
         
         setProjectName(project.name);
         setDescription(project.description || '');
-        setProjectType(project.type || 'webapp');
+        setProjectType(getProjectTypeId(project.type));
         setGeneratedCode(project.code);
         setCurrentProjectId(projectId);
         setStep('preview');
@@ -92,7 +107,7 @@ function BuilderContent() {
       
       setProjectName(project.name);
       setDescription(project.description || '');
-      setProjectType(project.type || 'webapp');
+      setProjectType(getProjectTypeId(project.type));
       setGeneratedCode(project.code);
       setCurrentProjectId(projectId);
       setStep('preview');

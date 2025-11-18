@@ -221,23 +221,32 @@ export default function EnhancedDashboard() {
   };
 
   const handleEdit = (project: Project) => {
-    console.log("🔧 Editing project:", project.id);
-
-    try {
-      // Store serialized project for the builder (session + persistent)
-      sessionStorage.setItem("editingProject", JSON.stringify(project));
-      localStorage.setItem("editingProject", JSON.stringify(project));
-      // Also store just the ID for quick access
-      sessionStorage.setItem("editingProjectId", project.id);
-      localStorage.setItem("editingProjectId", project.id);
-    } catch (e) {
-      console.error("Storage error while saving editingProject:", e);
-    }
-
-    // Close any open preview modal
+    console.log('🔧 Editing project:', project.id);
+    
+    // Convert display type to ID for builder compatibility
+    const typeMap: { [key: string]: string } = {
+      'Landing Page': 'landing',
+      'Web App': 'webapp',
+      'Dashboard': 'dashboard',
+      'Portfolio': 'portfolio',
+      'webapp': 'webapp',
+      'landing': 'landing',
+      'dashboard': 'dashboard',
+      'portfolio': 'portfolio'
+    };
+    
+    const projectForEdit = {
+      ...project,
+      type: typeMap[project.type] || 'webapp'
+    };
+    
+    // Store properly formatted project
+    sessionStorage.setItem('editingProject', JSON.stringify(projectForEdit));
+    
+    // Close any modals
     setShowPreview(false);
-
-    // Navigate to builder with project id in query
+    
+    // Navigate
     router.push(`/builder?project=${project.id}`);
   };
 
