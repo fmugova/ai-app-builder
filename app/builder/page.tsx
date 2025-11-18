@@ -37,7 +37,7 @@ const templates = [
 function BuilderContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const editProjectId = searchParams.get('edit')
+  const editProjectId = searchParams.get('project') || searchParams.get('edit')
   
   const [step, setStep] = useState('input')
   const [projectType, setProjectType] = useState('')
@@ -63,24 +63,44 @@ function BuilderContent() {
 
   const loadProjectForEdit = async (projectId: string) => {
     try {
-      setLoading(true)
-      const res = await fetch(`/api/projects/${projectId}`)
+      setLoading(true);
       
-      if (!res.ok) throw new Error('Failed to load project')
+      // Try sessionStorage first (instant load)
+      const storedProject = sessionStorage.getItem('editingProject');
+      if (storedProject) {
+        const project = JSON.parse(storedProject);
+        console.log('✅ Loaded from sessionStorage:', project);
+        
+        setProjectName(project.name);
+        setDescription(project.description || '');
+        setProjectType(project.type || 'webapp');
+        setGeneratedCode(project.code);
+        setCurrentProjectId(projectId);
+        setStep('preview');
+        setLoading(false);
+        return;
+      }
       
-      const project = await res.json()
+      // Otherwise fetch from API
+      console.log('📡 Fetching from API:', projectId);
+      const res = await fetch(`/api/projects/${projectId}`);
       
-      setProjectName(project.name)
-      setDescription(project.description || '')
-      setProjectType(project.type || 'webapp')
-      setGeneratedCode(project.code)
-      setCurrentProjectId(projectId)
-      setStep('preview')
+      if (!res.ok) throw new Error('Failed to load project');
+      
+      const project = await res.json();
+      console.log('✅ Loaded from API:', project);
+      
+      setProjectName(project.name);
+      setDescription(project.description || '');
+      setProjectType(project.type || 'webapp');
+      setGeneratedCode(project.code);
+      setCurrentProjectId(projectId);
+      setStep('preview');
     } catch (err) {
-      console.error('Error loading project:', err)
-      setError('Failed to load project for editing')
+      console.error('❌ Error loading project:', err);
+      setError('Failed to load project for editing');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
