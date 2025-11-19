@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Sparkles, Code, Globe, Loader2, Download, Copy, Check, Save, MessageSquare, Send, X, ArrowLeft } from 'lucide-react'
+import { Sparkles, Code, Globe, Loader2, Download, Copy, Check, Save, MessageSquare, Send, X, ArrowLeft, Eye } from 'lucide-react'
 import { saveProject as saveProjectToHistory } from '@/utils/projectHistory'
 
 const projectTypes = [
@@ -53,6 +53,14 @@ function BuilderContent() {
   const [usage, setUsage] = useState<any>(null)
   const [projectName, setProjectName] = useState('')
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'code' | 'preview'>('code')
+  const [previewMode, setPreviewMode] = useState<'desktop' | 'tablet' | 'mobile'>('desktop')
+
+  const previewWidths: Record<'desktop' | 'tablet' | 'mobile', string> = {
+    desktop: 'w-full',
+    tablet: 'w-[768px]',
+    mobile: 'w-[375px]',
+  }
 
   // Load project for editing
   useEffect(() => {
@@ -378,11 +386,77 @@ function BuilderContent() {
             </div>
           </div>
           
-          <div className="flex-1 overflow-auto p-4">
-            <div className="bg-gray-900 rounded-lg p-6 overflow-auto">
-              <pre className="text-sm text-green-400 font-mono whitespace-pre-wrap break-words">
-                {generatedCode}
-              </pre>
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Tab Switcher */}
+            <div className="bg-white border-b border-gray-200 px-4 flex gap-2">
+              <button
+                onClick={() => setActiveTab('code')}
+                className={`px-4 py-3 font-medium border-b-2 transition ${
+                  activeTab === 'code'
+                    ? 'border-purple-600 text-purple-600'
+                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Code className="w-4 h-4 inline mr-2" />
+                Code
+              </button>
+              <button
+                onClick={() => setActiveTab('preview')}
+                className={`px-4 py-3 font-medium border-b-2 transition ${
+                  activeTab === 'preview'
+                    ? 'border-purple-600 text-purple-600'
+                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Eye className="w-4 h-4 inline mr-2" />
+                Live Preview
+              </button>
+            </div>
+
+            {/* Content Area */}
+            <div className="flex-1 overflow-auto p-4">
+              {activeTab === 'code' ? (
+                <div className="bg-gray-900 rounded-lg p-6 overflow-auto h-full">
+                  <pre className="text-sm text-green-400 font-mono whitespace-pre-wrap break-words">
+                    {generatedCode}
+                  </pre>
+                </div>
+              ) : (
+                <div className="h-full bg-gray-50 overflow-hidden flex flex-col">
+                  {/* Device selector */}
+                  <div className="flex items-center gap-2 p-2 bg-gray-50 border-b">
+                    <button
+                      onClick={() => setPreviewMode('desktop')}
+                      className={`px-3 py-1 rounded ${previewMode === 'desktop' ? 'bg-purple-600 text-white' : 'bg-white'}`}
+                    >
+                      Desktop
+                    </button>
+                    <button
+                      onClick={() => setPreviewMode('tablet')}
+                      className={`px-3 py-1 rounded ${previewMode === 'tablet' ? 'bg-purple-600 text-white' : 'bg-white'}`}
+                    >
+                      Tablet
+                    </button>
+                    <button
+                      onClick={() => setPreviewMode('mobile')}
+                      className={`px-3 py-1 rounded ${previewMode === 'mobile' ? 'bg-purple-600 text-white' : 'bg-white'}`}
+                    >
+                      Mobile
+                    </button>
+                  </div>
+
+                  <div className="flex-1 flex justify-center overflow-auto h-full bg-gray-100 p-4">
+                    <div className={`${previewWidths[previewMode]} h-full bg-white rounded-lg shadow-xl overflow-hidden transition-all`}>
+                      <iframe
+                        srcDoc={generatedCode}
+                        title="Live Preview"
+                        className="w-full h-full border-0"
+                        sandbox="allow-scripts allow-same-origin"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
