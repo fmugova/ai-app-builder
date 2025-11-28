@@ -8,9 +8,9 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// ============ NextAuth Models ============
+// ============ KEEP AS IS ============
 model Account {
-  id                String  @id @default(cuid())
+  id                String  @id
   userId            String
   type              String
   provider          String
@@ -22,18 +22,16 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-  
   User              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
 
 model Session {
-  id           String   @id @default(cuid())
+  id           String   @id
   sessionToken String   @unique
   userId       String
   expires      DateTime
-  
   User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -45,16 +43,16 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// ============ USER MODEL ============
+// ============ USER MODEL - ADD MISSING FIELDS ============
 model User {
-  id                    String           @id @default(cuid())
+  id                    String           @id
   name                  String?
   email                 String           @unique
   emailVerified         DateTime?
-  password              String?
+  password              String
   image                 String?
   createdAt             DateTime         @default(now())
-  updatedAt             DateTime         @updatedAt
+  updatedAt             DateTime
   
   // Subscription & Billing
   promoCodeUsed         String?
@@ -71,7 +69,7 @@ model User {
   projectsLimit         Int              @default(3)
   subscriptionResetDate DateTime         @default(now())
   
-  // User Preferences
+  // ✅ ADD THESE NEW FIELDS
   bio                   String?
   theme                 String           @default("light")
   notifications         Boolean          @default(true)
@@ -85,25 +83,27 @@ model User {
   ProjectVersion        ProjectVersion[]
   Subscription          Subscription[]
   Generation            Generation[]
+  
+  // ✅ ADD THESE NEW RELATIONS
   Feedback              Feedback[]
   Activity              Activity[]
   ProjectShare          ProjectShare[]
 }
 
-// ============ PROJECT MODEL ============
+// ============ PROJECT MODEL - ADD MISSING FIELDS ============
 model Project {
-  id             String           @id @default(cuid())
+  id             String           @id
   userId         String
   name           String
   description    String?
   type           String
-  code           String           @db.Text
+  code           String
   createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  isPublic       Boolean          @default(false)
+  updatedAt      DateTime
+  isPublic       Boolean?         @default(false)
   shareToken     String?          @unique
   
-  // Project Stats
+  // ✅ ADD THESE NEW FIELDS
   views          Int              @default(0)
   downloads      Int              @default(0)
   tags           String[]         @default([])
@@ -118,13 +118,80 @@ model Project {
   @@index([isPublic])
 }
 
-// ============ PROJECT VERSION MODEL ============
+// ============ GENERATION MODEL - FIX FIELDS ============
+model Generation {
+  id        String   @id
+  userId    String
+  createdAt DateTime @default(now())
+  prompt    String
+  code      String   // ✅ ADD THIS (or keep response, your choice)
+  type      String
+  
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([userId])
+}
+
+// ============ ADD PROPER RELATIONS ============
+model Activity {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  userId    String
+  type      String
+  action    String
+  metadata  Json?
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  
+  // ✅ ADD RELATION
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt], map: "idx_activity_createdat")
+  @@index([userId], map: "idx_activity_userid")
+}
+
+model Feedback {
+  id          String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  userId      String
+  type        String
+  message     String
+  rating      Int?
+  status      String    @default("new")
+  response    String?
+  respondedAt DateTime? @db.Timestamp(6)
+  respondedBy String?
+  createdAt   DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime  @default(now()) @db.Timestamp(6)
+  
+  // ✅ ADD RELATION
+  User        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status], map: "idx_feedback_status")
+  @@index([type], map: "idx_feedback_type")
+  @@index([userId], map: "idx_feedback_userid")
+}
+
+model ProjectShare {
+  id         String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  projectId  String
+  sharedWith String
+  permission String    @default("view")
+  createdAt  DateTime  @default(now()) @db.Timestamp(6)
+  expiresAt  DateTime? @db.Timestamp(6)
+  
+  // ✅ ADD RELATIONS
+  Project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  User       User      @relation(fields: [sharedWith], references: [id], onDelete: Cascade)
+
+  @@index([projectId], map: "idx_projectshare_projectid")
+  @@index([sharedWith], map: "idx_projectshare_sharedwith")
+}
+
 model ProjectVersion {
-  id          String   @id @default(cuid())
+  id          String   @id
   projectId   String
-  version     Int
-  code        String   @db.Text
-  description String?
+  version     Int      // Keep as 'version' (matches DB)
+  code        String
+  description String?  // Keep as 'description' (matches DB)
   createdAt   DateTime @default(now())
   userId      String?
   
@@ -132,98 +199,27 @@ model ProjectVersion {
   User        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
-  @@index([userId])
+  @@index([userId], map: "idx_projectversion_userid")
 }
 
-// ============ GENERATION MODEL ============
-model Generation {
-  id        String   @id @default(cuid())
-  userId    String
-  createdAt DateTime @default(now())
-  prompt    String   @db.Text
-  code      String   @db.Text
-  type      String
-  
-  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([createdAt])
-  @@index([userId])
-}
-
-// ============ ACTIVITY MODEL ============
-model Activity {
-  id        String   @id @default(cuid())
-  userId    String
-  type      String
-  action    String
-  metadata  Json?
-  createdAt DateTime @default(now())
-  
-  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([createdAt])
-  @@index([userId])
-}
-
-// ============ FEEDBACK MODEL ============
-model Feedback {
-  id          String    @id @default(cuid())
-  userId      String
-  type        String
-  message     String    @db.Text
-  rating      Int?
-  status      String    @default("new")
-  response    String?   @db.Text
-  respondedAt DateTime?
-  respondedBy String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  
-  User        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([status])
-  @@index([type])
-  @@index([userId])
-}
-
-// ============ PROJECT SHARE MODEL ============
-model ProjectShare {
-  id         String    @id @default(cuid())
-  projectId  String
-  sharedWith String
-  permission String    @default("view")
-  createdAt  DateTime  @default(now())
-  expiresAt  DateTime?
-  
-  Project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  User       User      @relation(fields: [sharedWith], references: [id], onDelete: Cascade)
-
-  @@index([projectId])
-  @@index([sharedWith])
-}
-
-// ============ PROMO CODES MODEL ============
 model PromoCodes {
-  id            String    @id @default(cuid())
-  code          String    @unique
-  discountType  String
-  discountValue Int
-  maxUses       Int
-  timesUsed     Int       @default(0)
+  id            String   @id @default(cuid())
+  code          String   @unique
+  discountType  String   // 'percentage' or 'fixed'
+  discountValue Int      // Percentage (0-100) or fixed amount in cents
+  maxUses       Int      // -1 for unlimited
+  timesUsed     Int      @default(0)
   validUntil    DateTime?
-  applicableTo  String[]  @default([])
-  active        Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  applicableTo  String[] // Array of plan IDs: ['pro', 'enterprise']
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  @@index([code])
-  @@index([active])
   @@map("promo_codes")
 }
 
-// ============ SUBSCRIPTION MODEL ============
 model Subscription {
-  id                   String    @id @default(cuid())
+  id                   String    @id
   userId               String    @unique
   stripeCustomerId     String?   @unique
   stripeSubscriptionId String?   @unique
@@ -231,10 +227,10 @@ model Subscription {
   plan                 String    @default("free")
   status               String    @default("active")
   createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-  currentPeriodStart   DateTime  @default(now())
+  updatedAt            DateTime
+  currentPeriodStart   DateTime? @default(now())
   currentPeriodEnd     DateTime?
-  cancelAtPeriodEnd    Boolean   @default(false)
+  cancelAtPeriodEnd    Boolean?  @default(false)
   
   User                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -243,10 +239,9 @@ model Subscription {
   @@index([userId])
 }
 
-// ============ ANALYTICS EVENT MODEL ============
 model AnalyticsEvent {
-  id         String   @id @default(cuid())
-  userId     String?
+  id         String   @id
+  userId     String
   event      String
   properties Json?
   createdAt  DateTime @default(now())

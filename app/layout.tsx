@@ -8,47 +8,72 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   metadataBase: new URL('https://buildflow.app'),
   title: {
-    default: 'BuildFlow - AI-Powered Code Generation | Create Web Apps Instantly',
+    default: 'BuildFlow - AI-Powered App Builder',
     template: '%s | BuildFlow'
   },
-  description: 'Generate production-ready React components, landing pages, and web apps in seconds using AI. No coding required. Try BuildFlow free today.',
+  description: 'Build beautiful apps with AI. Create landing pages, web apps, and dashboards instantly. No coding required. Get production-ready React + Tailwind code in seconds.',
   keywords: [
-    'AI code generator',
-    'React component generator',
+    'AI app builder',
+    'no-code',
+    'low-code',
+    'code generator',
+    'AI coding assistant',
+    'React generator',
+    'Tailwind CSS',
     'landing page builder',
-    'no-code platform',
     'web app builder',
-    'AI development tool',
-    'Claude AI',
-    'code automation',
-    'rapid prototyping'
+    'dashboard builder',
+    'AI developer tools'
   ],
-  authors: [{ name: 'BuildFlow' }],
+  authors: [{ name: 'BuildFlow Team', url: 'https://buildflow.app' }],
   creator: 'BuildFlow',
   publisher: 'BuildFlow',
+  
+  // Open Graph
   openGraph: {
     type: 'website',
     locale: 'en_US',
     url: 'https://buildflow.app',
     siteName: 'BuildFlow',
-    title: 'BuildFlow - AI-Powered Code Generation',
-    description: 'Generate production-ready code in seconds with AI',
+    title: 'BuildFlow - AI-Powered App Builder',
+    description: 'Build beautiful apps with AI. No coding required.',
     images: [
       {
         url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'BuildFlow - AI Code Generator'
-      }
-    ]
+        alt: 'BuildFlow - AI App Builder',
+        type: 'image/png',
+      },
+    ],
   },
+  
+  // Twitter Card
   twitter: {
     card: 'summary_large_image',
-    title: 'BuildFlow - AI-Powered Code Generation',
-    description: 'Generate production-ready code in seconds',
+    site: '@buildflow',
+    creator: '@buildflow',
+    title: 'BuildFlow - AI-Powered App Builder',
+    description: 'Build beautiful apps with AI. No coding required.',
     images: ['/og-image.png'],
-    creator: '@buildflow'
   },
+  
+  // Icons
+  icons: {
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/icon.png', type: 'image/png', sizes: '32x32' },
+    ],
+    apple: '/apple-touch-icon.png',
+  },
+  
+  // Verification
+  verification: {
+    google: 'your-google-verification-code',
+    yandex: 'your-yandex-verification-code',
+  },
+  
+  // Robots
   robots: {
     index: true,
     follow: true,
@@ -60,10 +85,29 @@ export const metadata: Metadata = {
       'max-snippet': -1,
     },
   },
-  verification: {
-    google: 'your-google-verification-code',
-    yandex: 'your-yandex-verification-code',
-  }
+  
+  // ✅ Enhanced Alternates with mobile/desktop variants
+  alternates: {
+    canonical: 'https://buildflow.app',
+    languages: {
+      'en-US': 'https://buildflow.app',
+      'en-GB': 'https://buildflow.app/en-gb',
+      'es-ES': 'https://buildflow.app/es',
+      'fr-FR': 'https://buildflow.app/fr',
+      'de-DE': 'https://buildflow.app/de',
+      'x-default': 'https://buildflow.app', // Fallback for other languages
+    },
+    media: {
+      'only screen and (max-width: 600px)': 'https://m.buildflow.app',
+    },
+    types: {
+      'application/rss+xml': 'https://buildflow.app/rss.xml',
+      'application/atom+xml': 'https://buildflow.app/atom.xml',
+    },
+  },
+  
+  // Categories
+  category: 'technology',
 }
 
 export default function RootLayout({

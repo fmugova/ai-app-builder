@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authConfig } from '@/lib/auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { SUBSCRIPTION_TIERS, canGenerateMore, canCreateProject } from '@/lib/subscriptionTiers'
 
 export async function GET() {
   try {
-    const session = await getServerSession(authConfig)
+    const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -14,18 +14,20 @@ export async function GET() {
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       select: {
-        subscription: true,
-        generations: true,
-        // note: do not select subscriptionResetDate here if it's not present in the Prisma schema
+        subscriptionTier: true,
+        generationsUsed: true,
+        generationsLimit: true,
+        projectsThisMonth: true,  // ✅ Must exist
+        projectsLimit: true,      // ✅ Must exist
+        subscriptionResetDate: true,
       }
     }) as {
-      subscription: string | null;
-      // optional because the DB shape may differ from local expectations
-      generations?: number;
-      generationsCount?: number;
-      projectsThisMonth?: number;
-      // treat reset date as optional on the local type to avoid relying on a DB field that may not exist
-      subscriptionResetDate?: Date | null;
+      subscriptionTier: string | null;
+      generationsUsed: number;
+      generationsLimit: number;
+      projectsThisMonth: number;
+      projectsLimit: number;
+      subscriptionResetDate: Date | null;
     } | null
 
     if (!user) {
@@ -52,17 +54,16 @@ export async function GET() {
       // keep a local value for the reset date (does not attempt to persist if the field doesn't exist)
       user.subscriptionResetDate = now
       // ensure local fallbacks mirror the reset so subsequent logic uses 0
-      user.generations = 0
-      user.generationsCount = 0
+      user.generationsUsed = 0
       user.projectsThisMonth = 0
       // Note: we don't rely on the presence of the DB fields below; we'll use fallbacks when reading
     }
 
     // Use safe fallbacks for counts because the selected DB fields might have different names or be absent
-    const generationsUsed = (user as any).generationsCount ?? (user as any).generations ?? 0
-    const projectsThisMonthNow = (user as any).projectsThisMonth ?? 0
-
-    const tier = (user.subscription || 'free') as keyof typeof SUBSCRIPTION_TIERS
+    // Use safe fallbacks for counts because the selected DB fields might have different names or be absent
+    const generationsUsed = user.generationsUsed ?? 0
+    const projectsThisMonthNow = user.projectsThisMonth ?? 0
+    const tier = (user.subscriptionTier || 'free') as keyof typeof SUBSCRIPTION_TIERS
     const tierConfig = SUBSCRIPTION_TIERS[tier]
 
     const canGenerate = canGenerateMore(tier, generationsUsed)

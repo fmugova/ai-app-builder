@@ -1,37 +1,62 @@
-import Link from 'next/link'
-import { Sparkles } from 'lucide-react'
-import AuthForm from '@/components/AuthForm'
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import bcrypt from 'bcrypt'
 
-export default function SignUp() {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <Sparkles className="w-10 h-10 text-purple-600" />
-            <span className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-              AI App Builder
-            </span>
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900 mt-4">Create Your Account</h1>
-          <p className="text-gray-600 mt-2">Start building with AI in seconds</p>
-        </div>
+export async function POST(request: NextRequest) {
+  try {
+    const { name, email, password } = await request.json()
 
-        <div className="bg-white rounded-xl shadow-xl p-8">
-          <AuthForm mode="signup" />
-        </div>
+    console.log('📝 Signup attempt:', email)
 
-        <p className="text-center text-sm text-gray-600 mt-6">
-          By signing up, you agree to our{' '}
-          <Link href="/terms" className="text-purple-600 hover:underline">
-            Terms of Service
-          </Link>
-          {' '}and{' '}
-          <Link href="/privacy" className="text-purple-600 hover:underline">
-            Privacy Policy
-          </Link>
-        </p>
-      </div>
-    </div>
-  )
+    if (!email || !password) {
+      return NextResponse.json(
+        { error: 'Email and password are required' },
+        { status: 400 }
+      )
+    }
+
+    // Check if user exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    })
+
+    if (existingUser) {
+      return NextResponse.json(
+        { error: 'User already exists' },
+        { status: 400 }
+      )
+    }
+
+    // ✅ HASH PASSWORD (THIS IS CRITICAL!)
+    console.log('🔐 Hashing password...')
+    const hashedPassword = await bcrypt.hash(password, 10)
+    console.log('✅ Password hashed')
+
+    // Create user
+    const user = await prisma.user.create({
+      data: {
+        id: require('crypto').randomBytes(12).toString('hex'),
+        email,
+        name: name || email.split('@')[0],
+        password: hashedPassword, // ✅ Use hashed password, not plaintext!
+        updatedAt: new Date(),
+      },
+    })
+
+    console.log('✅ User created:', user.email)
+
+    return NextResponse.json(
+      { 
+        message: 'User created successfully',
+        user: { id: user.id, email: user.email, name: user.name }
+      },
+      { status: 201 }
+    )
+  } catch (error: any) {
+    console.error('❌ Signup error:', error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to create user' },
+      { status: 500 }
+    )
+  }
 }

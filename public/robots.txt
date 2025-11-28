@@ -1,0 +1,28 @@
+import { MetadataRoute } from 'next'
+
+export default function robots(): MetadataRoute.Robots {
+  return {
+    rules: [
+      {
+        userAgent: '*',
+        allow: '/',
+        disallow: [
+          '/api/',           // Don't crawl API routes
+          '/dashboard/',     // Don't crawl user dashboard (requires auth)
+          '/settings/',      // Don't crawl settings pages
+          '/_next/',         // Don't crawl Next.js internals
+          '/private/',       // Don't crawl private pages
+        ],
+      },
+      {
+        userAgent: 'GPTBot',  // OpenAI's crawler
+        disallow: '/',        // Optionally block AI crawlers
+      },
+      {
+        userAgent: 'ChatGPT-User',
+        disallow: '/',
+      },
+    ],
+    sitemap: 'https://buildflow.app/sitemap.xml',
+  }
+}
