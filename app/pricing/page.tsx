@@ -1,219 +1,217 @@
 'use client'
 
-import { useState } from 'react'
-import Link from 'next/link'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Check, ArrowLeft, Loader2 } from 'lucide-react'
-import type { Metadata } from 'next'
+import { Toaster, toast } from 'react-hot-toast'
 
-export const metadata: Metadata = {
-  title: 'Pricing',
-  description: 'Simple, transparent pricing for BuildFlow. Start free with 3 generations per month.',
-  alternates: {
-    canonical: 'https://buildflow.app/pricing',
+const PLANS = [
+  {
+    id: 'free',
+    name: 'Free',
+    price: 0,
+    description: 'Perfect for getting started',
+    features: [
+      '3 Projects',
+      'Basic AI Generation',
+      'Community Support',
+      'Basic Templates',
+      'Export to HTML',
+    ],
+    limitations: [
+      'Limited AI requests',
+      'No priority support',
+      'BuildFlow branding',
+    ],
+    cta: 'Get Started',
+    popular: false,
   },
-  openGraph: {
-    url: 'https://buildflow.app/pricing',
-    title: 'BuildFlow Pricing - Start Free',
-    description: 'Simple, transparent pricing. Start free with 3 generations per month.',
+  {
+    id: 'pro',
+    name: 'Pro',
+    price: 19,
+    originalPrice: 29,
+    description: 'Best for professionals',
+    features: [
+      'Unlimited Projects',
+      'Advanced AI Generation',
+      'Priority Support',
+      'All Premium Templates',
+      'Export to HTML/ZIP',
+      'GitHub Integration',
+      'Remove Branding',
+      'Custom Domains',
+    ],
+    limitations: [],
+    cta: 'Upgrade to Pro',
+    popular: true,
+    priceId: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID,
   },
-}
+  {
+    id: 'business',
+    name: 'Business',
+    price: 49,
+    description: 'For teams and agencies',
+    features: [
+      'Everything in Pro',
+      'Team Collaboration',
+      'API Access',
+      'White-label Options',
+      'Dedicated Support',
+      'Custom Integrations',
+      'Analytics Dashboard',
+      'SLA Guarantee',
+    ],
+    limitations: [],
+    cta: 'Contact Sales',
+    popular: false,
+    priceId: process.env.NEXT_PUBLIC_STRIPE_BUSINESS_PRICE_ID,
+  },
+]
 
 export default function PricingPage() {
   const router = useRouter()
   const { data: session } = useSession()
-  
+  const [loading, setLoading] = useState<string | null>(null)
   const [promoCode, setPromoCode] = useState('')
-  const [promoApplied, setPromoApplied] = useState(false)
-  const [promoDiscount, setPromoDiscount] = useState(0)
-  const [promoError, setPromoError] = useState('')
+  const [appliedPromo, setAppliedPromo] = useState<{
+    code: string
+    discountValue: number
+    discountType: string
+  } | null>(null)
   const [validatingPromo, setValidatingPromo] = useState(false)
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly')
 
-  const plans = [
-    {
-      id: 'free',
-      name: 'Free',
-      monthlyPrice: 0,
-      annualPrice: 0,
-      description: 'Perfect for trying out the platform',
-      features: [
-        '3 AI generations per month',
-        'Basic templates',
-        'Community support',
-        'Export code',
-      ],
-      cta: 'Get Started',
-      popular: false,
-    },
-    {
-      id: 'pro',
-      name: 'Pro',
-      monthlyPrice: 29,
-      annualPrice: 23, // $276/year = $23/month (save 20%)
-      description: 'Best for professional developers',
-      features: [
-        'Unlimited AI generations',
-        'All premium templates',
-        'Priority support',
-        'Advanced customization',
-        'Export to GitHub',
-        'Team collaboration',
-      ],
-      cta: 'Start Free Trial',
-      popular: true,
-    },
-    {
-      id: 'enterprise',
-      name: 'Enterprise',
-      monthlyPrice: 99,
-      annualPrice: 79, // $948/year = $79/month (save 20%)
-      description: 'For teams and organizations',
-      features: [
-        'Everything in Pro',
-        'Dedicated support',
-        'Custom integrations',
-        'SSO & advanced security',
-        'Priority feature requests',
-        'SLA guarantee',
-      ],
-      cta: 'Contact Sales',
-      popular: false,
-    },
-  ]
-
+  // Apply promo code
   const applyPromoCode = async () => {
     if (!promoCode.trim()) {
-      setPromoError('Please enter a promo code')
+      toast.error('Please enter a promo code')
       return
     }
 
     setValidatingPromo(true)
-    setPromoError('')
-
     try {
       const response = await fetch('/api/promo/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code: promoCode.toUpperCase(),
-          plan: 'pro',
-        }),
+        body: JSON.stringify({ code: promoCode.trim().toUpperCase() }),
       })
 
       const data = await response.json()
 
       if (data.valid) {
-        setPromoApplied(true)
-        setPromoDiscount(data.discountValue)
-        setPromoError('')
+        setAppliedPromo({
+          code: data.code,
+          discountValue: data.discountValue,
+          discountType: data.discountType,
+        })
+        toast.success(`🎉 ${data.discountValue}% discount applied!`)
       } else {
-        setPromoError(data.error || 'Invalid promo code')
-        setPromoApplied(false)
-        setPromoDiscount(0)
+        toast.error(data.message || 'Invalid promo code')
       }
     } catch (error) {
-      setPromoError('Failed to validate promo code')
-      setPromoApplied(false)
-      setPromoDiscount(0)
+      toast.error('Failed to validate promo code')
     } finally {
       setValidatingPromo(false)
     }
   }
 
-  const calculatePrice = (plan: typeof plans[0]) => {
-    const basePrice = billingCycle === 'monthly' ? plan.monthlyPrice : plan.annualPrice
-    if (basePrice === 0) return 0
-    if (promoApplied && plan.id === 'pro') {
-      return basePrice - (basePrice * promoDiscount / 100)
+  // Calculate discounted price
+  const getDiscountedPrice = (price: number) => {
+    if (!appliedPromo || price === 0) return price
+    if (appliedPromo.discountType === 'percentage') {
+      return price * (1 - appliedPromo.discountValue / 100)
     }
-    return basePrice
-  } //
+    return Math.max(0, price - appliedPromo.discountValue)
+  }
 
-  const handleUpgrade = async (planId: string) => {
+  // Handle subscription
+  const handleSubscribe = async (planId: string, priceId?: string) => {
     if (planId === 'free') {
-      router.push(session ? '/dashboard' : '/auth/signup')
+      router.push('/dashboard')
       return
     }
 
-    if (planId === 'enterprise') {
-      window.location.href = 'mailto:sales@buildflow.app?subject=Enterprise Plan Inquiry'
+    if (planId === 'business') {
+      window.location.href = 'mailto:sales@buildflow.app?subject=Business Plan Inquiry'
       return
     }
 
-    // ✅ Include promo code in checkout
-    const params = new URLSearchParams({
-      plan: planId,
-      ...(promoApplied && promoCode ? { promo: promoCode } : {})
-    })
-    
-    router.push(`/checkout?${params.toString()}`)
+    if (!session) {
+      router.push('/auth/signin?callbackUrl=/pricing')
+      return
+    }
+
+    if (!priceId) {
+      toast.error('Plan not available')
+      return
+    }
+
+    setLoading(planId)
+    try {
+      const response = await fetch('/api/stripe/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          priceId,
+          promoCode: appliedPromo?.code,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        throw new Error(data.error || 'Failed to create checkout')
+      }
+    } catch (error) {
+      console.error('Subscription error:', error)
+      toast.error('Failed to start checkout')
+    } finally {
+      setLoading(null)
+    }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
-      <div className="max-w-7xl mx-auto px-4 py-16">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-purple-600 hover:text-purple-700 mb-8 text-sm font-medium"
+    <>
+      <Toaster position="top-center" />
+      
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50 py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          {/* Back Button */}
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-8 transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Home
-          </Link>
+            <ArrowLeft className="w-5 h-5" />
+            <span>Back</span>
+          </button>
 
-          <h1 className="text-5xl font-bold text-gray-900 mb-4">
-            Choose Your Plan
-          </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto mb-8">
-            Start building amazing apps with AI assistance
-          </p>
-
-          {/* Billing Toggle */}
-          <div className="inline-flex items-center bg-white rounded-lg p-1 shadow-sm mb-8">
-            <button
-              onClick={() => setBillingCycle('monthly')}
-              className={`px-6 py-2 rounded-md text-sm font-medium transition ${
-                billingCycle === 'monthly'
-                  ? 'bg-purple-600 text-white'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Monthly
-            </button>
-            <button
-              onClick={() => setBillingCycle('annual')}
-              className={`px-6 py-2 rounded-md text-sm font-medium transition ${
-                billingCycle === 'annual'
-                  ? 'bg-purple-600 text-white'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Annual
-              <span className="ml-2 text-xs text-green-600 font-semibold">Save 20%</span>
-            </button>
+          {/* Header */}
+          <div className="text-center mb-12">
+            <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
+              Simple, Transparent Pricing
+            </h1>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Choose the plan that's right for you. Upgrade or downgrade at any time.
+            </p>
           </div>
 
           {/* Promo Code Input */}
-          <div className="max-w-md mx-auto">
+          <div className="max-w-md mx-auto mb-12">
             <div className="flex gap-2">
               <input
                 type="text"
                 value={promoCode}
-                onChange={(e) => {
-                  setPromoCode(e.target.value.toUpperCase())
-                  setPromoError('')
-                  setPromoApplied(false)
-                }}
+                onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
                 placeholder="Enter promo code"
-                className="flex-1 px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none uppercase font-mono"
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               />
               <button
                 onClick={applyPromoCode}
-                disabled={validatingPromo || !promoCode.trim()}
-                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                disabled={validatingPromo}
+                className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-medium transition-colors disabled:opacity-50"
               >
                 {validatingPromo ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -222,124 +220,147 @@ export default function PricingPage() {
                 )}
               </button>
             </div>
-            
-            {promoApplied && (
-              <p className="text-green-600 text-sm mt-2 font-medium flex items-center justify-center gap-2">
+            {appliedPromo && (
+              <div className="mt-2 text-green-600 text-sm flex items-center gap-2">
                 <Check className="w-4 h-4" />
-                🎉 {promoDiscount}% discount applied!
-              </p>
-            )}
-            
-            {promoError && (
-              <p className="text-red-600 text-sm mt-2">
-                {promoError}
-              </p>
-            )}
-            
-            {!promoApplied && !promoError && (
-              <p className="text-gray-500 text-sm mt-2">
-                Try: <span className="font-mono font-bold">LAUNCH2024</span> for 50% off
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-          {plans.map((plan) => {
-            const finalPrice = calculatePrice(plan)
-            const basePrice = billingCycle === 'monthly' ? plan.monthlyPrice : plan.annualPrice
-            const savings = basePrice - finalPrice
-
-            return (
-              <div
-                key={plan.id}
-                className={`bg-white rounded-2xl shadow-xl p-8 relative transition-all hover:scale-105 ${
-                  plan.popular ? 'ring-2 ring-blue-600' : ''
-                }`}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-blue-600 text-white text-sm font-bold rounded-full">
-                    Most Popular
-                  </div>
-                )}
-
-                <div className="text-center mb-6">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                    {plan.name}
-                  </h3>
-                  <p className="text-gray-600 text-sm mb-4">{plan.description}</p>
-
-                  <div className="flex items-baseline justify-center gap-2">
-                    {promoApplied && plan.id === 'pro' && basePrice > 0 && (
-                      <span className="text-2xl text-gray-400 line-through">
-                        ${basePrice}
-                      </span>
-                    )}
-                    <span className="text-5xl font-bold text-gray-900">
-                      ${finalPrice}
-                    </span>
-                    <span className="text-gray-600">
-                      /{billingCycle === 'monthly' ? 'mo' : 'mo'}
-                    </span>
-                  </div>
-
-                  {billingCycle === 'annual' && basePrice > 0 && (
-                    <p className="text-green-600 text-sm font-medium mt-1">
-                      ${basePrice * 12}/year
-                    </p>
-                  )}
-
-                  {promoApplied && savings > 0 && plan.id === 'pro' && (
-                    <div className="mt-2">
-                      <p className="text-green-600 text-sm font-medium">
-                        Save ${savings.toFixed(2)}/month
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        for first 3 months
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <ul className="space-y-3 mb-8">
-                  {plan.features.map((feature, i) => (
-                    <li key={i} className="flex items-start gap-3">
-                      <Check className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
-                      <span className="text-gray-700 text-sm">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-
+                <span>
+                  {appliedPromo.discountValue}% discount with code {appliedPromo.code}
+                </span>
                 <button
-                  onClick={() => handleUpgrade(plan.id)}
-                  className={`block w-full py-3 rounded-lg font-semibold text-center transition ${
-                    plan.popular
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-                  }`}
+                  onClick={() => setAppliedPromo(null)}
+                  className="text-red-500 hover:text-red-700 ml-2"
                 >
-                  {plan.cta}
+                  Remove
                 </button>
               </div>
-            )
-          })}
-        </div>
+            )}
+          </div>
 
-        {/* CTA Section */}
-        <div className="mt-16 text-center bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-12 text-white">
-          <h2 className="text-3xl font-bold mb-4">Ready to Start Building?</h2>
-          <p className="text-xl mb-8 opacity-90">
-            Join thousands of developers building faster with AI
-          </p>
-          <Link
-            href="/auth/signup"
-            className="inline-flex items-center gap-2 px-8 py-4 bg-white text-purple-600 rounded-lg font-bold text-lg hover:bg-gray-100 transition"
-          >
-            Get Started Free
-          </Link>
+          {/* Pricing Cards */}
+          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {PLANS.map((plan) => {
+              const discountedPrice = getDiscountedPrice(plan.price)
+              const hasDiscount = appliedPromo && plan.price > 0 && discountedPrice < plan.price
+
+              return (
+                <div
+                  key={plan.id}
+                  className={`relative bg-white rounded-2xl shadow-lg overflow-hidden transition-all hover:shadow-2xl ${
+                    plan.popular ? 'ring-2 ring-purple-600 scale-105' : 'border border-gray-100'
+                  }`}
+                >
+                  {/* Popular Badge */}
+                  {plan.popular && (
+                    <div className="absolute top-0 right-0 bg-purple-600 text-white px-4 py-1 text-sm font-medium rounded-bl-xl">
+                      Most Popular
+                    </div>
+                  )}
+
+                  <div className="p-8">
+                    {/* Plan Name */}
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                      {plan.name}
+                    </h3>
+                    <p className="text-gray-600 mb-6">{plan.description}</p>
+
+                    {/* Price */}
+                    <div className="mb-8">
+                      {hasDiscount && (
+                        <div className="text-gray-400 line-through text-lg">
+                          ${plan.price}/mo
+                        </div>
+                      )}
+                      <div className="flex items-baseline">
+                        <span className="text-5xl font-bold text-gray-900">
+                          ${hasDiscount ? discountedPrice.toFixed(0) : plan.price}
+                        </span>
+                        {plan.price > 0 && (
+                          <span className="text-gray-600 ml-2">/month</span>
+                        )}
+                      </div>
+                      {hasDiscount && (
+                        <div className="text-green-600 text-sm mt-1">
+                          Save ${(plan.price - discountedPrice).toFixed(0)}/mo
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Features */}
+                    <ul className="space-y-4 mb-8">
+                      {plan.features.map((feature, i) => (
+                        <li key={i} className="flex items-center gap-3">
+                          <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
+                          <span className="text-gray-700">{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    {/* CTA Button */}
+                    <button
+                      onClick={() => handleSubscribe(plan.id, plan.priceId)}
+                      disabled={loading === plan.id}
+                      className={`w-full py-4 rounded-xl font-semibold text-lg transition-all ${
+                        plan.popular
+                          ? 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg hover:shadow-xl'
+                          : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      {loading === plan.id ? (
+                        <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                      ) : (
+                        plan.cta
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* FAQ Section */}
+          <div className="mt-20 max-w-3xl mx-auto">
+            <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">
+              Frequently Asked Questions
+            </h2>
+            <div className="space-y-6">
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Can I cancel anytime?
+                </h3>
+                <p className="text-gray-600">
+                  Yes! You can cancel your subscription at any time. You'll continue to have access until the end of your billing period.
+                </p>
+              </div>
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  What payment methods do you accept?
+                </h3>
+                <p className="text-gray-600">
+                  We accept all major credit cards, debit cards, and PayPal through our secure payment partner Stripe.
+                </p>
+              </div>
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Is there a free trial?
+                </h3>
+                <p className="text-gray-600">
+                  Our Free plan lets you try all basic features. Upgrade when you're ready for more power!
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Trust Badges */}
+          <div className="mt-16 text-center">
+            <p className="text-gray-500 mb-4">Trusted by developers worldwide</p>
+            <div className="flex justify-center items-center gap-8 text-gray-400">
+              <span>🔒 Secure Payments</span>
+              <span>💳 Stripe Powered</span>
+              <span>🌍 Global Access</span>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }
