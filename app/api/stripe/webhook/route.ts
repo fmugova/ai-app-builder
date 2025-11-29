@@ -1,151 +1,195 @@
 export const dynamic = 'force-dynamic'
 
-// @ts-nocheck
-import { NextResponse } from "next/server"
-import { stripe, PLANS } from "@/lib/stripe"
-import { prisma } from "@/lib/db"
-import Stripe from "stripe"
+import { NextRequest, NextResponse } from 'next/server'
+import { headers } from 'next/headers'
+import Stripe from 'stripe'
+import { prisma } from '@/lib/prisma'
 
-export async function POST(req: Request) {
-  const body = await req.text()
-  const signature = req.headers.get("stripe-signature")!
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2025-11-17.clover',
+})
 
-  let event: Stripe.Event
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
 
+export async function POST(request: NextRequest) {
   try {
-    event = stripe.webhooks.constructEvent(
-      body,
-      signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
-    )
-  } catch (error) {
-    console.error("Webhook signature verification failed:", error)
-    return NextResponse.json(
-      { error: "Invalid signature" },
-      { status: 400 }
-    )
-  }
+    const body = await request.text()
+    const signature = headers().get('stripe-signature')!
 
-  try {
+    let event: Stripe.Event
+
+    try {
+      event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
+    } catch (err: any) {
+      console.error('Webhook signature verification failed:', err.message)
+      return NextResponse.json(
+        { error: 'Webhook signature verification failed' },
+        { status: 400 }
+      )
+    }
+
+    // Handle the event
     switch (event.type) {
-      case "checkout.session.completed": {
-        const session = event.data.object as Stripe.Checkout.Session
-        const userId = session.metadata?.userId
-        const plan = session.metadata?.plan as keyof typeof PLANS
+      case 'checkout.session.completed': {
+        const session = event.data.object
 
-        if (!userId || !plan) {
-          throw new Error("Missing metadata")
+        if (!session.metadata?.userId) {
+          console.error('No userId in session metadata')
+          break
         }
 
-        const planConfig = PLANS[plan]
+        // Determine plan from amount
+        const plan = 
+          session.amount_total === 1900 ? 'pro' : 
+          session.amount_total === 4900 ? 'business' : 
+          'free'
 
+        const planConfig = {
+          pro: { generationsLimit: 100, projectsLimit: 50 },
+          business: { generationsLimit: 500, projectsLimit: 200 },
+          free: { generationsLimit: 3, projectsLimit: 3 },
+        }[plan]
+
+        // Update or create subscription
         await prisma.subscription.upsert({
-          where: { userId },
+          where: { userId: session.metadata.userId },
           update: {
-            stripeCustomerId: session.customer as string,
+            plan: plan,
+            status: 'active',
             stripeSubscriptionId: session.subscription as string,
-            stripePriceId: session.line_items?.data[0]?.price?.id,
-            plan: plan.toLowerCase(),
-            status: "active",
-            generationsLimit: planConfig.generationsLimit,
-            generationsUsed: 0,
-            stripeCurrentPeriodEnd: session.expires_at 
-              ? new Date(session.expires_at * 1000)
-              : null,
+            stripePriceId: session.metadata?.priceId,
           },
           create: {
-            userId,
+            userId: session.metadata.userId,
+            plan: plan,
+            status: 'active',
             stripeCustomerId: session.customer as string,
             stripeSubscriptionId: session.subscription as string,
-            stripePriceId: session.line_items?.data[0]?.price?.id,
-            plan: plan.toLowerCase(),
-            status: "active",
+            stripePriceId: session.metadata?.priceId,
+          },
+        })
+
+        // Update user
+        await prisma.user.update({
+          where: { id: session.metadata.userId },
+          data: {
+            subscriptionTier: plan,
+            subscriptionStatus: 'active',
+            stripeCustomerId: session.customer as string,
+            stripeSubscriptionId: session.subscription as string,
             generationsLimit: planConfig.generationsLimit,
+            projectsLimit: planConfig.projectsLimit,
             generationsUsed: 0,
-            stripeCurrentPeriodEnd: session.expires_at 
-              ? new Date(session.expires_at * 1000)
-              : null,
           },
         })
 
+        console.log(`✅ Subscription created for user: ${session.metadata.userId}`)
         break
       }
 
-      case "invoice.payment_succeeded": {
-        const invoice = event.data.object as Stripe.Invoice
-        const subscriptionId = invoice.subscription as string | undefined
+      case 'customer.subscription.updated': {
+        const subscription = event.data.object
 
-        if (subscriptionId) {
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+        const status = subscription.status === 'active' ? 'active' : 'canceled'
 
-          await prisma.subscription.update({
-            where: { stripeSubscriptionId: subscriptionId },
-            data: {
-              status: "active",
-              stripeCurrentPeriodEnd: new Date(subscription.current_period_end * 1000),
-              generationsUsed: 0,
-            },
-          })
-        }
-
-        break
-      }
-
-      case "invoice.payment_failed": {
-        const invoice = event.data.object as Stripe.Invoice
-        const subscriptionId = invoice.subscription
-
-        if (subscriptionId && typeof subscriptionId === 'string') {
-          await prisma.subscription.update({
-            where: { stripeSubscriptionId: subscriptionId },
-            data: {
-              status: "past_due",
-            },
-          })
-        }
-
-        break
-      }
-
-      case "customer.subscription.deleted": {
-        const subscription = event.data.object as Stripe.Subscription
-
-        await prisma.subscription.update({
+        // Update subscription in database
+        await prisma.subscription.updateMany({
           where: { stripeSubscriptionId: subscription.id },
           data: {
-            status: "canceled",
-            plan: "free",
+            status: status,
+            currentPeriodStart: new Date((subscription as any).current_period_start * 1000),
+            currentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
+            cancelAtPeriodEnd: (subscription as any).cancel_at_period_end || false,
+          },
+        })
+
+        // Update user
+        await prisma.user.updateMany({
+          where: { stripeSubscriptionId: subscription.id },
+          data: {
+            subscriptionStatus: status,
+          },
+        })
+
+        console.log(`✅ Subscription updated: ${subscription.id}`)
+        break
+      }
+
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object
+
+        // Update subscription to canceled
+        await prisma.subscription.updateMany({
+          where: { stripeSubscriptionId: subscription.id },
+          data: {
+            status: 'canceled',
+            cancelAtPeriodEnd: false,
+          },
+        })
+
+        // Update user to free tier
+        await prisma.user.updateMany({
+          where: { stripeSubscriptionId: subscription.id },
+          data: {
+            subscriptionTier: 'free',
+            subscriptionStatus: 'canceled',
             generationsLimit: 3,
-            stripePriceId: null,
-            stripeCurrentPeriodEnd: null,
+            projectsLimit: 3,
           },
         })
 
+        console.log(`✅ Subscription canceled: ${subscription.id}`)
         break
       }
 
-      case "customer.subscription.updated": {
-        const subscription = event.data.object as Stripe.Subscription
+      case 'invoice.payment_succeeded': {
+        const invoice = event.data.object as any
 
-        await prisma.subscription.update({
-          where: { stripeSubscriptionId: subscription.id },
-          data: {
-            status: subscription.status,
-            stripePriceId: subscription.items.data[0].price.id,
-            stripeCurrentPeriodEnd: new Date(subscription.current_period_end * 1000),
-          },
-        })
+        if (invoice.subscription) {
+          await prisma.subscription.updateMany({
+            where: { stripeSubscriptionId: invoice.subscription as string },
+            data: {
+              status: 'active',
+            },
+          })
 
+          console.log(`✅ Payment succeeded for subscription: ${invoice.subscription}`)
+        }
         break
       }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as any
+
+        if (invoice.subscription) {
+          await prisma.subscription.updateMany({
+            where: { stripeSubscriptionId: invoice.subscription as string },
+            data: {
+              status: 'past_due',
+            },
+          })
+
+          await prisma.user.updateMany({
+            where: { stripeSubscriptionId: invoice.subscription as string },
+            data: {
+              subscriptionStatus: 'past_due',
+            },
+          })
+
+          console.log(`❌ Payment failed for subscription: ${invoice.subscription}`)
+        }
+        break
+      }
+
+      default:
+        console.log(`Unhandled event type: ${event.type}`)
     }
 
     return NextResponse.json({ received: true })
-
-  } catch (error) {
-    console.error("Webhook handler error:", error)
+  } catch (error: any) {
+    console.error('Webhook error:', error)
     return NextResponse.json(
-      { error: "Webhook handler failed" },
+      { error: 'Webhook handler failed' },
       { status: 500 }
     )
   }
