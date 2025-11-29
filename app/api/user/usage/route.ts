@@ -16,9 +16,9 @@ export async function GET() {
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       select: {
-        aiRequestsUsed: true,
-        aiRequestsLimit: true,
-        subscriptionPlan: true,
+        generationsUsed: true,
+        generationsLimit: true,
+        subscriptionTier: true,
       },
     })
 
@@ -28,10 +28,10 @@ export async function GET() {
 
     return NextResponse.json({
       usage: {
-        used: user.aiRequestsUsed || 0,
-        limit: user.aiRequestsLimit || 10,
-        plan: user.subscriptionPlan || 'free',
-        remaining: (user.aiRequestsLimit || 10) - (user.aiRequestsUsed || 0),
+        used: user.generationsUsed || 0,
+        limit: user.generationsLimit || 10,
+        plan: user.subscriptionTier || 'free',
+        remaining: (user.generationsLimit || 10) - (user.generationsUsed || 0),
       },
     })
   } catch (error) {

@@ -17,13 +17,13 @@ export async function GET() {
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       include: {
-        projects: {
+        Project: {
           orderBy: { createdAt: 'desc' },
         },
       },
     })
 
-    return NextResponse.json(user?.projects || [])
+    return NextResponse.json(user?.Project || [])
   } catch (error) {
     console.error('Fetch projects error:', error)
     return NextResponse.json(
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-      include: { _count: { select: { projects: true } } },
+      include: { _count: { select: { Project: true } } },
     })
 
     if (!user) {
@@ -52,10 +52,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Check project limit
-    const plan = user.subscriptionPlan || 'free'
+    const plan = user.subscriptionTier || 'free'
     const limit = plan === 'free' ? 3 : plan === 'pro' ? 50 : 999
     
-    if (user._count.projects >= limit) {
+    if (user._count.Project >= limit) {
       return NextResponse.json(
         { error: 'Project limit reached. Please upgrade your plan.' },
         { status: 429 }

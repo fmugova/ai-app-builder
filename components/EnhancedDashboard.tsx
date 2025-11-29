@@ -84,8 +84,8 @@ export default function EnhancedDashboard() {
         const response = await fetch("/api/projects");
         if (response.ok) {
           const data = await response.json();
-          setProjects(data.projects || []);
-          setProjectCount(data.projects?.length || 0);
+          setProjects(data.Project || []);
+          setProjectCount(data.Project?.length || 0);
         }
       } catch (error) {
         console.error("Error fetching projects:", error);

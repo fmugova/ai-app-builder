@@ -16,11 +16,11 @@ export async function GET() {
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       select: {
-        aiRequestsUsed: true,
-        aiRequestsLimit: true,
-        subscriptionPlan: true,
+        generationsUsed: true,
+        generationsLimit: true,
+        subscriptionTier: true,
         _count: {
-          select: { projects: true },
+          select: { Project: true },
         },
       },
     })
@@ -29,16 +29,16 @@ export async function GET() {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const plan = user.subscriptionPlan || 'free'
+    const plan = user.subscriptionTier || 'free'
     const projectLimit = plan === 'free' ? 3 : plan === 'pro' ? 50 : 999
-    const aiLimit = user.aiRequestsLimit || 10
+    const aiLimit = user.generationsLimit || 10
 
     return NextResponse.json({
-      canGenerate: (user.aiRequestsUsed || 0) < aiLimit,
-      canCreateProject: user._count.projects < projectLimit,
+      canGenerate: (user.generationsUsed || 0) < aiLimit,
+      canCreateProject: user._count.Project < projectLimit,
       limits: {
-        aiRequests: { used: user.aiRequestsUsed || 0, limit: aiLimit },
-        projects: { used: user._count.projects, limit: projectLimit },
+        aiRequests: { used: user.generationsUsed || 0, limit: aiLimit },
+        Project: { used: user._count.Project, limit: projectLimit },
       },
       plan,
     })

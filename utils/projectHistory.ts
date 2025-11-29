@@ -76,7 +76,7 @@ export function updateProject(id: string, updates: Partial<Project>): Project | 
   if (index === -1) return null;
   
   projects[index] = {
-    ...projects[index],
+    ...Project[index],
     ...updates,
     updatedAt: new Date(),
   };

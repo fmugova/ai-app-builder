@@ -23,9 +23,9 @@ export async function POST(request: NextRequest) {
       where: { email: session.user.email },
       select: {
         id: true,
-        aiRequestsUsed: true,
-        aiRequestsLimit: true,
-        subscriptionPlan: true,
+        generationsUsed: true,
+        generationsLimit: true,
+        subscriptionTier: true,
       },
     })
 
@@ -33,8 +33,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const limit = user.aiRequestsLimit || 10
-    if ((user.aiRequestsUsed || 0) >= limit) {
+    const limit = user.generationsLimit || 10
+    if ((user.generationsUsed || 0) >= limit) {
       return NextResponse.json(
         { error: 'AI request limit reached. Please upgrade your plan.' },
         { status: 429 }
@@ -72,7 +72,7 @@ Requirements:
     // Increment usage
     await prisma.user.update({
       where: { id: user.id },
-      data: { aiRequestsUsed: { increment: 1 } },
+      data: { generationsUsed: { increment: 1 } },
     })
 
     const content = message.content[0]
