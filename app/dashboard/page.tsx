@@ -91,7 +91,7 @@ export default function DashboardPage() {
 
   // ✅ ADD THIS: Filter and sort logic
   const filteredProjects = useMemo(() => {
-    let filtered = [...Project]
+    let filtered = [...projects]
 
     // Search
     if (searchQuery) {
