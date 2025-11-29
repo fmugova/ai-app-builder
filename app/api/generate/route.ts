@@ -25,7 +25,6 @@ export async function POST(request: NextRequest) {
         id: true,
         generationsUsed: true,
         generationsLimit: true,
-        subscriptionTier: true,
       },
     })
 
