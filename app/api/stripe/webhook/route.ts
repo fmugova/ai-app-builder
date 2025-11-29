@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 // @ts-nocheck
 import { NextResponse } from "next/server"
 import { stripe, PLANS } from "@/lib/stripe"

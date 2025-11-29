@@ -1,45 +1,44 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest) {
+import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+
+export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(authOptions)
     
     if (!session?.user?.email) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-    });
+      select: {
+        aiRequestsUsed: true,
+        aiRequestsLimit: true,
+        subscriptionPlan: true,
+      },
+    })
 
     if (!user) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const projectCount = await prisma.project.count({
-      where: { userId: user.id },
-    });
-
     return NextResponse.json({
-      generationsUsed: 0,
-      generationsLimit: 3,
-      projectsCreated: projectCount,
-      plan: "free",
-    });
+      usage: {
+        used: user.aiRequestsUsed || 0,
+        limit: user.aiRequestsLimit || 10,
+        plan: user.subscriptionPlan || 'free',
+        remaining: (user.aiRequestsLimit || 10) - (user.aiRequestsUsed || 0),
+      },
+    })
   } catch (error) {
-    console.error("Error fetching usage:", error);
+    console.error('Usage error:', error)
     return NextResponse.json(
-      { error: "Failed to fetch usage" },
+      { error: 'Failed to fetch usage' },
       { status: 500 }
-    );
+    )
   }
 }
