@@ -1,62 +1,47 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import bcrypt from 'bcrypt'
+'use client'
 
-export async function POST(request: NextRequest) {
-  try {
-    const { name, email, password } = await request.json()
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+// ... other imports
 
-    console.log('📝 Signup attempt:', email)
+export default function SignupPage() {
+  const [loading, setLoading] = useState(false)
+  const router = useRouter()
 
-    if (!email || !password) {
-      return NextResponse.json(
-        { error: 'Email and password are required' },
-        { status: 400 }
-      )
+  const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setLoading(true)
+
+    const formData = new FormData(e.currentTarget)
+    
+    try {
+      // Call the API route instead
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.get('email'),
+          password: formData.get('password'),
+          name: formData.get('name'),
+        }),
+      })
+
+      if (response.ok) {
+        router.push('/auth/signin')
+      } else {
+        const error = await response.json()
+        alert(error.message || 'Signup failed')
+      }
+    } catch (error) {
+      alert('Signup failed')
+    } finally {
+      setLoading(false)
     }
-
-    // Check if user exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    })
-
-    if (existingUser) {
-      return NextResponse.json(
-        { error: 'User already exists' },
-        { status: 400 }
-      )
-    }
-
-    // ✅ HASH PASSWORD (THIS IS CRITICAL!)
-    console.log('🔐 Hashing password...')
-    const hashedPassword = await bcrypt.hash(password, 10)
-    console.log('✅ Password hashed')
-
-    // Create user
-    const user = await prisma.user.create({
-      data: {
-        id: require('crypto').randomBytes(12).toString('hex'),
-        email,
-        name: name || email.split('@')[0],
-        password: hashedPassword, // ✅ Use hashed password, not plaintext!
-        updatedAt: new Date(),
-      },
-    })
-
-    console.log('✅ User created:', user.email)
-
-    return NextResponse.json(
-      { 
-        message: 'User created successfully',
-        user: { id: user.id, email: user.email, name: user.name }
-      },
-      { status: 201 }
-    )
-  } catch (error: any) {
-    console.error('❌ Signup error:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to create user' },
-      { status: 500 }
-    )
   }
+
+  return (
+    <form onSubmit={handleSignup}>
+      {/* Your form JSX */}
+    </form>
+  )
 }
