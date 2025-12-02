@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import Link from 'next/link'
 import { Sparkles, Code, Zap, Shield, Users, ArrowRight } from 'lucide-react'
 import type { Metadata } from 'next'
