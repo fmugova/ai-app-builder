@@ -77,6 +77,19 @@ Requirements:
     const content = message.content[0]
     const code = content.type === 'text' ? content.text : ''
 
+    // Log activity
+    await prisma.activity.create({
+      data: {
+        userId: user.id,
+        type: 'generation',
+        action: 'generated',
+        metadata: {
+          promptPreview: prompt.substring(0, 100),
+          generationType: type || 'landing-page'
+        }
+      }
+    })
+
     return NextResponse.json({ code })
   } catch (error) {
     console.error('Generate error:', error)

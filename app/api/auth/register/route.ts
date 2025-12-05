@@ -47,6 +47,19 @@ export async function POST(req: Request) {
       },
     });
 
+    // Log activity
+    await prisma.activity.create({
+      data: {
+        userId: user.id,
+        type: 'auth',
+        action: 'signup',
+        metadata: {
+          email: user.email,
+          name: user.name
+        }
+      }
+    });
+
     return NextResponse.json(
       {
         message: "User created successfully",

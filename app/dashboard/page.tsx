@@ -1,576 +1,616 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react' // ✅ Add useMemo
+import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useSession, signOut } from 'next-auth/react'
-import { Toaster, toast } from 'react-hot-toast'
+import Link from 'next/link'
 import SimpleExportButton from '@/components/SimpleExportButton'
-import SearchFilter from '@/components/SearchFilter' // ✅ Add this import
+import OnboardingTutorial, { QuickTips } from '@/components/OnboardingTutorial'
+
+const ADMIN_EMAILS = ['fmugova@yahoo.com', 'admin@buildflow.app']
 
 interface Project {
   id: string
   name: string
-  description: string
-  type: string
-  code?: string
+  description: string | null
+  code: string | null
+  prompt: string | null
   createdAt: string
+  updatedAt: string
 }
 
-const STAT_CARDS = [
-  {
-    label: 'Total Projects',
-    icon: '📁',
-    color: 'from-purple-500 to-purple-600',
-  },
-  {
-    label: 'Active',
-    icon: '🚀',
-    color: 'from-blue-500 to-blue-600',
-  },
-  {
-    label: 'Completed',
-    icon: '✅',
-    color: 'from-green-500 to-green-600',
-  },
-  {
-    label: 'In Progress',
-    icon: '⚡',
-    color: 'from-yellow-500 to-yellow-600',
-  },
-]
-
-const ADMIN_EMAILS = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(e => e.trim()) || []
+interface UserStats {
+  projectsThisMonth: number
+  projectsLimit: number
+  generationsUsed: number
+  generationsLimit: number
+  subscriptionTier: string
+  subscriptionStatus: string
+}
 
 export default function DashboardPage() {
-  const router = useRouter()
   const { data: session, status } = useSession()
+  const router = useRouter()
   const [projects, setProjects] = useState<Project[]>([])
+  const [stats, setStats] = useState<UserStats | null>(null)
   const [loading, setLoading] = useState(true)
-  const [darkMode, setDarkMode] = useState(false)
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  // ✅ ADD THESE: Search, Filter, Sort state
   const [searchQuery, setSearchQuery] = useState('')
-  const [filterType, setFilterType] = useState('all')
-  const [sortBy, setSortBy] = useState('newest')
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
 
   const isAdmin = session?.user?.email && ADMIN_EMAILS.includes(session.user.email)
 
-  // Initialize dark mode from localStorage
   useEffect(() => {
-    const savedDarkMode = localStorage.getItem('darkMode') === 'true'
-    setDarkMode(savedDarkMode)
-    fetchProjects()
-  }, [])
+    if (status === 'loading') return
 
-  // Save dark mode preference
-  useEffect(() => {
-    localStorage.setItem('darkMode', darkMode.toString())
-  }, [darkMode])
+    if (!session) {
+      router.push('/auth/signin')
+      return
+    }
 
-  // Fetch projects function
-  const fetchProjects = async () => {
+    loadDashboard()
+  }, [session, status])
+
+  const loadDashboard = async () => {
     try {
-      setError(null)
-      const res = await fetch('/api/projects')
-      if (res.ok) {
-        const data = await res.json()
+      const [projectsRes, statsRes] = await Promise.all([
+        fetch('/api/projects'),
+        fetch('/api/user/stats')
+      ])
+
+      if (projectsRes.ok) {
+        const data = await projectsRes.json()
         setProjects(data)
-      } else {
-        setError('Failed to load projects')
+      }
+
+      if (statsRes.ok) {
+        const data = await statsRes.json()
+        setStats(data)
       }
     } catch (error) {
-      console.error('Error fetching projects:', error)
-      setError('Failed to fetch projects')
-      toast.error('Failed to fetch projects')
+      console.error('Failed to load dashboard:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  // ✅ ADD THIS: Filter and sort logic
-  const filteredProjects = useMemo(() => {
-    let filtered = [...projects]
-
-    // Search
-    if (searchQuery) {
-      filtered = filtered.filter(p =>
-        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.description?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    }
-
-    // Filter by type
-    if (filterType !== 'all') {
-      filtered = filtered.filter(p => p.type === filterType)
-    }
-
-    // Sort
-    switch (sortBy) {
-      case 'newest':
-        filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        break
-      case 'oldest':
-        filtered.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-        break
-      case 'name-asc':
-        filtered.sort((a, b) => a.name.localeCompare(b.name))
-        break
-      case 'name-desc':
-        filtered.sort((a, b) => b.name.localeCompare(a.name))
-        break
-    }
-
-    return filtered
-  }, [projects, searchQuery, filterType, sortBy])
-
-  // ✅ ADD THIS: Get unique project types
-  const projectTypes = useMemo(() => {
-    return [...new Set(projects.map(p => p.type))]
-  }, [projects])
-
-  // Duplicate function
-  const duplicateProject = async (projectId: string, projectName: string) => {
+  const handleDeleteProject = async (projectId: string) => {
     try {
-      toast.loading('Duplicating project...', { id: 'duplicate' })
-
-      const response = await fetch(`/api/projects/${projectId}/duplicate`, {
-        method: 'POST',
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        await fetchProjects()
-        toast.success(`✅ "${projectName}" duplicated successfully!`, { id: 'duplicate' })
-      } else {
-        const error = await response.json()
-        toast.error(`❌ Error: ${error.error}`, { id: 'duplicate' })
-      }
-    } catch (error) {
-      console.error('Duplicate error:', error)
-      toast.error('❌ Failed to duplicate project', { id: 'duplicate' })
-    }
-  }
-
-  // Delete project function
-  const deleteProject = async (projectId: string) => {
-    if (!confirm('Are you sure you want to delete this project?')) {
-      return
-    }
-
-    try {
-      toast.loading('Deleting project...', { id: 'delete' })
-
-      const response = await fetch(`/api/projects/${projectId}`, {
-        method: 'DELETE',
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: 'DELETE'
       })
 
-      if (response.ok) {
-        await fetchProjects()
-        toast.success('✅ Project deleted successfully!', { id: 'delete' })
+      if (res.ok) {
+        setProjects(projects.filter(p => p.id !== projectId))
+        setShowDeleteConfirm(null)
+        alert('Project deleted successfully!')
       } else {
-        const error = await response.json()
-        toast.error(`❌ Error: ${error.error}`, { id: 'delete' })
+        alert('Failed to delete project')
       }
     } catch (error) {
       console.error('Delete error:', error)
-      toast.error('❌ Failed to delete project', { id: 'delete' })
+      alert('Failed to delete project')
     }
   }
 
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === 'd' && selectedProjectId) {
-        e.preventDefault()
-        const project = projects.find(p => p.id === selectedProjectId)
-        if (project) {
-          duplicateProject(project.id, project.name)
-        }
-      }
-    }
+  const handleDuplicateProject = async (projectId: string) => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/duplicate`, {
+        method: 'POST'
+      })
 
-    window.addEventListener('keydown', handleKeyPress)
-    return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [selectedProjectId, projects])
+      if (res.ok) {
+        await loadDashboard()
+        alert('Project duplicated successfully!')
+      } else {
+        alert('Failed to duplicate project')
+      }
+    } catch (error) {
+      console.error('Duplicate error:', error)
+      alert('Failed to duplicate project')
+    }
+  }
+
+  const filteredProjects = projects.filter(project =>
+    project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (project.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+  )
+
+  const getUsagePercentage = (used: number, limit: number) => {
+    return Math.min((used / limit) * 100, 100)
+  }
+
+  const getUsageColor = (percentage: number) => {
+    if (percentage >= 90) return 'bg-red-500'
+    if (percentage >= 70) return 'bg-yellow-500'
+    return 'bg-green-500'
+  }
+
+  const getTierColor = (tier: string) => {
+    switch (tier) {
+      case 'enterprise': return 'from-purple-500 to-pink-500'
+      case 'business': return 'from-blue-500 to-cyan-500'
+      case 'pro': return 'from-green-500 to-emerald-500'
+      default: return 'from-gray-500 to-gray-600'
+    }
+  }
+
+  const getTierBadge = (tier: string) => {
+    switch (tier) {
+      case 'enterprise': return { text: 'Enterprise', color: 'bg-purple-900 text-purple-200 border-purple-700' }
+      case 'business': return { text: 'Business', color: 'bg-blue-900 text-blue-200 border-blue-700' }
+      case 'pro': return { text: 'Pro', color: 'bg-green-900 text-green-200 border-green-700' }
+      default: return { text: 'Free', color: 'bg-gray-700 text-gray-300 border-gray-600' }
+    }
+  }
+
+  if (status === 'loading' || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading your workspace...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const tierBadge = stats ? getTierBadge(stats.subscriptionTier) : { text: 'Free', color: 'bg-gray-700 text-gray-300' }
+  const projectsPercentage = stats ? getUsagePercentage(stats.projectsThisMonth, stats.projectsLimit) : 0
+  const generationsPercentage = stats ? getUsagePercentage(stats.generationsUsed, stats.generationsLimit) : 0
 
   return (
-    <>
-      <Toaster position="top-right" />
-      
-      <div className={`min-h-screen transition-colors duration-300 ${
-        darkMode 
-          ? 'bg-gray-900' 
-          : 'bg-gradient-to-br from-slate-50 via-white to-purple-50'
-      }`}>
-        {/* Header */}
-        <header className={`border-b sticky top-0 z-50 shadow-sm backdrop-blur-sm transition-colors ${
-          darkMode 
-            ? 'bg-gray-800/95 border-gray-700' 
-            : 'bg-white/95 border-gray-200'
-        }`}>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-            <div className="flex items-center justify-between">
-              {/* Logo & User Info */}
-              <div className="flex items-center gap-4">
-                <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-3 rounded-xl shadow-lg">
-                  <span className="text-white text-2xl font-bold">BF</span>
+    <div className="min-h-screen bg-gray-900">
+      {/* Header */}
+      <header className="bg-gray-800 border-b border-gray-700 sticky top-0 z-50 backdrop-blur-sm bg-gray-800/95">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Link href="/" className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+                  <span className="text-2xl">⚡</span>
                 </div>
                 <div>
-                  <h1 className={`text-xl sm:text-2xl font-bold ${
-                    darkMode ? 'text-white' : 'text-gray-900'
-                  }`}>
-                    BuildFlow
-                  </h1>
-                  <p className={`text-xs sm:text-sm ${
-                    darkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>
-                    Welcome, {session?.user?.name}! 👋
-                  </p>
+                  <h1 className="text-xl font-bold text-white">BuildFlow</h1>
+                  <p className="text-xs text-gray-400">AI App Builder</p>
                 </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2">
-                {/* Dark Mode Toggle */}
-                <button
-                  onClick={() => setDarkMode(!darkMode)}
-                  className={`p-3 rounded-xl transition-all ${
-                    darkMode 
-                      ? 'bg-yellow-900 hover:bg-yellow-800 text-yellow-200'
-                      : 'bg-gray-700 hover:bg-gray-600 text-gray-200'
-                  }`}
-                  aria-label="Toggle dark mode"
-                >
-                  <span className="text-xl">{darkMode ? '☀️' : '🌙'}</span>
-                </button>
-
-                {/* Analytics */}
-                <button
-                  onClick={() => router.push('/analytics')}
-                  className="hidden sm:flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all font-medium"
-                >
-                  <span>📊</span>
-                  <span>Analytics</span>
-                </button>
-
-                {/* Admin Button */}
-                {isAdmin && (
-                  <button
-                    onClick={() => router.push('/admin')}
-                    className="hidden sm:flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl transition-all font-medium"
-                  >
-                    <span>🛡️</span>
-                    <span>Admin</span>
-                  </button>
-                )}
-
-                {/* Logout */}
-                <button
-                  onClick={() => signOut({ callbackUrl: '/' })}
-                  className={`p-3 rounded-xl transition-all ${
-                    darkMode
-                      ? 'bg-purple-700 hover:bg-purple-600 text-white'
-                      : 'bg-purple-600 hover:bg-purple-700 text-white'
-                  }`}
-                  aria-label="Sign out"
-                >
-                  <span className="text-xl">🚪</span>
-                </button>
-              </div>
+              </Link>
             </div>
-          </div>
-        </header>
 
-        {/* Hero Section */}
-        <div className={`py-12 sm:py-16 ${
-          darkMode 
-            ? 'bg-gradient-to-r from-purple-900 via-blue-900 to-indigo-900' 
-            : 'bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600'
-        }`}>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6">
-            <div className="flex flex-col items-center gap-6">
-              {/* Title */}
-              <div className="text-center">
-                <h2 className="text-3xl sm:text-4xl font-bold text-white mb-2">
-                  Your Projects
-                </h2>
-                <p className="text-base sm:text-lg text-purple-100">
-                  {filteredProjects.length} of {projects.length} projects
-                </p>
-              </div>
-
-              {/* ✅ Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-                {/* Create New Project */}
+            <div className="flex items-center gap-3">
+              {stats && (
+                <span className={`px-4 py-2 rounded-lg border-2 ${tierBadge.color} text-sm font-semibold`}>
+                  {tierBadge.text}
+                </span>
+              )}
+              {isAdmin && (
                 <button
-                  onClick={() => router.push('/builder')}
-                  className="px-6 sm:px-8 py-3 sm:py-4 bg-white hover:bg-gray-50 text-purple-600 rounded-xl font-semibold text-base sm:text-lg shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-3"
+                  onClick={() => router.push('/admin')}
+                  className="hidden sm:flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl transition-all font-medium"
                 >
-                  <span className="text-2xl">✨</span>
-                  <span>Create New Project</span>
+                  <span>🛡️</span>
+                  <span>Admin</span>
                 </button>
-
-                {/* ✅ Browse Templates Button */}
-                <button
-                  onClick={() => router.push('/templates')}
-                  className="px-6 sm:px-8 py-3 sm:py-4 bg-transparent hover:bg-white/10 text-white border-2 border-white rounded-xl font-semibold text-base sm:text-lg shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-3"
-                >
-                  <span className="text-2xl">📋</span>
-                  <span>Browse Templates</span>
-                </button>
-              </div>
+              )}
+              <button
+                onClick={() => router.push('/api/auth/signout')}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition"
+              >
+                Sign Out
+              </button>
             </div>
           </div>
         </div>
+      </header>
 
-        {/* Stats Cards */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 -mt-8">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            {STAT_CARDS.map((stat, i) => (
-              <div 
-                key={i} 
-                className={`rounded-2xl shadow-lg p-4 sm:p-6 border transition-all hover:shadow-xl ${
-                  darkMode
-                    ? 'bg-gray-800 border-gray-700'
-                    : 'bg-white border-gray-100'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <p className={`text-xs sm:text-sm font-medium ${
-                    darkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>
-                    {stat.label}
-                  </p>
-                  <div className={`bg-gradient-to-r ${stat.color} p-2 rounded-lg`}>
-                    <span className="text-white text-lg sm:text-xl">{stat.icon}</span>
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Welcome Section */}
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold text-white mb-2">
+            Welcome back, {session?.user?.name || 'Developer'}! 👋
+          </h2>
+          <p className="text-gray-400">
+            {projects.length === 0 
+              ? "Let's build something amazing with AI-powered app generation."
+              : `You have ${projects.length} project${projects.length !== 1 ? 's' : ''} in your workspace.`
+            }
+          </p>
+        </div>
+
+        {/* Usage Stats Cards */}
+        {stats && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            {/* Projects Usage */}
+            <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700 hover:border-gray-600 transition">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-blue-900/30 rounded-xl flex items-center justify-center">
+                    <span className="text-2xl">📊</span>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-400">Projects</p>
+                    <p className="text-2xl font-bold text-white">
+                      {stats.projectsThisMonth}/{stats.projectsLimit}
+                    </p>
                   </div>
                 </div>
-                <p className={`text-2xl sm:text-4xl font-bold ${
-                  darkMode ? 'text-white' : 'text-gray-900'
-                }`}>
-                  {projects.length}
+              </div>
+              <div className="space-y-2">
+                <div className="w-full bg-gray-700 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full transition-all ${getUsageColor(projectsPercentage)}`}
+                    style={{ width: `${projectsPercentage}%` }}
+                  ></div>
+                </div>
+                <p className="text-xs text-gray-400">
+                  {projectsPercentage.toFixed(0)}% used this month
                 </p>
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
 
-        {/* ✅ ADD THIS: Search & Filter Section */}
-        {projects.length > 0 && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 mt-8">
-            <SearchFilter
-              onSearch={setSearchQuery}
-              onFilterType={setFilterType}
-              onSort={setSortBy}
-              projectTypes={projectTypes}
-            />
+            {/* Generations Usage */}
+            <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700 hover:border-gray-600 transition">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-purple-900/30 rounded-xl flex items-center justify-center">
+                    <span className="text-2xl">✨</span>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-400">AI Generations</p>
+                    <p className="text-2xl font-bold text-white">
+                      {stats.generationsUsed}/{stats.generationsLimit}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="w-full bg-gray-700 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full transition-all ${getUsageColor(generationsPercentage)}`}
+                    style={{ width: `${generationsPercentage}%` }}
+                  ></div>
+                </div>
+                <p className="text-xs text-gray-400">
+                  {generationsPercentage.toFixed(0)}% used this month
+                </p>
+              </div>
+            </div>
+
+            {/* Subscription Status */}
+            <div className={`bg-gradient-to-br ${getTierColor(stats.subscriptionTier)} rounded-2xl p-6 border border-gray-700`}>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-sm text-white/80">Your Plan</p>
+                  <p className="text-2xl font-bold text-white capitalize">{stats.subscriptionTier}</p>
+                </div>
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <span className="text-2xl">👑</span>
+                </div>
+              </div>
+              {stats.subscriptionTier === 'free' && (
+                <Link
+                  href="/pricing"
+                  className="block w-full bg-white text-gray-900 hover:bg-gray-100 py-2 rounded-lg transition font-semibold text-sm text-center"
+                >
+                  Upgrade to Pro
+                </Link>
+              )}
+            </div>
           </div>
         )}
 
-        {/* ✅ Projects Grid - Updated to use filteredProjects */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-          {loading ? (
-            <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-              <p className={`mt-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                Loading projects...
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {/* New Project */}
+          <button
+            onClick={() => window.location.href = '/builder'}
+            className="flex items-center gap-3 p-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-xl transition group"
+          >
+            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition">
+              <span className="text-2xl">✨</span>
+            </div>
+            <div className="text-left">
+              <p className="font-semibold text-white">New Project</p>
+              <p className="text-xs text-white/80">Create with AI</p>
+            </div>
+          </button>
+
+          {/* Templates */}
+          <button
+            onClick={() => window.location.href = '/templates'}
+            className="flex items-center gap-3 p-4 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-purple-500 rounded-xl transition group"
+          >
+            <div className="w-10 h-10 bg-blue-900/30 rounded-lg flex items-center justify-center group-hover:scale-110 transition">
+              <span className="text-2xl">📋</span>
+            </div>
+            <div className="text-left">
+              <p className="font-semibold text-white group-hover:text-blue-400 transition">Templates</p>
+              <p className="text-xs text-gray-400">6 ready to use</p>
+            </div>
+          </button>
+
+          {/* Tutorial */}
+          <button
+            onClick={() => {
+              localStorage.removeItem('buildflow_onboarding_completed')
+              window.location.reload()
+            }}
+            className="flex items-center gap-3 p-4 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-green-500 rounded-xl transition group"
+          >
+            <div className="w-10 h-10 bg-green-900/30 rounded-lg flex items-center justify-center group-hover:scale-110 transition">
+              <span className="text-2xl">🎓</span>
+            </div>
+            <div className="text-left">
+              <p className="font-semibold text-white group-hover:text-green-400 transition">Tutorial</p>
+              <p className="text-xs text-gray-400">Learn the basics</p>
+            </div>
+          </button>
+
+          {/* Get Help */}
+          <button
+            onClick={() => {
+              const email = session?.user?.email || ''
+              const subject = 'BuildFlow Support Request'
+              const body = `Hi BuildFlow Team,\n\nI need help with:\n\n[Describe your issue here]\n\nUser: ${email}\nProjects: ${projects.length}`
+              window.location.href = `mailto:support@buildflow.app?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+            }}
+            className="flex items-center gap-3 p-4 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-orange-500 rounded-xl transition group"
+          >
+            <div className="w-10 h-10 bg-orange-900/30 rounded-lg flex items-center justify-center group-hover:scale-110 transition">
+              <span className="text-2xl">💬</span>
+            </div>
+            <div className="text-left">
+              <p className="font-semibold text-white group-hover:text-orange-400 transition">Get Help</p>
+              <p className="text-xs text-gray-400">Email support</p>
+            </div>
+          </button>
+        </div>
+
+        {/* Projects Section */}
+        <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+          {/* Projects Header */}
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-xl font-bold text-white mb-1">Your Projects</h3>
+              <p className="text-sm text-gray-400">
+                {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''} found
               </p>
             </div>
-          ) : projects.length === 0 ? (
-            <div className={`rounded-3xl shadow-xl p-8 sm:p-16 text-center border transition-colors ${
-              darkMode
-                ? 'bg-gray-800 border-gray-700'
-                : 'bg-white border-gray-100'
-            }`}>
-              <div className="text-6xl sm:text-8xl mb-6">🚀</div>
-              <h3 className={`text-2xl sm:text-3xl font-bold mb-4 ${
-                darkMode ? 'text-white' : 'text-gray-900'
-              }`}>
-                No projects yet
-              </h3>
-              <p className={`text-base sm:text-lg mb-8 ${
-                darkMode ? 'text-gray-400' : 'text-gray-600'
-              }`}>
-                Start building something amazing today!
-              </p>
-              <button
-                onClick={() => router.push('/builder')}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 sm:px-10 py-3 sm:py-4 rounded-xl text-base sm:text-lg font-semibold hover:shadow-2xl transform hover:scale-105 transition-all"
+
+            <div className="flex gap-3">
+              <input
+                type="text"
+                placeholder="Search projects..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <Link
+                href="/builder"
+                className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition font-medium flex items-center gap-2"
               >
-                Create Your First Project
-              </button>
+                <span>✨</span>
+                <span>New Project</span>
+              </Link>
             </div>
-          ) : filteredProjects.length === 0 ? (
-            // ✅ No results found
-            <div className={`rounded-3xl shadow-xl p-8 sm:p-16 text-center border transition-colors ${
-              darkMode
-                ? 'bg-gray-800 border-gray-700'
-                : 'bg-white border-gray-100'
-            }`}>
-              <div className="text-6xl sm:text-8xl mb-6">🔍</div>
-              <h3 className={`text-2xl sm:text-3xl font-bold mb-4 ${
-                darkMode ? 'text-white' : 'text-gray-900'
-              }`}>
-                No projects found
-              </h3>
-              <p className={`text-base sm:text-lg mb-8 ${
-                darkMode ? 'text-gray-400' : 'text-gray-600'
-              }`}>
-                Try adjusting your search or filters
-              </p>
-              <button
-                onClick={() => {
-                  setSearchQuery('')
-                  setFilterType('all')
-                  setSortBy('newest')
-                }}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-xl transform hover:scale-105 transition-all"
-              >
-                Clear Filters
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {/* ✅ Use filteredProjects instead of projects */}
+          </div>
+
+          {/* Projects Grid */}
+          {filteredProjects.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredProjects.map((project) => (
                 <div
                   key={project.id}
-                  className={`rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border overflow-hidden ${
-                    darkMode
-                      ? 'bg-gray-800 border-gray-700'
-                      : 'bg-white border-gray-100'
-                  }`}
+                  className="bg-gray-900 rounded-xl p-6 border border-gray-700 hover:border-purple-500 transition group"
                 >
-                  {/* Project Header */}
-                  <div className={`p-6 text-white ${
-                    darkMode
-                      ? 'bg-gradient-to-r from-purple-700 to-blue-700'
-                      : 'bg-gradient-to-r from-purple-500 to-blue-500'
-                  }`}>
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="text-4xl">
-                        {getProjectIcon(project.type)}
-                      </div>
-                      <span className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium capitalize">
-                        {project.type}
-                      </span>
-                    </div>
-                    <h3 className="text-xl font-bold truncate">{project.name}</h3>
+                  {/* Project Icon */}
+                  <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition">
+                    <span className="text-2xl">📱</span>
                   </div>
 
-                  {/* Project Body */}
-                  <div className="p-6">
-                    <p className={`text-sm mb-4 line-clamp-2 min-h-[40px] ${
-                      darkMode ? 'text-gray-400' : 'text-gray-600'
-                    }`}>
-                      {project.description || 'No description provided'}
+                  {/* Project Info */}
+                  <h4 className="text-lg font-semibold text-white mb-2 group-hover:text-purple-400 transition">
+                    {project.name}
+                  </h4>
+                  {project.description && (
+                    <p className="text-sm text-gray-400 mb-4 line-clamp-2">
+                      {project.description}
                     </p>
+                  )}
 
-                    <div className={`flex items-center gap-2 text-xs mb-6 ${
-                      darkMode ? 'text-gray-500' : 'text-gray-500'
-                    }`}>
-                      <span>📅</span>
-                      <span>{new Date(project.createdAt).toLocaleDateString()}</span>
+                  {/* Project Meta */}
+                  <div className="flex items-center justify-between text-xs text-gray-500 mb-4">
+                    <span>Updated {new Date(project.updatedAt).toLocaleDateString()}</span>
+                  </div>
+
+                  {/* Actions - ALL FIXED */}
+                  <div className="space-y-2">
+                    {/* Row 1: Primary Actions */}
+                    <div className="grid grid-cols-3 gap-2">
+                      {/* Edit in Main Editor */}
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          // Open main editor page with project
+                          window.location.href = `/builder?project=${project.id}`
+                        }}
+                        className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition text-xs font-medium"
+                        title="Edit in editor"
+                      >
+                        ✏️ Edit
+                      </button>
+                      
+                      {/* Preview in New Tab */}
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          window.open(`/preview/${project.id}`, '_blank')
+                        }}
+                        className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-xs"
+                        title="Preview"
+                      >
+                        👁️ View
+                      </button>
+                      
+                      {/* View Details */}
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          window.open(`/projects/${project.id}`, '_blank')
+                        }}
+                        className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition text-xs"
+                        title="View details"
+                      >
+                        📄 Code
+                      </button>
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="grid grid-cols-3 gap-2 mb-2">
-                      {/* Edit Button */}
-                      <button
-                        onClick={() => router.push(`/builder?project=${project.id}`)}
-                        className={`flex flex-col items-center gap-1 py-3 rounded-xl transition-all hover:scale-105 ${
-                          darkMode
-                            ? 'bg-purple-900/50 hover:bg-purple-900 text-purple-300'
-                            : 'bg-purple-50 hover:bg-purple-100 text-purple-600'
-                        }`}
-                      >
-                        <span className="text-xl">✏️</span>
-                        <span className="text-xs font-medium">Edit</span>
-                      </button>
-
-                      {/* Preview Button */}
-                      <button
-                        onClick={() => window.open(`/preview/${project.id}`, '_blank', 'noopener,noreferrer')}
-                        className={`flex flex-col items-center gap-1 py-3 rounded-xl transition-all hover:scale-105 ${
-                          darkMode
-                            ? 'bg-blue-900/50 hover:bg-blue-900 text-blue-300'
-                            : 'bg-blue-50 hover:bg-blue-100 text-blue-600'
-                        }`}
-                        title="Open preview in new tab"
-                      >
-                        <div className="flex items-center gap-1">
-                          <span className="text-xl">👁️</span>
-                          <span className="text-xs">↗️</span>
+                    {/* Row 2: Secondary Actions */}
+                    <div className="grid grid-cols-3 gap-2">
+                      {/* Export */}
+                      {project.code && (
+                        <div className="col-span-1">
+                          <SimpleExportButton
+                            projectId={project.id}
+                            projectName={project.name}
+                            projectCode={project.code}
+                            projectType="nextjs"
+                            onSuccess={() => console.log('Export successful')}
+                            onError={(error) => console.error('Export error:', error)}
+                          />
                         </div>
-                        <span className="text-xs font-medium">Preview</span>
-                      </button>
-
-                      {/* Duplicate Button */}
+                      )}
+                      
+                      {/* Duplicate */}
                       <button
-                        onClick={() => duplicateProject(project.id, project.name)}
-                        className={`flex flex-col items-center gap-1 py-3 rounded-xl transition-all hover:scale-105 ${
-                          darkMode
-                            ? 'bg-amber-900/50 hover:bg-amber-900 text-amber-300'
-                            : 'bg-amber-50 hover:bg-amber-100 text-amber-600'
-                        }`}
-                        title="Duplicate this project"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          handleDuplicateProject(project.id)
+                        }}
+                        className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition text-xs"
+                        title="Duplicate project"
                       >
-                        <span className="text-xl">📋</span>
-                        <span className="text-xs font-medium">Duplicate</span>
+                        📋 Copy
                       </button>
-                    </div>
-
-                    {/* Second row */}
-                    <div className="grid grid-cols-2 gap-2">
-                      {/* Export Button */}
-                      <SimpleExportButton
-                        projectId={project.id}
-                        projectName={project.name}
-                        projectCode={project.code || ''}
-                        projectType={project.type}
-                        onSuccess={() => console.log('Export successful!')}
-                        onError={(error) => console.error('Export failed:', error)}
-                      />
-
-                      {/* Delete Button */}
+                      
+                      {/* Delete */}
                       <button
-                        onClick={() => deleteProject(project.id)}
-                        className={`flex flex-col items-center gap-1 py-3 rounded-xl transition-all hover:scale-105 ${
-                          darkMode
-                            ? 'bg-red-900/50 hover:bg-red-900 text-red-300'
-                            : 'bg-red-50 hover:bg-red-100 text-red-600'
-                        }`}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          setShowDeleteConfirm(project.id)
+                        }}
+                        className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition text-xs"
+                        title="Delete project"
                       >
-                        <span className="text-xl">🗑️</span>
-                        <span className="text-xs font-medium">Delete</span>
+                        🗑️ Delete
                       </button>
                     </div>
                   </div>
+
+                  {/* Delete Confirmation */}
+                  {showDeleteConfirm === project.id && (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                      <div className="bg-gray-800 rounded-2xl p-6 max-w-md w-full border border-red-600">
+                        <h3 className="text-xl font-bold text-white mb-4">Delete Project?</h3>
+                        <p className="text-gray-400 mb-6">
+                          Are you sure you want to delete "{project.name}"? This action cannot be undone.
+                        </p>
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => handleDeleteProject(project.id)}
+                            className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg transition font-medium"
+                          >
+                            Delete
+                          </button>
+                          <button
+                            onClick={() => setShowDeleteConfirm(null)}
+                            className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg transition font-medium"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
+          ) : (
+            <div className="text-center py-16">
+              <div className="w-24 h-24 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-5xl">📭</span>
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">
+                {searchQuery ? 'No projects found' : 'No projects yet'}
+              </h3>
+              <p className="text-gray-400 mb-6">
+                {searchQuery 
+                  ? 'Try adjusting your search query'
+                  : 'Create your first AI-powered app in seconds'
+                }
+              </p>
+              {!searchQuery && (
+                <button
+                  onClick={() => window.location.href = '/builder'}
+                  className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg transition font-semibold"
+                >
+                  <span>✨</span>
+                  <span>Create Your First Project</span>
+                </button>
+              )}
+            </div>
           )}
         </div>
-      </div>
-    </>
-  )
-}
 
-// Helper function for project icons
-function getProjectIcon(type: string) {
-  switch (type) {
-    case 'landing-page':
-      return '🚀'
-    case 'dashboard':
-      return '📊'
-    case 'blog':
-      return '📝'
-    case 'portfolio':
-      return '💼'
-    case 'e-commerce':
-      return '🛒'
-    default:
-      return '📄'
-  }
+        {/* Upgrade CTA for Free Users */}
+        {stats && stats.subscriptionTier === 'free' && projects.length > 0 && (
+          <div className="mt-8 bg-gradient-to-r from-purple-900/50 to-pink-900/50 rounded-2xl p-8 border border-purple-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-2xl font-bold text-white mb-2">
+                  Ready to build more? 🚀
+                </h3>
+                <p className="text-gray-300 mb-4">
+                  Upgrade to Pro for unlimited projects, faster AI generations, and priority support.
+                </p>
+                <ul className="space-y-2 text-sm text-gray-300">
+                  <li className="flex items-center gap-2">
+                    <span className="text-green-400">✓</span>
+                    <span>Unlimited projects</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-green-400">✓</span>
+                    <span>500 AI generations/month</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-green-400">✓</span>
+                    <span>Priority support</span>
+                  </li>
+                </ul>
+              </div>
+              <div className="text-right">
+                <Link
+                  href="/pricing"
+                  className="inline-block px-8 py-4 bg-white text-gray-900 hover:bg-gray-100 rounded-lg transition font-bold text-lg mb-2"
+                >
+                  Upgrade to Pro
+                </Link>
+                <p className="text-sm text-gray-400">Starting at $29/month</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Onboarding Tutorial - Auto-shows on first visit */}
+      <OnboardingTutorial />
+      
+      {/* Quick Tips - Shows helpful tips periodically */}
+      <QuickTips />
+    </div>
+  )
 }

@@ -54,6 +54,51 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
   },
+  events: {
+    // Log sign-in activity for all users
+    async signIn({ user, account }) {
+      try {
+        if (user?.id) {
+          await prisma.activity.create({
+            data: {
+              userId: user.id,
+              type: 'auth',
+              action: 'signed_in',
+              metadata: {
+                provider: account?.provider || 'credentials',
+                email: user.email
+              }
+            }
+          })
+          console.log(`[Auth] User signed in: ${user.email}`)
+        }
+      } catch (error) {
+        console.error('[Auth] Failed to log sign-in activity:', error)
+      }
+    },
+    // Log new user creation (for OAuth sign-ups)
+    async createUser({ user }) {
+      try {
+        if (user?.id) {
+          await prisma.activity.create({
+            data: {
+              userId: user.id,
+              type: 'auth',
+              action: 'signup',
+              metadata: {
+                email: user.email,
+                name: user.name,
+                method: 'oauth'
+              }
+            }
+          })
+          console.log(`[Auth] New user created via OAuth: ${user.email}`)
+        }
+      } catch (error) {
+        console.error('[Auth] Failed to log user creation activity:', error)
+      }
+    }
+  },
   callbacks: {
     async jwt({ token, user, trigger, session }) {
       if (user) {

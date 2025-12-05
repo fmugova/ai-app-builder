@@ -4,8 +4,9 @@ import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { toast, Toaster } from 'react-hot-toast'
+import { templates } from '@/lib/templates'
 
-// ✅ Sanitization function
+// ✅ Sanitization and conversion function
 const sanitizeForPreview = (code: string): string => {
   let sanitized = code
     // Remove dashboard text variations
@@ -51,6 +52,78 @@ const sanitizeForPreview = (code: string): string => {
     .replace(/window\.location\.href\s*=\s*["'][^"']*\/dashboard[^"']*["']/gi, '')
     .replace(/window\.location\s*=\s*["'][^"']*\/builder[^"']*["']/gi, '')
     .replace(/window\.location\.href\s*=\s*["'][^"']*\/builder[^"']*["']/gi, '')
+
+  // Check if it's already HTML (has proper HTML structure)
+  if (sanitized.trim().startsWith('<!DOCTYPE') || 
+      sanitized.trim().startsWith('<html') ||
+      (sanitized.includes('<head>') && sanitized.includes('<body>'))) {
+    return sanitized
+  }
+
+  // Check if it's React/JSX code that needs conversion
+  const isReactCode = 
+    sanitized.includes('export default function') ||
+    sanitized.includes('export default class') ||
+    sanitized.includes('import React') ||
+    sanitized.includes('useState') ||
+    sanitized.includes('useEffect') ||
+    sanitized.includes('className=') ||
+    sanitized.includes('```tsx') ||
+    sanitized.includes('```jsx')
+
+  if (isReactCode) {
+    // Remove code blocks markers
+    sanitized = sanitized.replace(/```tsx|```jsx|```html|```/g, '')
+    
+    // Remove imports
+    sanitized = sanitized.replace(/import\s+.*?from\s+['"][^'"]+['"]\s*;?\n?/g, '')
+    sanitized = sanitized.replace(/import\s+['"][^'"]+['"]\s*;?\n?/g, '')
+    
+    // Remove 'use client' directive
+    sanitized = sanitized.replace(/['"]use client['"]\s*;?\n?/g, '')
+    
+    // Remove export statements and function declarations
+    sanitized = sanitized.replace(/export\s+default\s+function\s+\w+\s*\([^)]*\)\s*\{?\s*\n?\s*return\s*\(?/g, '')
+    sanitized = sanitized.replace(/function\s+\w+\s*\([^)]*\)\s*\{?\s*\n?\s*return\s*\(?/g, '')
+    
+    // Remove const declarations for components
+    sanitized = sanitized.replace(/const\s+\w+\s*=\s*\([^)]*\)\s*=>\s*\{?\s*\n?\s*return\s*\(?/g, '')
+    sanitized = sanitized.replace(/const\s+\w+\s*=\s*\([^)]*\)\s*=>\s*\(?/g, '')
+    
+    // Remove closing braces at the end
+    sanitized = sanitized.replace(/\)?\s*;?\s*\}?\s*$/, '')
+    
+    // Convert className to class
+    sanitized = sanitized.replace(/className=/g, 'class=')
+    
+    // Remove JSX comments
+    sanitized = sanitized.replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+    
+    // Convert simple JSX expressions
+    sanitized = sanitized.replace(/\{['"`]([^'"`]+)['"`]\}/g, '$1')
+    
+    // Remove .map() constructs
+    sanitized = sanitized.replace(/\{[\s\S]*?\.map\([\s\S]*?\)\}/g, '')
+  }
+
+  // Wrap in basic HTML structure with Tailwind CSS if needed
+  if (!sanitized.includes('<html') && !sanitized.includes('<!DOCTYPE')) {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
+  </style>
+</head>
+<body>
+  ${sanitized.trim()}
+</body>
+</html>`
+  }
 
   return sanitized
 }
@@ -182,7 +255,15 @@ function BuilderContent() {
       const data = await res.json()
 
       if (data.code) {
-        // Check if it's React/TSX code
+        // Always set project data
+        setCurrentProjectId(projectId)
+        setProjectName(data.name)
+        setProjectDescription(data.description)
+        setGeneratedCode(data.code)
+        setProjectType(data.type || 'landing')
+        setIsLoadedProject(true)
+
+        // Check if it's React/TSX code and show warning (but still load the code)
         const isReactCode = 
           data.code.includes('```tsx') || 
           data.code.includes('```jsx') ||
@@ -193,19 +274,7 @@ function BuilderContent() {
 
         if (isReactCode) {
           setShowReactWarning(true)
-          setProjectName(data.name)
-          setProjectDescription(data.description)
-          setCurrentProjectId(projectId)
-          setProjectType(data.type || 'landing')
-          return
         }
-
-        setCurrentProjectId(projectId)
-        setProjectName(data.name)
-        setProjectDescription(data.description)
-        setGeneratedCode(data.code)
-        setProjectType(data.type || 'landing')
-        setIsLoadedProject(true)
       }
     } catch (err) {
       console.error('Failed to load:', err)
@@ -311,7 +380,7 @@ function BuilderContent() {
             onClick={() => router.push('/dashboard')}
             className="text-gray-600 hover:text-gray-900"
           >
-            ← Back
+            ← Back to Dashboard
           </button>
         </header>
 
@@ -324,15 +393,21 @@ function BuilderContent() {
                   React/TypeScript Project Detected
                 </h3>
                 <p className="text-gray-700 mb-4">
-                  This project uses React/JSX. Our new builder only supports pure HTML.
+                  This project uses React/JSX. The preview may not render perfectly, but you can still edit the code.
                 </p>
-                <div className="flex gap-3">
+                <div className="flex gap-3 flex-wrap">
+                  <button
+                    onClick={() => setShowReactWarning(false)}
+                    className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-semibold"
+                  >
+                    ✏️ Edit Code Anyway
+                  </button>
                   <button
                     onClick={() => {
                       setShowReactWarning(false)
                       setPrompt(`Convert "${projectName}" to pure HTML with Tailwind CSS`)
                     }}
-                    className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-semibold"
+                    className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold"
                   >
                     🔄 Generate HTML Version
                   </button>
@@ -397,24 +472,33 @@ function BuilderContent() {
 
           <div className="mt-12 text-center">
             <p className="text-gray-500 mb-6">Or start with a template:</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {[
-                { name: 'SaaS Landing Page', type: 'landing', prompt: 'Modern SaaS landing page with hero section, features grid, pricing table, and call-to-action. Dark mode with gradients.' },
-                { name: 'E-commerce Product Page', type: 'webapp', prompt: 'Product showcase with image gallery, add to cart functionality, reviews section, and related products.' },
-                { name: 'Analytics Dashboard', type: 'dashboard', prompt: 'Professional analytics dashboard with line charts, bar charts, KPI cards, and data tables. Dark mode with blue/purple theme.' },
-              ].map((template) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {templates.map((template) => (
                 <button
-                  key={template.name}
+                  key={template.id}
                   onClick={() => {
                     setProjectType(template.type)
-                    setPrompt(template.prompt)
+                    setPrompt(template.description)
                     setStep('build')
-                    setTimeout(() => handleGenerate(), 100)
+                    // Use the actual template code
+                    setGeneratedCode(template.code)
+                    setProjectName(`${template.name} Project`)
+                    toast.success(`Loaded "${template.name}" template!`)
                   }}
-                  className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-xl p-6 hover:shadow-lg transition text-left"
+                  className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-xl p-6 hover:shadow-lg transition text-left group"
                 >
-                  <h4 className="font-semibold text-gray-900 mb-2">{template.name}</h4>
-                  <p className="text-sm text-gray-600 line-clamp-2">{template.prompt}</p>
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="text-3xl">{template.icon}</span>
+                    <h4 className="font-semibold text-gray-900 group-hover:text-purple-600 transition">{template.name}</h4>
+                  </div>
+                  <p className="text-sm text-gray-600 line-clamp-2">{template.description}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {template.tags.slice(0, 3).map(tag => (
+                      <span key={tag} className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
                 </button>
               ))}
             </div>

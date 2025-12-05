@@ -87,6 +87,19 @@ export async function PUT(
       },
     })
 
+    // Log activity
+    await prisma.activity.create({
+      data: {
+        userId: user.id,
+        type: 'project',
+        action: 'updated',
+        metadata: {
+          projectId: project.id,
+          projectName: project.name
+        }
+      }
+    })
+
     return NextResponse.json(project)
   } catch (error: any) {
     console.error('Project update error:', error)
@@ -130,6 +143,19 @@ export async function DELETE(
 
     await prisma.project.delete({
       where: { id: params.id },
+    })
+
+    // Log activity
+    await prisma.activity.create({
+      data: {
+        userId: user.id,
+        type: 'project',
+        action: 'deleted',
+        metadata: {
+          projectId: project.id,
+          projectName: project.name
+        }
+      }
     })
 
     return NextResponse.json({ message: 'Project deleted successfully' })

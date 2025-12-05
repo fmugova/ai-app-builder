@@ -17,7 +17,7 @@ export default function OnboardingTutorial() {
 
   useEffect(() => {
     // Check if user has completed onboarding
-    const completed = localStorage.getItem("shipfast_onboarding_completed");
+    const completed = localStorage.getItem("buildflow_onboarding_completed");
     if (!completed) {
       // Show onboarding after a brief delay
       setTimeout(() => setIsOpen(true), 1000);
@@ -28,8 +28,8 @@ export default function OnboardingTutorial() {
 
   const steps: OnboardingStep[] = [
     {
-      title: "Welcome to ShipFast! 🚀",
-      description: "Build and deploy production-ready code in minutes. Let's get you started with a quick tour.",
+      title: "Welcome to BuildFlow! 🚀",
+      description: "Build and deploy AI-powered apps in minutes. Let's get you started with a quick tour.",
       icon: <Sparkles className="w-12 h-12 text-white" />,
     },
     {
@@ -64,7 +64,7 @@ export default function OnboardingTutorial() {
   };
 
   const handleComplete = () => {
-    localStorage.setItem("shipfast_onboarding_completed", "true");
+    localStorage.setItem("buildflow_onboarding_completed", "true");
     setHasCompletedOnboarding(true);
     setIsOpen(false);
   };
@@ -77,7 +77,7 @@ export default function OnboardingTutorial() {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 right-4 p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg transition-all z-50"
+        className="fixed bottom-4 right-4 p-3 bg-purple-600 hover:bg-purple-700 text-white rounded-full shadow-lg transition-all z-50"
         title="Show tutorial"
       >
         <Sparkles className="w-5 h-5" />
@@ -92,7 +92,7 @@ export default function OnboardingTutorial() {
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden">
         {/* Header */}
-        <div className="relative bg-gradient-to-r from-blue-600 to-purple-600 p-8 text-white">
+        <div className="relative bg-gradient-to-r from-purple-600 to-pink-600 p-8 text-white">
           <button
             onClick={handleSkip}
             className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-lg transition-colors"
@@ -114,7 +114,7 @@ export default function OnboardingTutorial() {
         {/* Progress Bar */}
         <div className="w-full bg-gray-200 dark:bg-gray-700 h-1">
           <div
-            className="h-full bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-300"
+            className="h-full bg-gradient-to-r from-purple-600 to-pink-600 transition-all duration-300"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -133,7 +133,7 @@ export default function OnboardingTutorial() {
                 onClick={() => setCurrentStep(index)}
                 className={`w-2 h-2 rounded-full transition-all ${
                   index === currentStep
-                    ? "bg-blue-600 w-8"
+                    ? "bg-purple-600 w-8"
                     : index < currentStep
                     ? "bg-green-500"
                     : "bg-gray-300 dark:bg-gray-600"
@@ -162,7 +162,7 @@ export default function OnboardingTutorial() {
 
             <button
               onClick={handleNext}
-              className="flex items-center px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg font-medium transition-all"
+              className="flex items-center px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg font-medium transition-all"
             >
               {currentStep === steps.length - 1 ? (
                 <>
@@ -190,14 +190,15 @@ export function QuickTips() {
 
   const tips = [
     "💡 Tip: Use the AI chat to refine your code with natural language",
-    "⚡ Tip: Press Cmd/Ctrl + K to quickly create a new project",
-    "🚀 Tip: Upgrade to Pro for unlimited generations",
-    "✨ Tip: Save time by starting with a template",
+    "⚡ Tip: Start with a template to save time and get better results",
+    "🚀 Tip: Upgrade to Pro for unlimited projects and generations",
+    "✨ Tip: Export as ZIP for a complete Next.js project structure",
     "📱 Tip: All generated code is mobile-responsive by default",
+    "🎨 Tip: Choose from 6 pre-built templates to kickstart your project",
   ];
 
   useEffect(() => {
-    const showTips = localStorage.getItem("shipfast_show_tips") !== "false";
+    const showTips = localStorage.getItem("buildflow_show_tips") !== "false";
     if (!showTips) return;
 
     const interval = setInterval(() => {
@@ -211,7 +212,7 @@ export function QuickTips() {
 
   const handleDismiss = () => {
     setIsVisible(false);
-    localStorage.setItem("shipfast_show_tips", "false");
+    localStorage.setItem("buildflow_show_tips", "false");
   };
 
   if (!isVisible) return null;
