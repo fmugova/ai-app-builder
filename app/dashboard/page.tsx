@@ -9,6 +9,19 @@ import OnboardingTutorial, { QuickTips } from '@/components/OnboardingTutorial'
 
 const ADMIN_EMAILS = ['fmugova@yahoo.com', 'admin@buildflow.app']
 
+// Sun and Moon icons for dark mode toggle
+const SunIcon = () => (
+  <svg className="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+  </svg>
+)
+
+const MoonIcon = () => (
+  <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+  </svg>
+)
+
 interface Project {
   id: string
   name: string
@@ -36,8 +49,27 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
+  const [isDarkMode, setIsDarkMode] = useState(true) // Default to dark mode
 
   const isAdmin = session?.user?.email && ADMIN_EMAILS.includes(session.user.email)
+
+  // Load dark mode preference from localStorage
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme')
+    if (savedTheme) {
+      setIsDarkMode(savedTheme === 'dark')
+    }
+  }, [])
+
+  // Save dark mode preference to localStorage and update document
+  useEffect(() => {
+    localStorage.setItem('theme', isDarkMode ? 'dark' : 'light')
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [isDarkMode])
 
   useEffect(() => {
     if (status === 'loading') return
@@ -145,7 +177,7 @@ export default function DashboardPage() {
 
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-gray-900 dark:bg-gray-900">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-400">Loading your workspace...</p>
@@ -159,9 +191,9 @@ export default function DashboardPage() {
   const generationsPercentage = stats ? getUsagePercentage(stats.generationsUsed, stats.generationsLimit) : 0
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
       {/* Header */}
-      <header className="bg-gray-800 border-b border-gray-700 sticky top-0 z-50 backdrop-blur-sm bg-gray-800/95">
+      <header className={`${isDarkMode ? 'bg-gray-800 border-gray-700 bg-gray-800/95' : 'bg-white border-gray-200 bg-white/95'} border-b sticky top-0 z-50 backdrop-blur-sm`}>
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -170,8 +202,8 @@ export default function DashboardPage() {
                   <span className="text-2xl">⚡</span>
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-white">BuildFlow</h1>
-                  <p className="text-xs text-gray-400">AI App Builder</p>
+                  <h1 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>BuildFlow</h1>
+                  <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>AI App Builder</p>
                 </div>
               </Link>
             </div>
@@ -191,6 +223,14 @@ export default function DashboardPage() {
                   <span>Admin</span>
                 </button>
               )}
+              {/* Dark/Light Mode Toggle */}
+              <button
+                onClick={() => setIsDarkMode(!isDarkMode)}
+                className="p-2 rounded-lg bg-gray-700 dark:bg-gray-700 hover:bg-gray-600 dark:hover:bg-gray-600 transition-colors"
+                title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              >
+                {isDarkMode ? <SunIcon /> : <MoonIcon />}
+              </button>
               <button
                 onClick={() => router.push('/api/auth/signout')}
                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition"
@@ -205,10 +245,10 @@ export default function DashboardPage() {
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
-          <h2 className="text-3xl font-bold text-white mb-2">
+          <h2 className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-2`}>
             Welcome back, {session?.user?.name || 'Developer'}! 👋
           </h2>
-          <p className="text-gray-400">
+          <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>
             {projects.length === 0 
               ? "Let's build something amazing with AI-powered app generation."
               : `You have ${projects.length} project${projects.length !== 1 ? 's' : ''} in your workspace.`
@@ -220,22 +260,22 @@ export default function DashboardPage() {
         {stats && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             {/* Projects Usage */}
-            <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700 hover:border-gray-600 transition">
+            <div className={`${isDarkMode ? 'bg-gray-800 border-gray-700 hover:border-gray-600' : 'bg-white border-gray-200 hover:border-gray-300'} rounded-2xl p-6 border transition`}>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-blue-900/30 rounded-xl flex items-center justify-center">
+                  <div className={`w-12 h-12 ${isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'} rounded-xl flex items-center justify-center`}>
                     <span className="text-2xl">📊</span>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-400">Projects</p>
-                    <p className="text-2xl font-bold text-white">
+                    <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Projects</p>
+                    <p className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                       {stats.projectsThisMonth}/{stats.projectsLimit}
                     </p>
                   </div>
                 </div>
               </div>
               <div className="space-y-2">
-                <div className="w-full bg-gray-700 rounded-full h-2">
+                <div className={`w-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'} rounded-full h-2`}>
                   <div
                     className={`h-2 rounded-full transition-all ${getUsageColor(projectsPercentage)}`}
                     style={{ width: `${projectsPercentage}%` }}
@@ -248,28 +288,28 @@ export default function DashboardPage() {
             </div>
 
             {/* Generations Usage */}
-            <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700 hover:border-gray-600 transition">
+            <div className={`${isDarkMode ? 'bg-gray-800 border-gray-700 hover:border-gray-600' : 'bg-white border-gray-200 hover:border-gray-300'} rounded-2xl p-6 border transition`}>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-purple-900/30 rounded-xl flex items-center justify-center">
+                  <div className={`w-12 h-12 ${isDarkMode ? 'bg-purple-900/30' : 'bg-purple-100'} rounded-xl flex items-center justify-center`}>
                     <span className="text-2xl">✨</span>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-400">AI Generations</p>
-                    <p className="text-2xl font-bold text-white">
+                    <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>AI Generations</p>
+                    <p className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                       {stats.generationsUsed}/{stats.generationsLimit}
                     </p>
                   </div>
                 </div>
               </div>
               <div className="space-y-2">
-                <div className="w-full bg-gray-700 rounded-full h-2">
+                <div className={`w-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'} rounded-full h-2`}>
                   <div
                     className={`h-2 rounded-full transition-all ${getUsageColor(generationsPercentage)}`}
                     style={{ width: `${generationsPercentage}%` }}
                   ></div>
                 </div>
-                <p className="text-xs text-gray-400">
+                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                   {generationsPercentage.toFixed(0)}% used this month
                 </p>
               </div>
@@ -317,14 +357,14 @@ export default function DashboardPage() {
           {/* Templates */}
           <button
             onClick={() => window.location.href = '/templates'}
-            className="flex items-center gap-3 p-4 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-purple-500 rounded-xl transition group"
+            className={`flex items-center gap-3 p-4 ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700 border-gray-700' : 'bg-white hover:bg-gray-50 border-gray-200'} border hover:border-purple-500 rounded-xl transition group`}
           >
-            <div className="w-10 h-10 bg-blue-900/30 rounded-lg flex items-center justify-center group-hover:scale-110 transition">
+            <div className={`w-10 h-10 ${isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'} rounded-lg flex items-center justify-center group-hover:scale-110 transition`}>
               <span className="text-2xl">📋</span>
             </div>
             <div className="text-left">
-              <p className="font-semibold text-white group-hover:text-blue-400 transition">Templates</p>
-              <p className="text-xs text-gray-400">6 ready to use</p>
+              <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'} group-hover:text-blue-400 transition`}>Templates</p>
+              <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>6 ready to use</p>
             </div>
           </button>
 
@@ -334,14 +374,14 @@ export default function DashboardPage() {
               localStorage.removeItem('buildflow_onboarding_completed')
               window.location.reload()
             }}
-            className="flex items-center gap-3 p-4 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-green-500 rounded-xl transition group"
+            className={`flex items-center gap-3 p-4 ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700 border-gray-700' : 'bg-white hover:bg-gray-50 border-gray-200'} border hover:border-green-500 rounded-xl transition group`}
           >
-            <div className="w-10 h-10 bg-green-900/30 rounded-lg flex items-center justify-center group-hover:scale-110 transition">
+            <div className={`w-10 h-10 ${isDarkMode ? 'bg-green-900/30' : 'bg-green-100'} rounded-lg flex items-center justify-center group-hover:scale-110 transition`}>
               <span className="text-2xl">🎓</span>
             </div>
             <div className="text-left">
-              <p className="font-semibold text-white group-hover:text-green-400 transition">Tutorial</p>
-              <p className="text-xs text-gray-400">Learn the basics</p>
+              <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'} group-hover:text-green-400 transition`}>Tutorial</p>
+              <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Learn the basics</p>
             </div>
           </button>
 
@@ -353,25 +393,25 @@ export default function DashboardPage() {
               const body = `Hi BuildFlow Team,\n\nI need help with:\n\n[Describe your issue here]\n\nUser: ${email}\nProjects: ${projects.length}`
               window.location.href = `mailto:support@buildflow.app?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
             }}
-            className="flex items-center gap-3 p-4 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-orange-500 rounded-xl transition group"
+            className={`flex items-center gap-3 p-4 ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700 border-gray-700' : 'bg-white hover:bg-gray-50 border-gray-200'} border hover:border-orange-500 rounded-xl transition group`}
           >
-            <div className="w-10 h-10 bg-orange-900/30 rounded-lg flex items-center justify-center group-hover:scale-110 transition">
+            <div className={`w-10 h-10 ${isDarkMode ? 'bg-orange-900/30' : 'bg-orange-100'} rounded-lg flex items-center justify-center group-hover:scale-110 transition`}>
               <span className="text-2xl">💬</span>
             </div>
             <div className="text-left">
-              <p className="font-semibold text-white group-hover:text-orange-400 transition">Get Help</p>
-              <p className="text-xs text-gray-400">Email support</p>
+              <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'} group-hover:text-orange-400 transition`}>Get Help</p>
+              <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Email support</p>
             </div>
           </button>
         </div>
 
         {/* Projects Section */}
-        <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+        <div className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl p-6 border`}>
           {/* Projects Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-xl font-bold text-white mb-1">Your Projects</h3>
-              <p className="text-sm text-gray-400">
+              <h3 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-1`}>Your Projects</h3>
+              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                 {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''} found
               </p>
             </div>
@@ -382,7 +422,7 @@ export default function DashboardPage() {
                 placeholder="Search projects..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className={`px-4 py-2 ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-gray-100 border-gray-300 text-gray-900 placeholder-gray-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500`}
               />
               <Link
                 href="/builder"
@@ -400,7 +440,7 @@ export default function DashboardPage() {
               {filteredProjects.map((project) => (
                 <div
                   key={project.id}
-                  className="bg-gray-900 rounded-xl p-6 border border-gray-700 hover:border-purple-500 transition group"
+                  className={`${isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'} rounded-xl p-6 border hover:border-purple-500 transition group`}
                 >
                   {/* Project Icon */}
                   <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition">
@@ -408,17 +448,17 @@ export default function DashboardPage() {
                   </div>
 
                   {/* Project Info */}
-                  <h4 className="text-lg font-semibold text-white mb-2 group-hover:text-purple-400 transition">
+                  <h4 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-2 group-hover:text-purple-400 transition`}>
                     {project.name}
                   </h4>
                   {project.description && (
-                    <p className="text-sm text-gray-400 mb-4 line-clamp-2">
+                    <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-4 line-clamp-2`}>
                       {project.description}
                     </p>
                   )}
 
                   {/* Project Meta */}
-                  <div className="flex items-center justify-between text-xs text-gray-500 mb-4">
+                  <div className={`flex items-center justify-between text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'} mb-4`}>
                     <span>Updated {new Date(project.updatedAt).toLocaleDateString()}</span>
                   </div>
 
@@ -514,9 +554,9 @@ export default function DashboardPage() {
                   {/* Delete Confirmation */}
                   {showDeleteConfirm === project.id && (
                     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                      <div className="bg-gray-800 rounded-2xl p-6 max-w-md w-full border border-red-600">
-                        <h3 className="text-xl font-bold text-white mb-4">Delete Project?</h3>
-                        <p className="text-gray-400 mb-6">
+                      <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 max-w-md w-full border border-red-600`}>
+                        <h3 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-4`}>Delete Project?</h3>
+                        <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-6`}>
                           Are you sure you want to delete "{project.name}"? This action cannot be undone.
                         </p>
                         <div className="flex gap-3">
@@ -528,7 +568,7 @@ export default function DashboardPage() {
                           </button>
                           <button
                             onClick={() => setShowDeleteConfirm(null)}
-                            className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg transition font-medium"
+                            className={`flex-1 ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} ${isDarkMode ? 'text-white' : 'text-gray-900'} py-2 rounded-lg transition font-medium`}
                           >
                             Cancel
                           </button>
@@ -541,13 +581,13 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="text-center py-16">
-              <div className="w-24 h-24 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-6">
+              <div className={`w-24 h-24 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'} rounded-full flex items-center justify-center mx-auto mb-6`}>
                 <span className="text-5xl">📭</span>
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">
+              <h3 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-2`}>
                 {searchQuery ? 'No projects found' : 'No projects yet'}
               </h3>
-              <p className="text-gray-400 mb-6">
+              <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-6`}>
                 {searchQuery 
                   ? 'Try adjusting your search query'
                   : 'Create your first AI-powered app in seconds'
