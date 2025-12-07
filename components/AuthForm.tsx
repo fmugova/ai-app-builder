@@ -110,9 +110,10 @@ export default function AuthForm({ mode = 'signin' }: { mode?: 'signin' | 'signu
           value={formData.password}
           onChange={(e) => setFormData({ ...formData, password: e.target.value })}
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          placeholder="••••••••"
-          minLength={6}
+          placeholder="Min. 8 characters"
+          minLength={8}
         />
+        <p className="text-xs text-gray-500 mt-1">Must be at least 8 characters</p>
       </div>
 
       {error && (

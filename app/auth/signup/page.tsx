@@ -76,18 +76,20 @@ export default function SignupPage() {
             </div>
 
             {/* Password */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="space-y-2">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Password
               </label>
               <input
+                id="password"
                 type="password"
                 name="password"
                 required
                 minLength={8}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-600 focus:border-transparent"
-                placeholder="Min. 6 characters"
+                placeholder="Min. 8 characters"
               />
+              <p className="text-xs text-gray-500">Must be at least 8 characters</p>
             </div>
 
             {/* Submit */}
