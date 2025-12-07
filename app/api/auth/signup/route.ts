@@ -55,8 +55,10 @@ export async function POST(request: NextRequest) {
         name: name || null,
         subscriptionTier: 'free',
         subscriptionStatus: 'active',
-        generationsLimit: 10,
+        generationsLimit: 3,
         generationsUsed: 0,
+        projectsLimit: 3,
+        projectsThisMonth: 0,
       },
       select: {
         id: true,
