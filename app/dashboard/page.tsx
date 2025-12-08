@@ -50,6 +50,8 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
   const [isDarkMode, setIsDarkMode] = useState(true) // Default to dark mode
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null) // For code preview modal
+  const [exportProject, setExportProject] = useState<Project | null>(null) // For export modal
 
   const isAdmin = session?.user?.email && ADMIN_EMAILS.includes(session.user.email)
 
@@ -501,21 +503,37 @@ export default function DashboardPage() {
                           </svg>
                           Preview
                         </button>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setSelectedProject(project)
+                          }}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-sm font-medium"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                          </svg>
+                          Code
+                        </button>
                       </div>
                       
                       {/* Secondary Actions Row */}
                       <div className="flex gap-2">
                         {project.code && (
-                          <div className="flex-1">
-                            <SimpleExportButton
-                              projectId={project.id}
-                              projectName={project.name}
-                              projectCode={project.code}
-                              projectType="nextjs"
-                              onSuccess={() => console.log('Export successful')}
-                              onError={(error) => console.error('Export error:', error)}
-                            />
-                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setExportProject(project)
+                            }}
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Export
+                          </button>
                         )}
                         <button
                           onClick={(e) => {
@@ -523,7 +541,7 @@ export default function DashboardPage() {
                             e.stopPropagation()
                             handleDuplicateProject(project.id)
                           }}
-                          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'} ${isDarkMode ? 'text-white' : 'text-gray-700'} rounded-lg transition-colors text-sm`}
+                          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} ${isDarkMode ? 'text-white' : 'text-gray-700'} rounded-lg transition-colors text-sm font-medium`}
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -536,12 +554,13 @@ export default function DashboardPage() {
                             e.stopPropagation()
                             setShowDeleteConfirm(project.id)
                           }}
-                          className="px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors"
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-medium"
                           title="Delete project"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </svg>
+                          Delete
                         </button>
                       </div>
                     </div>
@@ -652,6 +671,107 @@ export default function DashboardPage() {
       
       {/* Quick Tips - Shows helpful tips periodically */}
       <QuickTips />
+
+      {/* Code Preview Modal */}
+      {selectedProject && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} shadow-2xl flex flex-col`}>
+            {/* Header */}
+            <div className={`px-6 py-4 border-b ${isDarkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gray-50'} flex items-center justify-between`}>
+              <div>
+                <h3 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  {selectedProject.name}
+                </h3>
+                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  View and copy your project code
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={async () => {
+                    if (selectedProject.code) {
+                      await navigator.clipboard.writeText(selectedProject.code)
+                      alert('Code copied to clipboard!')
+                    }
+                  }}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  Copy Code
+                </button>
+                <button
+                  onClick={() => setSelectedProject(null)}
+                  className={`p-2 ${isDarkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-200 text-gray-600'} rounded-lg transition-colors`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            {/* Code Content */}
+            <div className="flex-1 overflow-auto p-6">
+              {selectedProject.code ? (
+                <pre className={`text-sm ${isDarkMode ? 'bg-gray-900 text-gray-300' : 'bg-gray-100 text-gray-800'} p-4 rounded-lg overflow-x-auto`}>
+                  <code>{selectedProject.code}</code>
+                </pre>
+              ) : (
+                <div className="text-center py-12">
+                  <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    No code available for this project
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export Modal */}
+      {exportProject && exportProject.code && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl max-w-md w-full border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} shadow-2xl overflow-hidden`}>
+            {/* Header */}
+            <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-bold flex items-center gap-2">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Export Project
+                  </h3>
+                  <p className="text-sm text-green-100 mt-1">{exportProject.name}</p>
+                </div>
+                <button
+                  onClick={() => setExportProject(null)}
+                  className="text-white hover:bg-white/20 rounded-lg p-2 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            {/* Render the SimpleExportButton component here */}
+            <div className="p-4">
+              <SimpleExportButton
+                projectId={exportProject.id}
+                projectName={exportProject.name}
+                projectCode={exportProject.code}
+                projectType="nextjs"
+                onSuccess={() => {
+                  console.log('Export successful')
+                  setExportProject(null)
+                }}
+                onError={(error) => console.error('Export error:', error)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
