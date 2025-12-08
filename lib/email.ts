@@ -18,7 +18,7 @@ export async function sendEmail({ to, subject, html }: SendEmailOptions) {
 
   try {
     const { data, error } = await resend.emails.send({
-      from: process.env.EMAIL_FROM || 'BuildFlow <noreply@buildflow-ai.app>',
+      from: 'BuildFlow <onboarding@resend.dev>', // Use Resend's default domain
       to: [to],
       subject,
       html,
