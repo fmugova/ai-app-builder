@@ -54,7 +54,7 @@ export const metadata: Metadata = {
     description: 'Build beautiful apps with AI. No coding required.',
     images: [
       {
-        url: '/opengraph-image',
+        url: 'https://www.buildflow-ai.app/opengraph-image',
         width: 1200,
         height: 630,
         alt: 'BuildFlow - AI App Builder',
@@ -70,7 +70,7 @@ export const metadata: Metadata = {
     creator: '@buildflow',
     title: 'BuildFlow - AI-Powered App Builder',
     description: 'Build beautiful apps with AI. No coding required.',
-    images: ['/opengraph-image'],
+    images: ['https://www.buildflow-ai.app/opengraph-image'],
   },
   
   // Icons - Using Next.js generated icons
