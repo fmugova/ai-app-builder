@@ -84,7 +84,7 @@ export const metadata: Metadata = {
   },
   
   // App manifest
-  manifest: '/manifest.json',
+  manifest: '/site.webmanifest',
   
   // Verification (replace with actual codes)
   verification: {
