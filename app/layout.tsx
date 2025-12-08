@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     default: 'BuildFlow - AI-Powered App Builder',
     template: '%s | BuildFlow'
   },
-  description: 'Build beautiful apps with AI. Create landing pages, web apps, and dashboards instantly. No coding required. Get production-ready React + Tailwind code in seconds.',
+  description: 'Generate production-ready React components and web apps in seconds. Create landing pages, dashboards, portfolios, and more with AI. No coding required.',
   keywords: [
     'AI app builder',
     'no-code',
@@ -34,30 +34,33 @@ export const metadata: Metadata = {
     'code generator',
     'AI coding assistant',
     'React generator',
+    'React components',
     'Tailwind CSS',
     'landing page builder',
     'web app builder',
+    'web app generator',
     'dashboard builder',
+    'AI code generation',
     'AI developer tools'
   ],
-  authors: [{ name: 'BuildFlow Team', url: 'https://www.buildflow-ai.app' }],
+  authors: [{ name: 'BuildFlow', url: 'https://www.buildflow-ai.app' }],
   creator: 'BuildFlow',
   publisher: 'BuildFlow',
   
-  // Open Graph
+  // Open Graph (Facebook, LinkedIn)
   openGraph: {
     type: 'website',
     locale: 'en_US',
     url: 'https://www.buildflow-ai.app',
     siteName: 'BuildFlow',
     title: 'BuildFlow - AI-Powered App Builder',
-    description: 'Build beautiful apps with AI. No coding required.',
+    description: 'Generate production-ready React components and web apps in seconds. Create landing pages, dashboards, portfolios, and more with AI. No coding required.',
     images: [
       {
         url: 'https://www.buildflow-ai.app/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'BuildFlow - AI App Builder',
+        alt: 'BuildFlow - AI-Powered App Builder',
         type: 'image/png',
       },
     ],
@@ -69,27 +72,34 @@ export const metadata: Metadata = {
     site: '@buildflow',
     creator: '@buildflow',
     title: 'BuildFlow - AI-Powered App Builder',
-    description: 'Build beautiful apps with AI. No coding required.',
+    description: 'Generate production-ready React components and web apps in seconds. No coding required.',
     images: ['https://www.buildflow-ai.app/og-image.png'],
   },
   
-  // Icons - Using Next.js generated icons
+  // Icons
   icons: {
     icon: [
       { url: '/favicon.ico' },
       { url: '/icon', type: 'image/png', sizes: '32x32' },
     ],
-    apple: '/apple-icon',
     shortcut: '/favicon.ico',
+    apple: '/apple-icon',
   },
   
   // App manifest
   manifest: '/site.webmanifest',
   
-  // Verification (replace with actual codes)
+  // App/PWA Meta
+  applicationName: 'BuildFlow',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'BuildFlow',
+  },
+  
+  // Verification (replace with actual codes when available)
   verification: {
     google: 'your-google-verification-code',
-    // yandex: 'your-yandex-verification-code',
   },
   
   // Robots
@@ -114,7 +124,6 @@ export const metadata: Metadata = {
   category: 'technology',
   
   // Additional meta
-  applicationName: 'BuildFlow',
   referrer: 'origin-when-cross-origin',
   formatDetection: {
     email: false,
