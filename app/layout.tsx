@@ -3,12 +3,25 @@ import { Inter } from 'next/font/google'
 import { Providers } from './providers'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
-import type { Metadata } from 'next'
+import { HomePageSchema } from '@/components/JsonLd'
+import type { Metadata, Viewport } from 'next'
 
 const inter = Inter({ subsets: ['latin'] })
 
+// Viewport configuration (theme-color, etc.)
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#0f172a' },
+  ],
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  colorScheme: 'dark light',
+}
+
 export const metadata: Metadata = {
-  metadataBase: new URL('https://buildflow.app'),
+  metadataBase: new URL('https://www.buildflow-ai.app'),
   title: {
     default: 'BuildFlow - AI-Powered App Builder',
     template: '%s | BuildFlow'
@@ -27,7 +40,7 @@ export const metadata: Metadata = {
     'dashboard builder',
     'AI developer tools'
   ],
-  authors: [{ name: 'BuildFlow Team', url: 'https://buildflow.app' }],
+  authors: [{ name: 'BuildFlow Team', url: 'https://www.buildflow-ai.app' }],
   creator: 'BuildFlow',
   publisher: 'BuildFlow',
   
@@ -35,13 +48,13 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://buildflow.app',
+    url: 'https://www.buildflow-ai.app',
     siteName: 'BuildFlow',
     title: 'BuildFlow - AI-Powered App Builder',
     description: 'Build beautiful apps with AI. No coding required.',
     images: [
       {
-        url: '/og-image.png',
+        url: '/opengraph-image',
         width: 1200,
         height: 630,
         alt: 'BuildFlow - AI App Builder',
@@ -57,22 +70,26 @@ export const metadata: Metadata = {
     creator: '@buildflow',
     title: 'BuildFlow - AI-Powered App Builder',
     description: 'Build beautiful apps with AI. No coding required.',
-    images: ['/og-image.png'],
+    images: ['/opengraph-image'],
   },
   
-  // Icons
+  // Icons - Using Next.js generated icons
   icons: {
     icon: [
       { url: '/favicon.ico' },
-      { url: '/icon.png', type: 'image/png', sizes: '32x32' },
+      { url: '/icon', type: 'image/png', sizes: '32x32' },
     ],
-    apple: '/apple-touch-icon.png',
+    apple: '/apple-icon',
+    shortcut: '/favicon.ico',
   },
   
-  // Verification
+  // App manifest
+  manifest: '/manifest.json',
+  
+  // Verification (replace with actual codes)
   verification: {
     google: 'your-google-verification-code',
-    yandex: 'your-yandex-verification-code',
+    // yandex: 'your-yandex-verification-code',
   },
   
   // Robots
@@ -88,28 +105,22 @@ export const metadata: Metadata = {
     },
   },
   
-  // ✅ Enhanced Alternates with mobile/desktop variants
+  // Canonical URL
   alternates: {
-    canonical: 'https://buildflow.app',
-    languages: {
-      'en-US': 'https://buildflow.app',
-      'en-GB': 'https://buildflow.app/en-gb',
-      'es-ES': 'https://buildflow.app/es',
-      'fr-FR': 'https://buildflow.app/fr',
-      'de-DE': 'https://buildflow.app/de',
-      'x-default': 'https://buildflow.app', // Fallback for other languages
-    },
-    media: {
-      'only screen and (max-width: 600px)': 'https://m.buildflow.app',
-    },
-    types: {
-      'application/rss+xml': 'https://buildflow.app/rss.xml',
-      'application/atom+xml': 'https://buildflow.app/atom.xml',
-    },
+    canonical: 'https://www.buildflow-ai.app',
   },
   
   // Categories
   category: 'technology',
+  
+  // Additional meta
+  applicationName: 'BuildFlow',
+  referrer: 'origin-when-cross-origin',
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
 }
 
 export default function RootLayout({
@@ -119,6 +130,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        {/* JSON-LD Structured Data */}
+        <HomePageSchema />
+        {/* Preconnect to external domains for performance */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      </head>
       <body className={inter.className}>
         <Providers>{children}</Providers>
         <Analytics />

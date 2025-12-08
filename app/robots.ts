@@ -1,6 +1,8 @@
 import { MetadataRoute } from 'next'
 
 export default function robots(): MetadataRoute.Robots {
+  const baseUrl = 'https://www.buildflow-ai.app'
+  
   return {
     rules: [
       {
@@ -9,6 +11,8 @@ export default function robots(): MetadataRoute.Robots {
         disallow: [
           '/api/',           // Don't crawl API routes
           '/dashboard/',     // Don't crawl user dashboard (requires auth)
+          '/admin/',         // Don't crawl admin pages
+          '/checkout/',      // Don't crawl checkout pages
           '/settings/',      // Don't crawl settings pages
           '/_next/',         // Don't crawl Next.js internals
           '/private/',       // Don't crawl private pages
@@ -16,13 +20,21 @@ export default function robots(): MetadataRoute.Robots {
       },
       {
         userAgent: 'GPTBot',  // OpenAI's crawler
-        disallow: '/',        // Optionally block AI crawlers
+        disallow: '/',        // Block AI training crawlers
       },
       {
         userAgent: 'ChatGPT-User',
         disallow: '/',
       },
+      {
+        userAgent: 'CCBot',   // Common Crawl bot
+        disallow: '/',
+      },
+      {
+        userAgent: 'anthropic-ai',
+        disallow: '/',
+      },
     ],
-    sitemap: 'https://buildflow.app/sitemap.xml',
+    sitemap: `${baseUrl}/sitemap.xml`,
   }
 }
