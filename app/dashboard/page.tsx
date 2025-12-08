@@ -440,137 +440,138 @@ export default function DashboardPage() {
               {filteredProjects.map((project) => (
                 <div
                   key={project.id}
-                  className={`${isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'} rounded-xl p-6 border hover:border-purple-500 transition group`}
+                  className={`${isDarkMode ? 'bg-gray-800/50 border-gray-700/50' : 'bg-white border-gray-200'} rounded-2xl border hover:border-purple-500/50 transition-all duration-300 overflow-hidden group hover:shadow-xl hover:shadow-purple-500/10 flex flex-col h-[320px]`}
                 >
-                  {/* Project Icon */}
-                  <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition">
-                    <span className="text-2xl">📱</span>
-                  </div>
-
-                  {/* Project Info */}
-                  <h4 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-2 group-hover:text-purple-400 transition`}>
-                    {project.name}
-                  </h4>
-                  {project.description && (
-                    <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-4 line-clamp-2`}>
-                      {project.description}
-                    </p>
-                  )}
-
-                  {/* Project Meta */}
-                  <div className={`flex items-center justify-between text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'} mb-4`}>
-                    <span>Updated {new Date(project.updatedAt).toLocaleDateString()}</span>
-                  </div>
-
-                  {/* Actions - ALL FIXED */}
-                  <div className="space-y-2">
-                    {/* Row 1: Primary Actions */}
-                    <div className="grid grid-cols-3 gap-2">
-                      {/* Edit in Main Editor */}
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          // Open main editor page with project
-                          window.location.href = `/builder?project=${project.id}`
-                        }}
-                        className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition text-xs font-medium"
-                        title="Edit in editor"
-                      >
-                        ✏️ Edit
-                      </button>
-                      
-                      {/* Preview in New Tab */}
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          window.open(`/preview/${project.id}`, '_blank')
-                        }}
-                        className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-xs"
-                        title="Preview"
-                      >
-                        👁️ View
-                      </button>
-                      
-                      {/* View Details */}
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          window.open(`/projects/${project.id}`, '_blank')
-                        }}
-                        className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition text-xs"
-                        title="View details"
-                      >
-                        📄 Code
-                      </button>
+                  {/* Card Header with Gradient */}
+                  <div className="h-2 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500"></div>
+                  
+                  {/* Card Content */}
+                  <div className="p-5 flex flex-col flex-1">
+                    {/* Top Row: Icon + Meta */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="w-11 h-11 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                        <span className="text-xl">📱</span>
+                      </div>
+                      <span className={`text-xs px-2 py-1 rounded-full ${isDarkMode ? 'bg-gray-700/50 text-gray-400' : 'bg-gray-100 text-gray-500'}`}>
+                        {new Date(project.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
                     </div>
 
-                    {/* Row 2: Secondary Actions */}
-                    <div className="grid grid-cols-3 gap-2">
-                      {/* Export */}
-                      {project.code && (
-                        <div className="col-span-1">
-                          <SimpleExportButton
-                            projectId={project.id}
-                            projectName={project.name}
-                            projectCode={project.code}
-                            projectType="nextjs"
-                            onSuccess={() => console.log('Export successful')}
-                            onError={(error) => console.error('Export error:', error)}
-                          />
-                        </div>
-                      )}
+                    {/* Project Title - Fixed Height */}
+                    <h4 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-2 group-hover:text-purple-400 transition-colors line-clamp-1`}>
+                      {project.name}
+                    </h4>
+                    
+                    {/* Description - Fixed Height */}
+                    <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} line-clamp-2 h-10 mb-4`}>
+                      {project.description || 'No description provided'}
+                    </p>
+
+                    {/* Spacer to push actions to bottom */}
+                    <div className="flex-1"></div>
+
+                    {/* Action Buttons - Compact Grid */}
+                    <div className="space-y-2">
+                      {/* Primary Actions Row */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            window.location.href = `/builder?project=${project.id}`
+                          }}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          Edit
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            router.push(`/preview/${project.id}`)
+                          }}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          Preview
+                        </button>
+                      </div>
                       
-                      {/* Duplicate */}
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          handleDuplicateProject(project.id)
-                        }}
-                        className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition text-xs"
-                        title="Duplicate project"
-                      >
-                        📋 Copy
-                      </button>
-                      
-                      {/* Delete */}
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          setShowDeleteConfirm(project.id)
-                        }}
-                        className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition text-xs"
-                        title="Delete project"
-                      >
-                        🗑️ Delete
-                      </button>
+                      {/* Secondary Actions Row */}
+                      <div className="flex gap-2">
+                        {project.code && (
+                          <div className="flex-1">
+                            <SimpleExportButton
+                              projectId={project.id}
+                              projectName={project.name}
+                              projectCode={project.code}
+                              projectType="nextjs"
+                              onSuccess={() => console.log('Export successful')}
+                              onError={(error) => console.error('Export error:', error)}
+                            />
+                          </div>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleDuplicateProject(project.id)
+                          }}
+                          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'} ${isDarkMode ? 'text-white' : 'text-gray-700'} rounded-lg transition-colors text-sm`}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                          Copy
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setShowDeleteConfirm(project.id)
+                          }}
+                          className="px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors"
+                          title="Delete project"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
 
                   {/* Delete Confirmation */}
                   {showDeleteConfirm === project.id && (
-                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                      <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 max-w-md w-full border border-red-600`}>
-                        <h3 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-4`}>Delete Project?</h3>
-                        <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-6`}>
-                          Are you sure you want to delete "{project.name}"? This action cannot be undone.
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                      <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 max-w-md w-full border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} shadow-2xl`}>
+                        <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </div>
+                        <h3 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-2 text-center`}>Delete Project?</h3>
+                        <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-6 text-center`}>
+                          Are you sure you want to delete <span className="font-semibold">"{project.name}"</span>? This action cannot be undone.
                         </p>
                         <div className="flex gap-3">
                           <button
-                            onClick={() => handleDeleteProject(project.id)}
-                            className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg transition font-medium"
-                          >
-                            Delete
-                          </button>
-                          <button
                             onClick={() => setShowDeleteConfirm(null)}
-                            className={`flex-1 ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} ${isDarkMode ? 'text-white' : 'text-gray-900'} py-2 rounded-lg transition font-medium`}
+                            className={`flex-1 ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'} ${isDarkMode ? 'text-white' : 'text-gray-900'} py-2.5 rounded-xl transition font-medium`}
                           >
                             Cancel
+                          </button>
+                          <button
+                            onClick={() => handleDeleteProject(project.id)}
+                            className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-xl transition font-medium"
+                          >
+                            Delete
                           </button>
                         </div>
                       </div>
