@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import Stripe from 'stripe'
 import { prisma } from '@/lib/prisma'
+import { sendEmail, getSubscriptionSuccessHTML } from '@/lib/email'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-11-17.clover',
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
         })
 
         // Update user
-        await prisma.user.update({
+        const updatedUser = await prisma.user.update({
           where: { id: session.metadata.userId },
           data: {
             subscriptionTier: plan,
@@ -82,6 +83,20 @@ export async function POST(request: NextRequest) {
             generationsUsed: 0,
           },
         })
+
+        // Send subscription success email
+        if (updatedUser.email) {
+          try {
+            await sendEmail({
+              to: updatedUser.email,
+              subject: `🎉 Welcome to BuildFlow ${plan.charAt(0).toUpperCase() + plan.slice(1)}!`,
+              html: getSubscriptionSuccessHTML(updatedUser.name || 'there', plan),
+            })
+            console.log(`📧 Subscription email sent to: ${updatedUser.email}`)
+          } catch (emailError) {
+            console.error('Failed to send subscription email:', emailError)
+          }
+        }
 
         console.log(`✅ Subscription created for user: ${session.metadata.userId}`)
         break

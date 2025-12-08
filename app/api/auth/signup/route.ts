@@ -3,15 +3,17 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import { sendEmail, getWelcomeEmailHTML } from '@/lib/email'
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, name } = await request.json()
+    const body = await request.json()
+    const { name, email, password } = body
 
     // Validation
-    if (!email || !password) {
+    if (!name || !email || !password) {
       return NextResponse.json(
-        { error: 'Email and password are required' },
+        { error: 'All fields are required' },
         { status: 400 }
       )
     }
@@ -23,92 +25,59 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check for valid email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: 'Invalid email format' },
-        { status: 400 }
-      )
-    }
-
-    // Check if user already exists
+    // Check if user exists
     const existingUser = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+      where: { email }
     })
 
     if (existingUser) {
       return NextResponse.json(
-        { error: 'An account with this email already exists' },
-        { status: 409 }
+        { error: 'User already exists' },
+        { status: 400 }
       )
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12)
+    const hashedPassword = await bcrypt.hash(password, 10)
 
     // Create user
     const user = await prisma.user.create({
       data: {
-        email: email.toLowerCase(),
+        name,
+        email,
         password: hashedPassword,
-        name: name || null,
         subscriptionTier: 'free',
         subscriptionStatus: 'active',
-        generationsLimit: 3,
-        generationsUsed: 0,
         projectsLimit: 3,
-        projectsThisMonth: 0,
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        createdAt: true,
-      },
-    })
-
-    // Log activity
-    await prisma.activity.create({
-      data: {
-        userId: user.id,
-        type: 'auth',
-        action: 'signup',
-        metadata: {
-          email: user.email,
-          name: user.name
-        }
+        generationsLimit: 10,
       }
     })
 
-    console.log('✅ User created:', user.email)
-
-    return NextResponse.json(
-      { 
-        message: 'Account created successfully',
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-        },
-      },
-      { status: 201 }
-    )
-  } catch (error) {
-    console.error('Signup error:', error)
-    
-    // Handle Prisma errors
-    if (error instanceof Error) {
-      if (error.message.includes('Unique constraint')) {
-        return NextResponse.json(
-          { error: 'An account with this email already exists' },
-          { status: 409 }
-        )
-      }
+    // Send welcome email
+    try {
+      await sendEmail({
+        to: email,
+        subject: 'Welcome to BuildFlow! 🚀',
+        html: getWelcomeEmailHTML(name)
+      })
+      console.log('Welcome email sent to:', email)
+    } catch (emailError) {
+      console.error('Failed to send welcome email:', emailError)
+      // Don't fail signup if email fails
     }
 
+    return NextResponse.json({
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email
+      }
+    })
+  } catch (error: any) {
+    console.error('Signup error:', error)
     return NextResponse.json(
-      { error: 'Failed to create account. Please try again.' },
+      { error: 'Signup failed' },
       { status: 500 }
     )
   }
