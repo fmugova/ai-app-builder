@@ -845,10 +845,10 @@ export default function AdminDashboard() {
                 Total of {stats?.totalProjects || 0} projects created across all users.
               </p>
               <button
-                onClick={() => router.push('/dashboard')}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition"
+                onClick={() => router.push('/admin/projects')}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg transition font-semibold"
               >
-                View Your Projects →
+                View All Projects →
               </button>
             </div>
           )}
