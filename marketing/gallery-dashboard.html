@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>BuildFlow Gallery Image 3 - Dashboard</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      width: 1270px;
+      height: 760px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0a;
+      overflow: hidden;
+    }
+    
+    .browser-frame {
+      background: #1a1a1a;
+      border-radius: 12px;
+      margin: 20px;
+      height: calc(100% - 40px);
+      overflow: hidden;
+      box-shadow: 0 25px 80px rgba(0,0,0,0.6);
+    }
+    
+    .browser-bar {
+      background: #2a2a2a;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .dots {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    
+    .dot.red { background: #ff5f57; }
+    .dot.yellow { background: #ffbd2e; }
+    .dot.green { background: #28c840; }
+    
+    .url-bar {
+      flex: 1;
+      background: #3a3a3a;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #888;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .dashboard {
+      display: flex;
+      height: calc(100% - 48px);
+      background: #111827;
+    }
+    
+    /* Sidebar */
+    .sidebar {
+      width: 240px;
+      background: #1f2937;
+      padding: 20px;
+      border-right: 1px solid #374151;
+    }
+    
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 30px;
+    }
+    
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+    
+    .logo-text {
+      font-size: 18px;
+      font-weight: 700;
+      color: white;
+    }
+    
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      color: #9ca3af;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    
+    .nav-item.active {
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+      color: white;
+    }
+    
+    .nav-icon {
+      font-size: 16px;
+    }
+    
+    /* Main Content */
+    .main {
+      flex: 1;
+      padding: 24px 30px;
+      overflow: hidden;
+    }
+    
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 28px;
+    }
+    
+    .header h1 {
+      font-size: 26px;
+      font-weight: 700;
+      color: white;
+    }
+    
+    .new-btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 12px 22px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 8px 30px rgba(102, 126, 234, 0.3);
+    }
+    
+    /* Stats Cards */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    
+    .stat-card {
+      background: #1f2937;
+      border-radius: 14px;
+      padding: 18px;
+      border: 1px solid #374151;
+    }
+    
+    .stat-label {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-bottom: 6px;
+    }
+    
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: white;
+    }
+    
+    .stat-change {
+      font-size: 12px;
+      color: #10b981;
+      margin-top: 4px;
+    }
+    
+    /* Project Grid */
+    .projects-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    
+    .projects-header h2 {
+      font-size: 18px;
+      font-weight: 600;
+      color: white;
+    }
+    
+    .view-all {
+      color: #667eea;
+      font-size: 13px;
+    }
+    
+    .projects-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    
+    .project-card {
+      background: #1f2937;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid #374151;
+      transition: all 0.2s;
+    }
+    
+    .project-card:hover {
+      border-color: #667eea;
+      box-shadow: 0 10px 40px rgba(102, 126, 234, 0.15);
+    }
+    
+    .project-preview {
+      height: 120px;
+      background: linear-gradient(135deg, #1e3a5f 0%, #2d1b4e 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    
+    .project-preview.alt1 {
+      background: linear-gradient(135deg, #1e4d3a 0%, #1b3a4e 100%);
+    }
+    
+    .project-preview.alt2 {
+      background: linear-gradient(135deg, #4d1e3a 0%, #4e3a1b 100%);
+    }
+    
+    .preview-content {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .preview-elem {
+      background: rgba(255,255,255,0.1);
+      border-radius: 4px;
+      height: 10px;
+    }
+    
+    .preview-elem.short { width: 60%; }
+    .preview-elem.medium { width: 80%; }
+    .preview-elem.long { width: 100%; }
+    
+    .project-info {
+      padding: 14px 16px;
+    }
+    
+    .project-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: white;
+      margin-bottom: 4px;
+    }
+    
+    .project-date {
+      font-size: 12px;
+      color: #6b7280;
+    }
+    
+    .project-actions {
+      display: flex;
+      gap: 8px;
+      padding: 0 16px 14px;
+    }
+    
+    .action-btn {
+      flex: 1;
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      text-align: center;
+      font-weight: 500;
+    }
+    
+    .action-btn.edit {
+      background: #374151;
+      color: #e5e7eb;
+    }
+    
+    .action-btn.preview {
+      background: rgba(102, 126, 234, 0.2);
+      color: #a78bfa;
+    }
+  </style>
+</head>
+<body>
+  <div class="browser-frame">
+    <div class="browser-bar">
+      <div class="dots">
+        <div class="dot red"></div>
+        <div class="dot yellow"></div>
+        <div class="dot green"></div>
+      </div>
+      <div class="url-bar">
+        <span style="color: #28c840;">🔒</span>
+        buildflow-ai.app/dashboard
+      </div>
+    </div>
+    
+    <div class="dashboard">
+      <div class="sidebar">
+        <div class="logo">
+          <div class="logo-icon">⚡</div>
+          <span class="logo-text">BuildFlow</span>
+        </div>
+        
+        <div class="nav-item active">
+          <span class="nav-icon">📊</span>
+          Dashboard
+        </div>
+        <div class="nav-item">
+          <span class="nav-icon">📁</span>
+          Projects
+        </div>
+        <div class="nav-item">
+          <span class="nav-icon">📋</span>
+          Templates
+        </div>
+        <div class="nav-item">
+          <span class="nav-icon">⚙️</span>
+          Settings
+        </div>
+      </div>
+      
+      <div class="main">
+        <div class="header">
+          <h1>Welcome back, John! 👋</h1>
+          <div class="new-btn">
+            <span>✨</span> New Project
+          </div>
+        </div>
+        
+        <div class="stats">
+          <div class="stat-card">
+            <div class="stat-label">Total Projects</div>
+            <div class="stat-value">24</div>
+            <div class="stat-change">↑ 12% this month</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Components Built</div>
+            <div class="stat-value">142</div>
+            <div class="stat-change">↑ 8% this week</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Time Saved</div>
+            <div class="stat-value">48h</div>
+            <div class="stat-change">vs manual coding</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">AI Credits</div>
+            <div class="stat-value">∞</div>
+            <div class="stat-change">Pro Plan</div>
+          </div>
+        </div>
+        
+        <div class="projects-header">
+          <h2>Recent Projects</h2>
+          <span class="view-all">View All →</span>
+        </div>
+        
+        <div class="projects-grid">
+          <div class="project-card">
+            <div class="project-preview">
+              <div class="preview-content">
+                <div class="preview-elem short"></div>
+                <div class="preview-elem long"></div>
+                <div class="preview-elem medium"></div>
+              </div>
+            </div>
+            <div class="project-info">
+              <div class="project-name">E-commerce Dashboard</div>
+              <div class="project-date">Updated 2 hours ago</div>
+            </div>
+            <div class="project-actions">
+              <div class="action-btn edit">Edit</div>
+              <div class="action-btn preview">Preview</div>
+            </div>
+          </div>
+          
+          <div class="project-card">
+            <div class="project-preview alt1">
+              <div class="preview-content">
+                <div class="preview-elem medium"></div>
+                <div class="preview-elem short"></div>
+                <div class="preview-elem long"></div>
+              </div>
+            </div>
+            <div class="project-info">
+              <div class="project-name">SaaS Landing Page</div>
+              <div class="project-date">Updated yesterday</div>
+            </div>
+            <div class="project-actions">
+              <div class="action-btn edit">Edit</div>
+              <div class="action-btn preview">Preview</div>
+            </div>
+          </div>
+          
+          <div class="project-card">
+            <div class="project-preview alt2">
+              <div class="preview-content">
+                <div class="preview-elem long"></div>
+                <div class="preview-elem medium"></div>
+                <div class="preview-elem short"></div>
+              </div>
+            </div>
+            <div class="project-info">
+              <div class="project-name">Portfolio Website</div>
+              <div class="project-date">Updated 3 days ago</div>
+            </div>
+            <div class="project-actions">
+              <div class="action-btn edit">Edit</div>
+              <div class="action-btn preview">Preview</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

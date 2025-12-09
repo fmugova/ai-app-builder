@@ -105,9 +105,7 @@ export default function ProjectViewPage() {
               </div>
             </div>
             <button
-              onClick={() => {
-                window.location.href = `/builder?project=${project.id}`
-              }}
+              onClick={() => router.push(`/builder?project=${project.id}`)}
               className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition"
             >
               Edit Project
@@ -184,13 +182,13 @@ export default function ProjectViewPage() {
         {/* Preview Button */}
         <div className="mt-6 flex justify-center gap-4">
           <button
-            onClick={() => window.close()}
+            onClick={() => router.push('/dashboard')}
             className="px-8 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition font-medium"
           >
-            Close Window
+            ← Back to Dashboard
           </button>
           <button
-            onClick={() => window.location.href = `/builder?project=${project.id}`}
+            onClick={() => router.push(`/builder?project=${project.id}`)}
             className="px-8 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition font-medium"
           >
             🚀 Open in Editor

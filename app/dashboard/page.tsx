@@ -344,7 +344,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {/* New Project */}
           <button
-            onClick={() => window.location.href = '/builder'}
+            onClick={() => router.push('/builder')}
             className="flex items-center gap-3 p-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-xl transition group"
           >
             <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition">
@@ -358,7 +358,7 @@ export default function DashboardPage() {
 
           {/* Templates */}
           <button
-            onClick={() => window.location.href = '/templates'}
+            onClick={() => router.push('/templates')}
             className={`flex items-center gap-3 p-4 ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700 border-gray-700' : 'bg-white hover:bg-gray-50 border-gray-200'} border hover:border-purple-500 rounded-xl transition group`}
           >
             <div className={`w-10 h-10 ${isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'} rounded-lg flex items-center justify-center group-hover:scale-110 transition`}>
@@ -480,7 +480,7 @@ export default function DashboardPage() {
                           onClick={(e) => {
                             e.preventDefault()
                             e.stopPropagation()
-                            window.location.href = `/builder?project=${project.id}`
+                            router.push(`/builder?project=${project.id}`)
                           }}
                           className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
                         >
@@ -615,7 +615,7 @@ export default function DashboardPage() {
               </p>
               {!searchQuery && (
                 <button
-                  onClick={() => window.location.href = '/builder'}
+                  onClick={() => router.push('/builder')}
                   className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg transition font-semibold"
                 >
                   <span>✨</span>

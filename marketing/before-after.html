@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>BuildFlow Before/After - 1270x760</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      width: 1270px;
+      height: 760px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 30px;
+      text-align: center;
+    }
+    
+    .header h1 {
+      color: white;
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: 2px;
+    }
+    
+    .header p {
+      color: rgba(255,255,255,0.9);
+      font-size: 18px;
+      margin-top: 8px;
+    }
+    
+    .content {
+      flex: 1;
+      display: flex;
+    }
+    
+    .side {
+      flex: 1;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .side.before {
+      background: #1e293b;
+      border-right: 3px solid #667eea;
+    }
+    
+    .side.after {
+      background: #0f172a;
+    }
+    
+    .label {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .before .label {
+      color: #94a3b8;
+    }
+    
+    .after .label {
+      color: #22c55e;
+    }
+    
+    .label span {
+      font-size: 20px;
+    }
+    
+    .prompt-box {
+      background: #0f172a;
+      border: 2px solid #334155;
+      border-radius: 16px;
+      padding: 30px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .prompt-label {
+      color: #64748b;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 15px;
+    }
+    
+    .prompt-text {
+      color: #e2e8f0;
+      font-size: 20px;
+      line-height: 1.6;
+      flex: 1;
+    }
+    
+    .prompt-text .highlight {
+      color: #a78bfa;
+      font-weight: 600;
+    }
+    
+    .arrow-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 30px;
+    }
+    
+    .arrow {
+      background: linear-gradient(135deg, #667eea 0%, #a78bfa 100%);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-weight: 600;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .result-box {
+      background: white;
+      border-radius: 16px;
+      flex: 1;
+      overflow: hidden;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+    }
+    
+    .browser-bar {
+      background: #f1f5f9;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    
+    .browser-dots {
+      display: flex;
+      gap: 6px;
+    }
+    
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    
+    .dot.red { background: #ef4444; }
+    .dot.yellow { background: #eab308; }
+    .dot.green { background: #22c55e; }
+    
+    .browser-url {
+      flex: 1;
+      background: white;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #64748b;
+      margin-left: 10px;
+    }
+    
+    .preview-content {
+      padding: 30px;
+      background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+      height: calc(100% - 45px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    
+    .preview-logo {
+      width: 60px;
+      height: 60px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      color: white;
+      margin-bottom: 20px;
+    }
+    
+    .preview-title {
+      color: white;
+      font-size: 28px;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+    
+    .preview-subtitle {
+      color: rgba(255,255,255,0.9);
+      font-size: 14px;
+      margin-bottom: 25px;
+    }
+    
+    .preview-cta {
+      background: white;
+      color: #667eea;
+      padding: 12px 30px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    
+    .time-badge {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: #22c55e;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>BUILD IN 30 SECONDS</h1>
+    <p>From idea to production-ready code</p>
+  </div>
+  
+  <div class="content">
+    <div class="side before">
+      <div class="label"><span>📝</span> BEFORE</div>
+      <div class="prompt-box">
+        <div class="prompt-label">Your Prompt</div>
+        <div class="prompt-text">
+          "Create a <span class="highlight">modern SaaS landing page</span> with a hero section, feature cards, pricing table, and testimonials. Use a <span class="highlight">purple gradient</span> theme."
+        </div>
+        <div class="arrow-container">
+          <div class="arrow">Generate with AI →</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="side after">
+      <div class="label"><span>✨</span> AFTER</div>
+      <div class="result-box">
+        <div class="browser-bar">
+          <div class="browser-dots">
+            <div class="dot red"></div>
+            <div class="dot yellow"></div>
+            <div class="dot green"></div>
+          </div>
+          <div class="browser-url">localhost:3000</div>
+        </div>
+        <div class="preview-content">
+          <div class="preview-logo">⚡</div>
+          <div class="preview-title">SaaS Platform</div>
+          <div class="preview-subtitle">Build faster, ship smarter</div>
+          <div class="preview-cta">Get Started Free</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

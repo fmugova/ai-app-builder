@@ -122,6 +122,8 @@ export default function PreviewPage() {
   const { data: session, status } = useSession()
   const [project, setProject] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [showMenu, setShowMenu] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   const projectId = params.id as string
 
@@ -144,13 +146,96 @@ export default function PreviewPage() {
         setProject(data)
       } else {
         alert('Project not found')
-        window.close()
+        router.push('/dashboard')
       }
     } catch (error) {
       console.error('Failed to load project:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+  // Copy code to clipboard
+  const handleCopyCode = () => {
+    if (project?.code) {
+      navigator.clipboard.writeText(project.code)
+      alert('Code copied to clipboard!')
+    }
+  }
+
+  // Download as HTML file
+  const handleDownloadHTML = () => {
+    if (!project?.code) return
+    const blob = new Blob([convertToPreviewableHTML(project.code)], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${project.name || 'project'}.html`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  // Download as ZIP
+  const handleDownloadZIP = async () => {
+    if (!project?.code) return
+    setExporting(true)
+    try {
+      // Create a simple structure for download
+      const htmlContent = convertToPreviewableHTML(project.code)
+      const blob = new Blob([htmlContent], { type: 'text/html' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${project.name || 'project'}.html`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  // Export to GitHub
+  const handleExportGitHub = async () => {
+    if (!project?.code) return
+    setExporting(true)
+    try {
+      const res = await fetch('/api/github/create-repo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: projectId,
+          name: project.name,
+          code: project.code
+        })
+      })
+      
+      const data = await res.json()
+      if (res.ok && data.url) {
+        window.open(data.url, '_blank')
+        alert('Repository created successfully!')
+      } else {
+        alert(data.error || 'Failed to create GitHub repository')
+      }
+    } catch (error) {
+      console.error('GitHub export error:', error)
+      alert('Failed to export to GitHub')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  // Navigate to edit
+  const handleEdit = () => {
+    router.push(`/builder?project=${projectId}`)
+  }
+
+  // Navigate back to dashboard
+  const handleBack = () => {
+    router.push('/dashboard')
   }
 
   if (loading) {
@@ -170,10 +255,10 @@ export default function PreviewPage() {
         <div className="text-center">
           <p className="text-red-400 text-xl mb-4">No code to preview</p>
           <button
-            onClick={() => window.close()}
+            onClick={handleBack}
             className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition"
           >
-            Close Window
+            Back to Dashboard
           </button>
         </div>
       </div>
@@ -182,15 +267,15 @@ export default function PreviewPage() {
 
   return (
     <div className="h-screen flex flex-col bg-white">
-      {/* Preview Header */}
+      {/* Preview Header with Action Menu */}
       <header className="bg-gray-800 border-b border-gray-700 p-4 flex-shrink-0 z-10">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => window.close()}
-              className="text-gray-400 hover:text-white transition"
+              onClick={handleBack}
+              className="text-gray-400 hover:text-white transition flex items-center gap-2"
             >
-              ← Close Preview
+              ← Back to Dashboard
             </button>
             <div className="h-6 w-px bg-gray-700"></div>
             <div>
@@ -198,30 +283,98 @@ export default function PreviewPage() {
               <p className="text-xs text-gray-400">Preview Mode</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="px-3 py-1 bg-green-900/30 text-green-400 rounded-lg text-xs font-medium">
-              🟢 Secure Preview
+          
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 bg-green-900/30 text-green-400 rounded-lg text-xs font-medium mr-2">
+              🟢 Live Preview
             </span>
+            
+            {/* Copy Button */}
             <button
-              onClick={() => {
-                navigator.clipboard.writeText(project.code)
-                alert('Code copied to clipboard!')
-              }}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition text-sm"
+              onClick={handleCopyCode}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition text-sm flex items-center gap-2"
+              title="Copy Code"
             >
-              📋 Copy Code
+              📋 Copy
             </button>
+            
+            {/* Download Button */}
             <button
-              onClick={() => {
-                window.location.href = `/builder?project=${projectId}`
-              }}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition text-sm font-medium"
+              onClick={handleDownloadHTML}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition text-sm flex items-center gap-2"
+              title="Download HTML"
+            >
+              💾 Download
+            </button>
+            
+            {/* Export Menu */}
+            <div className="relative">
+              <button
+                onClick={() => setShowMenu(!showMenu)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm flex items-center gap-2"
+                disabled={exporting}
+              >
+                {exporting ? '⏳ Exporting...' : '📦 Export ▼'}
+              </button>
+              
+              {showMenu && (
+                <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
+                  <div className="py-1">
+                    <button
+                      onClick={() => { handleDownloadZIP(); setShowMenu(false); }}
+                      className="w-full px-4 py-3 text-left text-white hover:bg-gray-700 flex items-center gap-3"
+                    >
+                      <span className="text-xl">📁</span>
+                      <div>
+                        <div className="font-medium">Download ZIP</div>
+                        <div className="text-xs text-gray-400">Save as HTML file</div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => { handleExportGitHub(); setShowMenu(false); }}
+                      className="w-full px-4 py-3 text-left text-white hover:bg-gray-700 flex items-center gap-3"
+                    >
+                      <span className="text-xl">🐙</span>
+                      <div>
+                        <div className="font-medium">Push to GitHub</div>
+                        <div className="text-xs text-gray-400">Create new repository</div>
+                      </div>
+                    </button>
+                    <div className="border-t border-gray-700 my-1"></div>
+                    <button
+                      onClick={() => { handleCopyCode(); setShowMenu(false); }}
+                      className="w-full px-4 py-3 text-left text-white hover:bg-gray-700 flex items-center gap-3"
+                    >
+                      <span className="text-xl">📋</span>
+                      <div>
+                        <div className="font-medium">Copy Code</div>
+                        <div className="text-xs text-gray-400">Copy to clipboard</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Edit Button */}
+            <button
+              onClick={handleEdit}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition text-sm font-medium flex items-center gap-2"
             >
               ✏️ Edit Project
             </button>
           </div>
         </div>
       </header>
+
+      {/* Click outside to close menu */}
+      {showMenu && (
+        <div 
+          className="fixed inset-0 z-5" 
+          onClick={() => setShowMenu(false)}
+        />
+      )}
 
       {/* Preview Frame - Takes remaining height */}
       <div className="flex-1 w-full overflow-auto bg-white">

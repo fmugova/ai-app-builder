@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      width: 1270px;
+      height: 760px;
+      background: linear-gradient(180deg, #0f0f1a 0%, #1a1a2e 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    /* Background glow */
+    body::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 800px;
+      background: radial-gradient(circle, rgba(102, 126, 234, 0.15) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    
+    .badge {
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%);
+      color: #a78bfa;
+      padding: 10px 24px;
+      border-radius: 30px;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 30px;
+      border: 1px solid rgba(167, 139, 250, 0.3);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    h1 {
+      font-size: 52px;
+      font-weight: 800;
+      color: white;
+      text-align: center;
+      margin-bottom: 20px;
+      line-height: 1.2;
+    }
+    
+    h1 .highlight {
+      background: linear-gradient(135deg, #667eea 0%, #a78bfa 50%, #f472b6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .subtitle {
+      font-size: 20px;
+      color: #94a3b8;
+      text-align: center;
+      margin-bottom: 50px;
+      max-width: 600px;
+    }
+    
+    /* Export buttons container */
+    .export-container {
+      background: #1f2937;
+      border-radius: 20px;
+      padding: 40px 50px;
+      border: 1px solid #374151;
+      box-shadow: 0 25px 80px rgba(0,0,0,0.4);
+    }
+    
+    .export-title {
+      font-size: 14px;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    
+    .export-buttons {
+      display: flex;
+      gap: 16px;
+    }
+    
+    .export-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 24px 32px;
+      border-radius: 16px;
+      background: #374151;
+      border: 1px solid #4b5563;
+      min-width: 140px;
+      transition: all 0.2s;
+    }
+    
+    .export-btn:hover {
+      border-color: #667eea;
+      transform: translateY(-4px);
+      box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
+    }
+    
+    .export-btn .icon {
+      font-size: 32px;
+    }
+    
+    .export-btn .label {
+      font-size: 14px;
+      font-weight: 600;
+      color: white;
+    }
+    
+    .export-btn .desc {
+      font-size: 11px;
+      color: #9ca3af;
+    }
+    
+    .export-btn.github {
+      background: linear-gradient(135deg, #24292e 0%, #1a1e22 100%);
+    }
+    
+    .export-btn.zip {
+      background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    }
+    
+    .export-btn.codesandbox {
+      background: linear-gradient(135deg, #151515 0%, #000 100%);
+    }
+    
+    .export-btn.vercel {
+      background: linear-gradient(135deg, #000 0%, #111 100%);
+      border-color: #333;
+    }
+    
+    /* Bottom message */
+    .ownership-message {
+      margin-top: 40px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .ownership-message .check {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+    
+    .ownership-message .text {
+      font-size: 18px;
+      color: white;
+      font-weight: 600;
+    }
+    
+    .ownership-message .text span {
+      color: #10b981;
+    }
+  </style>
+</head>
+<body>
+  <div class="badge">
+    <span>📦</span>
+    Export Your Creation
+  </div>
+  
+  <h1>
+    <span class="highlight">You Own</span> Every Line
+  </h1>
+  
+  <p class="subtitle">
+    Export your generated code anywhere. No vendor lock-in. 
+    Full ownership of your code, forever.
+  </p>
+  
+  <div class="export-container">
+    <div class="export-title">Choose Your Export Method</div>
+    <div class="export-buttons">
+      <div class="export-btn github">
+        <span class="icon">🐙</span>
+        <span class="label">GitHub</span>
+        <span class="desc">Push to repo</span>
+      </div>
+      <div class="export-btn zip">
+        <span class="icon">📁</span>
+        <span class="label">Download</span>
+        <span class="desc">ZIP archive</span>
+      </div>
+      <div class="export-btn codesandbox">
+        <span class="icon">⚡</span>
+        <span class="label">CodeSandbox</span>
+        <span class="desc">Edit online</span>
+      </div>
+      <div class="export-btn vercel">
+        <span class="icon">▲</span>
+        <span class="label">Vercel</span>
+        <span class="desc">Deploy live</span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="ownership-message">
+    <div class="check">✓</div>
+    <div class="text">
+      <span>100% Code Ownership</span> — No strings attached
+    </div>
+  </div>
+</body>
+</html>

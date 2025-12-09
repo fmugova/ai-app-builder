@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>BuildFlow Gallery Image 2 - Code Generation</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      width: 1270px;
+      height: 760px;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      background: #0a0a0a;
+      overflow: hidden;
+    }
+    
+    .container {
+      display: flex;
+      height: 100%;
+      padding: 20px;
+      gap: 20px;
+    }
+    
+    .panel {
+      background: #1a1a1a;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 15px 50px rgba(0,0,0,0.4);
+    }
+    
+    .panel-header {
+      background: #2a2a2a;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .panel-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #888;
+    }
+    
+    .dots {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    
+    .dot.red { background: #ff5f57; }
+    .dot.yellow { background: #ffbd2e; }
+    .dot.green { background: #28c840; }
+    
+    /* Left Panel - Prompt */
+    .prompt-panel {
+      width: 420px;
+      flex-shrink: 0;
+    }
+    
+    .prompt-content {
+      padding: 24px;
+    }
+    
+    .input-label {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 10px;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    
+    .prompt-box {
+      background: #252525;
+      border-radius: 10px;
+      padding: 20px;
+      border: 1px solid #333;
+    }
+    
+    .prompt-text {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 15px;
+      color: #f0f0f0;
+      line-height: 1.6;
+    }
+    
+    .typing-indicator {
+      display: inline-flex;
+      gap: 3px;
+      margin-left: 4px;
+    }
+    
+    .typing-dot {
+      width: 6px;
+      height: 6px;
+      background: #667eea;
+      border-radius: 50%;
+      animation: typing 1.4s infinite ease-in-out;
+    }
+    
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    
+    @keyframes typing {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-8px); }
+    }
+    
+    .generate-btn {
+      margin-top: 24px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 14px 28px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: fit-content;
+      box-shadow: 0 8px 30px rgba(102, 126, 234, 0.4);
+    }
+    
+    /* Right Panel - Code */
+    .code-panel {
+      flex: 1;
+    }
+    
+    .code-tabs {
+      display: flex;
+      gap: 4px;
+    }
+    
+    .code-tab {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #666;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    
+    .code-tab.active {
+      background: #3a3a3a;
+      color: #a78bfa;
+    }
+    
+    .code-content {
+      padding: 20px;
+      font-size: 13px;
+      line-height: 1.7;
+      color: #e0e0e0;
+      height: calc(100% - 54px);
+      overflow: hidden;
+    }
+    
+    .code-line {
+      display: flex;
+    }
+    
+    .line-number {
+      color: #444;
+      width: 40px;
+      text-align: right;
+      padding-right: 20px;
+      user-select: none;
+    }
+    
+    .keyword { color: #c792ea; }
+    .string { color: #c3e88d; }
+    .function { color: #82aaff; }
+    .tag { color: #f07178; }
+    .attribute { color: #ffcb6b; }
+    .component { color: #89ddff; }
+    .prop { color: #f78c6c; }
+    .comment { color: #546e7a; font-style: italic; }
+    .bracket { color: #89ddff; }
+    
+    /* Generation effect */
+    .generating {
+      position: relative;
+    }
+    
+    .generating::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 50%;
+      background: linear-gradient(90deg, transparent, #1a1a1a);
+    }
+    
+    .cursor {
+      display: inline-block;
+      width: 2px;
+      height: 16px;
+      background: #667eea;
+      animation: blink 1s infinite;
+      margin-left: 2px;
+      vertical-align: middle;
+    }
+    
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="panel prompt-panel">
+      <div class="panel-header">
+        <div class="dots">
+          <div class="dot red"></div>
+          <div class="dot yellow"></div>
+          <div class="dot green"></div>
+        </div>
+        <div class="panel-title">PROMPT</div>
+      </div>
+      <div class="prompt-content">
+        <div class="input-label">Describe your component</div>
+        <div class="prompt-box">
+          <div class="prompt-text">
+            Create a modern pricing card component with a gradient header, three pricing tiers (Basic, Pro, Enterprise), feature lists with checkmarks, and animated hover effects. Include a "Most Popular" badge on the Pro tier.
+            <span class="typing-indicator">
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+            </span>
+          </div>
+        </div>
+        <div class="generate-btn">
+          <span>✨</span> Generating...
+        </div>
+      </div>
+    </div>
+    
+    <div class="panel code-panel">
+      <div class="panel-header">
+        <div class="code-tabs">
+          <div class="code-tab active">PricingCard.tsx</div>
+          <div class="code-tab">styles.css</div>
+        </div>
+        <div class="panel-title">GENERATED CODE</div>
+      </div>
+      <div class="code-content">
+        <div class="code-line"><span class="line-number">1</span><span class="keyword">import</span> React <span class="keyword">from</span> <span class="string">'react'</span>;</div>
+        <div class="code-line"><span class="line-number">2</span></div>
+        <div class="code-line"><span class="line-number">3</span><span class="keyword">interface</span> <span class="function">PricingTier</span> <span class="bracket">{</span></div>
+        <div class="code-line"><span class="line-number">4</span>  name: <span class="component">string</span>;</div>
+        <div class="code-line"><span class="line-number">5</span>  price: <span class="component">number</span>;</div>
+        <div class="code-line"><span class="line-number">6</span>  features: <span class="component">string</span>[];</div>
+        <div class="code-line"><span class="line-number">7</span>  popular?: <span class="component">boolean</span>;</div>
+        <div class="code-line"><span class="line-number">8</span><span class="bracket">}</span></div>
+        <div class="code-line"><span class="line-number">9</span></div>
+        <div class="code-line"><span class="line-number">10</span><span class="keyword">export const</span> <span class="function">PricingCard</span> = <span class="bracket">({</span> tier <span class="bracket">}</span>: <span class="bracket">{</span> tier: <span class="function">PricingTier</span> <span class="bracket">})</span> <span class="keyword">=></span> <span class="bracket">{</span></div>
+        <div class="code-line"><span class="line-number">11</span>  <span class="keyword">return</span> <span class="bracket">(</span></div>
+        <div class="code-line"><span class="line-number">12</span>    <span class="tag">&lt;div</span> <span class="attribute">className</span>=<span class="string">"pricing-card"</span><span class="tag">&gt;</span></div>
+        <div class="code-line"><span class="line-number">13</span>      <span class="bracket">{</span>tier.popular <span class="keyword">&&</span> <span class="bracket">(</span></div>
+        <div class="code-line"><span class="line-number">14</span>        <span class="tag">&lt;span</span> <span class="attribute">className</span>=<span class="string">"badge"</span><span class="tag">&gt;</span>Most Popular<span class="tag">&lt;/span&gt;</span></div>
+        <div class="code-line"><span class="line-number">15</span>      <span class="bracket">)}</span></div>
+        <div class="code-line"><span class="line-number">16</span>      <span class="tag">&lt;h3</span> <span class="attribute">className</span>=<span class="string">"tier-name"</span><span class="tag">&gt;</span><span class="bracket">{</span>tier.name<span class="bracket">}</span><span class="tag">&lt;/h3&gt;</span></div>
+        <div class="code-line"><span class="line-number">17</span>      <span class="tag">&lt;div</span> <span class="attribute">className</span>=<span class="string">"price"</span><span class="tag">&gt;</span></div>
+        <div class="code-line"><span class="line-number">18</span>        <span class="tag">&lt;span</span> <span class="attribute">className</span>=<span class="string">"currency"</span><span class="tag">&gt;</span>$<span class="tag">&lt;/span&gt;</span></div>
+        <div class="code-line"><span class="line-number">19</span>        <span class="tag">&lt;span</span> <span class="attribute">className</span>=<span class="string">"amount"</span><span class="tag">&gt;</span><span class="bracket">{</span>tier.price<span class="bracket">}</span><span class="tag">&lt;/span&gt;</span><span class="cursor"></span></div>
+        <div class="code-line"><span class="line-number">20</span>        <span class="tag">&lt;span</span> <span class="attribute">className</span>=<span class="string">"period"</span><span class="tag">&gt;</span>/mo<span class="tag">&lt;/span&gt;</span></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

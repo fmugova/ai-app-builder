@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>BuildFlow Hero (Light) - 1270x760</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      width: 1270px;
+      height: 760px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #ffffff;
+      overflow: hidden;
+    }
+    
+    .browser-frame {
+      background: #ffffff;
+      border-radius: 12px;
+      margin: 20px;
+      height: calc(100% - 40px);
+      overflow: hidden;
+      box-shadow: 0 25px 80px rgba(0,0,0,0.15);
+      border: 1px solid #e5e7eb;
+    }
+    
+    .browser-bar {
+      background: #f9fafb;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .dots {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+    }
+    
+    .dot.red { background: #ff5f57; }
+    .dot.yellow { background: #ffbd2e; }
+    .dot.green { background: #28c840; }
+    
+    .url-bar {
+      flex: 1;
+      background: #ffffff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #6b7280;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid #e5e7eb;
+    }
+    
+    .url-bar .lock {
+      color: #22c55e;
+    }
+    
+    .content {
+      height: calc(100% - 54px);
+      background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 60px;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .content::before {
+      content: '';
+      position: absolute;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(102, 126, 234, 0.1) 0%, transparent 60%);
+    }
+    
+    .badge {
+      background: rgba(102, 126, 234, 0.1);
+      color: #667eea;
+      padding: 8px 20px;
+      border-radius: 30px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 30px;
+      border: 1px solid rgba(102, 126, 234, 0.2);
+      z-index: 1;
+    }
+    
+    h1 {
+      font-size: 56px;
+      font-weight: 800;
+      color: #1f2937;
+      line-height: 1.1;
+      margin-bottom: 24px;
+      z-index: 1;
+    }
+    
+    h1 .gradient {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #ec4899 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .subtitle {
+      font-size: 20px;
+      color: #6b7280;
+      max-width: 600px;
+      line-height: 1.6;
+      margin-bottom: 40px;
+      z-index: 1;
+    }
+    
+    .cta-buttons {
+      display: flex;
+      gap: 16px;
+      z-index: 1;
+    }
+    
+    .btn {
+      padding: 16px 32px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .btn.primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+    }
+    
+    .btn.secondary {
+      background: #ffffff;
+      color: #374151;
+      border: 2px solid #e5e7eb;
+    }
+    
+    .stats {
+      display: flex;
+      gap: 60px;
+      margin-top: 60px;
+      z-index: 1;
+    }
+    
+    .stat {
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-size: 36px;
+      font-weight: 800;
+      color: #1f2937;
+    }
+    
+    .stat-label {
+      font-size: 14px;
+      color: #9ca3af;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="browser-frame">
+    <div class="browser-bar">
+      <div class="dots">
+        <div class="dot red"></div>
+        <div class="dot yellow"></div>
+        <div class="dot green"></div>
+      </div>
+      <div class="url-bar">
+        <span class="lock">🔒</span>
+        buildflow-ai.app
+      </div>
+    </div>
+    <div class="content">
+      <div class="badge">⚡ AI-Powered Development</div>
+      <h1>Build Apps <span class="gradient">10x Faster</span><br>With AI</h1>
+      <p class="subtitle">Generate production-ready React components and web apps in seconds. No coding required. Just describe what you want.</p>
+      <div class="cta-buttons">
+        <div class="btn primary">✨ Start Building Free</div>
+        <div class="btn secondary">▶ Watch Demo</div>
+      </div>
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-value">10K+</div>
+          <div class="stat-label">Apps Created</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">30s</div>
+          <div class="stat-label">Avg. Build Time</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">98%</div>
+          <div class="stat-label">Satisfaction</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

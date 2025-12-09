@@ -522,15 +522,44 @@ function BuilderContent() {
               ← Dashboard
             </button>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               {generatedCode && (
-                <button
-                  onClick={downloadCode}
-                  className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700"
-                >
-                  💾 Download
-                </button>
+                <>
+                  {/* Copy Code */}
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedCode)
+                      toast.success('Code copied to clipboard!')
+                    }}
+                    className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 text-sm"
+                    title="Copy Code"
+                  >
+                    📋 Copy
+                  </button>
+                  
+                  {/* Download */}
+                  <button
+                    onClick={downloadCode}
+                    className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 text-sm"
+                    title="Download HTML"
+                  >
+                    💾 Download
+                  </button>
+                  
+                  {/* Preview in New Tab */}
+                  {currentProjectId && (
+                    <button
+                      onClick={() => window.open(`/preview/${currentProjectId}`, '_blank')}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm"
+                      title="Open Preview"
+                    >
+                      👁️ Preview
+                    </button>
+                  )}
+                </>
               )}
+              
+              {/* Save Button */}
               <button
                 onClick={handleSave}
                 disabled={saving || !generatedCode}
@@ -629,14 +658,50 @@ function BuilderContent() {
             ) : generatedCode ? (
               // ✅ NEW GENERATION: Show live iframe
               <div className="bg-white rounded-xl shadow-sm border p-6">
-                <h3 className="text-xl font-semibold mb-4">Live Preview</h3>
-                <div className="bg-gray-100 rounded-lg overflow-hidden border" style={{ height: '600px' }}>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-semibold">Live Preview</h3>
+                  {currentProjectId && (
+                    <button
+                      onClick={() => window.open(`/preview/${currentProjectId}`, '_blank')}
+                      className="text-sm bg-blue-100 text-blue-700 hover:bg-blue-200 px-4 py-2 rounded-lg flex items-center gap-2"
+                    >
+                      🔗 Open Full Preview
+                    </button>
+                  )}
+                </div>
+                <div className="bg-gray-100 rounded-lg overflow-hidden border" style={{ height: '500px' }}>
                   <iframe
                     srcDoc={sanitizeForPreview(generatedCode)}
                     className="w-full h-full border-0"
                     sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
                     title="Live Preview"
                   />
+                </div>
+                
+                {/* Quick Actions Bar */}
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedCode)
+                      toast.success('Code copied!')
+                    }}
+                    className="flex-1 min-w-[120px] px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+                  >
+                    📋 Copy Code
+                  </button>
+                  <button
+                    onClick={downloadCode}
+                    className="flex-1 min-w-[120px] px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+                  >
+                    💾 Download
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="flex-1 min-w-[120px] px-4 py-3 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {saving ? '⏳ Saving...' : '✅ Save Project'}
+                  </button>
                 </div>
               </div>
             ) : (
@@ -659,7 +724,7 @@ function BuilderContent() {
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(generatedCode)
-                      alert('Code copied!')
+                      toast.success('Code copied!')
                     }}
                     className="text-sm bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg"
                   >

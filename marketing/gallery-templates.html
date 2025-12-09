@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>BuildFlow Gallery Image 4 - Templates</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      width: 1270px;
+      height: 760px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0a;
+      overflow: hidden;
+    }
+    
+    .browser-frame {
+      background: #1a1a1a;
+      border-radius: 12px;
+      margin: 20px;
+      height: calc(100% - 40px);
+      overflow: hidden;
+      box-shadow: 0 25px 80px rgba(0,0,0,0.6);
+    }
+    
+    .browser-bar {
+      background: #2a2a2a;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .dots {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    
+    .dot.red { background: #ff5f57; }
+    .dot.yellow { background: #ffbd2e; }
+    .dot.green { background: #28c840; }
+    
+    .url-bar {
+      flex: 1;
+      background: #3a3a3a;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #888;
+    }
+    
+    .content {
+      background: linear-gradient(180deg, #0f0f1a 0%, #1a1a2e 100%);
+      height: calc(100% - 48px);
+      padding: 40px;
+      overflow: hidden;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+    
+    .header h1 {
+      font-size: 36px;
+      font-weight: 800;
+      color: white;
+      margin-bottom: 12px;
+    }
+    
+    .header p {
+      color: #94a3b8;
+      font-size: 16px;
+    }
+    
+    /* Category Tabs */
+    .tabs {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 36px;
+    }
+    
+    .tab {
+      padding: 10px 22px;
+      border-radius: 30px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #9ca3af;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .tab.active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+    }
+    
+    /* Template Grid */
+    .templates-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+    }
+    
+    .template-card {
+      background: #1f2937;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid #374151;
+      transition: all 0.3s;
+    }
+    
+    .template-card:hover {
+      transform: translateY(-4px);
+      border-color: #667eea;
+      box-shadow: 0 20px 60px rgba(102, 126, 234, 0.2);
+    }
+    
+    .template-preview {
+      height: 160px;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .template-preview.landing {
+      background: linear-gradient(135deg, #1e3a5f 0%, #4a1e5f 100%);
+    }
+    
+    .template-preview.dashboard {
+      background: linear-gradient(135deg, #1e4a3f 0%, #1e3a5f 100%);
+    }
+    
+    .template-preview.ecommerce {
+      background: linear-gradient(135deg, #5f1e3a 0%, #5f4a1e 100%);
+    }
+    
+    .template-preview.blog {
+      background: linear-gradient(135deg, #3a1e5f 0%, #1e5f4a 100%);
+    }
+    
+    /* Mini wireframe inside preview */
+    .wireframe {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      height: 100%;
+    }
+    
+    .wire-elem {
+      background: rgba(255,255,255,0.15);
+      border-radius: 4px;
+    }
+    
+    .wire-header {
+      height: 24px;
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    
+    .wire-logo {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.25);
+    }
+    
+    .wire-nav {
+      flex: 1;
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    
+    .wire-nav-item {
+      width: 40px;
+      height: 8px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 4px;
+    }
+    
+    .wire-hero {
+      height: 50px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .wire-btn {
+      width: 60px;
+      height: 16px;
+      background: rgba(102, 126, 234, 0.6);
+      border-radius: 4px;
+    }
+    
+    .wire-cards {
+      display: flex;
+      gap: 8px;
+      flex: 1;
+    }
+    
+    .wire-card {
+      flex: 1;
+      background: rgba(255,255,255,0.08);
+      border-radius: 6px;
+    }
+    
+    .template-badge {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(102, 126, 234, 0.9);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+    
+    .template-info {
+      padding: 16px;
+    }
+    
+    .template-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: white;
+      margin-bottom: 4px;
+    }
+    
+    .template-desc {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-bottom: 12px;
+    }
+    
+    .template-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .template-tag {
+      font-size: 11px;
+      color: #a78bfa;
+      background: rgba(167, 139, 250, 0.15);
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+    
+    .use-btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="browser-frame">
+    <div class="browser-bar">
+      <div class="dots">
+        <div class="dot red"></div>
+        <div class="dot yellow"></div>
+        <div class="dot green"></div>
+      </div>
+      <div class="url-bar">
+        <span style="color: #28c840;">🔒</span>
+        buildflow-ai.app/templates
+      </div>
+    </div>
+    
+    <div class="content">
+      <div class="header">
+        <h1>🎨 Template Gallery</h1>
+        <p>Start with a template and customize with AI in seconds</p>
+      </div>
+      
+      <div class="tabs">
+        <div class="tab active">All</div>
+        <div class="tab">Landing Pages</div>
+        <div class="tab">Dashboards</div>
+        <div class="tab">E-commerce</div>
+        <div class="tab">Portfolios</div>
+      </div>
+      
+      <div class="templates-grid">
+        <div class="template-card">
+          <div class="template-preview landing">
+            <div class="wireframe">
+              <div class="wire-header">
+                <div class="wire-logo"></div>
+                <div class="wire-nav">
+                  <div class="wire-nav-item"></div>
+                  <div class="wire-nav-item"></div>
+                  <div class="wire-nav-item"></div>
+                </div>
+              </div>
+              <div class="wire-hero">
+                <div class="wire-btn"></div>
+              </div>
+              <div class="wire-cards">
+                <div class="wire-card"></div>
+                <div class="wire-card"></div>
+                <div class="wire-card"></div>
+              </div>
+            </div>
+            <div class="template-badge">Popular</div>
+          </div>
+          <div class="template-info">
+            <div class="template-name">SaaS Landing</div>
+            <div class="template-desc">Modern startup landing page</div>
+            <div class="template-footer">
+              <span class="template-tag">React</span>
+              <div class="use-btn">Use</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="template-card">
+          <div class="template-preview dashboard">
+            <div class="wireframe">
+              <div class="wire-header">
+                <div class="wire-logo"></div>
+                <div class="wire-nav">
+                  <div class="wire-nav-item"></div>
+                  <div class="wire-nav-item"></div>
+                </div>
+              </div>
+              <div class="wire-cards">
+                <div class="wire-card" style="height: 60px;"></div>
+                <div class="wire-card" style="height: 60px;"></div>
+              </div>
+              <div class="wire-card" style="height: 40px; margin-top: 8px;"></div>
+            </div>
+          </div>
+          <div class="template-info">
+            <div class="template-name">Admin Dashboard</div>
+            <div class="template-desc">Full-featured admin panel</div>
+            <div class="template-footer">
+              <span class="template-tag">Next.js</span>
+              <div class="use-btn">Use</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="template-card">
+          <div class="template-preview ecommerce">
+            <div class="wireframe">
+              <div class="wire-header">
+                <div class="wire-logo"></div>
+                <div class="wire-nav">
+                  <div class="wire-nav-item"></div>
+                  <div class="wire-nav-item"></div>
+                  <div class="wire-nav-item"></div>
+                </div>
+              </div>
+              <div class="wire-cards" style="flex: 1;">
+                <div class="wire-card"></div>
+                <div class="wire-card"></div>
+              </div>
+              <div class="wire-cards" style="flex: 1;">
+                <div class="wire-card"></div>
+                <div class="wire-card"></div>
+              </div>
+            </div>
+            <div class="template-badge">New</div>
+          </div>
+          <div class="template-info">
+            <div class="template-name">E-commerce Store</div>
+            <div class="template-desc">Product catalog & cart</div>
+            <div class="template-footer">
+              <span class="template-tag">Tailwind</span>
+              <div class="use-btn">Use</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="template-card">
+          <div class="template-preview blog">
+            <div class="wireframe">
+              <div class="wire-header">
+                <div class="wire-logo"></div>
+                <div class="wire-nav">
+                  <div class="wire-nav-item"></div>
+                  <div class="wire-nav-item"></div>
+                </div>
+              </div>
+              <div class="wire-hero" style="height: 40px;"></div>
+              <div class="wire-card" style="height: 20px; margin-top: 8px;"></div>
+              <div class="wire-card" style="height: 10px; width: 70%; margin-top: 6px;"></div>
+              <div class="wire-card" style="height: 10px; width: 50%; margin-top: 6px;"></div>
+            </div>
+          </div>
+          <div class="template-info">
+            <div class="template-name">Blog / Portfolio</div>
+            <div class="template-desc">Personal blog with MDX</div>
+            <div class="template-footer">
+              <span class="template-tag">MDX</span>
+              <div class="use-btn">Use</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

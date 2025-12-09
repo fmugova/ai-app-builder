@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      margin: 0;
+      width: 1270px;
+      height: 760px;
+      background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      padding: 60px;
+      box-sizing: border-box;
+    }
+    .header {
+      text-align: center;
+      color: white;
+      font-size: 48px;
+      font-weight: bold;
+      margin-bottom: 50px;
+      letter-spacing: 4px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 30px;
+    }
+    .card {
+      background: #374151;
+      border-radius: 12px;
+      overflow: hidden;
+      transition: transform 0.2s;
+    }
+    .card:hover {
+      transform: translateY(-5px);
+    }
+    .screenshot {
+      width: 100%;
+      height: 180px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+    }
+    .label {
+      padding: 20px;
+      text-align: center;
+      color: white;
+      font-weight: 600;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">BUILD ANYTHING</div>
+  <div class="grid">
+    <div class="card">
+      <div class="screenshot">🚀</div>
+      <div class="label">SaaS Landing</div>
+    </div>
+    <div class="card">
+      <div class="screenshot">📊</div>
+      <div class="label">Dashboard</div>
+    </div>
+    <div class="card">
+      <div class="screenshot">💼</div>
+      <div class="label">Portfolio</div>
+    </div>
+    <div class="card">
+      <div class="screenshot">📱</div>
+      <div class="label">Mobile App</div>
+    </div>
+    <div class="card">
+      <div class="screenshot">🍕</div>
+      <div class="label">Restaurant</div>
+    </div>
+    <div class="card">
+      <div class="screenshot">🛍️</div>
+      <div class="label">E-commerce</div>
+    </div>
+  </div>
+</body>
+</html>
