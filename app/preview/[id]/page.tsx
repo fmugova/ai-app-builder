@@ -82,6 +82,7 @@ const convertToPreviewableHTML = (code: string): string => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base target="_blank">
   <title>Preview</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -101,6 +102,7 @@ const convertToPreviewableHTML = (code: string): string => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base target="_blank">
   <title>Preview</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -111,6 +113,11 @@ const convertToPreviewableHTML = (code: string): string => {
   ${code}
 </body>
 </html>`
+  }
+
+  // For complete HTML, inject base target into existing head
+  if (code.includes('<head>')) {
+    return code.replace('<head>', '<head>\n  <base target="_blank">')
   }
 
   return code
