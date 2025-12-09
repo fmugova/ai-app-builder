@@ -3,8 +3,9 @@ import { Inter } from 'next/font/google'
 import { Providers } from './providers'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
-import { GoogleAnalytics } from '@next/third-parties/google'
+import { GoogleAnalytics, GoogleTagManager } from '@next/third-parties/google'
 import { HomePageSchema } from '@/components/JsonLd'
+import Script from 'next/script'
 import type { Metadata, Viewport } from 'next'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -147,12 +148,20 @@ export default function RootLayout({
         {/* Preconnect to external domains for performance */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/* AMP Analytics */}
+        <Script 
+          async 
+          custom-element="amp-analytics" 
+          src="https://cdn.ampproject.org/v0/amp-analytics-0.1.js"
+          strategy="afterInteractive"
+        />
       </head>
       <body className={inter.className}>
         <Providers>{children}</Providers>
         <Analytics />
         <SpeedInsights />
         <GoogleAnalytics gaId="GTM-KNTK3Z8G" />
+        <GoogleTagManager gtmId="GTM-KNTK3Z8G" />
       </body>
     </html>
   )
