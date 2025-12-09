@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Check, ArrowLeft, Loader2 } from 'lucide-react'
 import { Toaster, toast } from 'react-hot-toast'
+import { analytics } from '@/lib/analytics'
 
 const PLANS = [
   {
@@ -82,6 +83,11 @@ export default function PricingPage() {
   } | null>(null)
   const [validatingPromo, setValidatingPromo] = useState(false)
 
+  // Track pricing page view on mount
+  useEffect(() => {
+    analytics.pricingViewed()
+  }, [])
+
   // Apply promo code
   const applyPromoCode = async () => {
     if (!promoCode.trim()) {
@@ -127,6 +133,9 @@ export default function PricingPage() {
 
   // Handle subscription
   const handleSubscribe = async (planId: string, priceId?: string) => {
+    // Track upgrade button clicked
+    analytics.upgradeClicked(planId)
+
     if (planId === 'free') {
       router.push('/dashboard')
       return
@@ -147,8 +156,15 @@ export default function PricingPage() {
       return
     }
 
+    // Get price for analytics
+    const plan = PLANS.find(p => p.id === planId)
+    const price = plan?.price || 0
+
     setLoading(planId)
     try {
+      // Track checkout started
+      analytics.checkoutStarted(planId, price)
+
       const response = await fetch('/api/stripe/create-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

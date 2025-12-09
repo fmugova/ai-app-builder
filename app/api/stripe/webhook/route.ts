@@ -6,6 +6,11 @@ import Stripe from 'stripe'
 import { prisma } from '@/lib/prisma'
 import { sendEmail, getSubscriptionSuccessHTML } from '@/lib/email'
 
+// Server-side analytics logging (GA tracking happens client-side)
+const logAnalyticsEvent = (event: string, properties?: Record<string, any>) => {
+  console.log(`📊 Analytics [${event}]:`, properties || {})
+}
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-11-17.clover',
 })
@@ -97,6 +102,14 @@ export async function POST(request: NextRequest) {
             console.error('Failed to send subscription email:', emailError)
           }
         }
+
+        // Log checkout completed analytics event
+        logAnalyticsEvent('checkout_completed', {
+          tier: plan,
+          value: session.amount_total ? session.amount_total / 100 : 0,
+          currency: 'USD',
+          userId: session.metadata.userId
+        })
 
         console.log(`✅ Subscription created for user: ${session.metadata.userId}`)
         break

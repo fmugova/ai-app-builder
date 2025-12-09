@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import SimpleExportButton from '@/components/SimpleExportButton'
 import OnboardingTutorial, { QuickTips } from '@/components/OnboardingTutorial'
+import { analytics } from '@/lib/analytics'
 
 const ADMIN_EMAILS = ['fmugova@yahoo.com', 'admin@buildflow.app']
 

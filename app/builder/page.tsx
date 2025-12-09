@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { toast, Toaster } from 'react-hot-toast'
 import { templates } from '@/lib/templates'
+import { analytics } from '@/lib/analytics'
 
 // ✅ Sanitization and conversion function
 const sanitizeForPreview = (code: string): string => {
@@ -312,10 +313,16 @@ function BuilderContent() {
 
       if (res.ok) {
         setGeneratedCode(data.code)
+        // Track successful AI generation
+        analytics.aiGeneration(true, projectType)
       } else {
+        // Track failed AI generation
+        analytics.aiGeneration(false, projectType)
         alert(data.error || 'Failed to generate')
       }
     } catch (err) {
+      // Track failed AI generation
+      analytics.aiGeneration(false, projectType)
       alert('Generation failed')
     } finally {
       setGenerating(false)
@@ -352,6 +359,10 @@ function BuilderContent() {
       })
 
       if (res.ok) {
+        // Track project creation analytics
+        if (!currentProjectId) {
+          analytics.projectCreated(projectType)
+        }
         alert('Saved successfully!')
         router.push('/dashboard')
       } else {

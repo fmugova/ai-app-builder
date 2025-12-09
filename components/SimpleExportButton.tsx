@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
+import { analytics } from '@/lib/analytics'
 
 interface SimpleExportButtonProps {
   projectId: string
@@ -188,6 +189,9 @@ next-env.d.ts`
       const fileName = `${projectName.toLowerCase().replace(/\s+/g, '-')}.zip`
       saveAs(content, fileName)
 
+      // Track export analytics
+      analytics.projectExported('zip')
+
       setShowModal(false)
       onSuccess?.()
     } catch (error) {
@@ -204,6 +208,10 @@ next-env.d.ts`
       setLoading(true)
       setLoadingMessage('Copying to clipboard...')
       await navigator.clipboard.writeText(projectCode)
+      
+      // Track export analytics
+      analytics.projectExported('copy')
+      
       alert('Code copied to clipboard!')
       setShowModal(false)
       onSuccess?.()
@@ -223,6 +231,10 @@ next-env.d.ts`
       const blob = new Blob([projectCode], { type: 'text/plain;charset=utf-8' })
       const fileName = `${projectName.toLowerCase().replace(/\s+/g, '-')}.tsx`
       saveAs(blob, fileName)
+      
+      // Track export analytics
+      analytics.projectExported('file')
+      
       setShowModal(false)
       onSuccess?.()
     } catch (error) {
@@ -270,6 +282,9 @@ next-env.d.ts`
       // Success! Show the repo URL
       alert(`✅ Repository created successfully!\n\n${data.repoUrl}\n\nOpening in new tab...`)
       window.open(data.repoUrl, '_blank')
+      
+      // Track export analytics
+      analytics.projectExported('github')
       
       setShowModal(false)
       onSuccess?.()

@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import { Providers } from './providers'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
+import { GoogleAnalytics } from '@next/third-parties/google'
 import { HomePageSchema } from '@/components/JsonLd'
 import type { Metadata, Viewport } from 'next'
 
@@ -151,6 +152,7 @@ export default function RootLayout({
         <Providers>{children}</Providers>
         <Analytics />
         <SpeedInsights />
+        <GoogleAnalytics gaId="GTM-KNTK3Z8G" />
       </body>
     </html>
   )

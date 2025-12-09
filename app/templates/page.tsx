@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { templates, getTemplatesByCategory } from '@/lib/templates'
 import { Toaster, toast } from 'react-hot-toast'
+import { analytics } from '@/lib/analytics'
 
 export default function TemplatesPage() {
   const router = useRouter()
@@ -20,6 +21,9 @@ export default function TemplatesPage() {
 
   // Create project from template
   const createFromTemplate = async (template: typeof templates[0]) => {
+    // Track template viewed/selected
+    analytics.templateViewed(template.name)
+    
     setCreating(true)
     
     try {
