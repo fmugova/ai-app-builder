@@ -407,7 +407,7 @@ export default function DashboardPage() {
               const email = session?.user?.email || ''
               const subject = 'BuildFlow Support Request'
               const body = `Hi BuildFlow Team,\n\nI need help with:\n\n[Describe your issue here]\n\nUser: ${email}\nProjects: ${projects.length}`
-              window.location.href = `mailto:support@buildflow.app?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+              window.location.href = `mailto:support@buildflow-ai.app?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
             }}
             className={`flex items-center gap-3 p-4 ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700 border-gray-700' : 'bg-white hover:bg-gray-50 border-gray-200'} border hover:border-orange-500 rounded-xl transition group`}
           >

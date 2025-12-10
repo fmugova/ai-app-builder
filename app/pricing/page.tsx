@@ -142,7 +142,7 @@ export default function PricingPage() {
     }
 
     if (planId === 'business') {
-      window.location.href = 'mailto:sales@buildflow.app?subject=Business Plan Inquiry'
+      window.location.href = 'mailto:enquiries@buildflow-ai.app?subject=Business Plan Inquiry'
       return
     }
 

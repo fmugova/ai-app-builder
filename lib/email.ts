@@ -18,7 +18,8 @@ export async function sendEmail({ to, subject, html }: SendEmailOptions) {
 
   try {
     const { data, error } = await resend.emails.send({
-      from: 'BuildFlow <onboarding@resend.dev>', // Use Resend's default domain
+      from: 'BuildFlow <noreply@buildflow-ai.app>',
+      replyTo: 'support@buildflow-ai.app',
       to: [to],
       subject,
       html,
@@ -97,8 +98,11 @@ export function getWelcomeEmailHTML(name: string) {
                     <p style="margin: 0 0 10px 0; color: #999999; font-size: 14px;">
                       BuildFlow - Build Beautiful Apps with AI Power
                     </p>
+                    <p style="margin: 0 0 10px 0; color: #999999; font-size: 12px;">
+                      Questions? Contact us at <a href="mailto:support@buildflow-ai.app" style="color: #667eea;">support@buildflow-ai.app</a>
+                    </p>
                     <p style="margin: 0; color: #999999; font-size: 12px;">
-                      © 2024 BuildFlow. All rights reserved.
+                      © 2025 BuildFlow. All rights reserved.
                     </p>
                   </td>
                 </tr>
@@ -148,8 +152,11 @@ export function getSubscriptionSuccessHTML(name: string, tier: string) {
                 </tr>
                 <tr>
                   <td style="background-color: #f8f8f8; padding: 30px; text-align: center;">
+                    <p style="margin: 0 0 10px 0; color: #999999; font-size: 12px;">
+                      Need help? Contact <a href="mailto:support@buildflow-ai.app" style="color: #667eea;">support@buildflow-ai.app</a>
+                    </p>
                     <p style="margin: 0; color: #999999; font-size: 12px;">
-                      © 2024 BuildFlow. All rights reserved.
+                      © 2025 BuildFlow. All rights reserved.
                     </p>
                   </td>
                 </tr>
@@ -199,8 +206,11 @@ export function getPasswordResetHTML(name: string, resetLink: string) {
                 </tr>
                 <tr>
                   <td style="background-color: #f8f8f8; padding: 30px; text-align: center;">
+                    <p style="margin: 0 0 10px 0; color: #999999; font-size: 12px;">
+                      Need help? Contact <a href="mailto:support@buildflow-ai.app" style="color: #667eea;">support@buildflow-ai.app</a>
+                    </p>
                     <p style="margin: 0; color: #999999; font-size: 12px;">
-                      © 2024 BuildFlow. All rights reserved.
+                      © 2025 BuildFlow. All rights reserved.
                     </p>
                   </td>
                 </tr>
@@ -250,8 +260,11 @@ export function getProjectExportHTML(name: string, projectName: string, download
                 </tr>
                 <tr>
                   <td style="background-color: #f8f8f8; padding: 30px; text-align: center;">
+                    <p style="margin: 0 0 10px 0; color: #999999; font-size: 12px;">
+                      Need help? Contact <a href="mailto:support@buildflow-ai.app" style="color: #667eea;">support@buildflow-ai.app</a>
+                    </p>
                     <p style="margin: 0; color: #999999; font-size: 12px;">
-                      © 2024 BuildFlow. All rights reserved.
+                      © 2025 BuildFlow. All rights reserved.
                     </p>
                   </td>
                 </tr>
