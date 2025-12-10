@@ -5,6 +5,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+// Admin emails for debug access
+const ADMIN_EMAILS = process.env.ADMIN_EMAILS?.split(',') || []
+
 export async function GET(request: NextRequest) {
   try {
     // Test session
@@ -12,9 +15,15 @@ export async function GET(request: NextRequest) {
     
     if (!session?.user?.email) {
       return NextResponse.json({ 
-        error: 'No session',
-        session: session 
-      })
+        error: 'Unauthorized - No session'
+      }, { status: 401 })
+    }
+
+    // Only allow admins to access debug info
+    if (!ADMIN_EMAILS.includes(session.user.email)) {
+      return NextResponse.json({ 
+        error: 'Forbidden - Admin access required'
+      }, { status: 403 })
     }
 
     // Test database
@@ -27,9 +36,8 @@ export async function GET(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json({ 
-        error: 'User not found',
-        email: session.user.email 
-      })
+        error: 'User not found'
+      }, { status: 404 })
     }
 
     return NextResponse.json({
@@ -39,13 +47,15 @@ export async function GET(request: NextRequest) {
         email: user.email,
         projectCount: user.Project.length,
       },
-      projects: user.Project,
+      projects: user.Project.map(p => ({ id: p.id, name: p.name })),
     })
 
   } catch (error: any) {
+    // Don't expose error details in production
+    console.error('Debug route error:', error)
     return NextResponse.json({ 
-      error: error.message,
-      stack: error.stack 
+      error: 'Internal server error'
     }, { status: 500 })
+  }
   }
 }

@@ -23,21 +23,17 @@ export async function POST(request: NextRequest) {
       select: { githubAccessToken: true, githubUsername: true }
     })
 
-    let githubToken = user?.githubAccessToken
+    const githubToken = user?.githubAccessToken
     
-    // Fallback to environment token if user hasn't connected GitHub
+    // Require user to have connected their own GitHub account
     if (!githubToken) {
-      githubToken = process.env.GITHUB_TOKEN
-      
-      if (!githubToken) {
-        return NextResponse.json(
-          { 
-            error: 'GitHub not connected. Please sign in with GitHub or connect your GitHub account to export projects.',
-            needsGithubConnection: true
-          },
-          { status: 400 }
-        )
-      }
+      return NextResponse.json(
+        { 
+          error: 'GitHub not connected. Please sign in with GitHub to connect your account and export projects to your own repositories.',
+          needsGithubConnection: true
+        },
+        { status: 400 }
+      )
     }
 
     // Parse request body
