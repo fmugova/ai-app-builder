@@ -3,14 +3,30 @@ import { Resend } from 'resend'
 // Initialize Resend only if API key is available
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 
+
 interface SendEmailOptions {
-  to: string
+  to: string | string[]
   subject: string
   html: string
+  from?: string
+  replyTo?: string
 }
 
-export async function sendEmail({ to, subject, html }: SendEmailOptions) {
-  // Skip email sending if Resend is not configured
+// Helper to get sender from env or fallback
+function getSender(type: 'noreply' | 'support' | 'enquiries' | 'marketing'): string {
+  switch (type) {
+    case 'support':
+      return process.env.RESEND_SUPPORT_EMAIL || 'BuildFlow Support <support@buildflow-ai.app>'
+    case 'enquiries':
+      return process.env.RESEND_ENQUIRIES_EMAIL || 'BuildFlow Enquiries <enquiries@buildflow-ai.app>'
+    case 'marketing':
+      return process.env.RESEND_MARKETING_EMAIL || 'BuildFlow Team <marketing@buildflow-ai.app>'
+    default:
+      return process.env.RESEND_NOREPLY_EMAIL || 'BuildFlow <noreply@buildflow-ai.app>'
+  }
+}
+
+export async function sendEmail({ to, subject, html, from, replyTo }: SendEmailOptions) {
   if (!resend) {
     console.warn('Email not sent: RESEND_API_KEY is not configured')
     return { success: false, error: 'Email service not configured' }
@@ -18,9 +34,9 @@ export async function sendEmail({ to, subject, html }: SendEmailOptions) {
 
   try {
     const { data, error } = await resend.emails.send({
-      from: 'BuildFlow <noreply@buildflow-ai.app>',
-      replyTo: 'support@buildflow-ai.app',
-      to: [to],
+      from: from || getSender('noreply'),
+      replyTo: replyTo || 'support@buildflow-ai.app',
+      to: Array.isArray(to) ? to : [to],
       subject,
       html,
     })
