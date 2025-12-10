@@ -30,32 +30,49 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
+        console.log("[Auth] Credentials login attempt for:", credentials?.email)
+        
         if (!credentials?.email || !credentials?.password) {
+          console.log("[Auth] Missing email or password")
           throw new Error("Invalid credentials")
         }
 
         // Normalize email to lowercase for lookup
         const normalizedEmail = credentials.email.toLowerCase().trim()
+        console.log("[Auth] Looking up user:", normalizedEmail)
 
-        const user = await prisma.user.findUnique({
-          where: { email: normalizedEmail },
-        })
+        try {
+          const user = await prisma.user.findUnique({
+            where: { email: normalizedEmail },
+          })
 
-        if (!user || !user.password) {
+          if (!user) {
+            console.log("[Auth] User not found:", normalizedEmail)
+            throw new Error("Invalid credentials")
+          }
+
+          if (!user.password) {
+            console.log("[Auth] User has no password (OAuth account):", normalizedEmail)
+            throw new Error("Please sign in with Google or GitHub")
+          }
+
+          const isValid = await bcrypt.compare(credentials.password, user.password)
+
+          if (!isValid) {
+            console.log("[Auth] Invalid password for:", normalizedEmail)
+            throw new Error("Invalid credentials")
+          }
+
+          console.log("[Auth] Successful login for:", normalizedEmail)
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            image: user.image,
+          }
+        } catch (error: any) {
+          console.error("[Auth] Database error:", error.message)
           throw new Error("Invalid credentials")
-        }
-
-        const isValid = await bcrypt.compare(credentials.password, user.password)
-
-        if (!isValid) {
-          throw new Error("Invalid credentials")
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.image,
         }
       },
     }),
