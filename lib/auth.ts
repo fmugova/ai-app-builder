@@ -118,25 +118,28 @@ export const authOptions: NextAuthOptions = {
       if (account?.provider === "github" && account.access_token) {
         token.githubAccessToken = account.access_token
         
-        // Fetch GitHub username
+        // Fetch GitHub username (non-blocking - don't fail auth if this fails)
         try {
           const res = await fetch("https://api.github.com/user", {
             headers: { Authorization: `token ${account.access_token}` },
           })
-          const githubUser = await res.json()
-          token.githubUsername = githubUser.login
-          
-          // Save to database
-          if (user?.id) {
-            await prisma.user.update({
-              where: { id: user.id },
-              data: {
-                githubAccessToken: account.access_token,
-                githubUsername: githubUser.login,
-              },
-            })
+          if (res.ok) {
+            const githubUser = await res.json()
+            token.githubUsername = githubUser.login
+            
+            // Save to database (async, don't block auth)
+            if (user?.id) {
+              prisma.user.update({
+                where: { id: user.id },
+                data: {
+                  githubAccessToken: account.access_token,
+                  githubUsername: githubUser.login,
+                },
+              }).catch(err => console.error("[Auth] Failed to save GitHub info:", err))
+            }
           }
         } catch (error) {
+          // Log but don't fail authentication
           console.error("[Auth] Failed to fetch GitHub user:", error)
         }
       }
