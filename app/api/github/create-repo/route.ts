@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,14 +17,27 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get GitHub token from environment
-    const githubToken = process.env.GITHUB_TOKEN
+    // Get user's GitHub token from database
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { githubAccessToken: true, githubUsername: true }
+    })
+
+    let githubToken = user?.githubAccessToken
     
+    // Fallback to environment token if user hasn't connected GitHub
     if (!githubToken) {
-      return NextResponse.json(
-        { error: 'GitHub integration not configured. Please add GITHUB_TOKEN to .env.local' },
-        { status: 500 }
-      )
+      githubToken = process.env.GITHUB_TOKEN
+      
+      if (!githubToken) {
+        return NextResponse.json(
+          { 
+            error: 'GitHub not connected. Please sign in with GitHub or connect your GitHub account to export projects.',
+            needsGithubConnection: true
+          },
+          { status: 400 }
+        )
+      }
     }
 
     // Parse request body
@@ -38,7 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create repository name (lowercase, no spaces)
-    const repoName = projectName.toLowerCase().replace(/\s+/g, '-')
+    const repoName = projectName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
 
     // Step 1: Create the repository
     console.log('Creating GitHub repository:', repoName)
@@ -65,8 +79,26 @@ export async function POST(request: NextRequest) {
       // Handle specific errors
       if (error.errors && error.errors[0]?.message?.includes('already exists')) {
         return NextResponse.json(
-          { error: `Repository '${repoName}' already exists. Please choose a different name.` },
+          { error: `Repository '${repoName}' already exists in your GitHub account. Please choose a different name.` },
           { status: 409 }
+        )
+      }
+
+      // Handle token expired/invalid
+      if (error.message?.includes('Bad credentials') || createRepoResponse.status === 401) {
+        // Clear the invalid token
+        if (user?.githubAccessToken) {
+          await prisma.user.update({
+            where: { email: session.user.email },
+            data: { githubAccessToken: null, githubUsername: null }
+          })
+        }
+        return NextResponse.json(
+          { 
+            error: 'GitHub authorization expired. Please reconnect your GitHub account.',
+            needsGithubConnection: true
+          },
+          { status: 401 }
         )
       }
       
@@ -124,7 +156,7 @@ export async function POST(request: NextRequest) {
       repoUrl: repo.html_url,
       repoName: repoName,
       owner: repo.owner.login,
-      message: 'Repository created successfully!',
+      message: `Repository created successfully in ${repo.owner.login}'s GitHub!`,
     })
 
   } catch (error: any) {

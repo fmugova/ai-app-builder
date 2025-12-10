@@ -276,6 +276,19 @@ next-env.d.ts`
       const data = await response.json()
 
       if (!response.ok) {
+        // Check if user needs to connect GitHub
+        if (data.needsGithubConnection) {
+          const connect = confirm(
+            '🔗 GitHub not connected!\n\n' +
+            'To export to your own GitHub account, you need to sign in with GitHub.\n\n' +
+            'Click OK to sign in with GitHub, or Cancel to skip.'
+          )
+          if (connect) {
+            // Redirect to sign in with GitHub
+            window.location.href = '/api/auth/signin?callbackUrl=' + encodeURIComponent(window.location.pathname)
+          }
+          return
+        }
         throw new Error(data.error || 'Failed to create repository')
       }
 

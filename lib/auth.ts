@@ -12,6 +12,12 @@ export const authOptions: NextAuthOptions = {
     GitHubProvider({
       clientId: process.env.GITHUB_CLIENT_ID!,
       clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          // Request repo scope for GitHub integration
+          scope: "read:user user:email repo",
+        },
+      },
     }),
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -103,9 +109,36 @@ export const authOptions: NextAuthOptions = {
     }
   },
   callbacks: {
-    async jwt({ token, user, trigger, session }) {
+    async jwt({ token, user, account, trigger, session }) {
       if (user) {
         token.id = user.id
+      }
+
+      // Save GitHub access token when user signs in with GitHub
+      if (account?.provider === "github" && account.access_token) {
+        token.githubAccessToken = account.access_token
+        
+        // Fetch GitHub username
+        try {
+          const res = await fetch("https://api.github.com/user", {
+            headers: { Authorization: `token ${account.access_token}` },
+          })
+          const githubUser = await res.json()
+          token.githubUsername = githubUser.login
+          
+          // Save to database
+          if (user?.id) {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: {
+                githubAccessToken: account.access_token,
+                githubUsername: githubUser.login,
+              },
+            })
+          }
+        } catch (error) {
+          console.error("[Auth] Failed to fetch GitHub user:", error)
+        }
       }
 
       // Handle session updates
@@ -119,6 +152,9 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string
+        // Include GitHub info in session
+        ;(session.user as any).githubUsername = token.githubUsername
+        ;(session.user as any).hasGithubConnected = !!token.githubAccessToken
       }
       return session
     },
