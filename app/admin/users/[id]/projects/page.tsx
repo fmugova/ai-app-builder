@@ -4,8 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 
-const ADMIN_EMAILS = ['fmugova@yahoo.com', 'admin@buildflow.app']
-
 interface Project {
   id: string
   name: string
@@ -27,12 +25,28 @@ export default function UserProjectsPage() {
   const [user, setUser] = useState<User | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
 
   const userId = params.id as string
-  const isAdmin = session?.user?.email && ADMIN_EMAILS.includes(session.user.email)
+
+  // Check admin status via API
+  useEffect(() => {
+    const checkAdmin = async () => {
+      try {
+        const res = await fetch('/api/admin/check')
+        const data = await res.json()
+        setIsAdmin(data.isAdmin)
+      } catch (error) {
+        setIsAdmin(false)
+      }
+    }
+    if (session?.user?.email) {
+      checkAdmin()
+    }
+  }, [session?.user?.email])
 
   useEffect(() => {
-    if (status === 'loading') return
+    if (status === 'loading' || isAdmin === null) return
 
     if (!session || !isAdmin) {
       router.push('/dashboard')

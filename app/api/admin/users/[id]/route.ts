@@ -4,8 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-
-const ADMIN_EMAILS = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(e => e.trim()) || []
+import { isAdmin } from '@/lib/admin'
 
 export async function PATCH(
   request: NextRequest,
@@ -15,7 +14,7 @@ export async function PATCH(
     const session = await getServerSession(authOptions)
 
     // Check if user is admin
-    if (!session?.user?.email || !ADMIN_EMAILS.includes(session.user.email)) {
+    if (!session?.user?.email || !isAdmin(session.user.email)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
@@ -77,7 +76,7 @@ export async function DELETE(
     const session = await getServerSession(authOptions)
 
     // Check if user is admin
-    if (!session?.user?.email || !ADMIN_EMAILS.includes(session.user.email)) {
+    if (!session?.user?.email || !isAdmin(session.user.email)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 

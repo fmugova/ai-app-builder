@@ -23,24 +23,39 @@ export default function AdminProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
 
-  const ADMIN_EMAILS = ['fmugova@yahoo.com', 'admin@buildflow.app']
+  // Check admin status via API
+  useEffect(() => {
+    const checkAdmin = async () => {
+      try {
+        const res = await fetch('/api/admin/check')
+        const data = await res.json()
+        setIsAdmin(data.isAdmin)
+      } catch (error) {
+        setIsAdmin(false)
+      }
+    }
+    if (session?.user?.email) {
+      checkAdmin()
+    }
+  }, [session?.user?.email])
 
   useEffect(() => {
-    if (status === 'loading') return
+    if (status === 'loading' || isAdmin === null) return
 
     if (!session) {
       router.push('/auth/signin')
       return
     }
 
-    if (!ADMIN_EMAILS.includes(session.user?.email || '')) {
+    if (!isAdmin) {
       router.push('/dashboard')
       return
     }
 
     loadProjects()
-  }, [session, status])
+  }, [session, status, isAdmin])
 
   const loadProjects = async () => {
     try {

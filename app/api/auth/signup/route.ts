@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { sendEmail, getWelcomeEmailHTML } from '@/lib/email'
+import { checkRateLimit, rateLimits } from '@/lib/rateLimit'
+import { validatePassword } from '@/lib/validation'
 
 // Server-side analytics logging (GA tracking happens client-side)
 const logAnalyticsEvent = (event: string, properties?: Record<string, any>) => {
@@ -12,6 +14,20 @@ const logAnalyticsEvent = (event: string, properties?: Record<string, any>) => {
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting - use IP address for signup
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 
+               request.headers.get('x-real-ip') || 
+               'unknown'
+    
+    const rateLimitResult = checkRateLimit(`signup:${ip}`, rateLimits.auth)
+    if (!rateLimitResult.allowed) {
+      const resetIn = Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000)
+      return NextResponse.json(
+        { error: `Too many signup attempts. Please try again in ${resetIn} seconds.` },
+        { status: 429 }
+      )
+    }
+
     const body = await request.json()
     const { name, email, password } = body
 
@@ -23,9 +39,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (password.length < 8) {
+    // Strong password validation
+    const passwordValidation = validatePassword(password)
+    if (!passwordValidation.valid) {
       return NextResponse.json(
-        { error: 'Password must be at least 8 characters' },
+        { error: passwordValidation.errors.join(' ') },
         { status: 400 }
       )
     }

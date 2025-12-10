@@ -8,8 +8,6 @@ import SimpleExportButton from '@/components/SimpleExportButton'
 import OnboardingTutorial, { QuickTips } from '@/components/OnboardingTutorial'
 import { analytics } from '@/lib/analytics'
 
-const ADMIN_EMAILS = ['fmugova@yahoo.com', 'admin@buildflow.app']
-
 // Sun and Moon icons for dark mode toggle
 const SunIcon = () => (
   <svg className="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -53,8 +51,23 @@ export default function DashboardPage() {
   const [isDarkMode, setIsDarkMode] = useState(true) // Default to dark mode
   const [selectedProject, setSelectedProject] = useState<Project | null>(null) // For code preview modal
   const [exportProject, setExportProject] = useState<Project | null>(null) // For export modal
+  const [isAdmin, setIsAdmin] = useState(false)
 
-  const isAdmin = session?.user?.email && ADMIN_EMAILS.includes(session.user.email)
+  // Check admin status via API
+  useEffect(() => {
+    const checkAdmin = async () => {
+      try {
+        const res = await fetch('/api/admin/check')
+        const data = await res.json()
+        setIsAdmin(data.isAdmin)
+      } catch (error) {
+        setIsAdmin(false)
+      }
+    }
+    if (session?.user?.email) {
+      checkAdmin()
+    }
+  }, [session?.user?.email])
 
   // Load dark mode preference from localStorage
   useEffect(() => {

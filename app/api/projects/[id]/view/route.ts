@@ -4,8 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-
-const ADMIN_EMAILS = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(e => e.trim()) || []
+import { isAdmin } from '@/lib/admin'
 
 export async function GET(
   request: NextRequest,
@@ -19,7 +18,7 @@ export async function GET(
     }
 
     const { id } = params
-    const isAdmin = ADMIN_EMAILS.includes(session.user.email)
+    const userIsAdmin = isAdmin(session.user.email)
 
     // Get project with user info
     const project = await prisma.project.findUnique({
@@ -41,7 +40,7 @@ export async function GET(
     // Check if user has access (owner or admin)
     const userHasAccess = 
       project.User.email === session.user.email || 
-      isAdmin
+      userIsAdmin
 
     if (!userHasAccess) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 })

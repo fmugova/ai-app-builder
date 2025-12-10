@@ -4,9 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-
-// Admin emails for debug access
-const ADMIN_EMAILS = process.env.ADMIN_EMAILS?.split(',') || []
+import { isAdmin } from '@/lib/admin'
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,7 +18,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Only allow admins to access debug info
-    if (!ADMIN_EMAILS.includes(session.user.email)) {
+    if (!isAdmin(session.user.email)) {
       return NextResponse.json({ 
         error: 'Forbidden - Admin access required'
       }, { status: 403 })
@@ -56,6 +54,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ 
       error: 'Internal server error'
     }, { status: 500 })
-  }
   }
 }

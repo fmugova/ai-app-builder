@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { toast, Toaster } from 'react-hot-toast'
 
-const ADMIN_EMAILS = ['fmugova@yahoo.com', 'admin@buildflow.app']
-
 interface User {
   id: string
   name: string | null
@@ -66,6 +64,7 @@ export default function AdminDashboard() {
   const [feedback, setFeedback] = useState<Feedback[]>([])
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(false)
   
   // View toggles
   const [showUsers, setShowUsers] = useState(false)
@@ -88,7 +87,21 @@ export default function AdminDashboard() {
   const [quickActionUser, setQuickActionUser] = useState<User | null>(null)
   const [userNote, setUserNote] = useState('')
 
-  const isAdmin = session?.user?.email && ADMIN_EMAILS.includes(session.user.email)
+  // Check admin status via API
+  useEffect(() => {
+    const checkAdmin = async () => {
+      try {
+        const res = await fetch('/api/admin/check')
+        const data = await res.json()
+        setIsAdmin(data.isAdmin)
+      } catch (error) {
+        setIsAdmin(false)
+      }
+    }
+    if (session?.user?.email) {
+      checkAdmin()
+    }
+  }, [session?.user?.email])
 
   useEffect(() => {
     if (status === 'loading') return
