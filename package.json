@@ -4,11 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "next build",
+    "analyze": "cross-env ANALYZE=true next build",
     "start": "next start",
-    "lint": "next lint",
-    "seed": "tsx prisma/seed-promos.ts",
-    "studio": "prisma studio"
+    "lint": "next lint"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.70.1",
@@ -42,6 +41,7 @@
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.0.9",
     "@types/bcrypt": "^6.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/file-saver": "^2.0.7",
@@ -50,7 +50,8 @@
     "@types/react": "^18.3.27",
     "@types/react-dom": "^18.3.7",
     "autoprefixer": "^10.0.1",
-    "eslint": "^8",
+    "cross-env": "^10.1.0",
+    "eslint": "^9.39.1",
     "eslint-config-next": "^16.0.3",
     "postcss": "^8",
     "prisma": "6",
