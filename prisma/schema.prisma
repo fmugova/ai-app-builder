@@ -93,6 +93,125 @@ model User {
   Feedback              Feedback[]
   Activity              Activity[]
   ProjectShare          ProjectShare[]
+
+  // Newsletter & Campaigns
+  newsletterSubscriber  NewsletterSubscriber?
+  emailCampaigns        EmailCampaign[]
+}
+
+// Newsletter Subscriber
+model NewsletterSubscriber {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  status        String   @default("active") // active, unsubscribed, bounced
+  source        String?  // signup_form, user_account, import
+  subscribedAt  DateTime @default(now())
+  unsubscribedAt DateTime?
+  preferences   Json?    // { frequency: 'weekly', topics: ['updates', 'tips'] }
+  metadata      Json?    // Additional data like location, referrer, etc.
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([status])
+  @@index([subscribedAt])
+}
+
+// Email Campaign
+model EmailCampaign {
+  id              String   @id @default(cuid())
+  name            String
+  subject         String
+  previewText     String?
+  htmlContent     String   @db.Text
+  status          String   @default("draft") // draft, scheduled, sending, sent, paused
+  scheduledFor    DateTime?
+  sentAt          DateTime?
+  segment         String   @default("all") // all, free, pro, business, enterprise
+  totalSent       Int      @default(0)
+  totalOpened     Int      @default(0)
+  totalClicked    Int      @default(0)
+  totalBounced    Int      @default(0)
+  totalUnsubscribed Int    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdBy       String
+  creator         User     @relation(fields: [createdBy], references: [id])
+  sends           EmailSend[]
+
+  @@index([status])
+  @@index([scheduledFor])
+  @@index([createdAt])
+}
+
+// Email Send (tracking individual sends)
+model EmailSend {
+  id              String   @id @default(cuid())
+  campaignId      String
+  campaign        EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  subscriberEmail String
+  sentAt          DateTime @default(now())
+  openedAt        DateTime?
+  clickedAt       DateTime?
+  bouncedAt       DateTime?
+  unsubscribedAt  DateTime?
+  metadata        Json?    // Click tracking, links clicked, etc.
+
+  @@index([campaignId])
+  @@index([subscriberEmail])
+  @@index([sentAt])
+}
+
+// Drip Campaign (Automated sequences)
+model DripCampaign {
+  id              String   @id @default(cuid())
+  name            String
+  description     String?
+  status          String   @default("active") // active, paused, archived
+  trigger         String   // signup, upgrade, project_created, etc.
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  emails          DripEmail[]
+  enrollments     DripEnrollment[]
+
+  @@index([status])
+  @@index([trigger])
+}
+
+// Individual emails in a drip sequence
+model DripEmail {
+  id              String   @id @default(cuid())
+  campaignId      String
+  campaign        DripCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name            String
+  subject         String
+  htmlContent     String   @db.Text
+  delayDays       Int      // Send X days after trigger
+  delayHours      Int      @default(0)
+  order           Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([campaignId])
+  @@index([order])
+}
+
+// Track who's enrolled in drip campaigns
+model DripEnrollment {
+  id              String   @id @default(cuid())
+  campaignId      String
+  campaign        DripCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userEmail       String
+  enrolledAt      DateTime @default(now())
+  completedAt     DateTime?
+  unsubscribedAt  DateTime?
+  emailsSent      Json?    // Array of email IDs and send dates
+
+  @@index([campaignId])
+  @@index([userEmail])
+  @@index([enrolledAt])
+}
 }
 
 // ============ PROJECT MODEL ============

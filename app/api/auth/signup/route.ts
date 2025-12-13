@@ -79,18 +79,15 @@ export async function POST(request: NextRequest) {
     // Log signup analytics event (server-side)
     logAnalyticsEvent('sign_up', { method: 'email', userId: user.id })
 
-    // Send welcome email
-    try {
-      await sendEmail({
-        to: email,
-        subject: 'Welcome to BuildFlow! 🚀',
-        html: getWelcomeEmailHTML(name)
-      })
-      console.log('Welcome email sent to:', email)
-    } catch (emailError) {
-      console.error('Failed to send welcome email:', emailError)
-      // Don't fail signup if email fails
-    }
+    // Send welcome email (don't await - send async)
+    sendEmail({
+      to: email,
+      subject: 'Welcome to BuildFlow! 🚀',
+      html: getWelcomeEmailHTML(name || 'there'),
+      from: 'BuildFlow <noreply@buildflow-ai.app>'
+    }).catch(err => 
+      console.error('Welcome email failed:', err)
+    )
 
     return NextResponse.json({
       success: true,

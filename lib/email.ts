@@ -1,3 +1,19 @@
+// Helper to send admin notification email
+export async function sendNotificationEmail(email: string, subject: string, message: string) {
+  return sendEmail({
+    to: email,
+    subject,
+    html: `<p>${message}</p>`
+  })
+}
+// Helper to send welcome email
+export async function sendWelcomeEmail(email: string, name: string) {
+  return sendEmail({
+    to: email,
+    subject: 'Welcome to BuildFlow! 🚀',
+    html: getWelcomeEmailHTML(name)
+  })
+}
 import { Resend } from 'resend'
 
 // Initialize Resend only if API key is available
