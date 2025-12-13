@@ -13,27 +13,27 @@ export const metadata: Metadata = {
   },
   alternates: {
     // Main canonical URL
-    canonical: 'https://buildflow.app',
+    canonical: 'https://buildflow-ai.app',
     
     // Language variants
     languages: {
-      'en-US': 'https://buildflow.app',
-      'en-GB': 'https://buildflow.app/en-gb',
-      'es-ES': 'https://buildflow.app/es',
-      'fr-FR': 'https://buildflow.app/fr',
-      'de-DE': 'https://buildflow.app/de',
-      'x-default': 'https://buildflow.app', // Fallback
+      'en-US': 'https://buildflow-ai.app',
+      'en-GB': 'https://buildflow-ai.app/en-gb',
+      'es-ES': 'https://buildflow-ai.app/es',
+      'fr-FR': 'https://buildflow-ai.app/fr',
+      'de-DE': 'https://buildflow-ai.app/de',
+      'x-default': 'https://buildflow-ai.app', // Fallback
     },
     
     // Media variants (mobile/desktop)
     media: {
-      'only screen and (max-width: 600px)': 'https://m.buildflow.app',
+      'only screen and (max-width: 600px)': 'https://m.buildflow-ai.app',
     },
     
     // Content types
     types: {
-      'application/rss+xml': 'https://buildflow.app/rss.xml',
-      'application/atom+xml': 'https://buildflow.app/atom.xml',
+      'application/rss+xml': 'https://buildflow-ai.app/rss.xml',
+      'application/atom+xml': 'https://buildflow-ai.app/atom.xml',
     },
   },
 }
@@ -71,11 +71,11 @@ export default function Home() {
       'Unlimited Projects'
     ],
     screenshot: '/og-image.png',
-    url: 'https://buildflow.app',
+    url: 'https://buildflow-ai.app',
     author: {
       '@type': 'Organization',
       name: 'BuildFlow Team',
-      url: 'https://buildflow.app'
+      url: 'https://buildflow-ai.app'
     },
     datePublished: '2025-01-01',
     softwareVersion: '1.0.0',

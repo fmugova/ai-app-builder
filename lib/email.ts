@@ -35,7 +35,7 @@ export async function sendEmail({ to, subject, html, from, replyTo }: SendEmailO
   try {
     const { data, error } = await resend.emails.send({
       from: from || getSender('noreply'),
-      replyTo: replyTo || 'support@buildflow-ai.app',
+      replyTo: replyTo || process.env.RESEND_SUPPORT_EMAIL || 'BuildFlow Support <support@buildflow-ai.app>',
       to: Array.isArray(to) ? to : [to],
       subject,
       html,

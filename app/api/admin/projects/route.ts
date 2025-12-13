@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
-const ADMIN_EMAILS = ['fmugova@yahoo.com', 'admin@buildflow.app']
+const ADMIN_EMAILS = ['fmugova@yahoo.com', 'admin@buildflow-ai.app']
 
 export async function GET() {
   try {

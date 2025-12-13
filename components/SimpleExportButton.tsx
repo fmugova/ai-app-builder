@@ -59,7 +59,7 @@ export default function SimpleExportButton({
   const generateReadme = () => {
     return `# ${projectName}
 
-Generated with [BuildFlow](https://buildflow.app) - AI-Powered Code Generation
+Generated with [BuildFlow](https://buildflow-ai.app) - AI-Powered Code Generation
 
 ## 🚀 Getting Started
 
