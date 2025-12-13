@@ -30,49 +30,46 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        console.log("[Auth] Credentials login attempt for:", credentials?.email)
-        
+        console.log('🔐 Login attempt for:', credentials?.email)
         if (!credentials?.email || !credentials?.password) {
-          console.log("[Auth] Missing email or password")
-          throw new Error("Invalid credentials")
+          console.log('❌ Missing credentials')
+          return null
         }
-
-        // Normalize email to lowercase for lookup
-        const normalizedEmail = credentials.email.toLowerCase().trim()
-        console.log("[Auth] Looking up user:", normalizedEmail)
 
         try {
           const user = await prisma.user.findUnique({
-            where: { email: normalizedEmail },
+            where: { email: credentials.email }
           })
 
-          if (!user) {
-            console.log("[Auth] User not found:", normalizedEmail)
-            throw new Error("Invalid credentials")
+          console.log('👤 User found:', user ? 'YES' : 'NO')
+
+          if (!user || !user.password) {
+            console.log('❌ User not found or no password')
+            return null
           }
 
-          if (!user.password) {
-            console.log("[Auth] User has no password (OAuth account):", normalizedEmail)
-            throw new Error("Please sign in with Google or GitHub")
+          const isPasswordValid = await bcrypt.compare(
+            credentials.password,
+            user.password
+          )
+
+          console.log('🔑 Password valid:', isPasswordValid)
+
+          if (!isPasswordValid) {
+            console.log('❌ Invalid password')
+            return null
           }
 
-          const isValid = await bcrypt.compare(credentials.password, user.password)
+          console.log('✅ Login successful for:', user.email)
 
-          if (!isValid) {
-            console.log("[Auth] Invalid password for:", normalizedEmail)
-            throw new Error("Invalid credentials")
-          }
-
-          console.log("[Auth] Successful login for:", normalizedEmail)
           return {
             id: user.id,
             email: user.email,
             name: user.name,
-            image: user.image,
           }
-        } catch (error: any) {
-          console.error("[Auth] Database error:", error.message)
-          throw new Error("Invalid credentials")
+        } catch (error) {
+          console.error('💥 Auth error:', error)
+          return null
         }
       },
     }),
