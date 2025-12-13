@@ -27,6 +27,7 @@ interface Subscriber {
   subscribedAt: string
 }
 
+
 export default function CampaignsPage() {
   const router = useRouter()
   const { data: session, status } = useSession()
@@ -35,16 +36,20 @@ export default function CampaignsPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'campaigns' | 'subscribers'>('campaigns')
   const [isAdmin, setIsAdmin] = useState(false)
+  const [checkingAdmin, setCheckingAdmin] = useState(true)
 
   // Check admin status
   useEffect(() => {
     const checkAdmin = async () => {
       try {
+        setCheckingAdmin(true)
         const res = await fetch('/api/admin/check')
         const data = await res.json()
         setIsAdmin(data.isAdmin)
       } catch (error) {
         setIsAdmin(false)
+      } finally {
+        setCheckingAdmin(false)
       }
     }
     if (session?.user?.email) {
@@ -53,7 +58,7 @@ export default function CampaignsPage() {
   }, [session?.user?.email])
 
   useEffect(() => {
-    if (status === 'loading') return
+    if (status === 'loading' || checkingAdmin) return
 
     if (!session) {
       router.push('/auth/signin')
@@ -66,7 +71,7 @@ export default function CampaignsPage() {
     }
 
     loadData()
-  }, [session, status, isAdmin])
+  }, [session, status, isAdmin, checkingAdmin])
 
   const loadData = async () => {
     try {

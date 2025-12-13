@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { toast, Toaster } from 'react-hot-toast'
@@ -8,9 +8,9 @@ import { newsletterTemplates } from '@/lib/email-templates'
 
 export default function NewCampaignPage() {
   const router = useRouter()
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const [loading, setLoading] = useState(false)
-  
+
   // Campaign details
   const [name, setName] = useState('')
   const [subject, setSubject] = useState('')
@@ -18,11 +18,48 @@ export default function NewCampaignPage() {
   const [segment, setSegment] = useState('all')
   const [templateType, setTemplateType] = useState<'custom' | 'product-update' | 'tips' | 'announcement'>('custom')
   const [htmlContent, setHtmlContent] = useState('')
-  
+
   // Template-specific content
   const [updates, setUpdates] = useState([{ title: '', description: '', link: '' }])
   const [tips, setTips] = useState([{ emoji: '💡', title: '', description: '' }])
   const [announcement, setAnnouncement] = useState({ title: '', message: '', ctaText: '', ctaLink: '' })
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [checkingAdmin, setCheckingAdmin] = useState(true)
+
+  // Check admin status
+  useEffect(() => {
+    const checkAdmin = async () => {
+      try {
+        setCheckingAdmin(true)
+        const res = await fetch('/api/admin/check')
+        const data = await res.json()
+        setIsAdmin(data.isAdmin)
+      } catch (error) {
+        setIsAdmin(false)
+      } finally {
+        setCheckingAdmin(false)
+      }
+    }
+    if (session?.user?.email) {
+      checkAdmin()
+    }
+  }, [session?.user?.email])
+
+  useEffect(() => {
+    if (status === 'loading' || checkingAdmin) return
+
+    if (!session) {
+      router.push('/auth/signin')
+      return
+    }
+
+    if (!isAdmin) {
+      router.push('/dashboard')
+      return
+    }
+
+    // No loadData here, just allow page to render
+  }, [session, status, isAdmin, checkingAdmin])
 
   const handleCreateCampaign = async () => {
     if (!name || !subject) {
