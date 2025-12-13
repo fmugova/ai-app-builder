@@ -65,6 +65,7 @@ export default function AdminDashboard() {
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null)
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [checkingAdmin, setCheckingAdmin] = useState(true) // Add this line
   
   // View toggles
   const [showUsers, setShowUsers] = useState(false)
@@ -88,14 +89,18 @@ export default function AdminDashboard() {
   const [userNote, setUserNote] = useState('')
 
   // Check admin status via API
+  // Check admin status via API
   useEffect(() => {
     const checkAdmin = async () => {
       try {
+        setCheckingAdmin(true) // Add this
         const res = await fetch('/api/admin/check')
         const data = await res.json()
         setIsAdmin(data.isAdmin)
       } catch (error) {
         setIsAdmin(false)
+      } finally {
+        setCheckingAdmin(false) // Add this
       }
     }
     if (session?.user?.email) {
@@ -104,7 +109,7 @@ export default function AdminDashboard() {
   }, [session?.user?.email])
 
   useEffect(() => {
-    if (status === 'loading') return
+    if (status === 'loading' || checkingAdmin) return // Add checkingAdmin here
 
     if (!session) {
       router.push('/auth/signin')
@@ -117,7 +122,7 @@ export default function AdminDashboard() {
     }
 
     loadData()
-  }, [session, status, isAdmin])
+  }, [session, status, isAdmin, checkingAdmin]) // Add checkingAdmin to dependencies
 
   const loadData = async () => {
     try {
