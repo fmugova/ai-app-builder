@@ -1,6 +1,3 @@
-  const [emailSubject, setEmailSubject] = useState('')
-  const [emailMessage, setEmailMessage] = useState('')
-  const [showEmailModal, setShowEmailModal] = useState(false)
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -90,6 +87,11 @@ export default function AdminDashboard() {
   const [showQuickActionsModal, setShowQuickActionsModal] = useState(false)
   const [quickActionUser, setQuickActionUser] = useState<User | null>(null)
   const [userNote, setUserNote] = useState('')
+
+  // ADD EMAIL MODAL STATE HERE:
+  const [emailSubject, setEmailSubject] = useState('')
+  const [emailMessage, setEmailMessage] = useState('')
+  const [showEmailModal, setShowEmailModal] = useState(false)
 
   // Check admin status via API
   // Check admin status via API
