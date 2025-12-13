@@ -110,7 +110,7 @@ model NewsletterSubscriber {
   unsubscribedAt DateTime?
   preferences   Json?    // { frequency: 'weekly', topics: ['updates', 'tips'] }
   metadata      Json?    // Additional data like location, referrer, etc.
-  userId        String?
+  userId        String?  @unique
   user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([email])
@@ -211,7 +211,6 @@ model DripEnrollment {
   @@index([campaignId])
   @@index([userEmail])
   @@index([enrolledAt])
-}
 }
 
 // ============ PROJECT MODEL ============

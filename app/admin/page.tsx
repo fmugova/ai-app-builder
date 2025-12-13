@@ -627,6 +627,21 @@ export default function AdminDashboard() {
                 Export CSV
               </button>
             </div>
+
+            {/* Marketing Campaigns */}
+            <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+              <div className="text-4xl mb-3">📧</div>
+              <h3 className="text-xl font-bold mb-2">Campaigns</h3>
+              <p className="text-gray-400 text-sm mb-4">
+                Email marketing
+              </p>
+              <button 
+                onClick={() => router.push('/admin/campaigns')}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg transition text-sm"
+              >
+                Manage
+              </button>
+            </div>
           </div>
 
           {/* Bulk Actions Bar */}

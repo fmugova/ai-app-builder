@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
+import NewsletterForm from '@/components/NewsletterForm'
 import { Sparkles, Code, Zap, Shield, Users, ArrowRight } from 'lucide-react'
 import type { Metadata } from 'next'
 
@@ -238,6 +239,53 @@ export default function Home() {
         </section>
 
         {/* Footer */}
+        <footer className="container mx-auto px-4 py-12 border-t border-gray-200">
+          <div className="grid md:grid-cols-4 gap-8 mb-8">
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles className="w-6 h-6 text-purple-600" />
+                <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                  BuildFlow
+                </span>
+              </div>
+              <p className="text-gray-600 text-sm">
+                Build beautiful apps with AI power. No coding required.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-4">Product</h4>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li><Link href="/pricing" className="hover:text-purple-600 transition">Pricing</Link></li>
+                <li><Link href="/templates" className="hover:text-purple-600 transition">Templates</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-4">Legal</h4>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li><Link href="/Privacy" className="hover:text-purple-600 transition">Privacy Policy</Link></li>
+                <li><Link href="/terms" className="hover:text-purple-600 transition">Terms of Service</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-4">Contact</h4>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li><a href="mailto:support@buildflow-ai.app" className="hover:text-purple-600 transition">Support</a></li>
+                <li><a href="mailto:enquiries@buildflow-ai.app" className="hover:text-purple-600 transition">Enquiries</a></li>
+                <li><Link href="/contact" className="hover:text-purple-600 transition">Contact Us</Link></li>
+              </ul>
+            </div>
+          </div>
+          <div className="text-center text-gray-600 text-sm border-t border-gray-200 pt-8">
+            <p>© 2025 BuildFlow. All rights reserved.</p>
+          </div>
+        </footer>
+        {/* Newsletter Signup Section */}
+        <section className="py-20 px-6">
+          <div className="max-w-6xl mx-auto">
+            <NewsletterForm />
+          </div>
+        </section>
+
         <footer className="container mx-auto px-4 py-12 border-t border-gray-200">
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
