@@ -12,104 +12,93 @@ const anthropic = new Anthropic({
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('💬 Chat API called')
+    const formData = await request.formData();
+    const message = formData.get('message') as string;
+    const files = formData.getAll('files') as File[];
+    const urls = JSON.parse(formData.get('urls') as string || '[]') as string[];
+    const currentCode = formData.get('currentCode') as string;
+    const projectType = formData.get('projectType') as string;
 
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      console.log('❌ No session')
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Process uploaded files
+    let fileContents = '';
+    for (const file of files) {
+      const buffer = await file.arrayBuffer();
+      const content = Buffer.from(buffer).toString('utf-8');
+      fileContents += `\n\n--- File: ${file.name} ---\n${content}\n`;
     }
 
-    // Rate limiting - use user email for AI requests
-    const rateLimitResult = checkRateLimit(`ai:${session.user.email}`, rateLimits.aiGeneration)
-    if (!rateLimitResult.allowed) {
-      const resetIn = Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000)
-      return NextResponse.json(
-        { error: `Rate limit exceeded. Please try again in ${resetIn} seconds.` },
-        { status: 429 }
-      )
+    // Fetch content from URLs
+    let urlContents = '';
+    for (const url of urls) {
+      try {
+        const response = await fetch(url);
+        const html = await response.text();
+        // Extract text content (simple version - could be enhanced)
+        const textContent = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        urlContents += `\n\n--- URL: ${url} ---\n${textContent.substring(0, 5000)}\n`;
+      } catch (error) {
+        console.error(`Failed to fetch ${url}:`, error);
+        urlContents += `\n\n--- URL: ${url} ---\n[Failed to fetch content]\n`;
+      }
     }
 
-    const body = await request.json()
-    console.log('📦 Request body:', { 
-      hasMessage: !!body.message, 
-      hasCode: !!body.currentCode,
-      historyLength: body.conversationHistory?.length || 0
-    })
+    // Build enhanced context
+    const enhancedContext = `
+${fileContents}
+${urlContents}
 
-    const { message, currentCode } = body
+User Message: ${message}
 
-    if (!message || !message.trim()) {
-      return NextResponse.json({ error: 'Message is required' }, { status: 400 })
-    }
+Current Code:
+${currentCode}
+`;
 
-    console.log('🤖 Calling Anthropic API...')
-
-    // Build the prompt
-    const systemPrompt = `You are an expert web developer. The user has existing HTML code and wants to improve it.
-
-CRITICAL RULES:
-1. Return ONLY complete, valid HTML code
-2. Maintain all existing functionality unless asked to change it
-3. Make the specific changes requested
-4. Keep the code clean and well-structured
-5. Include proper HTML structure with <!DOCTYPE>, <html>, <head>, <body>
-
-Current code:
-\`\`\`html
-${currentCode || 'No code yet'}
-\`\`\`
-
-User request: ${message}
-
-Respond with ONLY the updated HTML code. No explanations outside the code.`
-
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
-      messages: [
-        {
+    // Call Claude API with enhanced context
+    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY || '',
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4000,
+        messages: [{
           role: 'user',
-          content: systemPrompt
-        }
-      ],
-    })
+          content: `You are an expert web developer. The user has provided files, URLs, or references to other websites.
 
-    console.log('✅ Anthropic response received')
+Context from uploaded files and URLs:
+${enhancedContext}
 
-    const aiResponse = response.content[0].type === 'text' 
-      ? response.content[0].text 
-      : ''
+Instructions:
+1. Analyze any provided files, URLs, or website references
+2. Extract relevant features, design patterns, or functionality
+3. Adapt those features to the user's current project (${projectType})
+4. Generate complete, working code that incorporates the requested features
+5. Maintain the existing code structure while adding new features
 
-    // Extract code
-    let code = aiResponse
-    const codeMatch = aiResponse.match(/```(?:html)?\n([\s\S]*?)```/)
-    if (codeMatch) {
-      code = codeMatch[1].trim()
+Generate ONLY the complete HTML code. No explanations, no markdown, just the code.`
+        }]
+      })
+    });
+
+    if (!claudeRes.ok) {
+      const error = await claudeRes.text();
+      console.error('Claude API error:', error);
+      return NextResponse.json({ error: 'AI generation failed' }, { status: 500 });
     }
 
-    console.log('✅ Code extracted, length:', code.length)
+    const claudeData = await claudeRes.json();
+    const generatedCode = claudeData.content[0].text;
 
     return NextResponse.json({
-      success: true,
-      message: 'Code updated successfully',
-      code: code,
-    })
+      code: generatedCode,
+      message: 'Code generated successfully'
+    });
 
-  } catch (error: any) {
-    console.error('❌ Chat API error:', error)
-    console.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name
-    })
-    
-    return NextResponse.json(
-      { 
-        error: error.message || 'Failed to process chat message',
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      },
-      { status: 500 }
-    )
+  } catch (error) {
+    console.error('Chat API error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

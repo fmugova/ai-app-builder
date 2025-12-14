@@ -1,67 +1,45 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
 import { toast, Toaster } from 'react-hot-toast'
 import { templates } from '@/lib/templates'
 import { analytics } from '@/lib/analytics'
+import { Loader2 } from 'lucide-react'
 
-// ✅ Sanitization and conversion function
-const sanitizeForPreview = (code: string): string => {
+// Sanitize function (unchanged)
+function sanitizeForPreview(code: string): string {
   let sanitized = code
-    // Remove dashboard text variations
-    .replace(/Back\s+to\s+Dashboard/gi, '')
-    .replace(/Go\s+to\s+Dashboard/gi, '')
-    .replace(/Return\s+to\s+Dashboard/gi, '')
-    .replace(/Dashboard/gi, 'Home')
-    .replace(/Builder/gi, 'Editor')
-    
-    // Remove all dashboard links
     .replace(/<a\s+[^>]*href=["']\/dashboard["'][^>]*>[\s\S]*?<\/a>/gi, '')
     .replace(/<a\s+[^>]*href=["']http:\/\/localhost:\d+\/dashboard["'][^>]*>[\s\S]*?<\/a>/gi, '')
     .replace(/<a\s+[^>]*href=["']https?:\/\/[^"']*\/dashboard["'][^>]*>[\s\S]*?<\/a>/gi, '')
-    
-    // Remove builder links
     .replace(/<a\s+[^>]*href=["']\/builder["'][^>]*>[\s\S]*?<\/a>/gi, '')
     .replace(/<a\s+[^>]*href=["']http:\/\/localhost:\d+\/builder["'][^>]*>[\s\S]*?<\/a>/gi, '')
-    
-    // Remove auth and API links
     .replace(/<a\s+[^>]*href=["']\/auth[^"']*["'][^>]*>[\s\S]*?<\/a>/gi, '')
     .replace(/<a\s+[^>]*href=["']\/api[^"']*["'][^>]*>[\s\S]*?<\/a>/gi, '')
-    
-    // Fix remaining href attributes
     .replace(/href=["']\/dashboard["']/gi, 'href="#"')
     .replace(/href=["']\/builder["']/gi, 'href="#"')
     .replace(/href=["']\/auth[^"']*["']/gi, 'href="#"')
     .replace(/href=["']\/api[^"']*["']/gi, 'href="#"')
-    
-    // Remove onclick handlers
     .replace(/onclick=["'][^"']*dashboard[^"']*["']/gi, 'onclick="return false"')
     .replace(/onclick=["'][^"']*builder[^"']*["']/gi, 'onclick="return false"')
     .replace(/onclick=["'][^"']*router\.push[^"']*["']/gi, 'onclick="return false"')
-    
-    // Remove router and Next.js code
     .replace(/import\s+{\s*useRouter\s*}\s+from\s+['"]next\/navigation['"]/gi, '')
     .replace(/import\s+{\s*Link\s*}\s+from\s+['"]next\/link['"]/gi, '')
     .replace(/const\s+router\s*=\s*useRouter\(\)/gi, '')
     .replace(/router\.push\([^)]*\)/gi, '')
     .replace(/router\.replace\([^)]*\)/gi, '')
-    
-    // Remove window.location redirects
     .replace(/window\.location\s*=\s*["'][^"']*\/dashboard[^"']*["']/gi, '')
     .replace(/window\.location\.href\s*=\s*["'][^"']*\/dashboard[^"']*["']/gi, '')
     .replace(/window\.location\s*=\s*["'][^"']*\/builder[^"']*["']/gi, '')
     .replace(/window\.location\.href\s*=\s*["'][^"']*\/builder[^"']*["']/gi, '')
 
-  // Check if it's already HTML (has proper HTML structure)
   if (sanitized.trim().startsWith('<!DOCTYPE') || 
       sanitized.trim().startsWith('<html') ||
       (sanitized.includes('<head>') && sanitized.includes('<body>'))) {
     return sanitized
   }
 
-  // Check if it's React/JSX code that needs conversion
   const isReactCode = 
     sanitized.includes('export default function') ||
     sanitized.includes('export default class') ||
@@ -73,41 +51,21 @@ const sanitizeForPreview = (code: string): string => {
     sanitized.includes('```jsx')
 
   if (isReactCode) {
-    // Remove code blocks markers
     sanitized = sanitized.replace(/```tsx|```jsx|```html|```/g, '')
-    
-    // Remove imports
     sanitized = sanitized.replace(/import\s+.*?from\s+['"][^'"]+['"]\s*;?\n?/g, '')
     sanitized = sanitized.replace(/import\s+['"][^'"]+['"]\s*;?\n?/g, '')
-    
-    // Remove 'use client' directive
     sanitized = sanitized.replace(/['"]use client['"]\s*;?\n?/g, '')
-    
-    // Remove export statements and function declarations
     sanitized = sanitized.replace(/export\s+default\s+function\s+\w+\s*\([^)]*\)\s*\{?\s*\n?\s*return\s*\(?/g, '')
     sanitized = sanitized.replace(/function\s+\w+\s*\([^)]*\)\s*\{?\s*\n?\s*return\s*\(?/g, '')
-    
-    // Remove const declarations for components
     sanitized = sanitized.replace(/const\s+\w+\s*=\s*\([^)]*\)\s*=>\s*\{?\s*\n?\s*return\s*\(?/g, '')
     sanitized = sanitized.replace(/const\s+\w+\s*=\s*\([^)]*\)\s*=>\s*\(?/g, '')
-    
-    // Remove closing braces at the end
     sanitized = sanitized.replace(/\)?\s*;?\s*\}?\s*$/, '')
-    
-    // Convert className to class
     sanitized = sanitized.replace(/className=/g, 'class=')
-    
-    // Remove JSX comments
     sanitized = sanitized.replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
-    
-    // Convert simple JSX expressions
     sanitized = sanitized.replace(/\{['"`]([^'"`]+)['"`]\}/g, '$1')
-    
-    // Remove .map() constructs
     sanitized = sanitized.replace(/\{[\s\S]*?\.map\([\s\S]*?\)\}/g, '')
   }
 
-  // Wrap in basic HTML structure with Tailwind CSS if needed
   if (!sanitized.includes('<html') && !sanitized.includes('<!DOCTYPE')) {
     return `<!DOCTYPE html>
 <html lang="en">
@@ -127,7 +85,6 @@ const sanitizeForPreview = (code: string): string => {
 </html>`
   }
 
-  // For complete HTML, inject base target into existing head
   if (sanitized.includes('<head>')) {
     return sanitized.replace('<head>', '<head>\n  <base target="_blank">')
   }
@@ -135,7 +92,7 @@ const sanitizeForPreview = (code: string): string => {
   return sanitized
 }
 
-// ✅ BuilderContent component (uses useSearchParams)
+// BuilderContent component
 function BuilderContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -152,16 +109,60 @@ function BuilderContent() {
   const [isLoadedProject, setIsLoadedProject] = useState(false)
   const [showReactWarning, setShowReactWarning] = useState(false)
 
-  // ✅ NEW: Chat state variables
+  // Chat state
   const [chatOpen, setChatOpen] = useState(false)
   const [chatMessage, setChatMessage] = useState('')
-  const [chatHistory, setChatHistory] = useState<Array<{role: string, content: string}>>([])
+  const [chatHistory, setChatHistory] = useState<Array<{role: string, content: string, files?: string[], urls?: string[]}>>([])
   const [chatLoading, setChatLoading] = useState(false)
 
-  // ✅ Handle chat interaction
+  // ✨ NEW: File and URL uploads
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
+  const [uploadedUrls, setUploadedUrls] = useState<string[]>([])
+
+  // ✨ NEW: Handle file upload
+  const handleFileUpload = async (files: FileList) => {
+    const fileArray = Array.from(files)
+    const validFiles = fileArray.filter(file => {
+      const validTypes = ['.pdf', '.doc', '.docx', '.txt', '.md', '.png', '.jpg', '.jpeg']
+      const ext = '.' + file.name.split('.').pop()?.toLowerCase()
+      return validTypes.includes(ext)
+    })
+    
+    if (validFiles.length < fileArray.length) {
+      toast.error('Some files were skipped (unsupported format)')
+    }
+    
+    setUploadedFiles(prev => [...prev, ...validFiles])
+    toast.success(`Added ${validFiles.length} file(s)`)
+  }
+
+  // ✨ NEW: Add URL
+  const handleAddUrl = () => {
+    const url = window.prompt('Enter website URL to analyze:\n\nExample: https://example.com')
+    if (url) {
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        toast.error('Please enter a valid URL starting with http:// or https://')
+        return
+      }
+      setUploadedUrls(prev => [...prev, url])
+      toast.success('URL added! Include it in your next message.')
+    }
+  }
+
+  // ✨ NEW: Remove file
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  // ✨ NEW: Remove URL
+  const removeUrl = (index: number) => {
+    setUploadedUrls(prev => prev.filter((_, i) => i !== index))
+  }
+
+  // ✨ UPDATED: Handle chat with file/URL support
   const handleChat = async () => {
-    if (!chatMessage.trim()) {
-      toast.error('Please enter a message')
+    if (!chatMessage.trim() && uploadedFiles.length === 0 && uploadedUrls.length === 0) {
+      toast.error('Please enter a message or add files/URLs')
       return
     }
 
@@ -170,69 +171,66 @@ function BuilderContent() {
       return
     }
 
-    console.log('💬 Sending chat message:', chatMessage)
-
     setChatLoading(true)
     
-    // Store the current message before clearing input
-    const currentMessage = chatMessage.trim()
+    const currentMessage = chatMessage.trim() || 'Process uploaded files and URLs'
     
-    // Add user message to history immediately
     const newHistory = [
       ...chatHistory,
-      { role: 'user', content: currentMessage }
+      { 
+        role: 'user', 
+        content: currentMessage,
+        files: uploadedFiles.map(f => f.name),
+        urls: uploadedUrls
+      }
     ]
     setChatHistory(newHistory)
-    setChatMessage('') // Clear input immediately
+    setChatMessage('')
 
     try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: currentMessage,
-          currentCode: generatedCode,
-          conversationHistory: chatHistory,
-          projectType: projectType
-        })
+      const formData = new FormData()
+      formData.append('message', currentMessage)
+      formData.append('currentCode', generatedCode)
+      formData.append('projectType', projectType)
+      formData.append('urls', JSON.stringify(uploadedUrls))
+      formData.append('conversationHistory', JSON.stringify(chatHistory))
+      
+      // Append files
+      uploadedFiles.forEach(file => {
+        formData.append('files', file)
       })
 
-      console.log('📡 Chat response status:', res.status)
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        body: formData
+      })
 
       const data = await res.json()
-      console.log('📦 Chat response data:', data)
 
       if (res.ok && data.code) {
-        // ✅ Update code in preview
         setGeneratedCode(data.code)
-
-        // ✅ Add AI response to history
         setChatHistory([
           ...newHistory,
           { 
             role: 'assistant', 
-            content: data.message || '✅ Code updated successfully! Check the preview.' 
+            content: data.message || '✅ Code updated successfully!' 
           }
         ])
-
-        // ✅ Show success toast
         toast.success('Code updated!')
         
+        // Clear attachments
+        setUploadedFiles([])
+        setUploadedUrls([])
       } else {
-        // ❌ Show error message
         const errorMsg = data.error || 'Chat failed. Please try again.'
-        
         setChatHistory([
           ...newHistory,
           { role: 'assistant', content: `❌ ${errorMsg}` }
         ])
-        
         toast.error(errorMsg)
       }
     } catch (err: any) {
       console.error('❌ Chat error:', err)
-      
-      // Add error message to chat
       setChatHistory([
         ...newHistory,
         { 
@@ -240,14 +238,13 @@ function BuilderContent() {
           content: '❌ Failed to connect to AI assistant. Please check your connection and try again.' 
         }
       ])
-      
       toast.error('Connection failed: ' + err.message)
     } finally {
       setChatLoading(false)
     }
   }
 
-  // ✅ Load project on mount
+  // Load project on mount
   useEffect(() => {
     const projectId = searchParams.get('project')
     if (projectId) {
@@ -262,7 +259,6 @@ function BuilderContent() {
       const data = await res.json()
 
       if (data.code) {
-        // Always set project data
         setCurrentProjectId(projectId)
         setProjectName(data.name)
         setProjectDescription(data.description)
@@ -270,7 +266,6 @@ function BuilderContent() {
         setProjectType(data.type || 'landing')
         setIsLoadedProject(true)
 
-        // Check if it's React/TSX code and show warning (but still load the code)
         const isReactCode = 
           data.code.includes('```tsx') || 
           data.code.includes('```jsx') ||
@@ -313,15 +308,12 @@ function BuilderContent() {
 
       if (res.ok) {
         setGeneratedCode(data.code)
-        // Track successful AI generation
         analytics.aiGeneration(true, projectType)
       } else {
-        // Track failed AI generation
         analytics.aiGeneration(false, projectType)
         alert(data.error || 'Failed to generate')
       }
     } catch (err) {
-      // Track failed AI generation
       analytics.aiGeneration(false, projectType)
       alert('Generation failed')
     } finally {
@@ -343,8 +335,6 @@ function BuilderContent() {
         : '/api/projects'
       
       const method = currentProjectId ? 'PUT' : 'POST'
-
-      // ✅ Sanitize before saving
       const sanitizedCode = sanitizeForPreview(generatedCode)
 
       const res = await fetch(url, {
@@ -359,7 +349,6 @@ function BuilderContent() {
       })
 
       if (res.ok) {
-        // Track project creation analytics
         if (!currentProjectId) {
           analytics.projectCreated(projectType)
         }
@@ -388,7 +377,7 @@ function BuilderContent() {
     URL.revokeObjectURL(url)
   }
 
-  // ✅ React Warning Screen
+  // React Warning Screen
   if (showReactWarning) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -443,7 +432,7 @@ function BuilderContent() {
     )
   }
 
-  // ✅ Project Type Selection Screen
+  // Project Type Selection Screen
   if (step === 'select-type') {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -497,7 +486,6 @@ function BuilderContent() {
                     setProjectType(template.type)
                     setPrompt(template.description)
                     setStep('build')
-                    // Use the actual template code
                     setGeneratedCode(template.code)
                     setProjectName(`${template.name} Project`)
                     toast.success(`Loaded "${template.name}" template!`)
@@ -525,7 +513,7 @@ function BuilderContent() {
     )
   }
 
-  // ✅ Build Screen
+  // Build Screen
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -542,7 +530,6 @@ function BuilderContent() {
             <div className="flex items-center gap-2">
               {generatedCode && (
                 <>
-                  {/* Copy Code */}
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(generatedCode)
@@ -554,7 +541,6 @@ function BuilderContent() {
                     📋 Copy
                   </button>
                   
-                  {/* Download */}
                   <button
                     onClick={downloadCode}
                     className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 text-sm"
@@ -563,7 +549,6 @@ function BuilderContent() {
                     💾 Download
                   </button>
                   
-                  {/* Preview in New Tab */}
                   {currentProjectId && (
                     <button
                       onClick={() => window.open(`/preview/${currentProjectId}`, '_blank')}
@@ -576,7 +561,6 @@ function BuilderContent() {
                 </>
               )}
               
-              {/* Save Button */}
               <button
                 onClick={handleSave}
                 disabled={saving || !generatedCode}
@@ -647,7 +631,6 @@ function BuilderContent() {
           {/* Preview Panel */}
           <div className="space-y-6">
             {isLoadedProject ? (
-              // ✅ LOADED PROJECT: Show preview button
               <div className="bg-white rounded-xl shadow-sm border p-6">
                 <h3 className="text-xl font-semibold mb-4">Preview</h3>
                 <div className="bg-gray-50 rounded-lg p-12 text-center border-2 border-dashed border-gray-300">
@@ -673,7 +656,6 @@ function BuilderContent() {
                 </div>
               </div>
             ) : generatedCode ? (
-              // ✅ NEW GENERATION: Show live iframe
               <div className="bg-white rounded-xl shadow-sm border p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-xl font-semibold">Live Preview</h3>
@@ -695,7 +677,6 @@ function BuilderContent() {
                   />
                 </div>
                 
-                {/* Quick Actions Bar */}
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button
                     onClick={() => {
@@ -722,7 +703,6 @@ function BuilderContent() {
                 </div>
               </div>
             ) : (
-              // ✅ NO CODE YET
               <div className="bg-white rounded-xl shadow-sm border p-6">
                 <h3 className="text-xl font-semibold mb-4">Preview</h3>
                 <div className="bg-gray-50 rounded-lg p-12 text-center border-2 border-dashed">
@@ -733,7 +713,6 @@ function BuilderContent() {
               </div>
             )}
 
-            {/* Code View */}
             {generatedCode && (
               <div className="bg-white rounded-xl shadow-sm border p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -759,7 +738,7 @@ function BuilderContent() {
         </div>
       </div>
 
-      {/* ✅ NEW: Floating Chat Button */}
+      {/* Floating Chat Button */}
       <button
         onClick={() => setChatOpen(!chatOpen)}
         className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full shadow-2xl hover:scale-110 transition-transform z-50 flex items-center justify-center"
@@ -768,16 +747,16 @@ function BuilderContent() {
         {chatOpen ? '✕' : '💬'}
       </button>
 
-      {/* ✅ NEW: Chat Panel */}
+      {/* Chat Panel */}
       {chatOpen && (
-        <div className="fixed bottom-24 right-6 w-96 h-[500px] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col z-50 overflow-hidden">
+        <div className="fixed bottom-24 right-6 w-96 h-[600px] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col z-50 overflow-hidden">
           {/* Chat Header */}
           <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-2xl">🤖</span>
               <div>
                 <h3 className="font-bold">AI Assistant</h3>
-                <p className="text-xs text-purple-100">Ask me to improve your code</p>
+                <p className="text-xs text-purple-100">Upload files, add URLs, ask anything!</p>
               </div>
             </div>
             <button
@@ -794,7 +773,7 @@ function BuilderContent() {
               <div className="text-center text-gray-500 py-8">
                 <div className="text-4xl mb-2">👋</div>
                 <p className="text-sm">Start a conversation!</p>
-                <p className="text-xs mt-2">Try: "Add a navigation bar" or "Make it responsive"</p>
+                <p className="text-xs mt-2">Try: "Add a navigation bar" or upload a website for inspiration</p>
               </div>
             ) : (
               chatHistory.map((msg, i) => (
@@ -810,6 +789,30 @@ function BuilderContent() {
                     }`}
                   >
                     <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    
+                    {/* Show attached files */}
+                    {msg.files && msg.files.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {msg.files.map((fileName, idx) => (
+                          <div key={idx} className="text-xs opacity-75 flex items-center gap-1">
+                            <span>📄</span>
+                            <span>{fileName}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Show attached URLs */}
+                    {msg.urls && msg.urls.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {msg.urls.map((url, idx) => (
+                          <div key={idx} className="text-xs opacity-75 flex items-center gap-1">
+                            <span>🔗</span>
+                            <span className="truncate">{url}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))
@@ -829,26 +832,93 @@ function BuilderContent() {
 
           {/* Chat Input */}
           <div className="border-t border-gray-200 p-4 bg-white">
+            {/* Attachments Display */}
+            {(uploadedFiles.length > 0 || uploadedUrls.length > 0) && (
+              <div className="mb-3 max-h-24 overflow-y-auto space-y-2">
+                {/* Files */}
+                {uploadedFiles.map((file, index) => (
+                  <div
+                    key={`file-${index}`}
+                    className="flex items-center justify-between px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg text-sm"
+                  >
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <span>📄</span>
+                      <span className="text-gray-800 truncate">{file.name}</span>
+                    </div>
+                    <button
+                      onClick={() => removeFile(index)}
+                      className="text-red-600 hover:text-red-700 ml-2 flex-shrink-0"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                
+                {/* URLs */}
+                {uploadedUrls.map((url, index) => (
+                  <div
+                    key={`url-${index}`}
+                    className="flex items-center justify-between px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm"
+                  >
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <span>🔗</span>
+                      <span className="text-gray-800 truncate">{url}</span>
+                    </div>
+                    <button
+                      onClick={() => removeUrl(index)}
+                      className="text-red-600 hover:text-red-700 ml-2 flex-shrink-0"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Upload Buttons */}
+            <div className="flex gap-2 mb-2">
+              <label className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg cursor-pointer transition flex items-center gap-2 text-sm">
+                <span>📎</span>
+                <span>Files</span>
+                <input
+                  type="file"
+                  multiple
+                  accept=".pdf,.doc,.docx,.txt,.md,.png,.jpg,.jpeg"
+                  onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
+                  className="hidden"
+                />
+              </label>
+
+              <button
+                onClick={handleAddUrl}
+                className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition flex items-center gap-2 text-sm"
+              >
+                <span>🔗</span>
+                <span>URL</span>
+              </button>
+            </div>
+
+            {/* Message Input */}
             <div className="flex gap-2">
               <input
                 type="text"
                 value={chatMessage}
                 onChange={(e) => setChatMessage(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && !chatLoading && handleChat()} // ✅ Changed from handleChatMessage
-                placeholder="Ask AI to improve your code..."
+                onKeyPress={(e) => e.key === 'Enter' && !chatLoading && handleChat()}
+                placeholder="Ask AI or upload inspiration..."
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                 disabled={chatLoading}
               />
               <button
-                onClick={handleChat} // ✅ Changed from handleChatMessage
-                disabled={chatLoading || !chatMessage.trim()}
+                onClick={handleChat}
+                disabled={chatLoading || (!chatMessage.trim() && uploadedFiles.length === 0 && uploadedUrls.length === 0)}
                 className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {chatLoading ? '⏳' : '➤'}
               </button>
             </div>
             <p className="text-xs text-gray-500 mt-2 text-center">
-              Press Enter to send
+              💡 Upload docs, paste URLs, or chat normally
             </p>
           </div>
         </div>
@@ -859,7 +929,7 @@ function BuilderContent() {
   )
 }
 
-// ✅ Main component with Suspense wrapper
+// Main component with Suspense wrapper
 export default function Builder() {
   return (
     <Suspense fallback={
