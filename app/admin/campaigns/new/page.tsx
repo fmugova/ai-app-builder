@@ -8,7 +8,6 @@ import { toast, Toaster } from 'react-hot-toast'
 import { newsletterTemplates } from '@/lib/email-templates'
 
 export default function NewCampaignPage() {
-  const [showPreview, setShowPreview] = useState(false);
   const router = useRouter()
   const { data: session, status } = useSession()
   const [loading, setLoading] = useState(false)
