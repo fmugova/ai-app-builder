@@ -294,30 +294,43 @@ function BuilderContent() {
     setGenerating(true)
     setIsLoadedProject(false)
 
-    try {
-      const res = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          prompt, 
-          type: projectType 
+    const maxClientRetries = 2;
+    let lastError = null;
+    for (let i = 0; i < maxClientRetries; i++) {
+      try {
+        const res = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            prompt, 
+            type: projectType 
+          })
         })
-      })
 
-      const data = await res.json()
+        const data = await res.json();
 
-      if (res.ok) {
-        setGeneratedCode(data.code)
-        analytics.aiGeneration(true, projectType)
-      } else {
+        if (res.status === 503 && data.retryable && i < maxClientRetries - 1) {
+          await new Promise(r => setTimeout(r, 3000));
+          continue;
+        }
+
+        if (res.ok) {
+          setGeneratedCode(data.code)
+          analytics.aiGeneration(true, projectType)
+        } else {
+          analytics.aiGeneration(false, projectType)
+          alert(data.error || 'Failed to generate')
+        }
+        break;
+      } catch (err) {
+        lastError = err;
         analytics.aiGeneration(false, projectType)
-        alert(data.error || 'Failed to generate')
+        if (i === maxClientRetries - 1) {
+          alert('Generation failed')
+        }
+      } finally {
+        setGenerating(false)
       }
-    } catch (err) {
-      analytics.aiGeneration(false, projectType)
-      alert('Generation failed')
-    } finally {
-      setGenerating(false)
     }
   }
 

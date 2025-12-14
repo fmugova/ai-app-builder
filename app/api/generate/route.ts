@@ -1,3 +1,28 @@
+// Retry logic for Claude API with exponential backoff
+async function callClaudeWithRetry(messages: any[], maxRetries = 3) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // anthropic is imported at the top
+      // @ts-ignore
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4000,
+        messages: messages
+      });
+      return response;
+    } catch (error: any) {
+      const isOverloaded = error?.error?.type === 'overloaded_error';
+      const isLastAttempt = attempt === maxRetries - 1;
+      if (isOverloaded && !isLastAttempt) {
+        // Exponential backoff: 2s, 4s, 8s
+        const delay = Math.pow(2, attempt + 1) * 1000;
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      throw error;
+    }
+  }
+}
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -123,41 +148,22 @@ ${prompt}
 
 Generate ONLY the complete HTML code. No explanations, no markdown code blocks, just pure HTML starting with <!DOCTYPE html>.`
 
-    // Call Claude API
-    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY || '',
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
-        messages: [{
-          role: 'user',
-          content: systemPrompt
-        }]
-      })
-    })
+    // Call Claude API with retry logic
+    const message = await callClaudeWithRetry([
+      {
+        role: 'user',
+        content: systemPrompt
+      }
+    ]);
 
-    if (!claudeRes.ok) {
-      const errorText = await claudeRes.text()
-      console.error('Claude API error:', errorText)
-      return NextResponse.json({ error: 'AI generation failed' }, { status: 500 })
-    }
-
-    // Get the response
-    const claudeData = await claudeRes.json()
-    
     // Extract code
-    let code = ''
-    if (claudeData.content && claudeData.content[0]) {
-      const content = claudeData.content[0]
-      code = content.type === 'text' ? content.text : ''
+    let code = '';
+    if (message.content && message.content[0]) {
+      const content = message.content[0];
+      code = content.type === 'text' ? content.text : '';
     } else {
-      console.error('Unexpected Claude response:', claudeData)
-      return NextResponse.json({ error: 'Invalid AI response' }, { status: 500 })
+      console.error('Unexpected Claude response:', message);
+      return NextResponse.json({ error: 'Invalid AI response' }, { status: 500 });
     }
 
     // Clean up markdown code blocks
@@ -192,11 +198,20 @@ Generate ONLY the complete HTML code. No explanations, no markdown code blocks, 
 
     return NextResponse.json({ code })
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('Generate error:', error)
+    if (error?.error?.type === 'overloaded_error') {
+      return NextResponse.json(
+        {
+          error: 'Claude is experiencing high demand. Please try again in a moment.',
+          retryable: true
+        },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       { error: 'Failed to generate code' },
       { status: 500 }
-    )
+    );
   }
 }
