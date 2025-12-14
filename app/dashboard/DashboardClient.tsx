@@ -191,6 +191,13 @@ export default function DashboardClient({
               <span className={`px-4 py-2 rounded-lg border-2 ${tierBadge.color} text-sm font-semibold`}>
                 {tierBadge.text}
               </span>
+              {/* Contact Support Button */}
+              <button
+                onClick={() => router.push('/contact')}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+              >
+                📧 Contact Support
+              </button>
               {isAdmin && (
                 <button
                   onClick={() => router.push('/admin')}
