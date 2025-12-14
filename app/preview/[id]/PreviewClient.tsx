@@ -36,6 +36,7 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
     }
   }
 
+
   const enhanceCodeForPreview = (originalCode: string): string => {
     // Remove any existing base tags
     let enhanced = originalCode.replace(/<base[^>]*>/gi, '')
@@ -43,7 +44,7 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
     // Inject interactive scripts and styles
     const interactiveScript = `
 <script>
-  // Prevent external navigation
+  // Prevent MOST external navigation, but allow footer links
   window.addEventListener('DOMContentLoaded', function() {
     // Override all anchor clicks
     document.addEventListener('click', function(e) {
@@ -51,23 +52,38 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
       if (anchor && anchor.href) {
         const href = anchor.getAttribute('href');
         
-        // Allow hash links and javascript: links
-        if (href && (href.startsWith('#') || href.startsWith('javascript:'))) {
+        // Allow hash links
+        if (href && href.startsWith('#')) {
           return; // Let them work normally
         }
         
-        // Prevent external navigation
-        e.preventDefault();
+        // Allow footer links (terms, privacy, contact, etc.)
+        const footerLinks = [
+          '/terms', '/privacy', '/contact', '/about',
+          'mailto:', 'tel:', 'twitter.com', 'linkedin.com',
+          'facebook.com', 'instagram.com', 'github.com'
+        ];
         
-        // Simulate page change with smooth scroll
-        if (href && href.startsWith('#')) {
-          const target = document.querySelector(href);
-          if (target) {
-            target.scrollIntoView({ behavior: 'smooth' });
-          }
-        } else {
-          // Show toast for external links
-          console.log('External navigation blocked in preview:', href);
+        const isFooterLink = footerLinks.some(link => 
+          href && (href.includes(link) || href.startsWith(link))
+        );
+        
+        if (isFooterLink) {
+          // Open footer links in new tab
+          e.preventDefault();
+          window.open(href, '_blank');
+          return;
+        }
+        
+        // Allow javascript: links
+        if (href && href.startsWith('javascript:')) {
+          return;
+        }
+        
+        // Prevent other external navigation
+        if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
+          e.preventDefault();
+          console.log('Navigation blocked in preview:', href);
         }
       }
     });
@@ -114,30 +130,21 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
         }, 100);
       }
     });
-
-    // Log all clicks for debugging
-    document.addEventListener('click', function(e) {
-      console.log('Click:', e.target);
-    }, true);
   });
 
-  // Override window.open
+  // Override window.open for non-footer links
+  const originalWindowOpen = window.open;
   window.open = function(url, target, features) {
-    console.log('window.open blocked in preview:', url);
+    const footerDomains = ['twitter.com', 'linkedin.com', 'facebook.com', 'instagram.com', 'github.com'];
+    const isFooterLink = footerDomains.some(domain => url && url.includes(domain));
+    
+    if (isFooterLink || (url && url.startsWith('mailto:')) || (url && url.startsWith('tel:'))) {
+      return originalWindowOpen.call(window, url, target, features);
+    }
+    
+    console.log('window.open blocked in preview (use footer links for external):', url);
     return null;
   };
-
-  // Override window.location
-  const originalLocation = window.location;
-  Object.defineProperty(window, 'location', {
-    get: function() {
-      return originalLocation;
-    },
-    set: function(val) {
-      console.log('Navigation blocked in preview:', val);
-      return originalLocation;
-    }
-  });
 </script>
 
 <style>
@@ -163,6 +170,17 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
   
   button:not(:disabled):active {
     transform: scale(0.95);
+  }
+
+  /* Footer link styling */
+  footer a {
+    text-decoration: underline;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+  }
+
+  footer a:hover {
+    opacity: 1;
   }
 </style>
 `

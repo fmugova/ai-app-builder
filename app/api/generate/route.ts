@@ -74,7 +74,33 @@ Requirements:
 - Use modern design principles
 - Include all necessary sections
 - Use appropriate colors and typography
-- Return ONLY the complete HTML code, no explanations`,
+- Return ONLY the complete HTML code, no explanations
+
+IMPORTANT: Always include a footer at the bottom with:
+- © 2024 BuildFlow - Built with AI
+- Links: Terms | Privacy | Contact
+- Social media icons (if applicable)
+
+Example footer:
+<footer class="bg-gray-800 text-white py-8">
+  <div class="max-w-7xl mx-auto px-6 text-center">
+    <p class="text-sm text-gray-400 mb-4">© 2024 BuildFlow - Built with AI</p>
+    <div class="flex justify-center gap-6 mb-4">
+      <a href="/terms" class="text-gray-400 hover:text-white">Terms</a>
+      <a href="/privacy" class="text-gray-400 hover:text-white">Privacy</a>
+      <a href="/contact" class="text-gray-400 hover:text-white">Contact</a>
+    </div>
+    <div class="flex justify-center gap-4">
+      <a href="https://twitter.com/buildflow" target="_blank" class="text-gray-400 hover:text-white">
+        𝕏 Twitter
+      </a>
+      <a href="https://github.com/buildflow" target="_blank" class="text-gray-400 hover:text-white">
+        GitHub
+      </a>
+    </div>
+  </div>
+</footer>
+`,
         },
       ],
     })
