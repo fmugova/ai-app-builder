@@ -1,99 +1,50 @@
-'use client'
+"use client"
 
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 
-// Convert React/JSX code to previewable HTML
-const convertToPreviewableHTML = (code: string): string => {
-  // Check if it's already HTML (starts with <!DOCTYPE or <html or has proper HTML structure)
-  if (code.trim().startsWith('<!DOCTYPE') || 
-      code.trim().startsWith('<html') ||
-      (code.includes('<head>') && code.includes('<body>'))) {
-    return code
-  }
+// Converts code (JSX/HTML) to previewable HTML string
+function convertToPreviewableHTML(code: string) {
+  let html = code
 
-  // Check if it's React/JSX code
-  const isReactCode = 
-    code.includes('export default function') ||
-    code.includes('export default class') ||
-    code.includes('import React') ||
-    code.includes('import {') ||
-    code.includes('useState') ||
-    code.includes('useEffect') ||
-    code.includes('className=') ||
-    code.includes('=>') ||
-    code.includes('const ') ||
-    code.includes('```tsx') ||
-    code.includes('```jsx')
+  // Remove 'use client' directive
+  html = html.replace(/['"]use client['"]\s*;?\n?/g, '')
 
-  if (isReactCode) {
-    // Extract JSX content and convert to HTML
-    let html = code
-    
-    // Remove code blocks markers
-    html = html.replace(/```tsx|```jsx|```html|```/g, '')
-    
-    // Remove imports
-    html = html.replace(/import\s+.*?from\s+['"][^'"]+['"]\s*;?\n?/g, '')
-    html = html.replace(/import\s+['"][^'"]+['"]\s*;?\n?/g, '')
-    
-    // Remove 'use client' directive
-    html = html.replace(/['"]use client['"]\s*;?\n?/g, '')
-    
-    // Remove export statements and function declarations
-    html = html.replace(/export\s+default\s+function\s+\w+\s*\([^)]*\)\s*\{?\s*\n?\s*return\s*\(?/g, '')
-    html = html.replace(/export\s+default\s+function\s+\w+\s*\([^)]*\)\s*\{/g, '')
-    html = html.replace(/function\s+\w+\s*\([^)]*\)\s*\{?\s*\n?\s*return\s*\(?/g, '')
-    
-    // Remove const declarations for components
-    html = html.replace(/const\s+\w+\s*=\s*\([^)]*\)\s*=>\s*\{?\s*\n?\s*return\s*\(?/g, '')
-    html = html.replace(/const\s+\w+\s*=\s*\([^)]*\)\s*=>\s*\(?/g, '')
-    
-    // Remove closing braces and parentheses at the end
-    html = html.replace(/\)?\s*;?\s*\}?\s*$/, '')
-    
-    // Convert className to class
-    html = html.replace(/className=/g, 'class=')
-    
-    // Convert JSX expressions {variable} to empty (or placeholder)
-    html = html.replace(/\{[^{}]*\}/g, (match) => {
-      // Keep simple text content
-      if (match.match(/^\{['"`][^'"`]+['"`]\}$/)) {
-        return match.slice(2, -2) // Remove {" and "}
-      }
-      // Keep emoji and simple strings
-      if (match.match(/^\{['"`].*['"`]\}$/s)) {
-        return match.slice(2, -2)
-      }
-      return ''
-    })
-    
-    // Remove .map() constructs and replace with static content
-    html = html.replace(/\{[\s\S]*?\.map\([\s\S]*?\)\}/g, '')
-    
-    // Clean up any remaining JSX artifacts
-    html = html.replace(/\{\/\*[\s\S]*?\*\/\}/g, '') // Remove JSX comments
-    html = html.replace(/\{`[^`]*`\}/g, '') // Remove template literals
-    
-    // Wrap in basic HTML structure with Tailwind CSS
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <base target="_blank">
-  <title>Preview</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
-  </style>
-</head>
-<body>
-  ${html.trim()}
-</body>
-</html>`
-  }
+  // Remove export statements and function declarations
+  html = html.replace(/export\s+default\s+function\s+\w+\s*\([^)]*\)\s*\{?\s*\n?\s*return\s*\(?/g, '')
+  html = html.replace(/export\s+default\s+function\s+\w+\s*\([^)]*\)\s*\{/g, '')
+  html = html.replace(/function\s+\w+\s*\([^)]*\)\s*\{?\s*\n?\s*return\s*\(?/g, '')
+
+  // Remove const declarations for components
+  html = html.replace(/const\s+\w+\s*=\s*\([^)]*\)\s*=>\s*\{?\s*\n?\s*return\s*\(?/g, '')
+  html = html.replace(/const\s+\w+\s*=\s*\([^)]*\)\s*=>\s*\(?/g, '')
+
+  // Remove closing braces and parentheses at the end
+  html = html.replace(/\)?\s*;?\s*\}?\s*$/, '')
+
+  // Convert className to class
+  html = html.replace(/className=/g, 'class=')
+
+  // Convert JSX expressions {variable} to empty (or placeholder)
+  html = html.replace(/\{[^{}]*\}/g, (match) => {
+    // Keep simple text content
+    if (match.match(/^\{['"`][^'"`]+['"`]\}$/)) {
+      return match.slice(2, -2) // Remove {" and "}
+    }
+    // Keep emoji and simple strings
+    if (match.match(/^\{['"`].*['"`]\}$/s)) {
+      return match.slice(2, -2)
+    }
+    return ''
+  })
+
+  // Remove .map() constructs and replace with static content
+  html = html.replace(/\{[\s\S]*?\.map\([\s\S]*?\)\}/g, '')
+
+  // Clean up any remaining JSX artifacts
+  html = html.replace(/\{\/\*[\s\S]*?\*\/\}/g, '') // Remove JSX comments
+  html = html.replace(/\{`[^`]*`\}/g, '') // Remove template literals
 
   // If it's partial HTML without full structure, wrap it
   if (!code.includes('<html') && !code.includes('<!DOCTYPE')) {
@@ -110,7 +61,7 @@ const convertToPreviewableHTML = (code: string): string => {
   </style>
 </head>
 <body>
-  ${code}
+  ${html.trim()}
 </body>
 </html>`
   }
