@@ -25,7 +25,6 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
 
       if (data.code) {
         setProjectName(data.name || 'Preview')
-        // Enhance code for full interactivity
         const enhancedCode = enhanceCodeForPreview(data.code)
         setCode(enhancedCode)
       }
@@ -36,129 +35,119 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
     }
   }
 
-
   const enhanceCodeForPreview = (originalCode: string): string => {
-    // Remove any existing base tags
-    let enhanced = originalCode.replace(/<base[^>]*>/gi, '')
+    let enhanced = originalCode
 
-    // Inject interactive scripts and styles
+    // Interactive enhancement script
     const interactiveScript = `
 <script>
-  // Prevent MOST external navigation, but allow footer links
-  window.addEventListener('DOMContentLoaded', function() {
-    // Override all anchor clicks
-    document.addEventListener('click', function(e) {
-      const anchor = e.target.closest('a');
-      if (anchor && anchor.href) {
+  (function() {
+    'use strict';
+    
+    window.addEventListener('DOMContentLoaded', function() {
+      // Handle anchor clicks
+      document.addEventListener('click', function(e) {
+        const anchor = e.target.closest('a');
+        if (!anchor || !anchor.href) return;
+        
         const href = anchor.getAttribute('href');
+        if (!href) return;
         
         // Allow hash links
-        if (href && href.startsWith('#')) {
-          return; // Let them work normally
+        if (href.startsWith('#')) {
+          e.preventDefault();
+          const target = document.querySelector(href);
+          if (target) {
+            target.scrollIntoView({ behavior: 'smooth' });
+          }
+          return;
         }
         
-        // Allow footer links (terms, privacy, contact, etc.)
-        const footerLinks = [
-          '/terms', '/privacy', '/contact', '/about',
-          'mailto:', 'tel:', 'twitter.com', 'linkedin.com',
-          'facebook.com', 'instagram.com', 'github.com'
+        // Allow footer/legal links to open in new tab
+        const allowedLinks = [
+          'terms', 'privacy', 'contact', 'about',
+          'mailto:', 'tel:', 
+          'twitter.com', 'linkedin.com', 'facebook.com', 
+          'instagram.com', 'github.com'
         ];
         
-        const isFooterLink = footerLinks.some(link => 
-          href && (href.includes(link) || href.startsWith(link))
-        );
+        const isAllowed = allowedLinks.some(pattern => href.includes(pattern));
         
-        if (isFooterLink) {
-          // Open footer links in new tab
+        if (isAllowed) {
           e.preventDefault();
-          window.open(href, '_blank');
+          window.open(href, '_blank', 'noopener,noreferrer');
           return;
         }
         
-        // Allow javascript: links
-        if (href && href.startsWith('javascript:')) {
-          return;
-        }
-        
-        // Prevent other external navigation
-        if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
-          e.preventDefault();
-          console.log('Navigation blocked in preview:', href);
-        }
-      }
-    });
-
-    // Make forms work
-    document.addEventListener('submit', function(e) {
-      e.preventDefault();
-      const form = e.target;
-      const formData = new FormData(form);
-      const data = {};
-      
-      formData.forEach((value, key) => {
-        data[key] = value;
+        // Block other navigation
+        e.preventDefault();
       });
-      
-      // Show success message
-      const successDiv = document.createElement('div');
-      successDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 99999; animation: slideIn 0.3s ease-out;';
-      successDiv.innerHTML = '<strong>✅ Form Submitted!</strong><br><small>In production, this would send data to your server</small>';
-      document.body.appendChild(successDiv);
-      
-      // Add animation
-      const style = document.createElement('style');
-      style.textContent = '@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }';
-      document.head.appendChild(style);
-      
-      // Remove after 3 seconds
-      setTimeout(() => {
-        successDiv.style.animation = 'slideIn 0.3s ease-out reverse';
-        setTimeout(() => successDiv.remove(), 300);
-      }, 3000);
-      
-      console.log('Form submission (preview mode):', data);
-    });
 
-    // Enable localStorage (already works in iframe sandbox with allow-same-origin)
-    // Add visual feedback for buttons
-    document.addEventListener('click', function(e) {
-      const button = e.target.closest('button');
-      if (button && !button.disabled) {
-        button.style.transform = 'scale(0.95)';
+      // Handle form submissions
+      document.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const form = e.target;
+        const formData = new FormData(form);
+        const data = {};
+        formData.forEach((value, key) => { data[key] = value; });
+        
+        // Show success toast
+        const toast = document.createElement('div');
+        toast.style.cssText = \`
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: #10b981;
+          color: white;
+          padding: 16px 24px;
+          border-radius: 8px;
+          box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+          z-index: 999999;
+          animation: slideIn 0.3s ease-out;
+          font-family: system-ui, -apple-system, sans-serif;
+        \`;
+        toast.innerHTML = '<strong>✅ Form Submitted!</strong><br><small>In production, this would send data</small>';
+        document.body.appendChild(toast);
+        
+        // Add animation styles
+        if (!document.getElementById('toast-styles')) {
+          const style = document.createElement('style');
+          style.id = 'toast-styles';
+          style.textContent = '@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }';
+          document.head.appendChild(style);
+        }
+        
+        // Remove after 3 seconds
         setTimeout(() => {
-          button.style.transform = 'scale(1)';
-        }, 100);
-      }
-    });
-  });
+          toast.style.animation = 'slideIn 0.3s ease-out reverse';
+          setTimeout(() => toast.remove(), 300);
+        }, 3000);
+        
+        console.log('Form data:', data);
+      });
 
-  // Override window.open for non-footer links
-  const originalWindowOpen = window.open;
-  window.open = function(url, target, features) {
-    const footerDomains = ['twitter.com', 'linkedin.com', 'facebook.com', 'instagram.com', 'github.com'];
-    const isFooterLink = footerDomains.some(domain => url && url.includes(domain));
-    
-    if (isFooterLink || (url && url.startsWith('mailto:')) || (url && url.startsWith('tel:'))) {
-      return originalWindowOpen.call(window, url, target, features);
-    }
-    
-    console.log('window.open blocked in preview (use footer links for external):', url);
-    return null;
-  };
+      // Button click feedback
+      document.addEventListener('click', function(e) {
+        const button = e.target.closest('button');
+        if (button && !button.disabled) {
+          const originalTransform = button.style.transform;
+          button.style.transform = 'scale(0.95)';
+          button.style.transition = 'transform 0.1s';
+          setTimeout(() => {
+            button.style.transform = originalTransform || 'scale(1)';
+          }, 100);
+        }
+      });
+    });
+  })();
 </script>
 
 <style>
-  /* Ensure transitions work */
-  * {
-    transition-property: transform, opacity, background-color, border-color, color;
-  }
-  
-  /* Smooth scrolling */
   html {
     scroll-behavior: smooth;
   }
   
-  /* Button hover effects */
   button:not(:disabled) {
     cursor: pointer;
     transition: all 0.2s ease;
@@ -168,28 +157,26 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
     filter: brightness(1.1);
   }
   
-  button:not(:disabled):active {
-    transform: scale(0.95);
+  a {
+    cursor: pointer;
   }
-
-  /* Footer link styling */
+  
   footer a {
     text-decoration: underline;
-    opacity: 0.8;
-    transition: opacity 0.2s;
+    text-decoration-color: rgba(255,255,255,0.3);
   }
-
+  
   footer a:hover {
-    opacity: 1;
+    text-decoration-color: rgba(255,255,255,0.8);
   }
 </style>
 `
 
-    // Inject scripts before </body> or at the end
+    // Inject before closing body or html tag
     if (enhanced.includes('</body>')) {
-      enhanced = enhanced.replace('</body>', `${interactiveScript}</body>`)
+      enhanced = enhanced.replace('</body>', interactiveScript + '</body>')
     } else if (enhanced.includes('</html>')) {
-      enhanced = enhanced.replace('</html>', `${interactiveScript}</html>`)
+      enhanced = enhanced.replace('</html>', interactiveScript + '</html>')
     } else {
       enhanced += interactiveScript
     }
@@ -200,12 +187,6 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
   const refreshPreview = () => {
     loadProject()
     toast.success('Preview refreshed!')
-  }
-
-  const viewportSizes = {
-    desktop: { width: '100%', height: '100%' },
-    tablet: { width: '768px', height: '1024px' },
-    mobile: { width: '375px', height: '667px' }
   }
 
   if (loading) {
@@ -223,18 +204,18 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
     <>
       <Toaster position="top-right" />
       
-      <div className="min-h-screen bg-gray-900 flex flex-col">
-        {/* Preview Toolbar */}
-        <div className="bg-gray-800 border-b border-gray-700 px-6 py-3">
+      <div className="h-screen flex flex-col bg-gray-900">
+        {/* Toolbar */}
+        <div className="bg-gray-800 border-b border-gray-700 px-6 py-3 flex-shrink-0">
           <div className="flex items-center justify-between">
-            {/* Left side */}
+            {/* Left */}
             <div className="flex items-center gap-4">
               <h1 className="text-white font-semibold flex items-center gap-2">
                 <span>👁️</span>
                 <span>{projectName}</span>
               </h1>
               
-              {/* View Mode Toggle */}
+              {/* View Mode */}
               <div className="flex items-center gap-1 bg-gray-700 rounded-lg p-1">
                 <button
                   onClick={() => setViewMode('desktop')}
@@ -269,88 +250,93 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
               </div>
             </div>
 
-            {/* Right side */}
+            {/* Right */}
             <div className="flex items-center gap-2">
               <button
                 onClick={refreshPreview}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition flex items-center gap-2"
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition text-sm flex items-center gap-2"
               >
                 🔄 Refresh
               </button>
               
               <button
                 onClick={() => setShowCode(!showCode)}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition flex items-center gap-2"
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition text-sm flex items-center gap-2"
               >
                 {showCode ? '👁️ Preview' : '📝 Code'}
               </button>
               
               <button
                 onClick={() => window.close()}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition"
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition text-sm"
               >
-                ✕ Close
+                ✕
               </button>
             </div>
           </div>
         </div>
 
-        {/* Preview Area */}
-        <div className="flex-1 flex items-center justify-center p-6 overflow-auto">
+        {/* Content Area */}
+        <div className="flex-1 bg-gray-900 overflow-hidden">
           {showCode ? (
             // Code View
-            <div className="w-full max-w-6xl bg-gray-800 rounded-lg p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-white font-semibold">Source Code</h2>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(code)
-                    toast.success('Code copied to clipboard!')
-                  }}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition"
-                >
-                  📋 Copy Code
-                </button>
-              </div>
-              <div className="bg-gray-900 rounded-lg p-4 overflow-auto max-h-[70vh]">
-                <pre className="text-sm text-green-400 font-mono">
-                  <code>{code}</code>
-                </pre>
+            <div className="h-full p-6 overflow-auto">
+              <div className="max-w-6xl mx-auto bg-gray-800 rounded-lg p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-white font-semibold text-lg">Source Code</h2>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(code)
+                      toast.success('Code copied!')
+                    }}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition text-sm"
+                  >
+                    📋 Copy
+                  </button>
+                </div>
+                <div className="bg-gray-900 rounded-lg p-4 overflow-auto">
+                  <pre className="text-sm text-green-400 font-mono whitespace-pre-wrap">
+                    <code>{code}</code>
+                  </pre>
+                </div>
               </div>
             </div>
           ) : (
             // Preview View
-            <div 
-              className="bg-white rounded-lg shadow-2xl overflow-hidden transition-all duration-300"
-              style={{
-                width: viewportSizes[viewMode].width,
-                height: viewportSizes[viewMode].height,
-                maxWidth: '100%',
-                maxHeight: '100%'
-              }}
-            >
-              <iframe
-                srcDoc={code}
-                className="w-full h-full border-0"
-                sandbox="allow-scripts allow-forms allow-modals allow-popups allow-same-origin"
-                title="Full Preview"
-              />
+            <div className="h-full flex items-center justify-center p-6">
+              <div 
+                className="bg-white shadow-2xl transition-all duration-300 overflow-hidden"
+                style={{
+                  width: viewMode === 'desktop' ? '100%' : viewMode === 'tablet' ? '768px' : '375px',
+                  height: '100%',
+                  maxWidth: '100%',
+                  borderRadius: viewMode === 'desktop' ? '0' : '12px'
+                }}
+              >
+                <iframe
+                  srcDoc={code}
+                  className="w-full h-full border-0"
+                  sandbox="allow-scripts allow-forms allow-modals allow-popups allow-same-origin"
+                  title="Preview"
+                  style={{ background: 'white' }}
+                />
+              </div>
             </div>
           )}
         </div>
 
         {/* Status Bar */}
-        <div className="bg-gray-800 border-t border-gray-700 px-6 py-2">
+        <div className="bg-gray-800 border-t border-gray-700 px-6 py-2 flex-shrink-0">
           <div className="flex items-center justify-between text-xs text-gray-400">
             <div className="flex items-center gap-4">
-              <span>✅ All interactions work in preview</span>
+              <span>✅ Interactive</span>
               <span>💾 LocalStorage enabled</span>
-              <span>🔒 External links blocked</span>
+              <span>🔒 Safe preview mode</span>
             </div>
             <div>
-              {viewMode === 'desktop' ? '🖥️ Desktop View' : 
-               viewMode === 'tablet' ? '📱 Tablet View (768x1024)' : 
-               '📱 Mobile View (375x667)'}
+              {viewMode === 'desktop' && '🖥️ Desktop View'}
+              {viewMode === 'tablet' && '📱 Tablet (768px)'}
+              {viewMode === 'mobile' && '📱 Mobile (375px)'}
             </div>
           </div>
         </div>
