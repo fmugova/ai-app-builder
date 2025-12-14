@@ -71,6 +71,11 @@ ${currentCode}
 Context from uploaded files and URLs:
 ${enhancedContext}
 
+**IMPORTANT:**
+- If the current code has a footer, preserve it and enhance it
+- If no footer exists, add one following the template above
+- Footer should ALWAYS be present in the final code
+
 Instructions:
 1. Analyze any provided files, URLs, or website references
 2. Extract relevant features, design patterns, or functionality

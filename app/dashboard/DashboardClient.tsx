@@ -472,7 +472,7 @@ export default function DashboardClient({
                           onClick={(e) => {
                             e.preventDefault()
                             e.stopPropagation()
-                            router.push(`/preview/${project.id}`)
+                            window.open(`/preview/${project.id}`, '_blank')
                           }}
                           className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
                         >
