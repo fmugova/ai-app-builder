@@ -66,7 +66,7 @@ export default function NewCampaignPage() {
     setSubject(content.subject)
     setHtmlContent(content.body)
     setTemplateType('custom')
-    toast.success('AI content applied! Review and customize as needed.')
+    toast.success('AI content applied! Review and edit as needed.')
   }
 
   const handleCreateCampaign = async () => {
@@ -435,14 +435,31 @@ export default function NewCampaignPage() {
 
                 {/* Custom HTML Template */}
                 {templateType === 'custom' && (
-                  <div>
-                    <textarea
-                      placeholder="Enter your HTML content..."
-                      value={htmlContent}
-                      onChange={(e) => setHtmlContent(e.target.value)}
-                      rows={20}
-                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 font-mono text-sm"
-                    />
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        HTML Content
+                      </label>
+                      <textarea
+                        placeholder="Enter your HTML content..."
+                        value={htmlContent}
+                        onChange={(e) => setHtmlContent(e.target.value)}
+                        rows={20}
+                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 font-mono text-sm"
+                      />
+                    </div>
+
+                    {/* HTML Preview */}
+                    {htmlContent && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Preview
+                        </label>
+                        <div className="bg-white rounded-lg p-6 prose prose-sm max-w-none">
+                          <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
