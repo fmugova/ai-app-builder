@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import AIEmailWriter from '@/components/AIEmailWriter'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { toast, Toaster } from 'react-hot-toast'
@@ -60,6 +61,13 @@ export default function NewCampaignPage() {
 
     // No loadData here, just allow page to render
   }, [session, status, isAdmin, checkingAdmin])
+
+  const handleAIGenerated = (content: { subject: string; body: string }) => {
+    setSubject(content.subject)
+    setHtmlContent(content.body)
+    setTemplateType('custom')
+    toast.success('AI content applied! Review and customize as needed.')
+  }
 
   const handleCreateCampaign = async () => {
     if (!name || !subject) {
@@ -149,13 +157,16 @@ export default function NewCampaignPage() {
                 </div>
               </div>
 
-              <button
-                onClick={handleCreateCampaign}
-                disabled={loading}
-                className="px-6 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition font-medium disabled:opacity-50"
-              >
-                {loading ? 'Creating...' : 'Create Campaign'}
-              </button>
+              <div className="flex items-center gap-3">
+                <AIEmailWriter onGenerated={handleAIGenerated} />
+                <button
+                  onClick={handleCreateCampaign}
+                  disabled={loading}
+                  className="px-6 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition font-medium disabled:opacity-50"
+                >
+                  {loading ? 'Creating...' : 'Create Campaign'}
+                </button>
+              </div>
             </div>
           </div>
         </header>

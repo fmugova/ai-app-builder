@@ -3,8 +3,11 @@
 export function getNewsletterTemplateHTML(
   content: string,
   previewText?: string,
-  unsubscribeLink?: string
+  unsubscribeEmail?: string // Change parameter name
 ) {
+  const unsubscribeLink = unsubscribeEmail 
+    ? `https://buildflow-ai.app/unsubscribe?email=${encodeURIComponent(unsubscribeEmail)}`
+    : 'https://buildflow-ai.app/unsubscribe';
   return `
     <!DOCTYPE html>
     <html>
