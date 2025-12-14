@@ -8,9 +8,11 @@ import { toast, Toaster } from 'react-hot-toast'
 import { newsletterTemplates } from '@/lib/email-templates'
 
 export default function NewCampaignPage() {
+  const [showPreview, setShowPreview] = useState(false);
   const router = useRouter()
   const { data: session, status } = useSession()
   const [loading, setLoading] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
 
   // Campaign details
   const [name, setName] = useState('')
@@ -66,7 +68,8 @@ export default function NewCampaignPage() {
     setSubject(content.subject)
     setHtmlContent(content.body)
     setTemplateType('custom')
-    toast.success('AI content applied! Review and edit as needed.')
+    setShowPreview(true) // Show preview after AI generation
+    toast.success('AI content generated! ✨ Review in preview tab.')
   }
 
   const handleCreateCampaign = async () => {
@@ -436,28 +439,49 @@ export default function NewCampaignPage() {
                 {/* Custom HTML Template */}
                 {templateType === 'custom' && (
                   <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        HTML Content
-                      </label>
-                      <textarea
-                        placeholder="Enter your HTML content..."
-                        value={htmlContent}
-                        onChange={(e) => setHtmlContent(e.target.value)}
-                        rows={20}
-                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 font-mono text-sm"
-                      />
+                    {/* Tab Toggle */}
+                    <div className="flex gap-2 border-b border-gray-700">
+                      <button
+                        onClick={() => setShowPreview(false)}
+                        className={`px-4 py-2 font-medium transition ${!showPreview ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-white'}`}
+                      >
+                        Edit HTML
+                      </button>
+                      <button
+                        onClick={() => setShowPreview(true)}
+                        className={`px-4 py-2 font-medium transition ${showPreview ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-white'}`}
+                      >
+                        Preview
+                      </button>
                     </div>
 
-                    {/* HTML Preview */}
-                    {htmlContent && (
+                    {/* HTML Editor */}
+                    {!showPreview && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Preview
-                        </label>
-                        <div className="bg-white rounded-lg p-6 prose prose-sm max-w-none">
-                          <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
-                        </div>
+                        <textarea
+                          placeholder="Enter your HTML content or use AI Writer to generate..."
+                          value={htmlContent}
+                          onChange={(e) => setHtmlContent(e.target.value)}
+                          rows={20}
+                          className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 font-mono text-sm"
+                        />
+                      </div>
+                    )}
+
+                    {/* Preview */}
+                    {showPreview && (
+                      <div className="bg-white rounded-lg p-6 min-h-[400px]">
+                        {htmlContent ? (
+                          <div 
+                            className="prose prose-sm max-w-none"
+                            dangerouslySetInnerHTML={{ __html: htmlContent }} 
+                          />
+                        ) : (
+                          <div className="text-center py-20 text-gray-400">
+                            <p className="text-xl mb-2">No content yet</p>
+                            <p className="text-sm">Click \"Edit HTML\" to add content or use the AI Writer</p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
