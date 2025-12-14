@@ -439,14 +439,16 @@ export default function NewCampaignPage() {
                 {templateType === 'custom' && (
                   <div className="space-y-4">
                     {/* Tab Toggle */}
-                    <div className="flex gap-2 border-b border-gray-700">
+                    <div className="flex gap-2 border-b border-gray-700 pb-2">
                       <button
+                        type="button"
                         onClick={() => setShowPreview(false)}
                         className={`px-4 py-2 font-medium transition ${!showPreview ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-white'}`}
                       >
                         Edit HTML
                       </button>
                       <button
+                        type="button"
                         onClick={() => setShowPreview(true)}
                         className={`px-4 py-2 font-medium transition ${showPreview ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-white'}`}
                       >
@@ -464,23 +466,42 @@ export default function NewCampaignPage() {
                           rows={20}
                           className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 font-mono text-sm"
                         />
+                        <p className="text-xs text-gray-400 mt-2">
+                          {htmlContent.length} characters
+                        </p>
                       </div>
                     )}
 
                     {/* Preview */}
                     {showPreview && (
-                      <div className="bg-white rounded-lg p-6 min-h-[400px]">
-                        {htmlContent ? (
-                          <div 
-                            className="prose prose-sm max-w-none"
-                            dangerouslySetInnerHTML={{ __html: htmlContent }} 
-                          />
-                        ) : (
-                          <div className="text-center py-20 text-gray-400">
-                            <p className="text-xl mb-2">No content yet</p>
-                            <p className="text-sm">Click \"Edit HTML\" to add content or use the AI Writer</p>
-                          </div>
-                        )}
+                      <div>
+                        <div className="bg-white rounded-lg p-8 min-h-[400px] overflow-auto border-4 border-gray-600">
+                          {htmlContent ? (
+                            <div 
+                              style={{ 
+                                fontFamily: 'Arial, sans-serif',
+                                lineHeight: '1.6',
+                                color: '#333'
+                              }}
+                              dangerouslySetInnerHTML={{ __html: htmlContent }} 
+                            />
+                          ) : (
+                            <div className="text-center py-20 text-gray-400">
+                              <div className="text-6xl mb-4">✨</div>
+                              <p className="text-xl mb-2 font-semibold">No content yet</p>
+                              <p className="text-sm">Click \"AI Writer\" to generate content or switch to \"Edit HTML\"</p>
+                            </div>
+                          )}
+                        </div>
+                        {/* Debug Info - Remove after testing */}
+                        <div className="mt-2 p-3 bg-gray-900 rounded text-xs text-gray-400 font-mono">
+                          <strong>Debug:</strong> Content length: {htmlContent.length} chars
+                          {htmlContent && (
+                            <div className="mt-2">
+                              First 200 chars: {htmlContent.substring(0, 200)}...
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

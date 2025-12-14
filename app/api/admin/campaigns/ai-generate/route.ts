@@ -90,12 +90,18 @@ Only respond with valid JSON, nothing else.`
     const claudeData = await claudeRes.json()
     const content = claudeData.content[0].text
 
+
     // Parse JSON response from Claude
     let emailContent
     try {
       // Remove markdown code blocks if present
       const cleanContent = content.replace(/```json\n?|\n?```/g, '').trim()
       emailContent = JSON.parse(cleanContent)
+      // ADD THIS LOGGING
+      console.log('📧 Generated email content:')
+      console.log('Subject:', emailContent.subject)
+      console.log('Body length:', emailContent.body?.length)
+      console.log('Body preview:', emailContent.body?.substring(0, 200))
     } catch (error) {
       console.error('Failed to parse Claude response:', content)
       return NextResponse.json({ error: 'Failed to parse AI response' }, { status: 500 })
