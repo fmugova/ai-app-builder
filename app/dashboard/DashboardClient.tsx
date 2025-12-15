@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import { DashboardMobileMenu } from '@/components/DashboardMobileMenu'
+import { signOut } from 'next-auth/react'
 
 // Lazy load heavy components
 const SimpleExportButton = dynamic(() => import('@/components/SimpleExportButton'), {
@@ -172,54 +174,36 @@ export default function DashboardClient({
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
       {/* Header */}
-      <header className={`${isDarkMode ? 'bg-gray-800 border-gray-700 bg-gray-800/95' : 'bg-white border-gray-200 bg-white/95'} border-b sticky top-0 z-50 backdrop-blur-sm`}>
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/" className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                  <span className="text-2xl">⚡</span>
-                </div>
-                <div>
-                  <h1 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>BuildFlow</h1>
-                  <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>AI App Builder</p>
-                </div>
-              </Link>
+      <header className="bg-gray-900 border-b border-gray-800 sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            {/* Logo */}
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold text-white">BuildFlow</h1>
             </div>
 
-            <div className="flex items-center gap-3">
-              <span className={`px-4 py-2 rounded-lg border-2 ${tierBadge.color} text-sm font-semibold`}>
-                {tierBadge.text}
-              </span>
-              {/* Contact Support Button */}
-              <button
-                onClick={() => router.push('/contact')}
+            {/* Top Action Buttons - Hide on mobile, show in menu */}
+            <div className="hidden lg:flex items-center gap-3">
+              <button className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition">
+                Enterprise
+              </button>
+              <button 
+                onClick={() => window.location.href = '/contact'}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
               >
-                📧 Contact Support
+                Contact Support
               </button>
-              {isAdmin && (
-                <button
-                  onClick={() => router.push('/admin')}
-                  className="hidden sm:flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl transition-all font-medium"
-                >
-                  <span>🛡️</span>
-                  <span>Admin</span>
-                </button>
-              )}
-              <button
-                onClick={() => setIsDarkMode(!isDarkMode)}
-                className="p-2 rounded-lg bg-gray-700 dark:bg-gray-700 hover:bg-gray-600 dark:hover:bg-gray-600 transition-colors"
-                title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-              >
-                {isDarkMode ? <SunIcon /> : <MoonIcon />}
-              </button>
-              <button
-                onClick={() => router.push('/api/auth/signout')}
+              <button 
+                onClick={() => signOut()}
                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition"
               >
                 Sign Out
               </button>
+            </div>
+
+            {/* Mobile Menu Toggle */}
+            <div className="lg:hidden">
+              <DashboardMobileMenu />
             </div>
           </div>
         </div>
@@ -417,7 +401,7 @@ export default function DashboardClient({
 
           {/* Projects Grid */}
           {filteredProjects.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {filteredProjects.map((project) => (
                 <div
                   key={project.id}
