@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import Link from 'next/link'
 import NewsletterForm from '@/components/NewsletterForm'
 import { Sparkles, Code, Zap, Shield, Users, ArrowRight } from 'lucide-react'
+import { MobileMenu } from '@/components/MobileMenu'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
@@ -94,32 +95,33 @@ export default function Home() {
 
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
         {/* Header */}
-        <header className="container mx-auto px-4 py-6">
-          <nav className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-8 h-8 text-purple-600" />
-              <span className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                BuildFlow
-              </span>
-            </div>
-            <div className="flex items-center gap-4">
-              <Link href="/pricing" className="text-gray-700 hover:text-purple-600 transition">
-                Pricing
-              </Link>
-              <Link href="/contact" className="text-gray-700 hover:text-purple-600 transition">
-                Contact
-              </Link>
-              <Link href="/auth/signin" className="text-gray-700 hover:text-purple-600 transition">
-                Sign In
-              </Link>
-              <Link 
-                href="/auth/signup"
-                className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-2 rounded-lg hover:from-purple-700 hover:to-blue-700 transition"
-              >
-                Get Started
-              </Link>
-            </div>
-          </nav>
+        <header className="flex justify-between items-center container mx-auto px-4 py-6">
+          <div className="flex items-center gap-4">
+            <Sparkles className="w-8 h-8 text-purple-600" />
+            <span className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+              BuildFlow
+            </span>
+          </div>
+          {/* Desktop buttons */}
+          <div className="hidden lg:flex gap-2">
+            <Link href="/pricing" className="text-gray-700 hover:text-purple-600 transition">
+              Pricing
+            </Link>
+            <Link href="/contact" className="text-gray-700 hover:text-purple-600 transition">
+              Contact
+            </Link>
+            <Link href="/auth/signin" className="text-gray-700 hover:text-purple-600 transition">
+              Sign In
+            </Link>
+            <Link 
+              href="/auth/signup"
+              className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-2 rounded-lg hover:from-purple-700 hover:to-blue-700 transition"
+            >
+              Get Started
+            </Link>
+          </div>
+          {/* Mobile menu */}
+          <MobileMenu />
         </header>
 
         {/* Hero Section */}

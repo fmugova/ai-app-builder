@@ -1,9 +1,16 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import Anthropic from "@anthropic-ai/sdk" // ✅ Import at the TOP
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import { checkRateLimit, rateLimits } from '@/lib/rateLimit'
+
+export const dynamic = 'force-dynamic'
+
 // Retry logic for Claude API with exponential backoff
-async function callClaudeWithRetry(messages: any[], maxRetries = 3) {
+async function callClaudeWithRetry(anthropic: Anthropic, messages: any[], maxRetries = 3) {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      // anthropic is imported at the top
-      // @ts-ignore
       const response = await anthropic.messages.create({
         model: "claude-sonnet-4-20250514",
         max_tokens: 4000,
@@ -13,31 +20,31 @@ async function callClaudeWithRetry(messages: any[], maxRetries = 3) {
     } catch (error: any) {
       const isOverloaded = error?.error?.type === 'overloaded_error';
       const isLastAttempt = attempt === maxRetries - 1;
+      
       if (isOverloaded && !isLastAttempt) {
         // Exponential backoff: 2s, 4s, 8s
         const delay = Math.pow(2, attempt + 1) * 1000;
+        console.log(`Claude overloaded, retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
       throw error;
     }
   }
+  throw new Error('Max retries exceeded');
 }
-export const dynamic = 'force-dynamic'
-
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
-import { checkRateLimit, rateLimits } from '@/lib/rateLimit'
 
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // Initialize Anthropic inside the route handler
+    const anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    });
 
     // Rate limiting - use user email for AI requests
     const rateLimitResult = checkRateLimit(`ai:${session.user.email}`, rateLimits.aiGeneration)
@@ -148,13 +155,20 @@ ${prompt}
 
 Generate ONLY the complete HTML code. No explanations, no markdown code blocks, just pure HTML starting with <!DOCTYPE html>.`
 
+    console.log('Calling Claude API...');
+    
     // Call Claude API with retry logic
-    const message = await callClaudeWithRetry([
-      {
-        role: 'user',
-        content: systemPrompt
-      }
-    ]);
+    const message = await callClaudeWithRetry(
+      anthropic,
+      [
+        {
+          role: 'user',
+          content: systemPrompt
+        }
+      ]
+    );
+
+    console.log('Claude API response received');
 
     // Extract code
     let code = '';
@@ -177,6 +191,8 @@ Generate ONLY the complete HTML code. No explanations, no markdown code blocks, 
       code = `<!DOCTYPE html>\n${code}`
     }
 
+    console.log('Code generated successfully, updating user stats...');
+
     // Increment usage
     await prisma.user.update({
       where: { id: user.id },
@@ -196,10 +212,14 @@ Generate ONLY the complete HTML code. No explanations, no markdown code blocks, 
       }
     })
 
+    console.log('Generation completed successfully');
+
     return NextResponse.json({ code })
     
   } catch (error: any) {
     console.error('Generate error:', error)
+    
+    // Handle overloaded errors
     if (error?.error?.type === 'overloaded_error') {
       return NextResponse.json(
         {
@@ -209,8 +229,18 @@ Generate ONLY the complete HTML code. No explanations, no markdown code blocks, 
         { status: 503 }
       );
     }
+    
+    // Handle API key errors
+    if (error?.status === 401) {
+      console.error('ANTHROPIC_API_KEY is invalid or missing');
+      return NextResponse.json(
+        { error: 'AI service configuration error. Please contact support.' },
+        { status: 500 }
+      );
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to generate code' },
+      { error: 'Failed to generate code', details: error.message },
       { status: 500 }
     );
   }
