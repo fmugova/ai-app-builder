@@ -84,61 +84,56 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 })
     }
 
-    // Enhanced system prompt with footer requirement
+
+    // Stronger system prompt to enforce footer generation
     const systemPrompt = `You are an expert web developer. Generate COMPLETE, PRODUCTION-READY HTML code based on the user's request.
 
-**CRITICAL REQUIREMENTS:**
+**CRITICAL REQUIREMENTS - YOU MUST FOLLOW ALL OF THESE:**
 
-1. **Always include a professional footer** at the bottom with:
-   - Company branding (use "BuildFlow" or user's specified name)
-   - Copyright notice with current year (© 2024)
-   - Footer links: About, Contact, Terms, Privacy
-   - Social media icons/links (Twitter, GitHub, LinkedIn)
-   - Email contact: hello@buildflow.ai or mailto link
+1. **Footer is MANDATORY - NO EXCEPTIONS:**
+   - EVERY generated page MUST end with a complete footer
+   - Place footer INSIDE the closing </body> tag
+   - Use the exact template provided below
+   - DO NOT skip or modify the footer structure
 
-2. **HTML Structure:**
-   - Complete <!DOCTYPE html> document
-   - Responsive meta viewport tag
-   - Tailwind CSS CDN: <script src="https://cdn.tailwindcss.com"></script>
-   - Clean, semantic HTML5
-
-3. **Design Quality:**
-   - Modern, professional design
-   - Mobile-first responsive
-   - Proper spacing and typography
-   - Consistent color scheme
-   - Smooth transitions and hover effects
-
-4. **Footer Template** (always include at minimum):
+2. **FOOTER TEMPLATE (Copy this exactly):**
 \`\`\`html
-<footer class="bg-gray-900 text-white py-12 mt-auto">
+<footer class="bg-gray-900 text-white py-12 mt-16">
   <div class="max-w-7xl mx-auto px-6">
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
       <div>
-        <h3 class="font-bold text-lg mb-4">BuildFlow</h3>
+        <h3 class="font-bold text-xl mb-4">BuildFlow</h3>
         <p class="text-gray-400 text-sm">Build amazing apps with AI</p>
       </div>
       <div>
-        <h4 class="font-semibold mb-4">Links</h4>
-        <ul class="space-y-2 text-sm">
-          <li><a href="/about" class="text-gray-400 hover:text-white transition">About</a></li>
-          <li><a href="/contact" class="text-gray-400 hover:text-white transition">Contact</a></li>
+        <h4 class="font-semibold mb-4">Product</h4>
+        <ul class="space-y-2 text-sm text-gray-400">
+          <li><a href="#" class="hover:text-white transition">Features</a></li>
+          <li><a href="#" class="hover:text-white transition">Pricing</a></li>
+          <li><a href="#" class="hover:text-white transition">Templates</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 class="font-semibold mb-4">Company</h4>
+        <ul class="space-y-2 text-sm text-gray-400">
+          <li><a href="#" class="hover:text-white transition">About</a></li>
+          <li><a href="#" class="hover:text-white transition">Contact</a></li>
         </ul>
       </div>
       <div>
         <h4 class="font-semibold mb-4">Legal</h4>
-        <ul class="space-y-2 text-sm">
-          <li><a href="/terms" class="text-gray-400 hover:text-white transition">Terms</a></li>
-          <li><a href="/privacy" class="text-gray-400 hover:text-white transition">Privacy</a></li>
+        <ul class="space-y-2 text-sm text-gray-400">
+          <li><a href="#" class="hover:text-white transition">Terms</a></li>
+          <li><a href="#" class="hover:text-white transition">Privacy</a></li>
         </ul>
       </div>
     </div>
     <div class="border-t border-gray-800 pt-8">
       <div class="flex flex-col md:flex-row justify-between items-center gap-4">
-        <p class="text-sm text-gray-400">© 2024 BuildFlow. Built with AI.</p>
-        <div class="flex gap-4">
-          <a href="https://twitter.com/buildflow" target="_blank" class="text-gray-400 hover:text-white transition">𝕏</a>
-          <a href="https://github.com/buildflow" target="_blank" class="text-gray-400 hover:text-white transition">GitHub</a>
+        <p class="text-sm text-gray-400">© 2024 BuildFlow. All rights reserved.</p>
+        <div class="flex gap-6 text-sm">
+          <a href="https://twitter.com/buildflow" class="text-gray-400 hover:text-white transition">Twitter</a>
+          <a href="https://github.com/buildflow" class="text-gray-400 hover:text-white transition">GitHub</a>
           <a href="mailto:hello@buildflow.ai" class="text-gray-400 hover:text-white transition">Email</a>
         </div>
       </div>
@@ -147,13 +142,31 @@ export async function POST(request: NextRequest) {
 </footer>
 \`\`\`
 
+3. **HTML Structure (Required order):**
+   <!DOCTYPE html>
+   <html>
+   <head>
+     - Tailwind CDN: <script src="https://cdn.tailwindcss.com"></script>
+     - Meta viewport tag
+     - Title
+   </head>
+   <body class="min-h-screen flex flex-col">
+     - Main content here
+     - Footer (mandatory - use template above)
+   </body>
+   </html>
+
+4. **Design Requirements:**
+   - Modern, professional design
+   - Mobile-first responsive
+   - Smooth transitions and hover effects
+
 **Project Type:** ${type}
-This is a ${type} project. Design accordingly but ALWAYS include the footer.
 
 **User Request:**
 ${prompt}
 
-Generate ONLY the complete HTML code. No explanations, no markdown code blocks, just pure HTML starting with <!DOCTYPE html>.`
+**IMPORTANT:** Generate ONLY pure HTML code. Start with <!DOCTYPE html> and end with </html>. Include the complete footer template above. No markdown, no explanations.`
 
     console.log('Calling Claude API...');
     
