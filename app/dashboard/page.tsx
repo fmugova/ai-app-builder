@@ -17,6 +17,8 @@ export default async function DashboardPage() {
     select: {
       id: true,
       name: true,
+      email: true,
+      role: true,
       generationsUsed: true,
       generationsLimit: true,
       stripeSubscriptionId: true,
@@ -27,18 +29,31 @@ export default async function DashboardPage() {
     redirect('/auth/signin')
   }
 
-  // Get actual project count
+  // Get projects
+  const projects = await prisma.project.findMany({
+    where: { userId: user.id },
+    orderBy: { updatedAt: 'desc' },
+    take: 12,
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      updatedAt: true,
+    }
+  })
+
   const projectCount = await prisma.project.count({
     where: { userId: user.id }
   })
 
-  const plan = user.stripeSubscriptionId ? 'Enterprise' : 'Free'
+  // Determine plan - Check role first (admin = enterprise), then subscription
+  const plan = user.role === 'admin' ? 'Enterprise' : (user.stripeSubscriptionId ? 'Pro' : 'Free')
   const generationsUsed = user.generationsUsed || 0
   const generationsLimit = user.generationsLimit || 10
 
   return (
     <div className="min-h-screen bg-gray-950">
-      {/* Single Header with Navigation */}
+      {/* Header */}
       <header className="bg-gray-900 border-b border-gray-800 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -70,7 +85,7 @@ export default async function DashboardPage() {
               <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
                 <span className="text-2xl">📁</span>
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="text-sm text-gray-400">Projects</p>
                 <p className="text-3xl font-bold text-white">{projectCount}/999</p>
               </div>
@@ -92,7 +107,7 @@ export default async function DashboardPage() {
               <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-pink-500 rounded-lg flex items-center justify-center">
                 <span className="text-2xl">✨</span>
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="text-sm text-gray-400">AI Generations</p>
                 <p className="text-3xl font-bold text-white">{generationsUsed}/{generationsLimit}</p>
               </div>
@@ -111,7 +126,7 @@ export default async function DashboardPage() {
           {/* Plan Card */}
           <div className="bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl p-6 border border-purple-500">
             <div className="flex items-center justify-between mb-4">
-              <div>
+              <div className="flex-1">
                 <p className="text-sm text-purple-200">Your Plan</p>
                 <p className="text-3xl font-bold text-white">{plan}</p>
               </div>
@@ -120,7 +135,7 @@ export default async function DashboardPage() {
             {plan === 'Free' && (
               <Link 
                 href="/pricing"
-                className="block w-full py-2 px-4 bg-white text-purple-600 rounded-lg font-medium text-center hover:bg-purple-50 transition"
+                className="block w-full py-2 px-4 bg-white text-purple-600 rounded-lg font-medium text-center hover:bg-purple-50 transition text-sm"
               >
                 Upgrade Now
               </Link>
@@ -180,30 +195,74 @@ export default async function DashboardPage() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-2xl font-bold text-white">Your Projects</h2>
-              <p className="text-gray-400">{projectCount} projects found</p>
+              <p className="text-gray-400 text-sm">{projectCount} projects found</p>
             </div>
             <Link 
               href="/builder"
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition flex items-center gap-2"
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition flex items-center gap-2 text-sm"
             >
               <span>✨</span>
               <span>New Project</span>
             </Link>
           </div>
 
-          {/* Search Bar */}
-          <div className="mb-6">
-            <input
-              type="text"
-              placeholder="Search projects..."
-              className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-            />
-          </div>
+          {/* Projects Grid */}
+          {projects.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl">📁</span>
+              </div>
+              <h3 className="text-xl font-semibold text-white mb-2">No projects yet</h3>
+              <p className="text-gray-400 mb-6">Create your first project to get started</p>
+              <Link 
+                href="/builder"
+                className="inline-block px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition"
+              >
+                Create Your First Project
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {projects.map((project) => (
+                <Link 
+                  key={project.id}
+                  href={`/projects/${project.id}`}
+                  className="bg-gray-800 rounded-lg p-5 hover:bg-gray-750 transition border border-gray-700 hover:border-purple-500 group"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <span className="text-lg">📱</span>
+                    </div>
+                    <span className="text-xs text-gray-500">
+                      {new Date(project.updatedAt).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric'
+                      })}
+                    </span>
+                  </div>
+                  <h3 className="text-base font-semibold text-white mb-2 group-hover:text-purple-400 transition truncate">
+                    {project.name}
+                  </h3>
+                  {project.description && (
+                    <p className="text-sm text-gray-400 line-clamp-2">
+                      {project.description}
+                    </p>
+                  )}
+                </Link>
+              ))}
+            </div>
+          )}
 
-          {/* Projects Grid - Will be loaded dynamically */}
-          <div className="text-center text-gray-400 py-8">
-            Loading projects...
-          </div>
+          {projectCount > 12 && (
+            <div className="mt-6 text-center">
+              <Link 
+                href="/projects"
+                className="inline-block px-6 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition"
+              >
+                View All Projects ({projectCount})
+              </Link>
+            </div>
+          )}
         </div>
       </main>
     </div>
