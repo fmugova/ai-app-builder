@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { signOut, useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { 
-  Menu, X, Home, FolderOpen, User, Mail, LogOut, Plus, CreditCard
+  Menu, X, Home, FolderOpen, User, Mail, LogOut, Plus, 
+  CreditCard, Shield
 } from 'lucide-react'
 
 interface NavigationProps {
@@ -14,9 +15,31 @@ interface NavigationProps {
 
 export function Navigation({ variant = 'dashboard' }: NavigationProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   const { data: session, status } = useSession()
   const pathname = usePathname()
   const router = useRouter()
+
+  useEffect(() => {
+    // Check if user is admin
+    const checkAdmin = async () => {
+      if (session?.user?.email) {
+        try {
+          const res = await fetch('/api/user/role')
+          if (res.ok) {
+            const data = await res.json()
+            setIsAdmin(data.role === 'admin')
+          }
+        } catch (error) {
+          console.error('Failed to check admin status:', error)
+        }
+      }
+    }
+    
+    if (status === 'authenticated') {
+      checkAdmin()
+    }
+  }, [session, status])
 
   const isActive = (path: string) => pathname === path
   const closeMenu = () => setIsOpen(false)
@@ -153,6 +176,21 @@ export function Navigation({ variant = 'dashboard' }: NavigationProps) {
         >
           Account
         </Link>
+        
+        {isAdmin && (
+          <Link 
+            href="/admin"
+            className={`px-4 py-2 rounded-lg transition flex items-center gap-2 ${
+              isActive('/admin') 
+                ? 'bg-yellow-600 text-white' 
+                : 'bg-yellow-600/20 text-yellow-400 hover:bg-yellow-600/30'
+            }`}
+          >
+            <Shield className="w-4 h-4" />
+            <span>Admin</span>
+          </Link>
+        )}
+
         <Link 
           href="/builder"
           className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition"
@@ -228,6 +266,20 @@ export function Navigation({ variant = 'dashboard' }: NavigationProps) {
                 <User className="w-5 h-5" />
                 <span>Account</span>
               </Link>
+
+              {isAdmin && (
+                <>
+                  <div className="my-4 border-t border-gray-700" />
+                  <Link 
+                    href="/admin"
+                    onClick={closeMenu}
+                    className="w-full flex items-center gap-3 p-3 rounded-lg bg-yellow-600/20 hover:bg-yellow-600/30 transition text-yellow-400"
+                  >
+                    <Shield className="w-5 h-5" />
+                    <span>Admin Panel</span>
+                  </Link>
+                </>
+              )}
 
               <div className="my-4 border-t border-gray-700" />
 
