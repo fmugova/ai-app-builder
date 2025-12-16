@@ -1,70 +1,44 @@
-
 import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
-import { authOptions } from '@/lib/auth'
-import DashboardClient from './DashboardClient'
 import Link from 'next/link'
 import { Navigation } from '@/components/Navigation'
 
-export const metadata = {
-  title: 'Dashboard - BuildFlow',
-  description: 'Manage your AI-powered projects',
-}
-
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
+  
   if (!session?.user?.email) {
     redirect('/auth/signin')
   }
 
-  const [user, projects] = await Promise.all([
-    prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        projectsThisMonth: true,
-        projectsLimit: true,
-        generationsUsed: true,
-        generationsLimit: true,
-        subscriptionTier: true,
-        subscriptionStatus: true,
-      },
-    }),
-    prisma.project.findMany({
-      where: { userId: session.user.id as string },
-      orderBy: { updatedAt: 'desc' },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        code: true,
-        type: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    }),
-  ])
+  const user = await prisma.user.findUnique({
+    where: { email: session.user.email },
+    select: {
+      id: true,
+      name: true,
+      generationsUsed: true,
+      generationsLimit: true,
+      stripeSubscriptionId: true,
+    }
+  })
 
   if (!user) {
     redirect('/auth/signin')
   }
 
-  const isAdmin = user.role === 'admin'
-  const stats = {
-    projectsThisMonth: user.projectsThisMonth,
-    projectsLimit: user.projectsLimit,
-    generationsUsed: user.generationsUsed,
-    generationsLimit: user.generationsLimit,
-    subscriptionTier: user.subscriptionTier,
-    subscriptionStatus: user.subscriptionStatus,
-  }
+  // Get actual project count
+  const projectCount = await prisma.project.count({
+    where: { userId: user.id }
+  })
+
+  const plan = user.stripeSubscriptionId ? 'Enterprise' : 'Free'
+  const generationsUsed = user.generationsUsed || 0
+  const generationsLimit = user.generationsLimit || 10
 
   return (
     <div className="min-h-screen bg-gray-950">
+      {/* Single Header with Navigation */}
       <header className="bg-gray-900 border-b border-gray-800 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -75,14 +49,163 @@ export default async function DashboardPage() {
           </div>
         </div>
       </header>
-      {/* Rest of dashboard content */}
-      <DashboardClient
-        initialProjects={JSON.parse(JSON.stringify(projects))}
-        stats={stats}
-        userName={user.name}
-        userEmail={user.email}
-        isAdmin={isAdmin}
-      />
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Section */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-white mb-2">
+            Welcome back, {user.name || 'there'}! 👋
+          </h1>
+          <p className="text-gray-400">
+            You have {projectCount} project{projectCount !== 1 ? 's' : ''} in your workspace.
+          </p>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {/* Projects Card */}
+          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
+                <span className="text-2xl">📁</span>
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Projects</p>
+                <p className="text-3xl font-bold text-white">{projectCount}/999</p>
+              </div>
+            </div>
+            <div className="w-full bg-gray-800 rounded-full h-2">
+              <div 
+                className="bg-gradient-to-r from-purple-500 to-blue-500 h-2 rounded-full transition-all"
+                style={{ width: `${Math.min((projectCount / 999) * 100, 100)}%` }}
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              {Math.round((projectCount / 999) * 100)}% used this month
+            </p>
+          </div>
+
+          {/* AI Generations Card */}
+          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-pink-500 rounded-lg flex items-center justify-center">
+                <span className="text-2xl">✨</span>
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">AI Generations</p>
+                <p className="text-3xl font-bold text-white">{generationsUsed}/{generationsLimit}</p>
+              </div>
+            </div>
+            <div className="w-full bg-gray-800 rounded-full h-2">
+              <div 
+                className="bg-gradient-to-r from-orange-500 to-pink-500 h-2 rounded-full transition-all"
+                style={{ width: `${Math.min((generationsUsed / generationsLimit) * 100, 100)}%` }}
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              {Math.round((generationsUsed / generationsLimit) * 100)}% used this month
+            </p>
+          </div>
+
+          {/* Plan Card */}
+          <div className="bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl p-6 border border-purple-500">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-sm text-purple-200">Your Plan</p>
+                <p className="text-3xl font-bold text-white">{plan}</p>
+              </div>
+              <span className="text-3xl">👑</span>
+            </div>
+            {plan === 'Free' && (
+              <Link 
+                href="/pricing"
+                className="block w-full py-2 px-4 bg-white text-purple-600 rounded-lg font-medium text-center hover:bg-purple-50 transition"
+              >
+                Upgrade Now
+              </Link>
+            )}
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <Link
+            href="/builder"
+            className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl p-6 hover:from-purple-700 hover:to-pink-700 transition group"
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-2xl">✨</span>
+              <h3 className="text-lg font-semibold text-white">New Project</h3>
+            </div>
+            <p className="text-sm text-purple-100">Create with AI</p>
+          </Link>
+
+          <Link
+            href="/builder?templates=true"
+            className="bg-gray-900 rounded-xl p-6 border border-gray-800 hover:border-purple-500 transition group"
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-2xl">📋</span>
+              <h3 className="text-lg font-semibold text-white group-hover:text-purple-400 transition">Templates</h3>
+            </div>
+            <p className="text-sm text-gray-400">6 ready to use</p>
+          </Link>
+
+          <Link
+            href="/tutorial"
+            className="bg-gray-900 rounded-xl p-6 border border-gray-800 hover:border-purple-500 transition group"
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-2xl">🎓</span>
+              <h3 className="text-lg font-semibold text-white group-hover:text-purple-400 transition">Tutorial</h3>
+            </div>
+            <p className="text-sm text-gray-400">Learn the basics</p>
+          </Link>
+
+          <Link
+            href="/contact"
+            className="bg-gray-900 rounded-xl p-6 border border-gray-800 hover:border-purple-500 transition group"
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-2xl">💬</span>
+              <h3 className="text-lg font-semibold text-white group-hover:text-purple-400 transition">Get Help</h3>
+            </div>
+            <p className="text-sm text-gray-400">Email support</p>
+          </Link>
+        </div>
+
+        {/* Projects Section */}
+        <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-white">Your Projects</h2>
+              <p className="text-gray-400">{projectCount} projects found</p>
+            </div>
+            <Link 
+              href="/builder"
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition flex items-center gap-2"
+            >
+              <span>✨</span>
+              <span>New Project</span>
+            </Link>
+          </div>
+
+          {/* Search Bar */}
+          <div className="mb-6">
+            <input
+              type="text"
+              placeholder="Search projects..."
+              className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+
+          {/* Projects Grid - Will be loaded dynamically */}
+          <div className="text-center text-gray-400 py-8">
+            Loading projects...
+          </div>
+        </div>
+      </main>
     </div>
   )
 }
