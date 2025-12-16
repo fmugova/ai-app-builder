@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import { Navigation } from '@/components/Navigation'
+import { ProjectCard } from '@/components/ProjectCard'
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
@@ -29,7 +30,6 @@ export default async function DashboardPage() {
     redirect('/auth/signin')
   }
 
-  // Get projects
   const projects = await prisma.project.findMany({
     where: { userId: user.id },
     orderBy: { updatedAt: 'desc' },
@@ -46,14 +46,12 @@ export default async function DashboardPage() {
     where: { userId: user.id }
   })
 
-  // Determine plan - Check role first (admin = enterprise), then subscription
   const plan = user.role === 'admin' ? 'Enterprise' : (user.stripeSubscriptionId ? 'Pro' : 'Free')
   const generationsUsed = user.generationsUsed || 0
   const generationsLimit = user.generationsLimit || 10
 
   return (
     <div className="min-h-screen bg-gray-950">
-      {/* Header */}
       <header className="bg-gray-900 border-b border-gray-800 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -65,9 +63,7 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">
             Welcome back, {user.name || 'there'}! 👋
@@ -79,7 +75,6 @@ export default async function DashboardPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Projects Card */}
           <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
@@ -101,7 +96,6 @@ export default async function DashboardPage() {
             </p>
           </div>
 
-          {/* AI Generations Card */}
           <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-pink-500 rounded-lg flex items-center justify-center">
@@ -123,7 +117,6 @@ export default async function DashboardPage() {
             </p>
           </div>
 
-          {/* Plan Card */}
           <div className="bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl p-6 border border-purple-500">
             <div className="flex items-center justify-between mb-4">
               <div className="flex-1">
@@ -197,16 +190,22 @@ export default async function DashboardPage() {
               <h2 className="text-2xl font-bold text-white">Your Projects</h2>
               <p className="text-gray-400 text-sm">{projectCount} projects found</p>
             </div>
-            <Link 
-              href="/builder"
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition flex items-center gap-2 text-sm"
-            >
-              <span>✨</span>
-              <span>New Project</span>
-            </Link>
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                placeholder="Search projects..."
+                className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <Link 
+                href="/builder"
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition flex items-center gap-2 text-sm whitespace-nowrap"
+              >
+                <span>✨</span>
+                <span>New Project</span>
+              </Link>
+            </div>
           </div>
 
-          {/* Projects Grid */}
           {projects.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -222,33 +221,9 @@ export default async function DashboardPage() {
               </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
               {projects.map((project) => (
-                <Link 
-                  key={project.id}
-                  href={`/projects/${project.id}`}
-                  className="bg-gray-800 rounded-lg p-5 hover:bg-gray-750 transition border border-gray-700 hover:border-purple-500 group"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <span className="text-lg">📱</span>
-                    </div>
-                    <span className="text-xs text-gray-500">
-                      {new Date(project.updatedAt).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric'
-                      })}
-                    </span>
-                  </div>
-                  <h3 className="text-base font-semibold text-white mb-2 group-hover:text-purple-400 transition truncate">
-                    {project.name}
-                  </h3>
-                  {project.description && (
-                    <p className="text-sm text-gray-400 line-clamp-2">
-                      {project.description}
-                    </p>
-                  )}
-                </Link>
+                <ProjectCard key={project.id} project={project} />
               ))}
             </div>
           )}
@@ -265,6 +240,21 @@ export default async function DashboardPage() {
           )}
         </div>
       </main>
+
+      {/* Tips Section - Bottom Left */}
+      <div className="fixed bottom-6 left-6 z-20 max-w-sm">
+        <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg p-4 shadow-xl">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">💡</span>
+            <div>
+              <h4 className="text-white font-semibold mb-1">Pro Tip</h4>
+              <p className="text-sm text-purple-100">
+                Use descriptive prompts for better results. Include details about colors, layout, and features you want.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

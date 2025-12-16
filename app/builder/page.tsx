@@ -6,8 +6,9 @@ import { toast, Toaster } from 'react-hot-toast'
 import { templates } from '@/lib/templates'
 import { analytics } from '@/lib/analytics'
 import { Loader2 } from 'lucide-react'
+import { EnhancedPromptInput } from '@/components/EnhancedPromptInput'
 
-// Sanitize function (unchanged)
+// Sanitize function
 function sanitizeForPreview(code: string): string {
   let sanitized = code
     .replace(/<a\s+[^>]*href=["']\/dashboard["'][^>]*>[\s\S]*?<\/a>/gi, '')
@@ -92,7 +93,6 @@ function sanitizeForPreview(code: string): string {
   return sanitized
 }
 
-// BuilderContent component
 function BuilderContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -102,6 +102,7 @@ function BuilderContent() {
   const [prompt, setPrompt] = useState('')
   const [generatedCode, setGeneratedCode] = useState('')
   const [generating, setGenerating] = useState(false)
+  const [generatingStep, setGeneratingStep] = useState(0)
   const [projectName, setProjectName] = useState('')
   const [projectDescription, setProjectDescription] = useState('')
   const [saving, setSaving] = useState(false)
@@ -109,142 +110,22 @@ function BuilderContent() {
   const [isLoadedProject, setIsLoadedProject] = useState(false)
   const [showReactWarning, setShowReactWarning] = useState(false)
 
-  // Chat state
-  const [chatOpen, setChatOpen] = useState(false)
-  const [chatMessage, setChatMessage] = useState('')
-  const [chatHistory, setChatHistory] = useState<Array<{role: string, content: string, files?: string[], urls?: string[]}>>([])
-  const [chatLoading, setChatLoading] = useState(false)
-
-  // ✨ NEW: File and URL uploads
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
-  const [uploadedUrls, setUploadedUrls] = useState<string[]>([])
-
-  // ✨ NEW: Handle file upload
-  const handleFileUpload = async (files: FileList) => {
-    const fileArray = Array.from(files)
-    const validFiles = fileArray.filter(file => {
-      const validTypes = ['.pdf', '.doc', '.docx', '.txt', '.md', '.png', '.jpg', '.jpeg']
-      const ext = '.' + file.name.split('.').pop()?.toLowerCase()
-      return validTypes.includes(ext)
-    })
-    
-    if (validFiles.length < fileArray.length) {
-      toast.error('Some files were skipped (unsupported format)')
+  // Animating generating text
+  useEffect(() => {
+    if (generating) {
+      const interval = setInterval(() => {
+        setGeneratingStep(prev => (prev + 1) % 4)
+      }, 500)
+      return () => clearInterval(interval)
     }
-    
-    setUploadedFiles(prev => [...prev, ...validFiles])
-    toast.success(`Added ${validFiles.length} file(s)`)
+  }, [generating])
+
+  const getGeneratingText = () => {
+    const dots = '.'.repeat(generatingStep)
+    const spaces = '\u00A0'.repeat(3 - generatingStep)
+    return `Generating${dots}${spaces}`
   }
 
-  // ✨ NEW: Add URL
-  const handleAddUrl = () => {
-    const url = window.prompt('Enter website URL to analyze:\n\nExample: https://example.com')
-    if (url) {
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        toast.error('Please enter a valid URL starting with http:// or https://')
-        return
-      }
-      setUploadedUrls(prev => [...prev, url])
-      toast.success('URL added! Include it in your next message.')
-    }
-  }
-
-  // ✨ NEW: Remove file
-  const removeFile = (index: number) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index))
-  }
-
-  // ✨ NEW: Remove URL
-  const removeUrl = (index: number) => {
-    setUploadedUrls(prev => prev.filter((_, i) => i !== index))
-  }
-
-  // ✨ UPDATED: Handle chat with file/URL support
-  const handleChat = async () => {
-    if (!chatMessage.trim() && uploadedFiles.length === 0 && uploadedUrls.length === 0) {
-      toast.error('Please enter a message or add files/URLs')
-      return
-    }
-
-    if (!generatedCode) {
-      toast.error('Generate some code first!')
-      return
-    }
-
-    setChatLoading(true)
-    
-    const currentMessage = chatMessage.trim() || 'Process uploaded files and URLs'
-    
-    const newHistory = [
-      ...chatHistory,
-      { 
-        role: 'user', 
-        content: currentMessage,
-        files: uploadedFiles.map(f => f.name),
-        urls: uploadedUrls
-      }
-    ]
-    setChatHistory(newHistory)
-    setChatMessage('')
-
-    try {
-      const formData = new FormData()
-      formData.append('message', currentMessage)
-      formData.append('currentCode', generatedCode)
-      formData.append('projectType', projectType)
-      formData.append('urls', JSON.stringify(uploadedUrls))
-      formData.append('conversationHistory', JSON.stringify(chatHistory))
-      
-      // Append files
-      uploadedFiles.forEach(file => {
-        formData.append('files', file)
-      })
-
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        body: formData
-      })
-
-      const data = await res.json()
-
-      if (res.ok && data.code) {
-        setGeneratedCode(data.code)
-        setChatHistory([
-          ...newHistory,
-          { 
-            role: 'assistant', 
-            content: data.message || '✅ Code updated successfully!' 
-          }
-        ])
-        toast.success('Code updated!')
-        
-        // Clear attachments
-        setUploadedFiles([])
-        setUploadedUrls([])
-      } else {
-        const errorMsg = data.error || 'Chat failed. Please try again.'
-        setChatHistory([
-          ...newHistory,
-          { role: 'assistant', content: `❌ ${errorMsg}` }
-        ])
-        toast.error(errorMsg)
-      }
-    } catch (err: any) {
-      console.error('❌ Chat error:', err)
-      setChatHistory([
-        ...newHistory,
-        { 
-          role: 'assistant', 
-          content: '❌ Failed to connect to AI assistant. Please check your connection and try again.' 
-        }
-      ])
-      toast.error('Connection failed: ' + err.message)
-    } finally {
-      setChatLoading(false)
-    }
-  }
-
-  // Load project on mount
   useEffect(() => {
     const projectId = searchParams.get('project')
     if (projectId) {
@@ -289,13 +170,17 @@ function BuilderContent() {
   }
 
   const handleGenerate = async () => {
-    if (!prompt.trim()) return
+    if (!prompt.trim()) {
+      toast.error('Please enter a prompt')
+      return
+    }
 
     setGenerating(true)
+    setGeneratingStep(0)
     setIsLoadedProject(false)
 
-    const maxClientRetries = 2;
-    let lastError = null;
+    const maxClientRetries = 2
+    
     for (let i = 0; i < maxClientRetries; i++) {
       try {
         const res = await fetch('/api/generate', {
@@ -307,26 +192,27 @@ function BuilderContent() {
           })
         })
 
-        const data = await res.json();
+        const data = await res.json()
 
         if (res.status === 503 && data.retryable && i < maxClientRetries - 1) {
-          await new Promise(r => setTimeout(r, 3000));
-          continue;
+          toast('Claude is busy, retrying...', { icon: '⏳' })
+          await new Promise(r => setTimeout(r, 3000))
+          continue
         }
 
         if (res.ok) {
           setGeneratedCode(data.code)
           analytics.aiGeneration(true, projectType)
+          toast.success('Code generated successfully!')
         } else {
           analytics.aiGeneration(false, projectType)
-          alert(data.error || 'Failed to generate')
+          toast.error(data.error || 'Failed to generate')
         }
-        break;
+        break
       } catch (err) {
-        lastError = err;
         analytics.aiGeneration(false, projectType)
         if (i === maxClientRetries - 1) {
-          alert('Generation failed')
+          toast.error('Generation failed. Please try again.')
         }
       } finally {
         setGenerating(false)
@@ -336,7 +222,7 @@ function BuilderContent() {
 
   const handleSave = async () => {
     if (!projectName.trim() || !generatedCode) {
-      alert('Please enter project name and generate code')
+      toast.error('Please enter project name and generate code')
       return
     }
 
@@ -365,13 +251,13 @@ function BuilderContent() {
         if (!currentProjectId) {
           analytics.projectCreated(projectType)
         }
-        alert('Saved successfully!')
+        toast.success('Saved successfully!')
         router.push('/dashboard')
       } else {
-        alert('Save failed')
+        toast.error('Save failed')
       }
     } catch (err) {
-      alert('Save failed')
+      toast.error('Save failed')
     } finally {
       setSaving(false)
     }
@@ -390,7 +276,6 @@ function BuilderContent() {
     URL.revokeObjectURL(url)
   }
 
-  // React Warning Screen
   if (showReactWarning) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -445,7 +330,6 @@ function BuilderContent() {
     )
   }
 
-  // Project Type Selection Screen
   if (step === 'select-type') {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -526,10 +410,8 @@ function BuilderContent() {
     )
   }
 
-  // Build Screen
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
@@ -549,7 +431,6 @@ function BuilderContent() {
                       toast.success('Code copied to clipboard!')
                     }}
                     className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 text-sm"
-                    title="Copy Code"
                   >
                     📋 Copy
                   </button>
@@ -557,7 +438,6 @@ function BuilderContent() {
                   <button
                     onClick={downloadCode}
                     className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 text-sm"
-                    title="Download HTML"
                   >
                     💾 Download
                   </button>
@@ -566,7 +446,6 @@ function BuilderContent() {
                     <button
                       onClick={() => window.open(`/preview/${currentProjectId}`, '_blank')}
                       className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm"
-                      title="Open Preview"
                     >
                       👁️ Preview
                     </button>
@@ -586,10 +465,8 @@ function BuilderContent() {
         </div>
       </header>
 
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Input Panel */}
           <div className="space-y-6">
             <div className="bg-white rounded-xl shadow-sm border p-6">
               <h2 className="text-2xl font-bold mb-4">
@@ -605,6 +482,7 @@ function BuilderContent() {
                     onChange={(e) => setProjectName(e.target.value)}
                     placeholder="My Awesome Project"
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                    disabled={generating}
                   />
                 </div>
 
@@ -614,34 +492,52 @@ function BuilderContent() {
                     value={projectDescription}
                     onChange={(e) => setProjectDescription(e.target.value)}
                     placeholder="Describe your project..."
-                    rows={3}
+                    rows={2}
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                    disabled={generating}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2">What to build? *</label>
-                  <textarea
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Describe what you want to create..."
-                    rows={6}
+                  <label className="block text-sm font-medium mb-2">Project Type</label>
+                  <select
+                    value={projectType}
+                    onChange={(e) => setProjectType(e.target.value)}
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
-                  />
+                    disabled={generating}
+                  >
+                    <option value="landing">Landing Page</option>
+                    <option value="webapp">Web App</option>
+                    <option value="dashboard">Dashboard</option>
+                    <option value="portfolio">Portfolio</option>
+                    <option value="blog">Blog</option>
+                  </select>
                 </div>
 
-                <button
-                  onClick={handleGenerate}
-                  disabled={generating || !prompt.trim()}
-                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 disabled:opacity-50"
-                >
-                  {generating ? '✨ Generating...' : '✨ Generate with AI'}
-                </button>
+                <EnhancedPromptInput
+                  value={prompt}
+                  onChange={setPrompt}
+                  onGenerate={handleGenerate}
+                  isGenerating={generating}
+                />
+
+                {generating && (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="text-center">
+                      <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                      <p className="text-gray-900 text-lg font-medium">
+                        {getGeneratingText()}
+                      </p>
+                      <p className="text-gray-500 text-sm mt-2">
+                        This may take 10-30 seconds
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Preview Panel */}
           <div className="space-y-6">
             {isLoadedProject ? (
               <div className="bg-white rounded-xl shadow-sm border p-6">
@@ -750,199 +646,12 @@ function BuilderContent() {
           </div>
         </div>
       </div>
-
-      {/* Floating Chat Button */}
-      <button
-        onClick={() => setChatOpen(!chatOpen)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full shadow-2xl hover:scale-110 transition-transform z-50 flex items-center justify-center"
-        title="AI Chat Assistant"
-      >
-        {chatOpen ? '✕' : '💬'}
-      </button>
-
-      {/* Chat Panel */}
-      {chatOpen && (
-        <div className="fixed bottom-24 right-6 w-96 h-[600px] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col z-50 overflow-hidden">
-          {/* Chat Header */}
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">🤖</span>
-              <div>
-                <h3 className="font-bold">AI Assistant</h3>
-                <p className="text-xs text-purple-100">Upload files, add URLs, ask anything!</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setChatOpen(false)}
-              className="text-white hover:bg-white/20 rounded-lg p-2 transition"
-            >
-              ✕
-            </button>
-          </div>
-
-          {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
-            {chatHistory.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">
-                <div className="text-4xl mb-2">👋</div>
-                <p className="text-sm">Start a conversation!</p>
-                <p className="text-xs mt-2">Try: "Add a navigation bar" or upload a website for inspiration</p>
-              </div>
-            ) : (
-              chatHistory.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-2 ${
-                      msg.role === 'user'
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-white text-gray-800 border border-gray-200'
-                    }`}
-                  >
-                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                    
-                    {/* Show attached files */}
-                    {msg.files && msg.files.length > 0 && (
-                      <div className="mt-2 space-y-1">
-                        {msg.files.map((fileName, idx) => (
-                          <div key={idx} className="text-xs opacity-75 flex items-center gap-1">
-                            <span>📄</span>
-                            <span>{fileName}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    
-                    {/* Show attached URLs */}
-                    {msg.urls && msg.urls.length > 0 && (
-                      <div className="mt-2 space-y-1">
-                        {msg.urls.map((url, idx) => (
-                          <div key={idx} className="text-xs opacity-75 flex items-center gap-1">
-                            <span>🔗</span>
-                            <span className="truncate">{url}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-            
-            {chatLoading && (
-              <div className="flex justify-start">
-                <div className="bg-white border border-gray-200 rounded-2xl px-4 py-2">
-                  <div className="flex items-center gap-2 text-gray-500">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div>
-                    <span className="text-sm">AI is thinking...</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Chat Input */}
-          <div className="border-t border-gray-200 p-4 bg-white">
-            {/* Attachments Display */}
-            {(uploadedFiles.length > 0 || uploadedUrls.length > 0) && (
-              <div className="mb-3 max-h-24 overflow-y-auto space-y-2">
-                {/* Files */}
-                {uploadedFiles.map((file, index) => (
-                  <div
-                    key={`file-${index}`}
-                    className="flex items-center justify-between px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg text-sm"
-                  >
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <span>📄</span>
-                      <span className="text-gray-800 truncate">{file.name}</span>
-                    </div>
-                    <button
-                      onClick={() => removeFile(index)}
-                      className="text-red-600 hover:text-red-700 ml-2 flex-shrink-0"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-                
-                {/* URLs */}
-                {uploadedUrls.map((url, index) => (
-                  <div
-                    key={`url-${index}`}
-                    className="flex items-center justify-between px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm"
-                  >
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <span>🔗</span>
-                      <span className="text-gray-800 truncate">{url}</span>
-                    </div>
-                    <button
-                      onClick={() => removeUrl(index)}
-                      className="text-red-600 hover:text-red-700 ml-2 flex-shrink-0"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Upload Buttons */}
-            <div className="flex gap-2 mb-2">
-              <label className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg cursor-pointer transition flex items-center gap-2 text-sm">
-                <span>📎</span>
-                <span>Files</span>
-                <input
-                  type="file"
-                  multiple
-                  accept=".pdf,.doc,.docx,.txt,.md,.png,.jpg,.jpeg"
-                  onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
-                  className="hidden"
-                />
-              </label>
-
-              <button
-                onClick={handleAddUrl}
-                className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition flex items-center gap-2 text-sm"
-              >
-                <span>🔗</span>
-                <span>URL</span>
-              </button>
-            </div>
-
-            {/* Message Input */}
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={chatMessage}
-                onChange={(e) => setChatMessage(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && !chatLoading && handleChat()}
-                placeholder="Ask AI or upload inspiration..."
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                disabled={chatLoading}
-              />
-              <button
-                onClick={handleChat}
-                disabled={chatLoading || (!chatMessage.trim() && uploadedFiles.length === 0 && uploadedUrls.length === 0)}
-                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {chatLoading ? '⏳' : '➤'}
-              </button>
-            </div>
-            <p className="text-xs text-gray-500 mt-2 text-center">
-              💡 Upload docs, paste URLs, or chat normally
-            </p>
-          </div>
-        </div>
-      )}
       
       <Toaster position="top-right" />
     </div>
   )
 }
 
-// Main component with Suspense wrapper
 export default function Builder() {
   return (
     <Suspense fallback={
