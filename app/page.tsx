@@ -5,6 +5,7 @@ import NewsletterForm from '@/components/NewsletterForm'
 import { Sparkles, Code, Zap, Shield, Users, ArrowRight } from 'lucide-react'
 import { MobileMenu } from '@/components/MobileMenu'
 import type { Metadata } from 'next'
+import { Navigation } from '@/components/Navigation'
 
 export const metadata: Metadata = {
   title: 'Dashboard',
@@ -40,7 +41,7 @@ export const metadata: Metadata = {
   },
 }
 
-export default function Home() {
+export default function LandingPage() {
   // ✅ JSON-LD Structured Data for SEO
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -93,161 +94,64 @@ export default function Home() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
+      <div className="min-h-screen bg-gray-950">
         {/* Header */}
-        <header className="flex justify-between items-center container mx-auto px-4 py-6">
-          <div className="flex items-center gap-4">
-            <Sparkles className="w-8 h-8 text-purple-600" />
-            <span className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-              BuildFlow
-            </span>
+        <header className="bg-gray-900 border-b border-gray-800 sticky top-0 z-30">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-16">
+              <h1 className="text-xl font-bold text-white">BuildFlow</h1>
+              <Navigation variant="landing" />
+            </div>
           </div>
-          {/* Desktop buttons */}
-          <div className="hidden lg:flex gap-2">
-            <Link href="/pricing" className="text-gray-700 hover:text-purple-600 transition">
-              Pricing
-            </Link>
-            <Link href="/contact" className="text-gray-700 hover:text-purple-600 transition">
-              Contact
-            </Link>
-            <Link href="/auth/signin" className="text-gray-700 hover:text-purple-600 transition">
-              Sign In
-            </Link>
-            <Link 
-              href="/auth/signup"
-              className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-2 rounded-lg hover:from-purple-700 hover:to-blue-700 transition"
-            >
-              Get Started
-            </Link>
-          </div>
-          {/* Mobile menu */}
-          <MobileMenu />
         </header>
 
-        {/* Hero Section */}
-        <section className="container mx-auto px-4 py-20 text-center">
-          <h1 className="text-6xl font-bold text-gray-900 mb-6">
-            Build Beautiful Apps with{' '}
-            <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-              AI Power
-            </span>
-          </h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            Describe your vision, get production-ready code instantly. No coding required.
-            Create landing pages, web apps, dashboards, and more in seconds.
-          </p>
-          <div className="flex gap-4 justify-center">
-            <Link 
-              href="/auth/signup"
-              className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition flex items-center gap-2"
-            >
-              Start Building Free
-              <ArrowRight className="w-5 h-5" />
-            </Link>
-            <Link 
-              href="/pricing"
-              className="bg-white text-gray-800 px-8 py-4 rounded-lg text-lg font-semibold border-2 border-gray-300 hover:border-purple-600 transition"
-            >
-              View Pricing
-            </Link>
-          </div>
-          <p className="text-sm text-gray-500 mt-4">
-            Free tier includes 3 generations per month. No credit card required.
-          </p>
-        </section>
+        {/* Main content */}
+        <main>
+          {/* Your landing page content */}
+        </main>
 
-        {/* Features Section */}
-        <section className="container mx-auto px-4 py-20">
-          <h2 className="text-4xl font-bold text-center text-gray-900 mb-12">
-            Everything You Need to Build Faster
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-white p-8 rounded-xl shadow-lg">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                <Sparkles className="w-6 h-6 text-purple-600" />
+        {/* Footer - Add this */}
+        <footer className="bg-gray-900 text-white py-12 mt-16 border-t border-gray-800">
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+              <div>
+                <h3 className="font-bold text-xl mb-4">BuildFlow</h3>
+                <p className="text-gray-400 text-sm">Build amazing apps with AI</p>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">AI-Powered Generation</h3>
-              <p className="text-gray-600">
-                Advanced AI creates beautiful, functional code from your descriptions. Get production-ready components instantly.
-              </p>
+              <div>
+                <h4 className="font-semibold mb-4">Product</h4>
+                <ul className="space-y-2 text-sm text-gray-400">
+                  <li><a href="/pricing" className="hover:text-white transition">Pricing</a></li>
+                  <li><a href="/builder" className="hover:text-white transition">Builder</a></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-4">Company</h4>
+                <ul className="space-y-2 text-sm text-gray-400">
+                  <li><a href="/about" className="hover:text-white transition">About</a></li>
+                  <li><a href="/contact" className="hover:text-white transition">Contact</a></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-4">Legal</h4>
+                <ul className="space-y-2 text-sm text-gray-400">
+                  <li><a href="/terms" className="hover:text-white transition">Terms</a></li>
+                  <li><a href="/privacy" className="hover:text-white transition">Privacy</a></li>
+                </ul>
+              </div>
             </div>
-
-            <div className="bg-white p-8 rounded-xl shadow-lg">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
-                <Zap className="w-6 h-6 text-blue-600" />
+            <div className="border-t border-gray-800 pt-8">
+              <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                <p className="text-sm text-gray-400">© 2024 BuildFlow. All rights reserved.</p>
+                <div className="flex gap-6 text-sm">
+                  <a href="https://twitter.com/buildflow" className="text-gray-400 hover:text-white transition">Twitter</a>
+                  <a href="https://github.com/buildflow" className="text-gray-400 hover:text-white transition">GitHub</a>
+                  <a href="mailto:hello@buildflow.ai" className="text-gray-400 hover:text-white transition">Email</a>
+                </div>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Instant Refinements</h3>
-              <p className="text-gray-600">
-                Chat with AI to modify your code. Add features, change colors, or adjust layouts with simple requests.
-              </p>
-            </div>
-
-            <div className="bg-white p-8 rounded-xl shadow-lg">
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
-                <Code className="w-6 h-6 text-green-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Clean, Modern Code</h3>
-              <p className="text-gray-600">
-                Get React components with Tailwind CSS. Export and use anywhere. Fully customizable and maintainable.
-              </p>
-            </div>
-
-            <div className="bg-white p-8 rounded-xl shadow-lg">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                <Shield className="w-6 h-6 text-purple-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Save & Organize</h3>
-              <p className="text-gray-600">
-                Save unlimited projects. Access your creations anytime. Build a library of reusable components.
-              </p>
-            </div>
-
-            <div className="bg-white p-8 rounded-xl shadow-lg">
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mb-4">
-                <Users className="w-6 h-6 text-yellow-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Templates Library</h3>
-              <p className="text-gray-600">
-                Start with professional templates. SaaS pages, dashboards, portfolios, and more. Customize to your needs.
-              </p>
-            </div>
-
-            <div className="bg-white p-8 rounded-xl shadow-lg">
-              <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center mb-4">
-                <Sparkles className="w-6 h-6 text-red-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Export Anywhere</h3>
-              <p className="text-gray-600">
-                Download your code and deploy to Vercel, Netlify, or anywhere. You own everything you create.
-              </p>
             </div>
           </div>
-        </section>
-
-        {/* CTA Section */}
-        <section className="container mx-auto px-4 py-20">
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-12 text-center text-white">
-            <h2 className="text-4xl font-bold mb-4">Ready to Build Something Amazing?</h2>
-            <p className="text-xl mb-8 opacity-90">
-              Join thousands of developers building faster with AI
-            </p>
-            <Link 
-              href="/auth/signup"
-              className="inline-block bg-white text-purple-600 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-gray-100 transition"
-            >
-              Start Building for Free
-            </Link>
-          </div>
-        </section>
-
-        {/* Newsletter Signup Section */}
-        <section className="py-20 px-6 bg-gray-900">
-          <div className="max-w-6xl mx-auto">
-            <NewsletterForm />
-          </div>
-        </section>
-
-        {/* DO NOT include footer here - it's in layout.tsx */}
+        </footer>
       </div>
     </>
   )

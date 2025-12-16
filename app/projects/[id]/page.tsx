@@ -13,7 +13,7 @@ interface Project {
   createdAt: string
   updatedAt: string
   userId: string
-  user: {
+  User: {
     name: string | null
     email: string
   }
@@ -100,7 +100,7 @@ export default function ProjectViewPage() {
               <div>
                 <h1 className="text-2xl font-bold text-white">{project.name}</h1>
                 <p className="text-sm text-gray-400">
-                  By {project.user?.name || project.user?.email || 'Unknown User'}
+                  By {project.User?.name || project.User?.email || 'Unknown User'}
                 </p>
               </div>
             </div>
@@ -129,7 +129,7 @@ export default function ProjectViewPage() {
             </div>
             <div>
               <p className="text-sm text-gray-400">Owner</p>
-              <p className="font-medium">{project.user?.email || 'Unknown'}</p>
+              <p className="font-medium">{project.User?.email || 'Unknown'}</p>
             </div>
             <div>
               <p className="text-sm text-gray-400">Project ID</p>

@@ -1,8 +1,11 @@
+
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import DashboardClient from './DashboardClient'
+import Link from 'next/link'
+import { Navigation } from '@/components/Navigation'
 
 export const metadata = {
   title: 'Dashboard - BuildFlow',
@@ -11,7 +14,6 @@ export const metadata = {
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
-  
   if (!session?.user?.email) {
     redirect('/auth/signin')
   }
@@ -32,7 +34,6 @@ export default async function DashboardPage() {
         subscriptionStatus: true,
       },
     }),
-    
     prisma.project.findMany({
       where: { userId: session.user.id as string },
       orderBy: { updatedAt: 'desc' },
@@ -53,7 +54,6 @@ export default async function DashboardPage() {
   }
 
   const isAdmin = user.role === 'admin'
-
   const stats = {
     projectsThisMonth: user.projectsThisMonth,
     projectsLimit: user.projectsLimit,
@@ -64,12 +64,25 @@ export default async function DashboardPage() {
   }
 
   return (
-    <DashboardClient
-      initialProjects={JSON.parse(JSON.stringify(projects))}
-      stats={stats}
-      userName={user.name}
-      userEmail={user.email}
-      isAdmin={isAdmin}
-    />
+    <div className="min-h-screen bg-gray-950">
+      <header className="bg-gray-900 border-b border-gray-800 sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <Link href="/dashboard" className="text-xl font-bold text-white">
+              BuildFlow
+            </Link>
+            <Navigation variant="dashboard" />
+          </div>
+        </div>
+      </header>
+      {/* Rest of dashboard content */}
+      <DashboardClient
+        initialProjects={JSON.parse(JSON.stringify(projects))}
+        stats={stats}
+        userName={user.name}
+        userEmail={user.email}
+        isAdmin={isAdmin}
+      />
+    </div>
   )
 }
