@@ -1,4 +1,5 @@
 import { Navigation } from '@/components/Navigation'
+import NewsletterSubscribeForm from '@/components/NewsletterSubscribeForm'
 import Link from 'next/link'
 
 export default function LandingPage() {
@@ -127,21 +128,7 @@ export default function LandingPage() {
             <p className="text-purple-100 mb-8">
               Get the latest features, tips, and updates delivered to your inbox
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 max-w-2xl mx-auto">
-              <input
-                type="text"
-                placeholder="Your name (optional)"
-                className="flex-1 px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-white"
-              />
-              <input
-                type="email"
-                placeholder="Your email address"
-                className="flex-1 px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-white"
-              />
-              <button className="px-8 py-3 bg-white text-purple-600 hover:bg-gray-100 rounded-lg font-semibold transition">
-                Subscribe
-              </button>
-            </div>
+            <NewsletterSubscribeForm />
             <p className="text-sm text-purple-200 mt-4">
               No spam. Unsubscribe anytime. We respect your privacy.
             </p>
