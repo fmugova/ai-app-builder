@@ -85,88 +85,79 @@ export async function POST(request: NextRequest) {
     }
 
 
-    // Stronger system prompt to enforce footer generation
-    const systemPrompt = `You are an expert web developer. Generate COMPLETE, PRODUCTION-READY HTML code based on the user's request.
+    const systemPrompt = `You are an expert web developer creating production-ready HTML pages with Tailwind CSS.
 
-**CRITICAL REQUIREMENTS - YOU MUST FOLLOW ALL OF THESE:**
+CRITICAL REQUIREMENTS:
+1. Generate COMPLETE, SINGLE-FILE HTML with ALL content in ONE file
+2. Use Tailwind CSS via CDN: <script src="https://cdn.tailwindcss.com"></script>
+3. Make it fully responsive (mobile, tablet, desktop)
+4. Include modern design with gradients, shadows, and animations
+5. Add meta tags for SEO and viewport
+6. ALWAYS include a professional footer at the bottom with:
+   - Multiple columns (4 columns on desktop, stack on mobile)
+   - Company info, links, social media icons
+   - Copyright notice
+   - Dark background (bg-gray-900 or similar)
+   - Links that work (use # for demo)
+7. Use semantic HTML5 elements
+8. Include hover effects and transitions
+9. Make all interactive elements functional with JavaScript if needed
+10. Ensure high contrast for accessibility
 
-1. **Footer is MANDATORY - NO EXCEPTIONS:**
-   - EVERY generated page MUST end with a complete footer
-   - Place footer INSIDE the closing </body> tag
-   - Use the exact template provided below
-   - DO NOT skip or modify the footer structure
+Project type: ${type}
 
-2. **FOOTER TEMPLATE (Copy this exactly):**
-\`\`\`html
-<footer class="bg-gray-900 text-white py-12 mt-16">
+OUTPUT FORMAT:
+- Return ONLY the complete HTML code
+- NO explanations, NO markdown, NO code fences
+- Start with <!DOCTYPE html>
+- Include EVERYTHING in one file (CSS in <style>, JS in <script>)
+
+FOOTER TEMPLATE (ALWAYS include this at the end of <body>):
+<footer class="bg-gray-900 text-white py-12 mt-16 border-t border-gray-800">
   <div class="max-w-7xl mx-auto px-6">
     <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
       <div>
-        <h3 class="font-bold text-xl mb-4">BuildFlow</h3>
-        <p class="text-gray-400 text-sm">Build amazing apps with AI</p>
+        <h3 class="font-bold text-xl mb-4">Brand Name</h3>
+        <p class="text-gray-400 text-sm">Your tagline here</p>
       </div>
       <div>
         <h4 class="font-semibold mb-4">Product</h4>
         <ul class="space-y-2 text-sm text-gray-400">
           <li><a href="#" class="hover:text-white transition">Features</a></li>
           <li><a href="#" class="hover:text-white transition">Pricing</a></li>
-          <li><a href="#" class="hover:text-white transition">Templates</a></li>
+          <li><a href="#" class="hover:text-white transition">Docs</a></li>
         </ul>
       </div>
       <div>
         <h4 class="font-semibold mb-4">Company</h4>
         <ul class="space-y-2 text-sm text-gray-400">
           <li><a href="#" class="hover:text-white transition">About</a></li>
+          <li><a href="#" class="hover:text-white transition">Blog</a></li>
           <li><a href="#" class="hover:text-white transition">Contact</a></li>
         </ul>
       </div>
       <div>
         <h4 class="font-semibold mb-4">Legal</h4>
         <ul class="space-y-2 text-sm text-gray-400">
-          <li><a href="#" class="hover:text-white transition">Terms</a></li>
           <li><a href="#" class="hover:text-white transition">Privacy</a></li>
+          <li><a href="#" class="hover:text-white transition">Terms</a></li>
         </ul>
       </div>
     </div>
     <div class="border-t border-gray-800 pt-8">
       <div class="flex flex-col md:flex-row justify-between items-center gap-4">
-        <p class="text-sm text-gray-400">© 2024 BuildFlow. All rights reserved.</p>
+        <p class="text-sm text-gray-400">© 2024 Company Name. All rights reserved.</p>
         <div class="flex gap-6 text-sm">
-          <a href="https://twitter.com/buildflow" class="text-gray-400 hover:text-white transition">Twitter</a>
-          <a href="https://github.com/buildflow" class="text-gray-400 hover:text-white transition">GitHub</a>
-          <a href="mailto:hello@buildflow.ai" class="text-gray-400 hover:text-white transition">Email</a>
+          <a href="#" class="text-gray-400 hover:text-white transition">Twitter</a>
+          <a href="#" class="text-gray-400 hover:text-white transition">GitHub</a>
+          <a href="#" class="text-gray-400 hover:text-white transition">LinkedIn</a>
         </div>
       </div>
     </div>
   </div>
 </footer>
-\`\`\`
 
-3. **HTML Structure (Required order):**
-   <!DOCTYPE html>
-   <html>
-   <head>
-     - Tailwind CDN: <script src="https://cdn.tailwindcss.com"></script>
-     - Meta viewport tag
-     - Title
-   </head>
-   <body class="min-h-screen flex flex-col">
-     - Main content here
-     - Footer (mandatory - use template above)
-   </body>
-   </html>
-
-4. **Design Requirements:**
-   - Modern, professional design
-   - Mobile-first responsive
-   - Smooth transitions and hover effects
-
-**Project Type:** ${type}
-
-**User Request:**
-${prompt}
-
-**IMPORTANT:** Generate ONLY pure HTML code. Start with <!DOCTYPE html> and end with </html>. Include the complete footer template above. No markdown, no explanations.`
+Remember: ALWAYS include a footer. Every page needs one.`
 
     console.log('Calling Claude API...');
     

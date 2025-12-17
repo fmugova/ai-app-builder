@@ -117,6 +117,8 @@ export function ProjectCard({ project }: ProjectCardProps) {
           </Link>
           <Link
             href={`/preview/${project.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
             className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm"
           >
             <Eye className="w-4 h-4" />

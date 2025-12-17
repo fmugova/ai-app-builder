@@ -1,3 +1,19 @@
+// Sanitize and wrap preview HTML to ensure all links open in a new tab
+function sanitizeForPreview(code: string): string {
+  let sanitized = code || '';
+
+  // If not a full HTML doc, wrap it
+  if (!sanitized.includes('<html') && !sanitized.includes('<!DOCTYPE')) {
+    return `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <base target=\"_blank\">\n  <title>Preview</title>\n  <script src=\"https://cdn.tailwindcss.com\"></script>\n  <style>body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }</style>\n</head>\n<body>\n  ${sanitized.trim()}\n</body>\n</html>`;
+  }
+
+  // If <head> exists, inject <base target="_blank">
+  if (sanitized.includes('<head>')) {
+    return sanitized.replace('<head>', '<head>\n  <base target="_blank">');
+  }
+
+  return sanitized;
+}
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -356,7 +372,7 @@ export default function PreviewPage() {
               }}
             >
               <iframe
-                srcDoc={project.code}
+                srcDoc={sanitizeForPreview(project.code)}
                 className="w-full h-full rounded-lg"
                 title="Preview"
                 sandbox="allow-scripts allow-same-origin"

@@ -444,7 +444,7 @@ function BuilderContent() {
                   
                   {currentProjectId && (
                     <button
-                      onClick={() => window.open(`/preview/${currentProjectId}`, '_blank')}
+                      onClick={() => window.open(`/preview/${currentProjectId}`, '_blank', 'noopener,noreferrer')}
                       className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm"
                     >
                       👁️ Preview
@@ -547,7 +547,7 @@ function BuilderContent() {
                   <h4 className="text-lg font-semibold mb-2">Project Loaded</h4>
                   <p className="text-gray-600 mb-6">Click below to open preview in new tab</p>
                   <button
-                    onClick={() => window.open(`/preview/${currentProjectId}`, '_blank')}
+                    onClick={() => window.open(`/preview/${currentProjectId}`, '_blank', 'noopener,noreferrer')}
                     className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 inline-flex items-center gap-2 font-semibold"
                   >
                     <span>👁️ Open Preview</span>
@@ -570,7 +570,7 @@ function BuilderContent() {
                   <h3 className="text-xl font-semibold">Live Preview</h3>
                   {currentProjectId && (
                     <button
-                      onClick={() => window.open(`/preview/${currentProjectId}`, '_blank')}
+                      onClick={() => window.open(`/preview/${currentProjectId}`, '_blank', 'noopener,noreferrer')}
                       className="text-sm bg-blue-100 text-blue-700 hover:bg-blue-200 px-4 py-2 rounded-lg flex items-center gap-2"
                     >
                       🔗 Open Full Preview
