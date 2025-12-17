@@ -1,84 +1,67 @@
+import { Navigation } from '@/components/Navigation'
+import Link from 'next/link'
+
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-16 max-w-4xl">
-        <h1 className="text-4xl font-bold mb-8">Terms of Service</h1>
-        
-        <div className="prose prose-lg dark:prose-invert max-w-none space-y-6">
-          <p className="text-muted-foreground">
-            Last updated: December 10, 2025
+    <div className="min-h-screen bg-gradient-to-b from-gray-950 to-gray-900">
+      <header className="border-b border-gray-800 sticky top-0 z-30 bg-gray-950/80 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <Link href="/" className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
+                <span className="text-white text-xl font-bold">B</span>
+              </div>
+              <span className="text-xl font-bold text-white">BuildFlow</span>
+            </Link>
+            <Navigation variant="landing" />
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-4xl mx-auto px-4 py-16">
+        <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">Terms of Service</h1>
+        <div className="prose prose-invert max-w-none text-gray-300">
+          <p className="text-sm text-gray-500 mb-8">Last updated: December 2024</p>
+          
+          <h2 className="text-2xl font-bold text-white mt-8 mb-4">Agreement to Terms</h2>
+          <p className="mb-6">
+            By accessing or using BuildFlow, you agree to be bound by these Terms of Service and all applicable laws and regulations.
           </p>
 
-          <section>
-            <h2 className="text-2xl font-semibold mt-8 mb-4">1. Acceptance of Terms</h2>
-            <p>
-              By accessing and using BuildFlow AI app builder service, you accept and agree to be bound by the terms and provisions of this agreement. If you do not agree to these terms, please do not use our service.
-            </p>
-          </section>
+          <h2 className="text-2xl font-bold text-white mt-8 mb-4">Use License</h2>
+          <p className="mb-6">
+            We grant you a limited, non-exclusive, non-transferable license to use BuildFlow for creating and managing your projects. You retain all rights to the code you generate using our platform.
+          </p>
 
-          <section>
-            <h2 className="text-2xl font-semibold mt-8 mb-4">2. Use License</h2>
-            <p>
-              Permission is granted to use this service for personal and commercial purposes in accordance with your subscription plan. You retain full ownership of the code generated through our platform.
-            </p>
-          </section>
+          <h2 className="text-2xl font-bold text-white mt-8 mb-4">User Responsibilities</h2>
+          <p className="mb-4">You agree to:</p>
+          <ul className="space-y-2 mb-6">
+            <li>• Provide accurate account information</li>
+            <li>• Keep your password secure</li>
+            <li>• Not use the service for illegal purposes</li>
+            <li>• Not attempt to hack or disrupt the service</li>
+            <li>• Respect intellectual property rights</li>
+          </ul>
 
-          <section>
-            <h2 className="text-2xl font-semibold mt-8 mb-4">3. User Responsibilities</h2>
-            <p>
-              You are responsible for:
-            </p>
-            <ul className="list-disc pl-6 mt-2 space-y-1">
-              <li>Maintaining the confidentiality of your account</li>
-              <li>All activities that occur under your account</li>
-              <li>Ensuring your use complies with applicable laws</li>
-              <li>Not using the service for any illegal or unauthorized purpose</li>
-            </ul>
-          </section>
+          <h2 className="text-2xl font-bold text-white mt-8 mb-4">Payment Terms</h2>
+          <p className="mb-6">
+            Paid subscriptions are billed monthly or annually. You can cancel at any time. Refunds are provided according to our refund policy.
+          </p>
 
-          <section>
-            <h2 className="text-2xl font-semibold mt-8 mb-4">4. Disclaimer</h2>
-            <p>
-              The materials and AI-generated content on this service are provided on an &apos;as is&apos; basis. We make no warranties, expressed or implied, regarding the accuracy, reliability, or suitability of any generated content.
-            </p>
-          </section>
+          <h2 className="text-2xl font-bold text-white mt-8 mb-4">Limitation of Liability</h2>
+          <p className="mb-6">
+            BuildFlow is provided "as is" without warranties. We are not liable for any damages arising from your use of the service.
+          </p>
 
-          <section>
-            <h2 className="text-2xl font-semibold mt-8 mb-4">5. Limitations</h2>
-            <p>
-              In no event shall BuildFlow or its suppliers be liable for any damages arising out of the use or inability to use the materials or services provided.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mt-8 mb-4">6. Modifications</h2>
-            <p>
-              We may revise these terms of service at any time without prior notice. By continuing to use this service after changes are made, you agree to be bound by the revised terms.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mt-8 mb-4">7. Contact Us</h2>
-            <p>
-              For any questions regarding these Terms of Service, please contact us at:
-            </p>
-            <ul className="list-none pl-0 mt-4 space-y-2">
-              <li>
-                <strong>General Enquiries:</strong>{' '}
-                <a href="mailto:enquiries@buildflow-ai.app" className="text-purple-600 hover:underline">
-                  enquiries@buildflow-ai.app
-                </a>
-              </li>
-              <li>
-                <strong>Support:</strong>{' '}
-                <a href="mailto:support@buildflow-ai.app" className="text-purple-600 hover:underline">
-                  support@buildflow-ai.app
-                </a>
-              </li>
-            </ul>
-          </section>
+          <h2 className="text-2xl font-bold text-white mt-8 mb-4">Contact</h2>
+          <p className="mb-6">
+            Questions about these terms? Contact us at:{' '}
+            <a href="mailto:legal@buildflow-ai.app" className="text-purple-400 hover:text-purple-300">
+              legal@buildflow-ai.app
+            </a>
+          </p>
         </div>
-      </div>
+      </main>
     </div>
-  );
+  )
 }

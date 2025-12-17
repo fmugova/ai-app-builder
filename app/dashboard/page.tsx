@@ -1,3 +1,7 @@
+
+'use client'
+
+import { useState, useEffect } from 'react'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
@@ -5,14 +9,13 @@ import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import { Navigation } from '@/components/Navigation'
 import { ProjectCard } from '@/components/ProjectCard'
+import { TipsPopup } from '@/components/TipsPopup'
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
-  
   if (!session?.user?.email) {
     redirect('/auth/signin')
   }
-
   const user = await prisma.user.findUnique({
     where: { email: session.user.email },
     select: {
@@ -25,11 +28,9 @@ export default async function DashboardPage() {
       stripeSubscriptionId: true,
     }
   })
-
   if (!user) {
     redirect('/auth/signin')
   }
-
   const projects = await prisma.project.findMany({
     where: { userId: user.id },
     orderBy: { updatedAt: 'desc' },
@@ -41,11 +42,9 @@ export default async function DashboardPage() {
       updatedAt: true,
     }
   })
-
   const projectCount = await prisma.project.count({
     where: { userId: user.id }
   })
-
   const plan = user.role === 'admin' ? 'Enterprise' : (user.stripeSubscriptionId ? 'Pro' : 'Free')
   const generationsUsed = user.generationsUsed || 0
   const generationsLimit = user.generationsLimit || 10
@@ -241,20 +240,8 @@ export default async function DashboardPage() {
         </div>
       </main>
 
-      {/* Tips Section - Bottom Left */}
-      <div className="fixed bottom-6 left-6 z-20 max-w-sm">
-        <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg p-4 shadow-xl">
-          <div className="flex items-start gap-3">
-            <span className="text-2xl">💡</span>
-            <div>
-              <h4 className="text-white font-semibold mb-1">Pro Tip</h4>
-              <p className="text-sm text-purple-100">
-                Use descriptive prompts for better results. Include details about colors, layout, and features you want.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Tips Popup Component */}
+      <TipsPopup />
     </div>
   )
 }

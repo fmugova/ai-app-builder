@@ -183,9 +183,9 @@ export default function LandingPage() {
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
               <p className="text-sm text-gray-400">© 2024 BuildFlow. All rights reserved.</p>
               <div className="flex gap-6 text-sm">
-                <a href="https://twitter.com/buildflow" className="text-gray-400 hover:text-white transition">Twitter</a>
-                <a href="https://github.com/buildflow" className="text-gray-400 hover:text-white transition">GitHub</a>
-                <a href="mailto:hello@buildflow.ai" className="text-gray-400 hover:text-white transition">Email</a>
+                <a href="https://twitter.com/buildflow_ai" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition">Twitter</a>
+                <a href="https://github.com/buildflow-ai" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition">GitHub</a>
+                <a href="mailto:hello@buildflow-ai.app" className="text-gray-400 hover:text-white transition">Email</a>
               </div>
             </div>
           </div>

@@ -126,6 +126,126 @@ function BuilderContent() {
     return `Generating${dots}${spaces}`
   }
 
+  // ✨ AI Chat state
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatMessage, setChatMessage] = useState('')
+  const [chatHistory, setChatHistory] = useState<Array<{role: string, content: string, files?: string[], urls?: string[]}>>([])
+  const [chatLoading, setChatLoading] = useState(false)
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
+  const [uploadedUrls, setUploadedUrls] = useState<string[]>([])
+
+  // ✨ Handle file upload
+  const handleFileUpload = async (files: FileList) => {
+    const fileArray = Array.from(files)
+    const validFiles = fileArray.filter(file => {
+      const validTypes = ['.pdf', '.doc', '.docx', '.txt', '.md', '.png', '.jpg', '.jpeg']
+      const ext = '.' + file.name.split('.').pop()?.toLowerCase()
+      return validTypes.includes(ext)
+    })
+    if (validFiles.length < fileArray.length) {
+      toast.error('Some files were skipped (unsupported format)')
+    }
+    setUploadedFiles(prev => [...prev, ...validFiles])
+    toast.success(`Added ${validFiles.length} file(s)`)
+  }
+
+  // ✨ Add URL
+  const handleAddUrl = () => {
+    const url = window.prompt('Enter website URL to analyze:\n\nExample: https://example.com')
+    if (url) {
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        toast.error('Please enter a valid URL starting with http:// or https://')
+        return
+      }
+      setUploadedUrls(prev => [...prev, url])
+      toast.success('URL added! Include it in your next message.')
+    }
+  }
+
+  // ✨ Remove file
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  // ✨ Remove URL
+  const removeUrl = (index: number) => {
+    setUploadedUrls(prev => prev.filter((_, i) => i !== index))
+  }
+
+  // ✨ Handle chat with file/URL support
+  const handleChat = async () => {
+    if (!chatMessage.trim() && uploadedFiles.length === 0 && uploadedUrls.length === 0) {
+      toast.error('Please enter a message or add files/URLs')
+      return
+    }
+    if (!generatedCode) {
+      toast.error('Generate some code first!')
+      return
+    }
+    setChatLoading(true)
+    const currentMessage = chatMessage.trim() || 'Process uploaded files and URLs'
+    const newHistory = [
+      ...chatHistory,
+      { 
+        role: 'user', 
+        content: currentMessage,
+        files: uploadedFiles.map(f => f.name),
+        urls: uploadedUrls
+      }
+    ]
+    setChatHistory(newHistory)
+    setChatMessage('')
+    try {
+      const formData = new FormData()
+      formData.append('message', currentMessage)
+      formData.append('currentCode', generatedCode)
+      formData.append('projectType', projectType)
+      formData.append('urls', JSON.stringify(uploadedUrls))
+      formData.append('conversationHistory', JSON.stringify(chatHistory))
+      // Append files
+      uploadedFiles.forEach(file => {
+        formData.append('files', file)
+      })
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        body: formData
+      })
+      const data = await res.json()
+      if (res.ok && data.code) {
+        setGeneratedCode(data.code)
+        setChatHistory([
+          ...newHistory,
+          { 
+            role: 'assistant', 
+            content: data.message || '✅ Code updated successfully!'
+          }
+        ])
+        toast.success('Code updated!')
+        setUploadedFiles([])
+        setUploadedUrls([])
+      } else {
+        const errorMsg = data.error || 'Chat failed. Please try again.'
+        setChatHistory([
+          ...newHistory,
+          { role: 'assistant', content: `❌ ${errorMsg}` }
+        ])
+        toast.error(errorMsg)
+      }
+    } catch (err: any) {
+      console.error('❌ Chat error:', err)
+      setChatHistory([
+        ...newHistory,
+        { 
+          role: 'assistant', 
+          content: '❌ Failed to connect to AI assistant. Please check your connection and try again.'
+        }
+      ])
+      toast.error('Connection failed: ' + err.message)
+    } finally {
+      setChatLoading(false)
+    }
+  }
+
   useEffect(() => {
     const projectId = searchParams.get('project')
     if (projectId) {
@@ -647,6 +767,144 @@ function BuilderContent() {
         </div>
       </div>
       
+
+      {/* ✨ Floating Chat Button */}
+      <button
+        onClick={() => setChatOpen(!chatOpen)}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full shadow-2xl hover:scale-110 transition-transform z-50 flex items-center justify-center"
+        title="AI Chat Assistant"
+      >
+        {chatOpen ? '✕' : '💬'}
+      </button>
+
+      {/* ✨ Chat Panel */}
+      {chatOpen && (
+        <div className="fixed bottom-24 right-6 w-96 h-[600px] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col z-50 overflow-hidden">
+          {/* Chat Header */}
+          <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🤖</span>
+              <div>
+                <h3 className="font-bold">AI Assistant</h3>
+                <p className="text-xs text-purple-100">Upload files, add URLs, ask anything!</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setChatOpen(false)}
+              className="text-white hover:bg-white/20 rounded-lg p-2 transition"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Chat Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+            {chatHistory.length === 0 ? (
+              <div className="text-center text-gray-500 py-8">
+                <div className="text-4xl mb-2">👋</div>
+                <p className="text-sm">Start a conversation!</p>
+                <p className="text-xs mt-2">Try: \"Add a navigation bar\" or upload a website for inspiration</p>
+              </div>
+            ) : (
+              chatHistory.map((msg, i) => (
+                <div
+                  key={i}
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div
+                    className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+                      msg.role === 'user'
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-white text-gray-800 border border-gray-200'
+                    }`}
+                  >
+                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    {msg.files && msg.files.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {msg.files.map((fileName, idx) => (
+                          <div key={idx} className="text-xs opacity-75 flex items-center gap-1">
+                            <span>📄</span>
+                            <span>{fileName}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {msg.urls && msg.urls.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {msg.urls.map((url, idx) => (
+                          <div key={idx} className="text-xs opacity-75 flex items-center gap-1">
+                            <span>🔗</span>
+                            <span className="truncate">{url}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Chat Input */}
+          <div className="p-4 border-t bg-white">
+            <div className="flex gap-2 mb-2">
+              <input
+                type="text"
+                value={chatMessage}
+                onChange={e => setChatMessage(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !chatLoading) handleChat() }}
+                placeholder="Ask the AI assistant..."
+                className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
+                disabled={chatLoading}
+              />
+              <button
+                onClick={handleChat}
+                disabled={chatLoading}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
+              >
+                {chatLoading ? '...' : 'Send'}
+              </button>
+            </div>
+            <div className="flex gap-2 mb-2">
+              <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded hover:bg-gray-200">
+                <input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={e => e.target.files && handleFileUpload(e.target.files)}
+                  disabled={chatLoading}
+                />
+                <span>📎 Attach File</span>
+              </label>
+              <button
+                onClick={handleAddUrl}
+                disabled={chatLoading}
+                className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded hover:bg-blue-100"
+              >
+                ➕ Add URL
+              </button>
+            </div>
+            {/* Show uploaded files/urls */}
+            {(uploadedFiles.length > 0 || uploadedUrls.length > 0) && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {uploadedFiles.map((file, i) => (
+                  <span key={i} className="bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs flex items-center gap-1">
+                    📄 {file.name}
+                    <button onClick={() => removeFile(i)} className="ml-1 text-red-500 hover:text-red-700">✕</button>
+                  </span>
+                ))}
+                {uploadedUrls.map((url, i) => (
+                  <span key={i} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs flex items-center gap-1">
+                    🔗 {url}
+                    <button onClick={() => removeUrl(i)} className="ml-1 text-red-500 hover:text-red-700">✕</button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <Toaster position="top-right" />
     </div>
   )

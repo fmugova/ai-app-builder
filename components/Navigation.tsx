@@ -5,8 +5,8 @@ import { signOut, useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { 
-  Menu, X, Home, FolderOpen, User, Mail, LogOut, Plus, 
-  CreditCard, Shield
+  Menu, X, Home, FolderOpen, User, Mail, LogOut, 
+  CreditCard, Shield, Sun, Moon
 } from 'lucide-react'
 
 interface NavigationProps {
@@ -16,6 +16,7 @@ interface NavigationProps {
 export function Navigation({ variant = 'dashboard' }: NavigationProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [darkMode, setDarkMode] = useState(false)
   const { data: session, status } = useSession()
   const pathname = usePathname()
   const router = useRouter()
@@ -41,6 +42,26 @@ export function Navigation({ variant = 'dashboard' }: NavigationProps) {
     }
   }, [session, status])
 
+  // Dark mode toggle
+  useEffect(() => {
+    const isDark = localStorage.getItem('darkMode') === 'true'
+    setDarkMode(isDark)
+    if (isDark) {
+      document.documentElement.classList.add('dark')
+    }
+  }, [])
+
+  const toggleDarkMode = () => {
+    const newMode = !darkMode
+    setDarkMode(newMode)
+    localStorage.setItem('darkMode', String(newMode))
+    if (newMode) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }
+
   const isActive = (path: string) => pathname === path
   const closeMenu = () => setIsOpen(false)
 
@@ -55,6 +76,15 @@ export function Navigation({ variant = 'dashboard' }: NavigationProps) {
           <Link href="/contact" className="px-4 py-2 text-gray-300 hover:text-white transition">
             Contact
           </Link>
+          
+          <button
+            onClick={toggleDarkMode}
+            className="p-2 text-gray-300 hover:text-white transition rounded-lg hover:bg-gray-800"
+            title="Toggle dark mode"
+          >
+            {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
+
           {status === 'authenticated' ? (
             <>
               <Link href="/dashboard" className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition">
@@ -79,6 +109,7 @@ export function Navigation({ variant = 'dashboard' }: NavigationProps) {
           )}
         </div>
 
+        {/* Mobile menu button and drawer - same pattern */}
         <button 
           onClick={() => setIsOpen(true)}
           className="lg:hidden p-2 hover:bg-gray-800 rounded-lg transition"
@@ -99,6 +130,17 @@ export function Navigation({ variant = 'dashboard' }: NavigationProps) {
               </div>
 
               <nav className="space-y-2">
+                <button
+                  onClick={() => {
+                    toggleDarkMode()
+                    closeMenu()
+                  }}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition text-white"
+                >
+                  {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                  <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
+                </button>
+
                 <Link href="/pricing" onClick={closeMenu} className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition text-white">
                   <CreditCard className="w-5 h-5" />
                   <span>Pricing</span>
@@ -191,12 +233,14 @@ export function Navigation({ variant = 'dashboard' }: NavigationProps) {
           </Link>
         )}
 
-        <Link 
-          href="/builder"
-          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition"
+        <button
+          onClick={toggleDarkMode}
+          className="p-2 text-gray-300 hover:text-white transition rounded-lg hover:bg-gray-800"
+          title="Toggle dark mode"
         >
-          + New Project
-        </Link>
+          {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+        </button>
+
         <Link 
           href="/contact"
           className="px-4 py-2 text-blue-400 hover:text-blue-300 transition"
@@ -231,14 +275,16 @@ export function Navigation({ variant = 'dashboard' }: NavigationProps) {
             </div>
 
             <nav className="space-y-2">
-              <Link 
-                href="/builder"
-                onClick={closeMenu}
-                className="w-full flex items-center gap-3 p-3 rounded-lg bg-purple-600 hover:bg-purple-700 transition text-white font-medium"
+              <button
+                onClick={() => {
+                  toggleDarkMode()
+                  closeMenu()
+                }}
+                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition text-white"
               >
-                <Plus className="w-5 h-5" />
-                <span>New Project</span>
-              </Link>
+                {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
+              </button>
 
               <div className="my-4 border-t border-gray-700" />
 
