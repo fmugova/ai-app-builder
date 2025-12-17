@@ -17,29 +17,35 @@ export function Navigation({ variant = 'dashboard' }: NavigationProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const { data: session, status } = useSession()
   const pathname = usePathname()
   const router = useRouter()
 
   useEffect(() => {
-    // Check if user is admin
     const checkAdmin = async () => {
-      if (session?.user?.email) {
+      if (session?.user?.email && status === 'authenticated') {
         try {
-          const res = await fetch('/api/user/role')
+          setIsLoading(true)
+          const res = await fetch('/api/user/role', {
+            cache: 'no-store'
+          })
           if (res.ok) {
             const data = await res.json()
             setIsAdmin(data.role === 'admin')
           }
         } catch (error) {
           console.error('Failed to check admin status:', error)
+          setIsAdmin(false)
+        } finally {
+          setIsLoading(false)
         }
+      } else {
+        setIsAdmin(false)
+        setIsLoading(false)
       }
     }
-    
-    if (status === 'authenticated') {
-      checkAdmin()
-    }
+    checkAdmin()
   }, [session, status])
 
   // Dark mode toggle
@@ -219,7 +225,7 @@ export function Navigation({ variant = 'dashboard' }: NavigationProps) {
           Account
         </Link>
         
-        {isAdmin && (
+        {!isLoading && isAdmin && (
           <Link 
             href="/admin"
             className={`px-4 py-2 rounded-lg transition flex items-center gap-2 ${
@@ -313,7 +319,7 @@ export function Navigation({ variant = 'dashboard' }: NavigationProps) {
                 <span>Account</span>
               </Link>
 
-              {isAdmin && (
+              {!isLoading && isAdmin && (
                 <>
                   <div className="my-4 border-t border-gray-700" />
                   <Link 
