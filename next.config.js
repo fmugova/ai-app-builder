@@ -3,8 +3,8 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 })
 
 /** @type {import('next').NextConfig} */
+
 const nextConfig = {
-  // paste your existing config here
   images: {
     remotePatterns: [
       {
@@ -12,6 +12,10 @@ const nextConfig = {
         hostname: '**',
       },
     ],
+  },
+  // Add this to force new bundle generation
+  generateBuildId: async () => {
+    return `build-${Date.now()}`
   },
 }
 
