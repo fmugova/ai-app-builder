@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import Link from 'next/link'
@@ -10,8 +10,8 @@ import { Loader2, Eye, EyeOff, Mail, Lock } from 'lucide-react'
 function SignInContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
-  const error = searchParams.get('error')
+  const callbackUrl = searchParams?.get('callbackUrl') || '/dashboard'
+  const error = searchParams?.get('error')
   
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -20,8 +20,8 @@ function SignInContent() {
     password: '',
   })
 
-  // Show error from URL params
-  useState(() => {
+  // Show error from URL params - FIX: Use useEffect instead of useState
+  useEffect(() => {
     if (error) {
       const errorMessages: Record<string, string> = {
         CredentialsSignin: 'Invalid email or password',
@@ -31,7 +31,7 @@ function SignInContent() {
       }
       toast.error(errorMessages[error] || errorMessages.default)
     }
-  })
+  }, [error])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
