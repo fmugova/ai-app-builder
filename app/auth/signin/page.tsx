@@ -1,7 +1,4 @@
-
 'use client'
-
-export const dynamic = "force-dynamic"
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -23,7 +20,7 @@ function SignInContent() {
     password: '',
   })
 
-  // Show error from URL params - FIX: Use useEffect instead of useState
+  // Show error from URL params
   useEffect(() => {
     if (error) {
       const errorMessages: Record<string, string> = {
