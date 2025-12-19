@@ -225,7 +225,7 @@ export default function ContactPage() {
               © 2025 BuildFlow. All rights reserved.
             </p>
             <div className="flex gap-6 text-sm">
-              <Link href="/Privacy" className="text-gray-400 hover:text-white transition">Privacy Policy</Link>
+              <Link href="/terms" className="text-gray-400 hover:text-white transition">Terms of Service</Link>
               <Link href="/terms" className="text-gray-400 hover:text-white transition">Terms of Service</Link>
             </div>
           </div>
