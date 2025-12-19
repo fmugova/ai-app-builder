@@ -577,6 +577,7 @@ export default function DashboardClient({
               </div>
               <h3 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-2`}>
                 {searchQuery ? 'No projects found' : 'No projects yet'}
+              </h3>
               {/* Dark Mode Toggle */}
               <button
                 onClick={() => setIsDarkMode && setIsDarkMode((prev: boolean) => !prev)}
@@ -585,7 +586,6 @@ export default function DashboardClient({
               >
                 {isDarkMode ? <SunIcon /> : <MoonIcon />}
               </button>
-              )}
             </div>
           )}
         </div>
