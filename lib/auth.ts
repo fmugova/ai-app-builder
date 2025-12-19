@@ -29,8 +29,7 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import { prisma } from './prisma'
 import bcrypt from 'bcryptjs'
 
-const authOptions: NextAuthOptions = {
-  // adapter: PrismaAdapter(prisma) as any,
+export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       name: 'credentials',
@@ -74,8 +73,6 @@ const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: '/auth/signin',
-    signOut: '/auth/signin',
-    error: '/auth/signin'
   },
   callbacks: {
     async jwt({ token, user }) {
@@ -95,5 +92,3 @@ const authOptions: NextAuthOptions = {
   },
   secret: process.env.NEXTAUTH_SECRET
 }
-
-export { authOptions }
