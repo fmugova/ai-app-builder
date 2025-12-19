@@ -184,6 +184,14 @@ export default function DashboardClient({
 
             {/* Top Action Buttons - Hide on mobile, show in menu */}
             <div className="hidden lg:flex items-center gap-3">
+                            {/* Dark Mode Toggle */}
+                            <button
+                              onClick={() => setIsDarkMode && setIsDarkMode((prev: boolean) => !prev)}
+                              className="p-2 hover:bg-gray-800 rounded-lg transition"
+                              title="Toggle theme"
+                            >
+                              {isDarkMode ? <SunIcon /> : <MoonIcon />}
+                            </button>
               <button className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition">
                 Enterprise
               </button>
@@ -569,21 +577,14 @@ export default function DashboardClient({
               </div>
               <h3 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-2`}>
                 {searchQuery ? 'No projects found' : 'No projects yet'}
-              </h3>
-              <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-6`}>
-                {searchQuery 
-                  ? 'Try adjusting your search query'
-                  : 'Create your first AI-powered app in seconds'
-                }
-              </p>
-              {!searchQuery && (
-                <button
-                  onClick={() => router.push('/builder')}
-                  className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg transition font-semibold"
-                >
-                  <span>✨</span>
-                  <span>Create Your First Project</span>
-                </button>
+              {/* Dark Mode Toggle */}
+              <button
+                onClick={() => setIsDarkMode && setIsDarkMode((prev: boolean) => !prev)}
+                className="p-2 hover:bg-gray-800 rounded-lg transition"
+                title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                {isDarkMode ? <SunIcon /> : <MoonIcon />}
+              </button>
               )}
             </div>
           )}
