@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       include: {
-        Project: true,
+        projects: true,
       }
     })
 
@@ -43,9 +43,9 @@ export async function GET(request: NextRequest) {
       user: {
         id: user.id,
         email: user.email,
-        projectCount: user.Project.length,
+        projectCount: user.projects.length,
       },
-      projects: user.Project.map(p => ({ id: p.id, name: p.name })),
+      projects: user.projects.map(p => ({ id: p.id, name: p.name })),
     })
 
   } catch (error: any) {

@@ -20,7 +20,7 @@ export async function GET() {
         generationsLimit: true,
         subscriptionTier: true,
         _count: {
-          select: { Project: true },
+          select: { projects: true },
         },
       },
     })
@@ -35,10 +35,10 @@ export async function GET() {
 
     return NextResponse.json({
       canGenerate: (user.generationsUsed || 0) < aiLimit,
-      canCreateProject: user._count.Project < projectLimit,
+      canCreateProject: user._count.projects < projectLimit,
       limits: {
         aiRequests: { used: user.generationsUsed || 0, limit: aiLimit },
-        Project: { used: user._count.Project, limit: projectLimit },
+        projects: { used: user._count.projects, limit: projectLimit },
       },
       plan,
     })
