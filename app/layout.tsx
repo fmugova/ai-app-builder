@@ -8,8 +8,6 @@ import { GoogleAnalytics, GoogleTagManager } from '@next/third-parties/google'
 import { HomePageSchema } from '@/components/JsonLd'
 import Script from 'next/script'
 import type { Metadata, Viewport } from 'next'
-import Footer from './components/Footer'
-
 const inter = Inter({ subsets: ['latin'] })
 
 // Viewport configuration (theme-color, etc.)
@@ -160,7 +158,6 @@ export default function RootLayout({
       </head>
       <body className={inter.className}>
         <Providers>{children}</Providers>
-        <Footer />
         <Analytics />
         <SpeedInsights />
         <GoogleAnalytics gaId="GTM-KNTK3Z8G" />
