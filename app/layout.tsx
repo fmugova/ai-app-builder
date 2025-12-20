@@ -1,3 +1,4 @@
+
 import './globals.css'
 import { Inter } from 'next/font/google'
 import { Providers } from './providers'
@@ -7,6 +8,7 @@ import { GoogleAnalytics, GoogleTagManager } from '@next/third-parties/google'
 import { HomePageSchema } from '@/components/JsonLd'
 import Script from 'next/script'
 import type { Metadata, Viewport } from 'next'
+import Footer from './components/Footer'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -158,6 +160,7 @@ export default function RootLayout({
       </head>
       <body className={inter.className}>
         <Providers>{children}</Providers>
+        <Footer />
         <Analytics />
         <SpeedInsights />
         <GoogleAnalytics gaId="GTM-KNTK3Z8G" />

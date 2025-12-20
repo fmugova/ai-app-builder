@@ -176,14 +176,21 @@ export default function DashboardClient({
       {/* Header */}
       <header className="bg-gray-900 border-b border-gray-800 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* Logo */}
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-white">BuildFlow</h1>
-            </div>
+          <div className="flex justify-between items-center h-16">              {/* Logo */}
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold text-white">BuildFlow</h1>
+              </div>
 
-            {/* Top Action Buttons - Hide on mobile, show in menu */}
-            <div className="hidden lg:flex items-center gap-3">
+              {/* Top Action Buttons - Hide on mobile, show in menu */}
+              <div className="hidden lg:flex items-center gap-3">
+                {/* Dark Mode Toggle */}
+                <button
+                  onClick={() => setIsDarkMode(!isDarkMode)}
+                  className="p-2 hover:bg-gray-800 rounded-lg transition"
+                  title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+                >
+                  {isDarkMode ? <SunIcon /> : <MoonIcon />}
+                </button>
                             {/* Dark Mode Toggle */}
                             <button
                               onClick={() => setIsDarkMode && setIsDarkMode((prev: boolean) => !prev)}

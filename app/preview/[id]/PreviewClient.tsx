@@ -1,346 +1,431 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { toast, Toaster } from 'react-hot-toast'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
+import { Monitor, Tablet, Smartphone, RefreshCw, Code, Download, Copy, Trash2, Edit, X, Menu } from 'lucide-react'
+
+interface Project {
+  id: string
+  name: string
+  code: string | null
+  userId: string
+}
 
 interface PreviewClientProps {
   projectId: string
 }
 
 export default function PreviewClient({ projectId }: PreviewClientProps) {
-  const [code, setCode] = useState('')
+  const router = useRouter()
+  const { data: session, status } = useSession()
+  const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<'desktop' | 'tablet' | 'mobile'>('desktop')
   const [showCode, setShowCode] = useState(false)
-  const [projectName, setProjectName] = useState('Preview')
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  // Sanitize and wrap preview HTML to ensure all links open in a new tab
+  function sanitizeForPreview(code: string): string {
+    let sanitized = code || ''
+
+    // If not a full HTML doc, wrap it
+    if (!sanitized.includes('<html') && !sanitized.includes('<!DOCTYPE')) {
+      return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base target="_blank">
+  <title>Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }</style>
+</head>
+<body>
+  ${sanitized.trim()}
+</body>
+</html>`
+    }
+
+    // If <head> exists, inject <base target="_blank">
+    if (sanitized.includes('<head>')) {
+      return sanitized.replace('<head>', '<head>\n  <base target="_blank">')
+    }
+
+    return sanitized
+  }
 
   useEffect(() => {
+    if (status === 'loading') return
+    if (!session) {
+      router.push('/auth/signin')
+      return
+    }
     loadProject()
-  }, [projectId])
+  }, [session, status, projectId])
 
   const loadProject = async () => {
     try {
       const res = await fetch(`/api/projects/${projectId}`)
-      const data = await res.json()
-
-      if (data.code) {
-        setProjectName(data.name || 'Preview')
-        const enhancedCode = enhanceCodeForPreview(data.code)
-        setCode(enhancedCode)
+      if (res.ok) {
+        const data = await res.json()
+        setProject(data)
+      } else {
+        alert('Project not found')
+        router.push('/dashboard')
       }
     } catch (error) {
-      toast.error('Failed to load project')
+      console.error('Failed to load project:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const enhanceCodeForPreview = (originalCode: string): string => {
-    let enhanced = originalCode
-
-    // Interactive enhancement script
-    const interactiveScript = `
-<script>
-  (function() {
-    'use strict';
-    
-    window.addEventListener('DOMContentLoaded', function() {
-      // Handle anchor clicks
-      document.addEventListener('click', function(e) {
-        const anchor = e.target.closest('a');
-        if (!anchor || !anchor.href) return;
-        
-        const href = anchor.getAttribute('href');
-        if (!href) return;
-        
-        // Allow hash links
-        if (href.startsWith('#')) {
-          e.preventDefault();
-          const target = document.querySelector(href);
-          if (target) {
-            target.scrollIntoView({ behavior: 'smooth' });
-          }
-          return;
-        }
-        
-        // Allow footer/legal links to open in new tab
-        const allowedLinks = [
-          'terms', 'privacy', 'contact', 'about',
-          'mailto:', 'tel:', 
-          'twitter.com', 'linkedin.com', 'facebook.com', 
-          'instagram.com', 'github.com'
-        ];
-        
-        const isAllowed = allowedLinks.some(pattern => href.includes(pattern));
-        
-        if (isAllowed) {
-          e.preventDefault();
-          window.open(href, '_blank', 'noopener,noreferrer');
-          return;
-        }
-        
-        // Block other navigation
-        e.preventDefault();
-      });
-
-      // Handle form submissions
-      document.addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const form = e.target;
-        const formData = new FormData(form);
-        const data = {};
-        formData.forEach((value, key) => { data[key] = value; });
-        
-        // Show success toast
-        const toast = document.createElement('div');
-        toast.style.cssText = \`
-          position: fixed;
-          top: 20px;
-          right: 20px;
-          background: #10b981;
-          color: white;
-          padding: 16px 24px;
-          border-radius: 8px;
-          box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-          z-index: 999999;
-          animation: slideIn 0.3s ease-out;
-          font-family: system-ui, -apple-system, sans-serif;
-        \`;
-        toast.innerHTML = '<strong>✅ Form Submitted!</strong><br><small>In production, this would send data</small>';
-        document.body.appendChild(toast);
-        
-        // Add animation styles
-        if (!document.getElementById('toast-styles')) {
-          const style = document.createElement('style');
-          style.id = 'toast-styles';
-          style.textContent = '@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }';
-          document.head.appendChild(style);
-        }
-        
-        // Remove after 3 seconds
-        setTimeout(() => {
-          toast.style.animation = 'slideIn 0.3s ease-out reverse';
-          setTimeout(() => toast.remove(), 300);
-        }, 3000);
-        
-        console.log('Form data:', data);
-      });
-
-      // Button click feedback
-      document.addEventListener('click', function(e) {
-        const button = e.target.closest('button');
-        if (button && !button.disabled) {
-          const originalTransform = button.style.transform;
-          button.style.transform = 'scale(0.95)';
-          button.style.transition = 'transform 0.1s';
-          setTimeout(() => {
-            button.style.transform = originalTransform || 'scale(1)';
-          }, 100);
-        }
-      });
-    });
-  })();
-</script>
-
-<style>
-  html {
-    scroll-behavior: smooth;
-  }
-  
-  button:not(:disabled) {
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-  
-  button:not(:disabled):hover {
-    filter: brightness(1.1);
-  }
-  
-  a {
-    cursor: pointer;
-  }
-  
-  footer a {
-    text-decoration: underline;
-    text-decoration-color: rgba(255,255,255,0.3);
-  }
-  
-  footer a:hover {
-    text-decoration-color: rgba(255,255,255,0.8);
-  }
-</style>
-`
-
-    // Inject before closing body or html tag
-    if (enhanced.includes('</body>')) {
-      enhanced = enhanced.replace('</body>', interactiveScript + '</body>')
-    } else if (enhanced.includes('</html>')) {
-      enhanced = enhanced.replace('</html>', interactiveScript + '</html>')
-    } else {
-      enhanced += interactiveScript
+  const handleCopy = () => {
+    if (project?.code) {
+      navigator.clipboard.writeText(project.code)
+      alert('Code copied to clipboard!')
     }
-
-    return enhanced
   }
 
-  const refreshPreview = () => {
-    loadProject()
-    toast.success('Preview refreshed!')
+  const handleDownload = () => {
+    if (project?.code) {
+      const blob = new Blob([project.code], { type: 'text/html' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${project.name}.html`
+      a.click()
+      URL.revokeObjectURL(url)
+    }
   }
 
-  if (loading) {
+  const handleDelete = async () => {
+    if (!confirm('Are you sure you want to delete this project?')) return
+    
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: 'DELETE'
+      })
+      if (res.ok) {
+        alert('Project deleted')
+        router.push('/dashboard')
+      } else {
+        alert('Failed to delete project')
+      }
+    } catch (error) {
+      console.error('Delete error:', error)
+    }
+  }
+
+  const handleRefresh = () => {
+    window.location.reload()
+  }
+
+  const handleEdit = () => {
+    router.push(`/builder?project=${projectId}`)
+  }
+
+  const handleClose = () => {
+    router.push('/dashboard')
+  }
+
+  const getViewWidth = () => {
+    switch (viewMode) {
+      case 'mobile': return '375px'
+      case 'tablet': return '768px'
+      default: return '100%'
+    }
+  }
+
+  if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-950">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-white text-lg">Loading Preview...</p>
+          <p className="text-gray-400">Loading preview...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!project) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-950">
+        <div className="text-center">
+          <p className="text-red-400 text-xl mb-4">Project not found</p>
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition"
+          >
+            Back to Dashboard
+          </button>
         </div>
       </div>
     )
   }
 
   return (
-    <>
-      <Toaster position="top-right" />
-      
-      <div className="h-screen flex flex-col bg-gray-900">
-        {/* Toolbar */}
-        <div className="bg-gray-800 border-b border-gray-700 px-6 py-3 flex-shrink-0">
-          <div className="flex items-center justify-between">
-            {/* Left */}
-            <div className="flex items-center gap-4">
-              <h1 className="text-white font-semibold flex items-center gap-2">
-                <span>👁️</span>
-                <span>{projectName}</span>
-              </h1>
-              
-              {/* View Mode */}
-              <div className="flex items-center gap-1 bg-gray-700 rounded-lg p-1">
-                <button
-                  onClick={() => setViewMode('desktop')}
-                  className={`px-3 py-1.5 rounded-md text-sm transition ${
-                    viewMode === 'desktop'
-                      ? 'bg-purple-600 text-white'
-                      : 'text-gray-300 hover:text-white'
-                  }`}
-                >
-                  🖥️ Desktop
-                </button>
-                <button
-                  onClick={() => setViewMode('tablet')}
-                  className={`px-3 py-1.5 rounded-md text-sm transition ${
-                    viewMode === 'tablet'
-                      ? 'bg-purple-600 text-white'
-                      : 'text-gray-300 hover:text-white'
-                  }`}
-                >
-                  📱 Tablet
-                </button>
-                <button
-                  onClick={() => setViewMode('mobile')}
-                  className={`px-3 py-1.5 rounded-md text-sm transition ${
-                    viewMode === 'mobile'
-                      ? 'bg-purple-600 text-white'
-                      : 'text-gray-300 hover:text-white'
-                  }`}
-                >
-                  📱 Mobile
-                </button>
-              </div>
-            </div>
-
-            {/* Right */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={refreshPreview}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition text-sm flex items-center gap-2"
-              >
-                🔄 Refresh
-              </button>
-              
-              <button
-                onClick={() => setShowCode(!showCode)}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition text-sm flex items-center gap-2"
-              >
-                {showCode ? '👁️ Preview' : '📝 Code'}
-              </button>
-              
-              <button
-                onClick={() => window.close()}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition text-sm"
-              >
-                ✕
-              </button>
-            </div>
+    <div className="min-h-screen bg-gray-950 flex flex-col">
+      {/* Header */}
+      <header className="bg-gray-900 border-b border-gray-800 flex-shrink-0">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-3">
+            <h1 className="text-white font-semibold text-sm sm:text-base truncate max-w-[150px] sm:max-w-none">
+              {project.name}
+            </h1>
           </div>
-        </div>
 
-        {/* Content Area */}
-        <div className="flex-1 bg-gray-900 overflow-hidden">
-          {showCode ? (
-            // Code View
-            <div className="h-full p-6 overflow-auto">
-              <div className="max-w-6xl mx-auto bg-gray-800 rounded-lg p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-white font-semibold text-lg">Source Code</h2>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(code)
-                      toast.success('Code copied!')
-                    }}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition text-sm"
-                  >
-                    📋 Copy
-                  </button>
-                </div>
-                <div className="bg-gray-900 rounded-lg p-4 overflow-auto">
-                  <pre className="text-sm text-green-400 font-mono whitespace-pre-wrap">
-                    <code>{code}</code>
-                  </pre>
-                </div>
-              </div>
+          {/* Desktop Controls */}
+          <div className="hidden lg:flex items-center gap-2">
+            <button
+              onClick={() => setViewMode('desktop')}
+              className={`p-2 rounded-lg transition ${
+                viewMode === 'desktop' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+              }`}
+              title="Desktop View"
+            >
+              <Monitor className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setViewMode('tablet')}
+              className={`p-2 rounded-lg transition ${
+                viewMode === 'tablet' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+              }`}
+              title="Tablet View"
+            >
+              <Tablet className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setViewMode('mobile')}
+              className={`p-2 rounded-lg transition ${
+                viewMode === 'mobile' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+              }`}
+              title="Mobile View"
+            >
+              <Smartphone className="w-5 h-5" />
+            </button>
+            
+            <div className="w-px h-6 bg-gray-700 mx-1"></div>
+
+            <button
+              onClick={handleEdit}
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
+              title="Edit"
+            >
+              <Edit className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setShowCode(!showCode)}
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
+              title="View Code"
+            >
+              <Code className="w-5 h-5" />
+            </button>
+            <button
+              onClick={handleCopy}
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
+              title="Copy Code"
+            >
+              <Copy className="w-5 h-5" />
+            </button>
+            <button
+              onClick={handleDownload}
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
+              title="Download"
+            >
+              <Download className="w-5 h-5" />
+            </button>
+            <button
+              onClick={handleRefresh}
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
+              title="Refresh"
+            >
+              <RefreshCw className="w-5 h-5" />
+            </button>
+            <button
+              onClick={handleDelete}
+              className="p-2 text-red-400 hover:text-red-300 hover:bg-gray-800 rounded-lg transition"
+              title="Delete"
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+            <button
+              onClick={handleClose}
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
+              title="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Mobile Hamburger */}
+          <button 
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="lg:hidden p-2 hover:bg-gray-800 rounded-lg transition"
+            aria-label="Open menu"
+          >
+            <Menu className="w-6 h-6 text-white" />
+          </button>
+        </div>
+      </header>
+
+      {/* Mobile Menu */}
+      {isMobileMenuOpen && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+          <div className="fixed right-0 top-0 h-full w-72 bg-gray-900 z-50 p-6 overflow-y-auto lg:hidden">
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-lg font-semibold text-white">Menu</h2>
+              <button 
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="p-2 hover:bg-gray-800 rounded-lg transition"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
+            </div>
+
+            <nav className="space-y-2">
+              <p className="text-xs text-gray-400 uppercase mb-2">View</p>
+              <button 
+                onClick={() => { setViewMode('desktop'); setIsMobileMenuOpen(false) }}
+                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition text-white"
+              >
+                <Monitor className="w-5 h-5" />
+                <span>Desktop</span>
+              </button>
+              <button 
+                onClick={() => { setViewMode('tablet'); setIsMobileMenuOpen(false) }}
+                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition text-white"
+              >
+                <Tablet className="w-5 h-5" />
+                <span>Tablet</span>
+              </button>
+              <button 
+                onClick={() => { setViewMode('mobile'); setIsMobileMenuOpen(false) }}
+                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition text-white"
+              >
+                <Smartphone className="w-5 h-5" />
+                <span>Mobile</span>
+              </button>
+
+              <div className="my-4 border-t border-gray-700"></div>
+
+              <p className="text-xs text-gray-400 uppercase mb-2">Actions</p>
+              <button 
+                onClick={() => { handleEdit(); setIsMobileMenuOpen(false) }}
+                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition text-white"
+              >
+                <Edit className="w-5 h-5" />
+                <span>Edit</span>
+              </button>
+              <button 
+                onClick={() => { setShowCode(!showCode); setIsMobileMenuOpen(false) }}
+                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition text-white"
+              >
+                <Code className="w-5 h-5" />
+                <span>View Code</span>
+              </button>
+              <button 
+                onClick={() => { handleCopy(); setIsMobileMenuOpen(false) }}
+                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition text-white"
+              >
+                <Copy className="w-5 h-5" />
+                <span>Copy Code</span>
+              </button>
+              <button 
+                onClick={() => { handleDownload(); setIsMobileMenuOpen(false) }}
+                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition text-white"
+              >
+                <Download className="w-5 h-5" />
+                <span>Download</span>
+              </button>
+              <button 
+                onClick={() => { handleRefresh(); setIsMobileMenuOpen(false) }}
+                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition text-white"
+              >
+                <RefreshCw className="w-5 h-5" />
+                <span>Refresh</span>
+              </button>
+
+              <div className="my-4 border-t border-gray-700"></div>
+
+              <button 
+                onClick={() => { handleDelete(); setIsMobileMenuOpen(false) }}
+                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition text-red-400"
+              >
+                <Trash2 className="w-5 h-5" />
+                <span>Delete Project</span>
+              </button>
+              <button 
+                onClick={() => { handleClose(); setIsMobileMenuOpen(false) }}
+                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition text-gray-400"
+              >
+                <X className="w-5 h-5" />
+                <span>Close</span>
+              </button>
+            </nav>
+          </div>
+        </>
+      )}
+
+      {/* Main Content */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Preview Pane */}
+        <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
+          {project.code ? (
+            <div 
+              className="bg-white rounded-lg shadow-2xl transition-all duration-300"
+              style={{ 
+                width: getViewWidth(),
+                height: viewMode === 'mobile' ? '667px' : '100%',
+                maxWidth: '100%',
+                maxHeight: '100%'
+              }}
+            >
+              <iframe
+                srcDoc={sanitizeForPreview(project.code)}
+                className="w-full h-full rounded-lg"
+                title="Preview"
+                sandbox="allow-scripts allow-same-origin"
+              />
             </div>
           ) : (
-            // Preview View
-            <div className="h-full flex items-center justify-center p-6">
-              <div 
-                className="bg-white shadow-2xl transition-all duration-300 overflow-hidden"
-                style={{
-                  width: viewMode === 'desktop' ? '100%' : viewMode === 'tablet' ? '768px' : '375px',
-                  height: '100%',
-                  maxWidth: '100%',
-                  borderRadius: viewMode === 'desktop' ? '0' : '12px'
-                }}
+            <div className="text-center">
+              <p className="text-gray-400 mb-4">No preview available</p>
+              <button
+                onClick={handleEdit}
+                className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition"
               >
-                <iframe
-                  srcDoc={code}
-                  className="w-full h-full border-0"
-                  sandbox="allow-scripts allow-forms allow-modals allow-popups allow-same-origin"
-                  title="Preview"
-                  style={{ background: 'white' }}
-                />
-              </div>
+                Generate Code
+              </button>
             </div>
           )}
         </div>
 
-        {/* Status Bar */}
-        <div className="bg-gray-800 border-t border-gray-700 px-6 py-2 flex-shrink-0">
-          <div className="flex items-center justify-between text-xs text-gray-400">
-            <div className="flex items-center gap-4">
-              <span>✅ Interactive</span>
-              <span>💾 LocalStorage enabled</span>
-              <span>🔒 Safe preview mode</span>
+        {/* Code View */}
+        {showCode && project.code && (
+          <div className="w-full lg:w-1/2 bg-gray-900 border-l border-gray-800 overflow-auto">
+            <div className="sticky top-0 bg-gray-900 border-b border-gray-800 p-4 flex items-center justify-between">
+              <h3 className="text-white font-semibold">Code</h3>
+              <button
+                onClick={() => setShowCode(false)}
+                className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <div>
-              {viewMode === 'desktop' && '🖥️ Desktop View'}
-              {viewMode === 'tablet' && '📱 Tablet (768px)'}
-              {viewMode === 'mobile' && '📱 Mobile (375px)'}
+            <div className="p-4">
+              <pre className="text-sm text-gray-300 overflow-x-auto">
+                <code>{project.code}</code>
+              </pre>
             </div>
           </div>
-        </div>
+        )}
       </div>
-    </>
+    </div>
   )
 }

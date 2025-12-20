@@ -85,79 +85,62 @@ export async function POST(request: NextRequest) {
     }
 
 
-    const systemPrompt = `You are an expert web developer creating production-ready HTML pages with Tailwind CSS.
+    const systemPrompt = `You are an expert web developer. Generate production-ready HTML code.
 
-CRITICAL REQUIREMENTS:
-1. Generate COMPLETE, SINGLE-FILE HTML with ALL content in ONE file
-2. Use Tailwind CSS via CDN: <script src="https://cdn.tailwindcss.com"></script>
-3. Make it fully responsive (mobile, tablet, desktop)
-4. Include modern design with gradients, shadows, and animations
-5. Add meta tags for SEO and viewport
-6. ALWAYS include a professional footer at the bottom with:
-   - Multiple columns (4 columns on desktop, stack on mobile)
-   - Company info, links, social media icons
-   - Copyright notice
-   - Dark background (bg-gray-900 or similar)
-   - Links that work (use # for demo)
-7. Use semantic HTML5 elements
-8. Include hover effects and transitions
-9. Make all interactive elements functional with JavaScript if needed
-10. Ensure high contrast for accessibility
+IMPORTANT: Always include a professional footer section with:
+- Copyright notice
+- Social media links (placeholder hrefs)
+- Navigation links (About, Contact, Privacy, Terms)
+- Responsive design
+- Consistent styling with the rest of the page
 
-Project type: ${type}
-
-OUTPUT FORMAT:
-- Return ONLY the complete HTML code
-- NO explanations, NO markdown, NO code fences
-- Start with <!DOCTYPE html>
-- Include EVERYTHING in one file (CSS in <style>, JS in <script>)
-
-FOOTER TEMPLATE (ALWAYS include this at the end of <body>):
-<footer class="bg-gray-900 text-white py-12 mt-16 border-t border-gray-800">
-  <div class="max-w-7xl mx-auto px-6">
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+Example footer structure:
+<footer class="bg-gray-900 text-white py-12">
+  <div class="max-w-7xl mx-auto px-4">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
       <div>
-        <h3 class="font-bold text-xl mb-4">Brand Name</h3>
-        <p class="text-gray-400 text-sm">Your tagline here</p>
+        <h3 class="text-white font-bold text-lg mb-4">BuildFlow</h3>
+        <p class="text-gray-400 text-sm">
+          AI-powered no-code platform for building production-ready web applications
+        </p>
       </div>
       <div>
-        <h4 class="font-semibold mb-4">Product</h4>
-        <ul class="space-y-2 text-sm text-gray-400">
-          <li><a href="#" class="hover:text-white transition">Features</a></li>
-          <li><a href="#" class="hover:text-white transition">Pricing</a></li>
-          <li><a href="#" class="hover:text-white transition">Docs</a></li>
+        <h4 class="text-white font-semibold mb-4">Product</h4>
+        <ul class="space-y-2">
+          <li><a href="#" class="text-gray-400 hover:text-white text-sm">Features</a></li>
+          <li><a href="#" class="text-gray-400 hover:text-white text-sm">Pricing</a></li>
+          <li><a href="#" class="text-gray-400 hover:text-white text-sm">Templates</a></li>
         </ul>
       </div>
       <div>
-        <h4 class="font-semibold mb-4">Company</h4>
-        <ul class="space-y-2 text-sm text-gray-400">
-          <li><a href="#" class="hover:text-white transition">About</a></li>
-          <li><a href="#" class="hover:text-white transition">Blog</a></li>
-          <li><a href="#" class="hover:text-white transition">Contact</a></li>
+        <h4 class="text-white font-semibold mb-4">Company</h4>
+        <ul class="space-y-2">
+          <li><a href="#" class="text-gray-400 hover:text-white text-sm">About</a></li>
+          <li><a href="#" class="text-gray-400 hover:text-white text-sm">Contact</a></li>
         </ul>
       </div>
       <div>
-        <h4 class="font-semibold mb-4">Legal</h4>
-        <ul class="space-y-2 text-sm text-gray-400">
-          <li><a href="#" class="hover:text-white transition">Privacy</a></li>
-          <li><a href="#" class="hover:text-white transition">Terms</a></li>
+        <h4 class="text-white font-semibold mb-4">Legal</h4>
+        <ul class="space-y-2">
+          <li><a href="#" class="text-gray-400 hover:text-white text-sm">Privacy Policy</a></li>
+          <li><a href="#" class="text-gray-400 hover:text-white text-sm">Terms of Service</a></li>
         </ul>
       </div>
     </div>
-    <div class="border-t border-gray-800 pt-8">
-      <div class="flex flex-col md:flex-row justify-between items-center gap-4">
-        <p class="text-sm text-gray-400">© 2024 Company Name. All rights reserved.</p>
-        <div class="flex gap-6 text-sm">
-          <a href="#" class="text-gray-400 hover:text-white transition">Twitter</a>
-          <a href="#" class="text-gray-400 hover:text-white transition">GitHub</a>
-          <a href="#" class="text-gray-400 hover:text-white transition">LinkedIn</a>
-        </div>
+    <div class="border-t border-gray-800 mt-8 pt-8 text-center">
+      <p class="text-gray-400 text-sm">
+        © {new Date().getFullYear()} BuildFlow. All rights reserved.
+      </p>
+      <div class="flex justify-center gap-4 mt-4">
+        <a href="#" class="text-gray-400 hover:text-white text-lg" aria-label="Twitter">Twitter</a>
+        <a href="#" class="text-gray-400 hover:text-white text-lg" aria-label="GitHub">GitHub</a>
+        <a href="#" class="text-gray-400 hover:text-white text-lg" aria-label="LinkedIn">LinkedIn</a>
       </div>
     </div>
   </div>
 </footer>
 
-Remember: ALWAYS include a footer. Every page needs one.`
+Generate: ${prompt}`
 
     console.log('Calling Claude API...');
     
