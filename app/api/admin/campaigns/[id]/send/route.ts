@@ -74,7 +74,8 @@ export async function POST(
         await prisma.emailSend.create({
           data: {
             campaignId: campaign.id,
-            subscriberEmail: subscriber.email
+            subscriberEmail: subscriber.email,
+            user_id: session.user.id
           }
         })
 
