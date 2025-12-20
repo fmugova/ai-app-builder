@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
@@ -23,7 +23,6 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-  
   User              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
@@ -34,7 +33,6 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-  
   User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -48,169 +46,171 @@ model VerificationToken {
 
 // ============ USER MODEL ============
 model User {
-  id                    String           @id @default(cuid())
+  id                    String                 @id @default(cuid())
   name                  String?
-  email                 String           @unique
+  email                 String                 @unique
   emailVerified         DateTime?
   password              String?
   image                 String?
-  createdAt             DateTime         @default(now())
-  updatedAt             DateTime         @updatedAt
-  
-  // Subscription & Billing
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  discountRate          Float                  @default(0)
   promoCodeUsed         String?
-  discountRate          Float?           @default(0)
-  subscriptionTier      String           @default("free")
-  subscriptionStatus    String           @default("active")
-  stripeCustomerId      String?          @unique
-  stripeSubscriptionId  String?          @unique
-  
-  // Usage Limits
-  generationsUsed       Int              @default(0)
-  generationsLimit      Int              @default(3)
-  projectsThisMonth     Int              @default(0)
-  projectsLimit         Int              @default(3)
-  subscriptionResetDate DateTime         @default(now())
-  
-  // User Preferences
   bio                   String?
-  theme                 String           @default("light")
-  notifications         Boolean          @default(true)
-  autoSave              Boolean          @default(true)
-  role                  String           @default("user")
-  
-  // GitHub Integration
   githubAccessToken     String?
   githubUsername        String?
-  
-  // Relations
-  Account               Account[]
-  Session               Session[]
-  Project               Project[]
-  ProjectVersion        ProjectVersion[]
-  Subscription          Subscription[]
-  Generation            Generation[]
-  Feedback              Feedback[]
-  Activity              Activity[]
-  ProjectShare          ProjectShare[]
-
-  // Newsletter & Campaigns
-  newsletterSubscriber  NewsletterSubscriber?
-  emailCampaigns        EmailCampaign[]
+  subscriptionTier      String                 @default("free")
+  subscriptionStatus    String                 @default("active")
+  stripeCustomerId      String?                @unique
+  stripeSubscriptionId  String?                @unique
+  generationsUsed       Int                    @default(0)
+  generationsLimit      Int                    @default(10)
+  projectsThisMonth     Int                    @default(0)
+  projectsLimit         Int                    @default(3)
+  subscriptionResetDate DateTime?
+  theme                 String                 @default("dark")
+  notifications         Boolean                @default(true)
+  autoSave              Boolean                @default(true)
+  role                  String                 @default("user")
+  cancelAtPeriodEnd     Boolean                @default(false)
+  currentPeriodEnd      DateTime?
+  currentPeriodStart    DateTime?
+  accounts              Account[]
+  activities            Activity[]
+  dripEnrollments       DripEnrollment[]
+  createdCampaigns      EmailCampaign[]        @relation("CreatedCampaigns")
+  feedback              Feedback[]
+  generations           Generation[]
+  newsletterSubscribers NewsletterSubscriber[]
+  projects              Project[]
+  projectSharesReceived ProjectShare[]         @relation("UserProjectShares")
+  projectVersions       ProjectVersion[]
+  sessions              Session[]
+  subscriptions         Subscription?
 }
 
 // Newsletter Subscriber
 model NewsletterSubscriber {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  name          String?
-  status        String   @default("active") // active, unsubscribed, bounced
-  source        String?  // signup_form, user_account, import
-  subscribedAt  DateTime @default(now())
+  id             String    @id @default(cuid())
+  email          String    @unique
+  name           String?
+  status         String    @default("active")
+  source         String?
+  subscribedAt   DateTime  @default(now())
   unsubscribedAt DateTime?
-  preferences   Json?    // { frequency: 'weekly', topics: ['updates', 'tips'] }
-  metadata      Json?    // Additional data like location, referrer, etc.
-  userId        String?  @unique
-  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  preferences    Json?
+  metadata       Json?
+  userId         String?
+  user           User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([email])
+  @@index([email], map: "idx_newslettersubscriber_email")
   @@index([status])
   @@index([subscribedAt])
+  @@index([userId], map: "idx_newslettersubscriber_userid")
 }
 
 // Email Campaign
 model EmailCampaign {
-  id              String   @id @default(cuid())
-  name            String
-  subject         String
-  previewText     String?
-  htmlContent     String   @db.Text
-  status          String   @default("draft") // draft, scheduled, sending, sent, paused
-  scheduledFor    DateTime?
-  sentAt          DateTime?
-  segment         String   @default("all") // all, free, pro, business, enterprise
-  totalSent       Int      @default(0)
-  totalOpened     Int      @default(0)
-  totalClicked    Int      @default(0)
-  totalBounced    Int      @default(0)
-  totalUnsubscribed Int    @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  createdBy       String
-  creator         User     @relation(fields: [createdBy], references: [id])
-  sends           EmailSend[]
+  id                String      @id @default(cuid())
+  name              String
+  subject           String
+  previewText       String?
+  htmlContent       String
+  status            String      @default("draft")
+  scheduledFor      DateTime?
+  sentAt            DateTime?
+  segment           String      @default("all")
+  totalSent         Int         @default(0)
+  totalOpened       Int         @default(0)
+  totalClicked      Int         @default(0)
+  totalBounced      Int         @default(0)
+  totalUnsubscribed Int         @default(0)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @default(now()) @updatedAt
+  createdBy         String
+  creator           User        @relation("CreatedCampaigns", fields: [createdBy], references: [id])
+  sends             EmailSend[]
 
+  @@index([createdBy], map: "idx_emailcampaign_createdby")
   @@index([status])
   @@index([scheduledFor])
   @@index([createdAt])
 }
 
-// Email Send (tracking individual sends)
+// Email Send
 model EmailSend {
-  id              String   @id @default(cuid())
+  id              String        @id @default(cuid())
   campaignId      String
-  campaign        EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   subscriberEmail String
-  sentAt          DateTime @default(now())
+  sentAt          DateTime      @default(now())
   openedAt        DateTime?
   clickedAt       DateTime?
   bouncedAt       DateTime?
   unsubscribedAt  DateTime?
-  metadata        Json?    // Click tracking, links clicked, etc.
+  metadata        Json?
+  user_id         String        @db.Uuid
+  campaign        EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
   @@index([campaignId])
+  @@index([campaignId], map: "idx_emailsend_campaign_id")
   @@index([subscriberEmail])
   @@index([sentAt])
+  @@index([user_id], map: "idx_emailsend_user_id")
 }
 
-// Drip Campaign (Automated sequences)
+// Drip Campaign
 model DripCampaign {
-  id              String   @id @default(cuid())
-  name            String
-  description     String?
-  status          String   @default("active") // active, paused, archived
-  trigger         String   // signup, upgrade, project_created, etc.
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  emails          DripEmail[]
-  enrollments     DripEnrollment[]
+  id          String           @id @default(cuid())
+  name        String
+  description String?
+  status      String           @default("active")
+  trigger     String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @default(now()) @updatedAt
+  emails      DripEmail[]
+  enrollments DripEnrollment[]
 
   @@index([status])
   @@index([trigger])
 }
 
-// Individual emails in a drip sequence
+// Drip Email
 model DripEmail {
-  id              String   @id @default(cuid())
-  campaignId      String
-  campaign        DripCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  name            String
-  subject         String
-  htmlContent     String   @db.Text
-  delayDays       Int      // Send X days after trigger
-  delayHours      Int      @default(0)
-  order           Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id          String       @id @default(cuid())
+  campaignId  String
+  name        String
+  subject     String
+  htmlContent String
+  delayDays   Int
+  delayHours  Int          @default(0)
+  order       Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @default(now()) @updatedAt
+  campaign    DripCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
   @@index([campaignId])
+  @@index([campaignId], map: "idx_dripemail_campaignid")
   @@index([order])
 }
 
-// Track who's enrolled in drip campaigns
+// Drip Enrollment
 model DripEnrollment {
-  id              String   @id @default(cuid())
-  campaignId      String
-  campaign        DripCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  userEmail       String
-  enrolledAt      DateTime @default(now())
-  completedAt     DateTime?
-  unsubscribedAt  DateTime?
-  emailsSent      Json?    // Array of email IDs and send dates
+  id             String       @id @default(cuid())
+  campaignId     String
+  userEmail      String
+  userId         String
+  enrolledAt     DateTime     @default(now())
+  completedAt    DateTime?
+  unsubscribedAt DateTime?
+  emailsSent     Json?
+  campaign       DripCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([campaignId])
-  @@index([userEmail])
   @@index([enrolledAt])
+  @@index([userEmail])
+  @@index([userEmail], map: "idx_drip_enrollment_useremail")
+  @@index([userId])
 }
 
 // ============ PROJECT MODEL ============
@@ -220,29 +220,26 @@ model Project {
   name           String
   description    String?
   type           String
-  prompt         String?          @db.Text
-  code           String           @db.Text
-  language       String?
-  framework      String?
+  code           String
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
   isPublic       Boolean          @default(false)
   shareToken     String?          @unique
-  
-  // Project Stats
   views          Int              @default(0)
   downloads      Int              @default(0)
   tags           String[]         @default([])
-  
-  // Relations
+  prompt         String?
+  language       String?
+  framework      String?
   User           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ProjectVersion ProjectVersion[]
   ProjectShare   ProjectShare[]
-  
-  @@index([shareToken])
-  @@index([userId])
+  ProjectVersion ProjectVersion[]
+
   @@index([isPublic])
+  @@index([shareToken])
   @@index([updatedAt])
+  @@index([userId])
+  @@index([userId], map: "idx_project_userid")
   @@index([userId, updatedAt])
 }
 
@@ -251,16 +248,16 @@ model ProjectVersion {
   id          String   @id @default(cuid())
   projectId   String
   version     Int
-  code        String   @db.Text
+  code        String
   description String?
   createdAt   DateTime @default(now())
   userId      String?
-  
   Project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   User        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@index([userId])
+  @@index([userId], map: "idx_projectversion_userid")
 }
 
 // ============ GENERATION MODEL ============
@@ -268,14 +265,14 @@ model Generation {
   id        String   @id @default(cuid())
   userId    String
   createdAt DateTime @default(now())
-  prompt    String   @db.Text
-  code      String   @db.Text
+  prompt    String
+  code      String
   type      String
-  
   User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([createdAt])
   @@index([userId])
+  @@index([userId], map: "idx_generation_userid")
 }
 
 // ============ ACTIVITY MODEL ============
@@ -286,11 +283,11 @@ model Activity {
   action    String
   metadata  Json?
   createdAt DateTime @default(now())
-  
   User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([createdAt])
   @@index([userId])
+  @@index([userId], map: "idx_activity_userid")
 }
 
 // ============ FEEDBACK MODEL ============
@@ -299,18 +296,18 @@ model Feedback {
   userId    String
   type      String
   subject   String
-  message   String   @db.Text
+  message   String
   status    String   @default("pending")
   priority  String   @default("medium")
-  response  String?  @db.Text
+  response  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@index([userId])
-  @@index([status])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([createdAt])
+  @@index([status])
+  @@index([userId])
+  @@index([userId], map: "idx_feedback_userid")
 }
 
 // ============ PROJECT SHARE MODEL ============
@@ -321,12 +318,12 @@ model ProjectShare {
   permission String    @default("view")
   createdAt  DateTime  @default(now())
   expiresAt  DateTime?
-  
   Project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  User       User      @relation(fields: [sharedWith], references: [id], onDelete: Cascade)
+  user       User      @relation("UserProjectShares", fields: [sharedWith], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@index([sharedWith])
+  @@index([sharedWith], map: "idx_projectshare_sharedwith")
 }
 
 // ============ PROMO CODES MODEL ============
@@ -343,6 +340,7 @@ model PromoCodes {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  @@index([active], map: "idx_promo_codes_active")
   @@index([code])
   @@index([active])
   @@map("promo_codes")
@@ -362,12 +360,12 @@ model Subscription {
   currentPeriodStart   DateTime  @default(now())
   currentPeriodEnd     DateTime?
   cancelAtPeriodEnd    Boolean   @default(false)
-  
   User                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
   @@index([userId])
+  @@index([userId], map: "idx_subscription_userid")
 }
 
 // ============ ANALYTICS EVENT MODEL ============
@@ -381,4 +379,5 @@ model AnalyticsEvent {
   @@index([createdAt])
   @@index([event])
   @@index([userId])
+  @@index([userId], map: "idx_analyticsevent_userid")
 }

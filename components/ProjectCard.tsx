@@ -75,86 +75,73 @@ export function ProjectCard({ project }: ProjectCardProps) {
   }
 
   return (
-    <div className="bg-gray-800 rounded-xl overflow-hidden border border-gray-700 hover:border-purple-500 transition group">
+    <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden hover:border-purple-500 transition">
       {/* Gradient Header */}
       <div className="h-2 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500"></div>
-      
-      {/* Content */}
+
+      {/* Project Info */}
       <div className="p-6">
         <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
-              <span className="text-xl">📱</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-lg font-bold text-white mb-1 truncate group-hover:text-purple-400 transition">
-                {project.name}
-              </h3>
-              <p className="text-xs text-gray-500">
-                {new Date(project.updatedAt).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric'
-                })}
-              </p>
-            </div>
+          <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-xl flex items-center justify-center">
+            <Edit className="w-6 h-6 text-white" />
           </div>
+          <span className="text-xs text-gray-500">
+            {new Date(project.updatedAt).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric'
+            })}
+          </span>
         </div>
 
-        {project.description && (
-          <p className="text-sm text-gray-400 mb-4 line-clamp-2">
-            {project.description}
-          </p>
-        )}
+        {/* Title - Fixed truncation */}
+        <h3 className="text-lg font-semibold text-white mb-2 line-clamp-1" title={project.name}>
+          {project.name}
+        </h3>
+
+        {/* Description - Fixed truncation */}
+        <p className="text-sm text-gray-400 mb-6 line-clamp-2 min-h-[40px]">
+          {project.description || 'No description provided'}
+        </p>
 
         {/* Action Buttons */}
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          <Link
-            href={`/builder?project=${project.id}`}
-            className="flex items-center justify-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition text-sm"
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <button
+            onClick={() => router.push(`/builder?project=${project.id}`)}
+            className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition text-sm flex items-center justify-center gap-2"
           >
             <Edit className="w-4 h-4" />
-            <span>Edit</span>
-          </Link>
-          <Link
-            href={`/preview/${project.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm"
+            Edit
+          </button>
+          <button
+            onClick={() => router.push(`/preview/${project.id}`)}
+            className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm flex items-center justify-center gap-2"
           >
             <Eye className="w-4 h-4" />
-            <span>Preview</span>
-          </Link>
-          <Link
-            href={`/projects/${project.id}`}
-            className="flex items-center justify-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition text-sm"
-          >
-            <Code className="w-4 h-4" />
-            <span>Code</span>
-          </Link>
+            Preview
+          </button>
         </div>
 
         <div className="grid grid-cols-3 gap-2">
           <button
             onClick={handleExport}
-            className="flex items-center justify-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition text-sm"
+            className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition text-sm flex items-center justify-center gap-1"
           >
-            <Download className="w-4 h-4" />
-            <span>Export</span>
+            <Download className="w-3 h-3" />
+            <span className="hidden sm:inline">Export</span>
           </button>
           <button
             onClick={handleCopy}
-            className="flex items-center justify-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition text-sm"
+            className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition text-sm flex items-center justify-center gap-1"
           >
-            <Copy className="w-4 h-4" />
-            <span>Copy</span>
+            <Copy className="w-3 h-3" />
+            <span className="hidden sm:inline">Copy</span>
           </button>
           <button
             onClick={handleDelete}
-            disabled={isDeleting}
-            className="flex items-center justify-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition text-sm disabled:opacity-50"
+            className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition text-sm flex items-center justify-center gap-1"
           >
-            <Trash2 className="w-4 h-4" />
-            <span>Delete</span>
+            <Trash2 className="w-3 h-3" />
+            <span className="hidden sm:inline">Delete</span>
           </button>
         </div>
       </div>

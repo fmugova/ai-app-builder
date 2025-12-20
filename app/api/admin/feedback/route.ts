@@ -1,42 +1,42 @@
 export const dynamic = 'force-dynamic'
 
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
-import { isAdmin } from '@/lib/admin'
 
-export async function GET(request: NextRequest) {
+import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+import { prisma } from '@/lib/prisma'
+
+export async function GET() {
   try {
     const session = await getServerSession(authOptions)
-
-    // Check if user is admin
-    if (!session?.user?.email || !isAdmin(session.user.email)) {
+    
+    if (!session?.user || session.user.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    // Get all feedback
-    const feedback = await prisma.feedback.findMany({
-      include: {
-        user: {
-          select: {
-            name: true,
-            email: true
+    try {
+      const feedback = await prisma.feedback.findMany({
+        orderBy: {
+          createdAt: 'desc'
+        },
+        include: {
+          user: {
+            select: {
+              name: true,
+              email: true
+            }
           }
         }
-      },
-      orderBy: [
-        { status: 'asc' }, // pending first
-        { createdAt: 'desc' }
-      ]
-    })
+      })
 
-    return NextResponse.json(feedback)
+      return NextResponse.json(feedback)
+    } catch (error) {
+      // Table doesn't exist yet, return empty array
+      console.log('Feedback table not found, returning empty array')
+      return NextResponse.json([])
+    }
   } catch (error) {
     console.error('Feedback error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch feedback' },
-      { status: 500 }
-    )
+    return NextResponse.json([])
   }
 }

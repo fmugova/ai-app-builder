@@ -1,11 +1,10 @@
 export const dynamic = 'force-dynamic'
 
+
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { prisma } from '@/lib/prisma'
-
-const ADMIN_EMAILS = process.env.ADMIN_EMAILS?.split(',').map(e => e.trim()) || []
 
 export async function PATCH(
   request: NextRequest,
@@ -14,45 +13,19 @@ export async function PATCH(
   try {
     const session = await getServerSession(authOptions)
 
-    // Check if user is admin
-    if (!session?.user?.email || !ADMIN_EMAILS.includes(session.user.email)) {
+    if (!session?.user || session.user.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    const { id } = params
-    const body = await request.json()
-    const { response, status } = body
+    const { response, status } = await request.json()
 
-    // Update feedback
     const updatedFeedback = await prisma.feedback.update({
-      where: { id },
+      where: { id: params.id },
       data: {
         response,
-        status,
-        updatedAt: new Date()
+        status
       }
     })
-
-    // Get admin user ID
-    const adminUser = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true }
-    })
-
-    // Log activity
-    if (adminUser) {
-      await prisma.activity.create({
-        data: {
-          userId: adminUser.id,
-          type: 'feedback_response',
-          action: 'Feedback Responded',
-          metadata: {
-            feedbackId: id,
-            status
-          }
-        }
-      })
-    }
 
     return NextResponse.json(updatedFeedback)
   } catch (error) {

@@ -25,13 +25,71 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
   const [showCode, setShowCode] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
-  // Sanitize and wrap preview HTML to ensure all links open in a new tab
+  // Enhanced sanitize with React support
   function sanitizeForPreview(code: string): string {
     let sanitized = code || ''
 
-    // If not a full HTML doc, wrap it
-    if (!sanitized.includes('<html') && !sanitized.includes('<!DOCTYPE')) {
+    // If already complete HTML, add base target
+    if (sanitized.includes('<head>')) {
+      if (!sanitized.includes('<base')) {
+        sanitized = sanitized.replace('<head>', '<head>\n  <base target="_blank">')
+      }
+      return sanitized
+    }
+
+    // Detect React/JSX code
+    const isReactCode = 
+      sanitized.includes('export default function') ||
+      sanitized.includes('useState') ||
+      sanitized.includes('useEffect') ||
+      sanitized.includes('className=') ||
+      /function\s+\w+\s*\([^)]*\)\s*\{[\s\S]*?return\s*\(/i.test(sanitized)
+
+    if (isReactCode) {
+      let reactCode = sanitized.replace(/```(?:tsx|jsx|javascript|js)?\n?/g, '')
+      
+      // Extract JSX from component
+      const componentMatch = reactCode.match(/export\s+default\s+function\s+\w+[\s\S]*?\{[\s\S]*?return\s*\([\s\S]*?\)\s*\}/s)
+      if (componentMatch) {
+        const returnMatch = componentMatch[0].match(/return\s*\([\s\S]*?\)(?=\s*\})/s)
+        if (returnMatch) {
+          reactCode = returnMatch[0].replace(/^return\s*\(/, '').replace(/\)$/, '')
+        }
+      }
+      
       return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base target="_blank">
+  <title>Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+    
+    function App() {
+      return (
+        ${reactCode}
+      );
+    }
+    
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>`
+    }
+
+    // Regular HTML
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -45,14 +103,6 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
   ${sanitized.trim()}
 </body>
 </html>`
-    }
-
-    // If <head> exists, inject <base target="_blank">
-    if (sanitized.includes('<head>')) {
-      return sanitized.replace('<head>', '<head>\n  <base target="_blank">')
-    }
-
-    return sanitized
   }
 
   useEffect(() => {

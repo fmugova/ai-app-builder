@@ -8,7 +8,7 @@ import { analytics } from '@/lib/analytics'
 import { Loader2 } from 'lucide-react'
 import { EnhancedPromptInput } from '@/components/EnhancedPromptInput'
 
-// Sanitize function
+// Enhanced sanitize function with proper React support
 function sanitizeForPreview(code: string): string {
   let sanitized = code
     .replace(/<a\s+[^>]*href=["']\/dashboard["'][^>]*>[\s\S]*?<\/a>/gi, '')
@@ -25,50 +25,76 @@ function sanitizeForPreview(code: string): string {
     .replace(/onclick=["'][^"']*dashboard[^"']*["']/gi, 'onclick="return false"')
     .replace(/onclick=["'][^"']*builder[^"']*["']/gi, 'onclick="return false"')
     .replace(/onclick=["'][^"']*router\.push[^"']*["']/gi, 'onclick="return false"')
-    .replace(/import\s+{\s*useRouter\s*}\s+from\s+['"]next\/navigation['"]/gi, '')
-    .replace(/import\s+{\s*Link\s*}\s+from\s+['"]next\/link['"]/gi, '')
-    .replace(/const\s+router\s*=\s*useRouter\(\)/gi, '')
-    .replace(/router\.push\([^)]*\)/gi, '')
-    .replace(/router\.replace\([^)]*\)/gi, '')
-    .replace(/window\.location\s*=\s*["'][^"']*\/dashboard[^"']*["']/gi, '')
-    .replace(/window\.location\.href\s*=\s*["'][^"']*\/dashboard[^"']*["']/gi, '')
-    .replace(/window\.location\s*=\s*["'][^"']*\/builder[^"']*["']/gi, '')
-    .replace(/window\.location\.href\s*=\s*["'][^"']*\/builder[^"']*["']/gi, '')
 
+  // If already a complete HTML document, return as-is
   if (sanitized.trim().startsWith('<!DOCTYPE') || 
       sanitized.trim().startsWith('<html') ||
       (sanitized.includes('<head>') && sanitized.includes('<body>'))) {
+    if (sanitized.includes('<head>') && !sanitized.includes('<base')) {
+      sanitized = sanitized.replace('<head>', '<head>\n  <base target="_blank">')
+    }
     return sanitized
   }
 
+  // Detect React/JSX code
   const isReactCode = 
     sanitized.includes('export default function') ||
-    sanitized.includes('export default class') ||
-    sanitized.includes('import React') ||
     sanitized.includes('useState') ||
     sanitized.includes('useEffect') ||
     sanitized.includes('className=') ||
     sanitized.includes('```tsx') ||
-    sanitized.includes('```jsx')
+    sanitized.includes('```jsx') ||
+    /function\s+\w+\s*\([^)]*\)\s*\{[\s\S]*?return\s*\(/i.test(sanitized)
 
   if (isReactCode) {
-    sanitized = sanitized.replace(/```tsx|```jsx|```html|```/g, '')
-    sanitized = sanitized.replace(/import\s+.*?from\s+['"][^'"]+['"]\s*;?\n?/g, '')
-    sanitized = sanitized.replace(/import\s+['"][^'"]+['"]\s*;?\n?/g, '')
-    sanitized = sanitized.replace(/['"]use client['"]\s*;?\n?/g, '')
-    sanitized = sanitized.replace(/export\s+default\s+function\s+\w+\s*\([^)]*\)\s*\{?\s*\n?\s*return\s*\(?/g, '')
-    sanitized = sanitized.replace(/function\s+\w+\s*\([^)]*\)\s*\{?\s*\n?\s*return\s*\(?/g, '')
-    sanitized = sanitized.replace(/const\s+\w+\s*=\s*\([^)]*\)\s*=>\s*\{?\s*\n?\s*return\s*\(?/g, '')
-    sanitized = sanitized.replace(/const\s+\w+\s*=\s*\([^)]*\)\s*=>\s*\(?/g, '')
-    sanitized = sanitized.replace(/\)?\s*;?\s*\}?\s*$/, '')
-    sanitized = sanitized.replace(/className=/g, 'class=')
-    sanitized = sanitized.replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
-    sanitized = sanitized.replace(/\{['"`]([^'"`]+)['"`]\}/g, '$1')
-    sanitized = sanitized.replace(/\{[\s\S]*?\.map\([\s\S]*?\)\}/g, '')
+    // Clean markdown code blocks
+    let reactCode = sanitized.replace(/```(?:tsx|jsx|javascript|js)?\n?/g, '')
+    
+    // Extract JSX content from component
+    const componentMatch = reactCode.match(/export\s+default\s+function\s+\w+[\s\S]*?\{[\s\S]*?return\s*\([\s\S]*?\)\s*\}/s)
+    if (componentMatch) {
+      const returnMatch = componentMatch[0].match(/return\s*\([\s\S]*?\)(?=\s*\})/s)
+      if (returnMatch) {
+        reactCode = returnMatch[0].replace(/^return\s*\(/, '').replace(/\)$/, '')
+      }
+    }
+    
+    // Wrap in HTML with React via CDN and Babel for JSX transpilation
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base target="_blank">
+  <title>Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+    
+    function App() {
+      return (
+        ${reactCode}
+      );
+    }
+    
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>`
   }
 
-  if (!sanitized.includes('<html') && !sanitized.includes('<!DOCTYPE')) {
-    return `<!DOCTYPE html>
+  // Regular HTML content
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -84,13 +110,6 @@ function sanitizeForPreview(code: string): string {
   ${sanitized.trim()}
 </body>
 </html>`
-  }
-
-  if (sanitized.includes('<head>')) {
-    return sanitized.replace('<head>', '<head>\n  <base target="_blank">')
-  }
-
-  return sanitized
 }
 
 function BuilderContent() {

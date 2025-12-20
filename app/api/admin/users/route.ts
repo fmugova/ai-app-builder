@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
         role: true,
         _count: {
           select: {
-            Project: true
+            projects: true
           }
         }
       },
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     // Transform to include actual project count
     const usersWithProjectCount = users.map(user => ({
       ...user,
-      projectCount: user._count.Project,
+      projectCount: (user as any)._count?.projects ?? 0,
       _count: undefined
     }))
 

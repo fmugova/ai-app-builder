@@ -77,6 +77,8 @@ export default function DashboardClient({
   const [isDarkMode, setIsDarkMode] = useState(true)
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [exportProject, setExportProject] = useState<Project | null>(null)
+  // Account menu state
+  const [showAccountMenu, setShowAccountMenu] = useState(false)
 
   // Load dark mode preference from localStorage
   useEffect(() => {
@@ -172,53 +174,129 @@ export default function DashboardClient({
   const generationsPercentage = getUsagePercentage(stats.generationsUsed, stats.generationsLimit)
 
   return (
+
     <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
       {/* Header */}
-      <header className="bg-gray-900 border-b border-gray-800 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">              {/* Logo */}
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-white">BuildFlow</h1>
-              </div>
-
-              {/* Top Action Buttons - Hide on mobile, show in menu */}
-              <div className="hidden lg:flex items-center gap-3">
-                {/* Dark Mode Toggle */}
-                <button
-                  onClick={() => setIsDarkMode(!isDarkMode)}
-                  className="p-2 hover:bg-gray-800 rounded-lg transition"
-                  title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-                >
-                  {isDarkMode ? <SunIcon /> : <MoonIcon />}
-                </button>
-                            {/* Dark Mode Toggle */}
-                            <button
-                              onClick={() => setIsDarkMode && setIsDarkMode((prev: boolean) => !prev)}
-                              className="p-2 hover:bg-gray-800 rounded-lg transition"
-                              title="Toggle theme"
-                            >
-                              {isDarkMode ? <SunIcon /> : <MoonIcon />}
-                            </button>
-              <button className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition">
-                Enterprise
-              </button>
-              <button 
-                onClick={() => window.location.href = '/contact'}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+      <header className="bg-gray-900/50 backdrop-blur-sm border-b border-gray-800 sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <a href="/" className="text-2xl font-bold text-white">
+            BuildFlow
+          </a>
+          <div className="flex items-center gap-3">
+            {/* Theme Toggle */}
+            <button
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              className="p-2 hover:bg-gray-800 rounded-lg transition"
+              aria-label="Toggle theme"
+              title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {isDarkMode ? <SunIcon /> : <MoonIcon />}
+            </button>
+            {/* Settings */}
+            <a
+              href="/settings"
+              className="p-2 hover:bg-gray-800 rounded-lg transition"
+              title="Settings"
+            >
+              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 0V4m0 16v-4m8-4h-4m-8 0H4" /></svg>
+            </a>
+            {/* Enterprise Link */}
+            <a
+              href="/enterprise"
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition text-sm font-medium"
+            >
+              Enterprise
+            </a>
+            {/* Contact Support */}
+            <a
+              href="/contact"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm font-medium"
+            >
+              Contact Support
+            </a>
+            {/* Account Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowAccountMenu && setShowAccountMenu((v: boolean) => !v)}
+                className="flex items-center gap-2 p-2 hover:bg-gray-800 rounded-lg transition"
               >
-                Contact Support
+                <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
+                  <span className="text-white text-sm font-bold">
+                    {userName?.charAt(0).toUpperCase() || 'U'}
+                  </span>
+                </div>
               </button>
-              <button 
-                onClick={() => signOut()}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition"
-              >
-                Sign Out
-              </button>
-            </div>
-
-            {/* Mobile Menu Toggle */}
-            <div className="lg:hidden">
-              <DashboardMobileMenu />
+              {typeof setShowAccountMenu === 'function' && showAccountMenu && (
+                <>
+                  {/* Backdrop */}
+                  <div 
+                    className="fixed inset-0 z-10" 
+                    onClick={() => setShowAccountMenu(false)}
+                  />
+                  {/* Dropdown Menu */}
+                  <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20">
+                    <div className="p-3 border-b border-gray-700">
+                      <p className="text-white font-medium text-sm truncate">
+                        {userName || 'User'}
+                      </p>
+                      <p className="text-gray-400 text-xs truncate">
+                        {userEmail}
+                      </p>
+                      {isAdmin && (
+                        <span className="inline-flex items-center gap-1 mt-2 px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded-full">
+                          {/* Shield icon */}
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V7l7-4z" /></svg>
+                          Admin
+                        </span>
+                      )}
+                    </div>
+                    <div className="py-1">
+                      <a
+                        href="/settings"
+                        onClick={() => setShowAccountMenu(false)}
+                        className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm transition"
+                      >
+                        {/* Settings icon */}
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 0V4m0 16v-4m8-4h-4m-8 0H4" /></svg>
+                        Settings
+                      </a>
+                      <a
+                        href="/settings/billing"
+                        onClick={() => setShowAccountMenu(false)}
+                        className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm transition"
+                      >
+                        {/* LayoutGrid icon */}
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+                        Billing
+                      </a>
+                      {isAdmin && (
+                        <a
+                          href="/admin"
+                          onClick={() => setShowAccountMenu(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-yellow-400 hover:bg-gray-700 text-sm transition"
+                        >
+                          {/* Shield icon */}
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V7l7-4z" /></svg>
+                          Admin Panel
+                        </a>
+                      )}
+                    </div>
+                    <div className="border-t border-gray-700">
+                      <button
+                        onClick={() => {
+                          setShowAccountMenu(false)
+                          signOut()
+                        }}
+                        className="flex items-center gap-2 w-full px-4 py-2 text-red-400 hover:bg-gray-700 text-sm transition"
+                      >
+                        {/* LogOut icon */}
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1" /></svg>
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

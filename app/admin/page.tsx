@@ -880,9 +880,12 @@ export default function AdminDashboard() {
                       <div className="flex-1">
                         <p className="font-medium text-white">{activity.action}</p>
                         <p className="text-sm text-gray-400">
-                          {typeof activity.details === 'string' 
-                            ? activity.details 
-                            : JSON.stringify(activity.details).substring(0, 100)}
+                          {/* FIX: Check if details exists before stringifying */}
+                          {activity.details 
+                            ? (typeof activity.details === 'string' 
+                                ? activity.details.substring(0, 100)
+                                : JSON.stringify(activity.details).substring(0, 100))
+                            : 'No details available'}
                         </p>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-xs text-gray-500">

@@ -1,25 +1,27 @@
-export const dynamic = 'force-dynamic'
-
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { isAdminAsync } from '@/lib/admin'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ isAdmin: false }, { status: 200 })
+    
+    if (!session?.user) {
+      return NextResponse.json({ isAdmin: false })
     }
 
-    const adminStatus = await isAdminAsync(session.user.email)
-
+    // Check if user has admin role
+    const isAdmin = session.user.role === 'admin'
+    
     return NextResponse.json({ 
-      isAdmin: adminStatus 
-    }, { status: 200 })
+      isAdmin,
+      user: {
+        email: session.user.email,
+        role: session.user.role
+      }
+    })
   } catch (error) {
     console.error('Admin check error:', error)
-    return NextResponse.json({ isAdmin: false }, { status: 200 })
+    return NextResponse.json({ isAdmin: false })
   }
 }

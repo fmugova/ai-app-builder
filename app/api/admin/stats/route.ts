@@ -12,22 +12,14 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions)
 
     // Check if user is admin
-    if (!session?.user?.email || !ADMIN_EMAILS.includes(session.user.email)) {
+    if (!session?.user || session.user.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
     // Get stats
-    const [totalUsers, totalProjects, activeSubscriptions, totalGenerations] = await Promise.all([
+    const [totalUsers, totalProjects, totalGenerations] = await Promise.all([
       prisma.user.count(),
       prisma.project.count(),
-      prisma.user.count({
-        where: {
-          subscriptionTier: {
-            not: 'free'
-          },
-          subscriptionStatus: 'active'
-        }
-      }),
       prisma.user.aggregate({
         _sum: {
           generationsUsed: true
@@ -35,11 +27,20 @@ export async function GET(request: NextRequest) {
       })
     ])
 
+    // Get active users (logged in within last 24 hours)
+    const activeUsers = await prisma.user.count({
+      where: {
+        updatedAt: {
+          gte: new Date(Date.now() - 24 * 60 * 60 * 1000)
+        }
+      }
+    })
+
     return NextResponse.json({
       totalUsers,
       totalProjects,
-      activeSubscriptions,
-      totalGenerations: totalGenerations._sum.generationsUsed || 0
+      totalGenerations: totalGenerations._sum.generationsUsed || 0,
+      activeUsers
     })
   } catch (error) {
     console.error('Admin stats error:', error)

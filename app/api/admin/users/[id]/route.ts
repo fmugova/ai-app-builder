@@ -2,127 +2,95 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { prisma } from '@/lib/prisma'
-import { isAdmin } from '@/lib/admin'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
-
-    // Check if user is admin
-    if (!session?.user?.email || !isAdmin(session.user.email)) {
+    
+    if (!session?.user || session.user.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    const { id } = await params
+    const { id } = params
     const body = await request.json()
     const { subscriptionTier, projectsLimit, generationsLimit, role } = body
 
-    // Update user
     const updatedUser = await prisma.user.update({
       where: { id },
       data: {
         subscriptionTier,
         projectsLimit,
         generationsLimit,
-        role,
-        updatedAt: new Date()
+        role
       }
     })
-
-    // Get admin user ID
-    const adminUser = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true }
-    })
-
-    // Log activity using YOUR existing schema (type, action, metadata)
-    if (adminUser) {
-      await prisma.activity.create({
-        data: {
-          userId: adminUser.id,
-          type: 'user_update',
-          action: 'User Updated',
-          metadata: {
-            targetEmail: updatedUser.email,
-            subscriptionTier,
-            projectsLimit,
-            generationsLimit,
-            role
-          }
-        }
-      })
-    }
 
     return NextResponse.json(updatedUser)
   } catch (error) {
     console.error('Update user error:', error)
-    return NextResponse.json(
-      { error: 'Failed to update user' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to update user' }, { status: 500 })
   }
 }
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
-
-    // Check if user is admin
-    if (!session?.user?.email || !isAdmin(session.user.email)) {
+    
+    if (!session?.user || session.user.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    const { id } = await params
+    // Don't allow deleting yourself
+    if (params.id === session.user.id) {
+      return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 })
+    }
 
-    // Get user email before deleting
+    await prisma.user.delete({
+      where: { id: params.id }
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Delete user error:', error)
+    return NextResponse.json({ error: 'Failed to delete user' }, { status: 500 })
+  }
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user || session.user.role !== 'admin') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
     const user = await prisma.user.findUnique({
-      where: { id },
-      select: { email: true }
+      where: { id: params.id },
+      select: {
+        name: true,
+        email: true,
+        subscriptionTier: true
+      }
     })
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Delete user (this will cascade delete related records)
-    await prisma.user.delete({
-      where: { id }
-    })
-
-    // Get admin user ID
-    const adminUser = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true }
-    })
-
-    // Log activity using YOUR existing schema (type, action, metadata)
-    if (adminUser) {
-      await prisma.activity.create({
-        data: {
-          userId: adminUser.id,
-          type: 'user_delete',
-          action: 'User Deleted',
-          metadata: {
-            email: user.email
-          }
-        }
-      })
-    }
-
-    return NextResponse.json({ success: true })
+    return NextResponse.json(user)
   } catch (error) {
-    console.error('Delete user error:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete user' },
-      { status: 500 }
-    )
+    console.error('Get user error:', error)
+    return NextResponse.json({ error: 'Failed to fetch user' }, { status: 500 })
   }
 }

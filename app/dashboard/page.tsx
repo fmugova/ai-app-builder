@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import DashboardClient from './DashboardClient'
+import Footer from '../components/Footer'
 
 // Server Component - NO 'use client'
 export default async function DashboardPage() {
@@ -67,12 +68,15 @@ export default async function DashboardPage() {
   }))
 
   return (
-    <DashboardClient
-      initialProjects={serializedProjects}
-      stats={stats}
-      userName={user.name}
-      userEmail={user.email}
-      isAdmin={user.role === 'admin'}
-    />
+    <div className="min-h-screen bg-gray-950">
+      <DashboardClient
+        initialProjects={serializedProjects}
+        stats={stats}
+        userName={user.name}
+        userEmail={user.email}
+        isAdmin={user.role === 'admin'}
+      />
+      <Footer />
+    </div>
   )
 }
