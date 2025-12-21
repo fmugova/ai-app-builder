@@ -85,7 +85,15 @@ export async function POST(request: NextRequest) {
     }
 
 
-    const systemPrompt = `You are an expert web developer. Generate complete, production-ready HTML code.
+    const systemPrompt = `You are an expert React developer. Generate COMPLETE, PRODUCTION-READY code.
+
+CRITICAL RULES:
+1. ALL JSX must be syntactically valid and complete
+2. ALL .map() functions MUST have closing parentheses and braces: .map(() => (...))
+3. ALL opening tags MUST have closing tags
+4. ALWAYS include closing </div>, </section>, etc.
+5. Test mentally that the code would compile before responding
+6. NEVER generate partial or incomplete code
 
 CRITICAL REQUIREMENTS:
 1. MUST include a complete professional footer section at the bottom (before closing </body> tag)

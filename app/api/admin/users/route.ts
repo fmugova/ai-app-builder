@@ -5,50 +5,44 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { isAdmin } from '@/lib/admin'
 
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 
-    // Check if user is admin
-    if (!session?.user?.email || !isAdmin(session.user.email)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    // Debug logging
+    console.log('Session:', JSON.stringify(session, null, 2))
+    console.log('User role:', session?.user?.role)
+    
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+    
+    if (session.user.role !== 'admin') {
+      console.log('Access denied - not admin:', session.user.email, 'Role:', session.user.role)
+      return NextResponse.json({ error: 'Unauthorized - Admin only' }, { status: 403 })
     }
 
     // Get all users with their stats and actual project count
     const users = await prisma.user.findMany({
+      orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         name: true,
         email: true,
+        role: true,
         subscriptionTier: true,
         subscriptionStatus: true,
+        createdAt: true,
         projectsThisMonth: true,
         generationsUsed: true,
-        generationsLimit: true,
-        projectsLimit: true,
-        createdAt: true,
-        role: true,
         _count: {
-          select: {
-            projects: true
-          }
+          select: { projects: true }
         }
-      },
-      orderBy: {
-        createdAt: 'desc'
       }
     })
 
-    // Transform to include actual project count
-    const usersWithProjectCount = users.map(user => ({
-      ...user,
-      projectCount: (user as any)._count?.projects ?? 0,
-      _count: undefined
-    }))
-
-    return NextResponse.json(usersWithProjectCount)
+    return NextResponse.json(users)
   } catch (error) {
     console.error('Users error:', error)
     return NextResponse.json(

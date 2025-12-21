@@ -21,6 +21,7 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
   const { data: session, status } = useSession()
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'desktop' | 'tablet' | 'mobile'>('desktop')
   const [showCode, setShowCode] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -117,15 +118,18 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
   const loadProject = async () => {
     try {
       const res = await fetch(`/api/projects/${projectId}`)
-      if (res.ok) {
-        const data = await res.json()
-        setProject(data)
+      const data = await res.json()
+      
+      if (data.error) {
+        setError(data.error)
+      } else if (!res.ok) {
+        setError('Failed to load project')
       } else {
-        alert('Project not found')
-        router.push('/dashboard')
+        setProject(data)
       }
-    } catch (error) {
-      console.error('Failed to load project:', error)
+    } catch (err) {
+      console.error('Error loading project:', err)
+      setError('Failed to load project')
     } finally {
       setLoading(false)
     }
@@ -194,6 +198,51 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-400">Loading preview...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="bg-red-900 border border-red-600 rounded-lg p-6 max-w-md">
+          <h2 className="text-xl font-bold text-red-200 mb-2">Preview Error</h2>
+          <p className="text-red-300">{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
+          >
+            Reload
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!project) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-gray-400">No project found</div>
+      </div>
+    )
+  }
+
+  // Validate the code before rendering
+  const codeToRender = project.code || '<div>No code generated</div>'
+  
+  // Check for syntax errors
+  if (codeToRender.includes('.map((') && !codeToRender.includes('.map(()')) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-6">
+        <div className="bg-yellow-900 border border-yellow-600 rounded-lg p-6 max-w-2xl">
+          <h2 className="text-xl font-bold text-yellow-200 mb-2">⚠️ Code Syntax Error</h2>
+          <p className="text-yellow-300 mb-4">
+            The generated code has syntax errors. Please regenerate this project.
+          </p>
+          <pre className="bg-black p-4 rounded overflow-auto text-sm text-gray-300">
+            {codeToRender.substring(0, 500)}...
+          </pre>
         </div>
       </div>
     )
