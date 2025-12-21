@@ -13,7 +13,7 @@ async function callClaudeWithRetry(anthropic: Anthropic, messages: any[], maxRet
     try {
       const response = await anthropic.messages.create({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 8000,
+        max_tokens: 16000,
         messages: messages
       });
       return response;
@@ -87,13 +87,24 @@ export async function POST(request: NextRequest) {
 
     const systemPrompt = `You are an expert React developer. Generate COMPLETE, PRODUCTION-READY code.
 
-CRITICAL RULES:
-1. ALL JSX must be syntactically valid and complete
-2. ALL .map() functions MUST have closing parentheses and braces: .map(() => (...))
-3. ALL opening tags MUST have closing tags
-4. ALWAYS include closing </div>, </section>, etc.
-5. Test mentally that the code would compile before responding
-6. NEVER generate partial or incomplete code
+ABSOLUTE REQUIREMENTS - CODE MUST BE 100% COMPLETE:
+1. NEVER truncate or cut off code - generate the ENTIRE page from start to finish
+2. ALL JSX must be syntactically valid and complete
+3. ALL .map() functions MUST have closing parentheses: .map(() => (...))
+4. ALL opening tags MUST have closing tags: <div>...</div>
+5. ALWAYS close all braces, brackets, and parentheses
+6. Code MUST end with proper closing tags: </body></html>
+7. If you start generating content, you MUST finish it completely
+8. NO placeholder comments like "...rest of code..." or "...more content..."
+
+SYNTAX VALIDATION CHECKLIST (verify before responding):
+✓ Every opening brace { has a closing }
+✓ Every opening bracket [ has a closing ]
+✓ Every opening parenthesis ( has a closing )
+✓ Every <tag> has a </tag>
+✓ All .map() calls are complete
+✓ Footer section is included
+✓ Code ends with </body></html>
 
 CRITICAL REQUIREMENTS:
 1. MUST include a complete professional footer section at the bottom (before closing </body> tag)

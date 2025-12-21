@@ -9,7 +9,6 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// ============ NextAuth Models ============
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -44,7 +43,6 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// ============ USER MODEL ============
 model User {
   id                    String                 @id @default(cuid())
   name                  String?
@@ -54,44 +52,31 @@ model User {
   image                 String?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
-  
-  // Promo and discount
-  promoCodeUsed         String?
-  discountRate          Float?                 @default(0)
-  
-  // Subscription fields
-  subscriptionTier      String                 @default("free")
-  subscriptionStatus    String                 @default("active")
+  autoSave              Boolean                @default(true)
+  discountRate          Float                  @default(0)
+  generationsLimit      Int                    @default(10)
+  generationsUsed       Int                    @default(0)
+  notifications         Boolean                @default(true)
+  projectsLimit         Int                    @default(3)
+  projectsThisMonth     Int                    @default(0)
+  role                  String                 @default("user")
   stripeCustomerId      String?                @unique
   stripeSubscriptionId  String?                @unique
-  subscriptionResetDate DateTime               @default(now())
-  
-  // Usage tracking
-  generationsUsed       Int                    @default(0)
-  generationsLimit      Int                    @default(3)
-  projectsThisMonth     Int                    @default(0)
-  projectsLimit         Int                    @default(3)
-  
-  // User preferences
+  subscriptionResetDate DateTime?
+  subscriptionStatus    String                 @default("active")
+  subscriptionTier      String                 @default("free")
+  theme                 String                 @default("dark")
+  cancelAtPeriodEnd     Boolean                @default(false)
+  currentPeriodEnd      DateTime?
+  currentPeriodStart    DateTime?
   bio                   String?
-  theme                 String                 @default("light")
-  notifications         Boolean                @default(true)
-  autoSave              Boolean                @default(true)
-  
-  // Role and integrations
-  role                  String                 @default("user")
   githubAccessToken     String?
   githubUsername        String?
-  
-  // Two-Factor Authentication
-  twoFactorEnabled      Boolean                @default(false)
-  twoFactorSecret       String?
-  
-  // Password Reset
+  promoCodeUsed         String?
   resetToken            String?                @unique
   resetTokenExpiry      DateTime?
-  
-  // Relations
+  twoFactorEnabled      Boolean                @default(false)
+  twoFactorSecret       String?
   accounts              Account[]
   activities            Activity[]
   dripEnrollments       DripEnrollment[]
@@ -104,11 +89,8 @@ model User {
   projectVersions       ProjectVersion[]
   sessions              Session[]
   subscriptions         Subscription?
-  deployments           Deployment[]
-  vercelConnection      VercelConnection?
 }
 
-// ============ Newsletter Subscriber ============
 model NewsletterSubscriber {
   id             String    @id @default(cuid())
   email          String    @unique
@@ -128,7 +110,6 @@ model NewsletterSubscriber {
   @@index([userId], map: "idx_newslettersubscriber_userid")
 }
 
-// ============ Email Campaign ============
 model EmailCampaign {
   id                String      @id @default(cuid())
   name              String
@@ -156,7 +137,6 @@ model EmailCampaign {
   @@index([createdAt])
 }
 
-// ============ Email Send ============
 model EmailSend {
   id              String        @id @default(cuid())
   campaignId      String
@@ -171,13 +151,11 @@ model EmailSend {
   campaign        EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
   @@index([campaignId])
-  @@index([campaignId], map: "idx_emailsend_campaign_id")
   @@index([subscriberEmail])
   @@index([sentAt])
   @@index([user_id], map: "idx_emailsend_user_id")
 }
 
-// ============ Drip Campaign ============
 model DripCampaign {
   id          String           @id @default(cuid())
   name        String
@@ -193,7 +171,6 @@ model DripCampaign {
   @@index([trigger])
 }
 
-// ============ Drip Email ============
 model DripEmail {
   id          String       @id @default(cuid())
   campaignId  String
@@ -208,31 +185,27 @@ model DripEmail {
   campaign    DripCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
   @@index([campaignId])
-  @@index([campaignId], map: "idx_dripemail_campaignid")
   @@index([order])
 }
 
-// ============ Drip Enrollment ============
 model DripEnrollment {
   id             String       @id @default(cuid())
   campaignId     String
   userEmail      String
-  userId         String
   enrolledAt     DateTime     @default(now())
   completedAt    DateTime?
   unsubscribedAt DateTime?
   emailsSent     Json?
+  userId         String
   campaign       DripCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([campaignId])
   @@index([enrolledAt])
   @@index([userEmail])
-  @@index([userEmail], map: "idx_drip_enrollment_useremail")
   @@index([userId])
 }
 
-// ============ PROJECT MODEL ============
 model Project {
   id             String           @id @default(cuid())
   userId         String
@@ -242,28 +215,25 @@ model Project {
   code           String
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
-  isPublic       Boolean          @default(false)
-  shareToken     String?          @unique
-  views          Int              @default(0)
   downloads      Int              @default(0)
-  tags           String[]         @default([])
-  prompt         String?
-  language       String?
   framework      String?
+  isPublic       Boolean          @default(false)
+  language       String?
+  prompt         String?
+  shareToken     String?          @unique
+  tags           String[]         @default([])
+  views          Int              @default(0)
   User           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   ProjectShare   ProjectShare[]
   ProjectVersion ProjectVersion[]
-  deployments    Deployment[]
 
   @@index([isPublic])
   @@index([shareToken])
   @@index([updatedAt])
   @@index([userId])
-  @@index([userId], map: "idx_project_userid")
   @@index([userId, updatedAt])
 }
 
-// ============ PROJECT VERSION MODEL ============
 model ProjectVersion {
   id          String   @id @default(cuid())
   projectId   String
@@ -277,25 +247,21 @@ model ProjectVersion {
 
   @@index([projectId])
   @@index([userId])
-  @@index([userId], map: "idx_projectversion_userid")
 }
 
-// ============ GENERATION MODEL ============
 model Generation {
   id        String   @id @default(cuid())
   userId    String
   createdAt DateTime @default(now())
-  prompt    String
   code      String
+  prompt    String
   type      String
   User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([createdAt])
   @@index([userId])
-  @@index([userId], map: "idx_generation_userid")
 }
 
-// ============ ACTIVITY MODEL ============
 model Activity {
   id        String   @id @default(cuid())
   userId    String
@@ -307,10 +273,8 @@ model Activity {
 
   @@index([createdAt])
   @@index([userId])
-  @@index([userId], map: "idx_activity_userid")
 }
 
-// ============ FEEDBACK MODEL ============
 model Feedback {
   id        String   @id @default(cuid())
   userId    String
@@ -327,10 +291,8 @@ model Feedback {
   @@index([createdAt])
   @@index([status])
   @@index([userId])
-  @@index([userId], map: "idx_feedback_userid")
 }
 
-// ============ PROJECT SHARE MODEL ============
 model ProjectShare {
   id         String    @id @default(cuid())
   projectId  String
@@ -343,10 +305,8 @@ model ProjectShare {
 
   @@index([projectId])
   @@index([sharedWith])
-  @@index([sharedWith], map: "idx_projectshare_sharedwith")
 }
 
-// ============ PROMO CODES MODEL ============
 model PromoCodes {
   id            String    @id @default(cuid())
   code          String    @unique
@@ -362,11 +322,9 @@ model PromoCodes {
 
   @@index([active], map: "idx_promo_codes_active")
   @@index([code])
-  @@index([active])
   @@map("promo_codes")
 }
 
-// ============ SUBSCRIPTION MODEL ============
 model Subscription {
   id                   String    @id @default(cuid())
   userId               String    @unique
@@ -377,18 +335,16 @@ model Subscription {
   status               String    @default("active")
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
-  currentPeriodStart   DateTime  @default(now())
-  currentPeriodEnd     DateTime?
   cancelAtPeriodEnd    Boolean   @default(false)
+  currentPeriodEnd     DateTime?
+  currentPeriodStart   DateTime  @default(now())
   User                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
   @@index([userId])
-  @@index([userId], map: "idx_subscription_userid")
 }
 
-// ============ ANALYTICS EVENT MODEL ============
 model AnalyticsEvent {
   id         String   @id @default(cuid())
   userId     String?
@@ -398,43 +354,5 @@ model AnalyticsEvent {
 
   @@index([createdAt])
   @@index([event])
-  @@index([userId])
-  @@index([userId], map: "idx_analyticsevent_userid")
-}
-
-// ============ DEPLOYMENT MODEL ============
-model Deployment {
-  id                String   @id @default(cuid())
-  projectId         String
-  userId            String
-  platform          String   // "vercel", "netlify", "cloudflare"
-  deploymentUrl     String?
-  deploymentId      String?  // Platform's deployment ID
-  status            String   @default("pending") // pending, building, ready, error
-  errorMessage      String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  
-  project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([projectId])
-  @@index([userId])
-  @@index([status])
-}
-
-// ============ VERCEL CONNECTION MODEL ============
-model VercelConnection {
-  id                String   @id @default(cuid())
-  userId            String   @unique
-  accessToken       String   // Encrypted Vercel access token
-  teamId            String?  // Vercel team ID (optional)
-  username          String?  // Vercel username
-  email             String?
-  connectedAt       DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
   @@index([userId])
 }
