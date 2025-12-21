@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react'
 import PreviewClient from './PreviewClient'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 function PreviewLoading() {
   return (
@@ -15,10 +16,12 @@ function PreviewLoading() {
   )
 }
 
-export default function PreviewPage({ params }: { params: { id: string } }) {
+export default async function PreviewPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  
   return (
     <Suspense fallback={<PreviewLoading />}>
-      <PreviewClient projectId={params.id} />
+      <PreviewClient projectId={id} />
     </Suspense>
   )
 }

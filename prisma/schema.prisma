@@ -54,27 +54,39 @@ model User {
   image                 String?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
-  discountRate          Float                  @default(0)
+  
+  // Promo and discount
   promoCodeUsed         String?
-  bio                   String?
-  githubAccessToken     String?
-  githubUsername        String?
+  discountRate          Float                  @default(0)
+  
+  // Subscription fields
   subscriptionTier      String                 @default("free")
   subscriptionStatus    String                 @default("active")
   stripeCustomerId      String?                @unique
   stripeSubscriptionId  String?                @unique
+  subscriptionResetDate DateTime?
+  currentPeriodStart    DateTime?
+  currentPeriodEnd      DateTime?
+  cancelAtPeriodEnd     Boolean                @default(false)
+  
+  // Usage tracking
   generationsUsed       Int                    @default(0)
   generationsLimit      Int                    @default(10)
   projectsThisMonth     Int                    @default(0)
   projectsLimit         Int                    @default(3)
-  subscriptionResetDate DateTime?
+  
+  // User preferences
+  bio                   String?
   theme                 String                 @default("dark")
   notifications         Boolean                @default(true)
   autoSave              Boolean                @default(true)
+  
+  // Role and integrations
   role                  String                 @default("user")
-  cancelAtPeriodEnd     Boolean                @default(false)
-  currentPeriodEnd      DateTime?
-  currentPeriodStart    DateTime?
+  githubAccessToken     String?
+  githubUsername        String?
+  
+  // Relations (keep all as-is)
   accounts              Account[]
   activities            Activity[]
   dripEnrollments       DripEnrollment[]
