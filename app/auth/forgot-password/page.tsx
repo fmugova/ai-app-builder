@@ -20,12 +20,26 @@ export default function ForgotPasswordPage() {
 
     setLoading(true)
 
-    // For now, just show a message since password reset isn't fully implemented
-    setTimeout(() => {
-      setSent(true)
+    try {
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setSent(true)
+        toast.success(data.message || 'Reset link sent!')
+      } else {
+        toast.error(data.error || 'Failed to send reset link')
+      }
+    } catch (error) {
+      toast.error('Something went wrong')
+    } finally {
       setLoading(false)
-      toast.success('If an account exists, you will receive a reset link')
-    }, 1500)
+    }
   }
 
   return (

@@ -23,10 +23,11 @@ interface User {
 interface Activity {
   id: string
   userId: string
+  type: string
   action: string
-  details: string
+  metadata?: any
   createdAt: string
-  user?: {
+  User?: {
     name: string | null
     email: string
   }
@@ -875,21 +876,24 @@ export default function AdminDashboard() {
                   activities.slice(0, 20).map((activity) => (
                     <div key={activity.id} className="flex items-start gap-4 p-4 bg-gray-900 rounded-xl hover:bg-gray-700 transition">
                       <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
-                        <span className="text-xl">📝</span>
+                        <span className="text-xl">
+                          {activity.type === 'project' ? '📁' : 
+                           activity.type === 'user_update' ? '👤' : 
+                           activity.type === 'user_delete' ? '🗑️' : '📝'}
+                        </span>
                       </div>
                       <div className="flex-1">
                         <p className="font-medium text-white">{activity.action}</p>
                         <p className="text-sm text-gray-400">
-                          {/* FIX: Check if details exists before stringifying */}
-                          {activity.details 
-                            ? (typeof activity.details === 'string' 
-                                ? activity.details.substring(0, 100)
-                                : JSON.stringify(activity.details).substring(0, 100))
-                            : 'No details available'}
+                          {activity.metadata 
+                            ? (typeof activity.metadata === 'string' 
+                                ? activity.metadata.substring(0, 100)
+                                : JSON.stringify(activity.metadata).substring(0, 100))
+                            : `${activity.type} activity`}
                         </p>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-xs text-gray-500">
-                            {activity.user?.email || 'Unknown user'}
+                            {activity.User?.name || activity.User?.email || 'System'}
                           </span>
                           <span className="text-xs text-gray-600">•</span>
                           <span className="text-xs text-gray-500">

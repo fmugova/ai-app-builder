@@ -26,11 +26,21 @@ declare module 'next-auth/jwt' {
 }
 import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
+import GoogleProvider from 'next-auth/providers/google'
+import GitHubProvider from 'next-auth/providers/github'
 import { prisma } from './prisma'
 import bcrypt from 'bcryptjs'
 
 export const authOptions: NextAuthOptions = {
   providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    }),
+    GitHubProvider({
+      clientId: process.env.GITHUB_CLIENT_ID!,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+    }),
     CredentialsProvider({
       name: 'credentials',
       credentials: {
@@ -75,6 +85,31 @@ export const authOptions: NextAuthOptions = {
     signIn: '/auth/signin',
   },
   callbacks: {
+    async signIn({ user, account }) {
+      // OAuth sign in - create user if doesn't exist
+      if (account?.provider === 'google' || account?.provider === 'github') {
+        const existingUser = await prisma.user.findUnique({
+          where: { email: user.email! },
+        })
+        
+        if (!existingUser) {
+          await prisma.user.create({
+            data: {
+              email: user.email!,
+              name: user.name,
+              image: user.image,
+              emailVerified: new Date(),
+              role: 'user',
+              subscriptionTier: 'free',
+              subscriptionStatus: 'active',
+              generationsLimit: 10,
+              projectsLimit: 3,
+            },
+          })
+        }
+      }
+      return true
+    },
     async jwt({ token, user, account }) {
       // Initial sign in
       if (user) {

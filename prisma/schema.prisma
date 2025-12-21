@@ -57,27 +57,24 @@ model User {
   
   // Promo and discount
   promoCodeUsed         String?
-  discountRate          Float                  @default(0)
+  discountRate          Float?                 @default(0)
   
   // Subscription fields
   subscriptionTier      String                 @default("free")
   subscriptionStatus    String                 @default("active")
   stripeCustomerId      String?                @unique
   stripeSubscriptionId  String?                @unique
-  subscriptionResetDate DateTime?
-  currentPeriodStart    DateTime?
-  currentPeriodEnd      DateTime?
-  cancelAtPeriodEnd     Boolean                @default(false)
+  subscriptionResetDate DateTime               @default(now())
   
   // Usage tracking
   generationsUsed       Int                    @default(0)
-  generationsLimit      Int                    @default(10)
+  generationsLimit      Int                    @default(3)
   projectsThisMonth     Int                    @default(0)
   projectsLimit         Int                    @default(3)
   
   // User preferences
   bio                   String?
-  theme                 String                 @default("dark")
+  theme                 String                 @default("light")
   notifications         Boolean                @default(true)
   autoSave              Boolean                @default(true)
   
@@ -86,7 +83,15 @@ model User {
   githubAccessToken     String?
   githubUsername        String?
   
-  // Relations (keep all as-is)
+  // Two-Factor Authentication
+  twoFactorEnabled      Boolean                @default(false)
+  twoFactorSecret       String?
+  
+  // Password Reset
+  resetToken            String?                @unique
+  resetTokenExpiry      DateTime?
+  
+  // Relations
   accounts              Account[]
   activities            Activity[]
   dripEnrollments       DripEnrollment[]
@@ -101,7 +106,7 @@ model User {
   subscriptions         Subscription?
 }
 
-// Newsletter Subscriber
+// ============ Newsletter Subscriber ============
 model NewsletterSubscriber {
   id             String    @id @default(cuid())
   email          String    @unique
@@ -121,7 +126,7 @@ model NewsletterSubscriber {
   @@index([userId], map: "idx_newslettersubscriber_userid")
 }
 
-// Email Campaign
+// ============ Email Campaign ============
 model EmailCampaign {
   id                String      @id @default(cuid())
   name              String
@@ -149,7 +154,7 @@ model EmailCampaign {
   @@index([createdAt])
 }
 
-// Email Send
+// ============ Email Send ============
 model EmailSend {
   id              String        @id @default(cuid())
   campaignId      String
@@ -170,7 +175,7 @@ model EmailSend {
   @@index([user_id], map: "idx_emailsend_user_id")
 }
 
-// Drip Campaign
+// ============ Drip Campaign ============
 model DripCampaign {
   id          String           @id @default(cuid())
   name        String
@@ -186,7 +191,7 @@ model DripCampaign {
   @@index([trigger])
 }
 
-// Drip Email
+// ============ Drip Email ============
 model DripEmail {
   id          String       @id @default(cuid())
   campaignId  String
@@ -205,7 +210,7 @@ model DripEmail {
   @@index([order])
 }
 
-// Drip Enrollment
+// ============ Drip Enrollment ============
 model DripEnrollment {
   id             String       @id @default(cuid())
   campaignId     String
