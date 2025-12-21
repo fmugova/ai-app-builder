@@ -1,10 +1,10 @@
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
 
 export async function GET() {
   try {
@@ -15,17 +15,36 @@ export async function GET() {
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
+      where: { email: session.user.email },
+      select: {
+        subscriptionTier: true,
+        subscriptionStatus: true,
+        projectsThisMonth: true,
+        projectsLimit: true,
+        generationsUsed: true,
+        generationsLimit: true,
+        subscriptions: {
+          select: {
+            currentPeriodStart: true,
+            currentPeriodEnd: true,
+            cancelAtPeriodEnd: true
+          }
+        }
+      }
     })
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Calculate next billing date if no subscription exists
-    const currentPeriodEnd = user.currentPeriodEnd 
+    // Use subscription data if exists, otherwise use calculated values
+    const currentPeriodEnd = user.subscriptions?.currentPeriodEnd 
       || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    
+    const currentPeriodStart = user.subscriptions?.currentPeriodStart
+      || new Date()
 
+    // Mock invoices (replace with actual Stripe invoices later)
     const invoices = user.subscriptionTier !== 'free' ? [
       {
         id: '1',
@@ -39,9 +58,9 @@ export async function GET() {
     return NextResponse.json({
       tier: user.subscriptionTier,
       status: user.subscriptionStatus,
-      currentPeriodStart: user.currentPeriodStart?.toISOString() || new Date().toISOString(),
+      currentPeriodStart: currentPeriodStart.toISOString(),
       currentPeriodEnd: currentPeriodEnd.toISOString(),
-      cancelAtPeriodEnd: user.cancelAtPeriodEnd,
+      cancelAtPeriodEnd: user.subscriptions?.cancelAtPeriodEnd || false,
       projectsUsed: user.projectsThisMonth,
       projectsLimit: user.projectsLimit,
       generationsUsed: user.generationsUsed,
