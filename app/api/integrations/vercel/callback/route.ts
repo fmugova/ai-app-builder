@@ -33,8 +33,22 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const userId = session.user.id || session.user.email
+    // Get the actual user ID from database using email
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { id: true }
+    })
 
+    if (!user) {
+      console.error('User not found in database')
+      return NextResponse.redirect(
+        new URL('/settings?error=user_not_found', request.url)
+      )
+    }
+
+    const userId = user.id
+
+    console.log('User ID:', userId)
     console.log('Exchanging code for token...')
 
     // Exchange authorization code for access token
@@ -110,10 +124,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(
       new URL('/settings?vercel_connected=true', request.url)
     )
-  } catch (error) {
+  } catch (error: any) {
     console.error('Vercel callback error:', error)
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      meta: error.meta
+    })
     return NextResponse.redirect(
-      new URL('/settings?error=vercel_callback_failed', request.url)
+      new URL(`/settings?error=vercel_callback_failed&detail=${encodeURIComponent(error.message || 'Unknown error')}`, request.url)
     )
   }
 }
