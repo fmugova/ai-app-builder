@@ -282,12 +282,12 @@ next-env.d.ts`
         if (data.needsGithubConnection) {
           const connect = confirm(
             '🔗 GitHub not connected!\n\n' +
-            'To export to your own GitHub account, you need to sign in with GitHub.\n\n' +
-            'Click OK to sign in with GitHub, or Cancel to skip.'
+            'To export to your own GitHub account, you need to connect your GitHub account.\n\n' +
+            'Click OK to connect GitHub, or Cancel to skip.'
           )
           if (connect) {
-            // Redirect to sign in with GitHub
-            window.location.href = '/api/auth/signin?callbackUrl=' + encodeURIComponent(window.location.pathname)
+            // Redirect to GitHub OAuth flow with current project context
+            window.location.href = `/api/auth/github?projectId=${projectId}`
           }
           return
         }
