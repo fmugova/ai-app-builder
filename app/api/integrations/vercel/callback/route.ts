@@ -80,19 +80,15 @@ export async function GET(request: NextRequest) {
 
     // Encrypt tokens before storing
     const encryptedAccessToken = encrypt(tokenData.access_token)
-    const encryptedRefreshToken = tokenData.refresh_token 
-      ? encrypt(tokenData.refresh_token) 
-      : null
 
     console.log('Storing connection in database...')
 
-    // Store or update connection
+    // Store or update connection (not storing refreshToken since column doesn't exist in prod DB yet)
     await prisma.vercelConnection.upsert({
       where: { userId },
       create: {
         userId,
         accessToken: encryptedAccessToken,
-        refreshToken: encryptedRefreshToken,
         teamId: teamId || tokenData.team_id,
         configurationId: configurationId,
         username: userData.user?.username,
@@ -100,7 +96,6 @@ export async function GET(request: NextRequest) {
       },
       update: {
         accessToken: encryptedAccessToken,
-        refreshToken: encryptedRefreshToken,
         teamId: teamId || tokenData.team_id,
         configurationId: configurationId,
         username: userData.user?.username,
