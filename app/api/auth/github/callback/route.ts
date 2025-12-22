@@ -4,29 +4,32 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { headers } from 'next/headers';
 
+// Production: https://www.buildflow-ai.app
+// Development: https://ai-app-builder-flame.vercel.app
+const PRODUCTION_URL = 'https://www.buildflow-ai.app';
+const DEVELOPMENT_URL = 'https://ai-app-builder-flame.vercel.app';
+
 function getBaseUrl(): string {
-  // In production, use NEXTAUTH_URL or the request origin
   const headersList = headers();
-  const host = headersList.get('host');
-  const protocol = headersList.get('x-forwarded-proto') || 'https';
+  const host = headersList.get('host') || '';
   
-  // Prefer NEXTAUTH_URL for production
-  if (process.env.NEXTAUTH_URL && !process.env.NEXTAUTH_URL.includes('localhost')) {
-    return process.env.NEXTAUTH_URL;
+  // Check if we're on production domain
+  if (host.includes('buildflow-ai.app')) {
+    return PRODUCTION_URL;
   }
   
-  // Fall back to NEXT_PUBLIC_APP_URL
-  if (process.env.NEXT_PUBLIC_APP_URL && !process.env.NEXT_PUBLIC_APP_URL.includes('localhost')) {
-    return process.env.NEXT_PUBLIC_APP_URL;
+  // Check if we're on Vercel preview/development
+  if (host.includes('vercel.app')) {
+    return DEVELOPMENT_URL;
   }
   
-  // For local development or fallback, construct from host
-  if (host) {
-    return `${protocol}://${host}`;
+  // Local development
+  if (host.includes('localhost')) {
+    return 'http://localhost:3000';
   }
   
-  // Ultimate fallback
-  return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  // Fallback to production
+  return PRODUCTION_URL;
 }
 
 export async function GET(request: Request) {
