@@ -124,9 +124,13 @@ export default function DashboardClient({
       })
 
       if (res.ok) {
-        const newProject = await res.json()
-        setProjects([newProject, ...projects])
-        alert('Project duplicated successfully!')
+        const data = await res.json()
+        if (data.project) {
+          setProjects([data.project, ...projects])
+          alert('Project duplicated successfully!')
+        } else {
+          alert('Failed to duplicate project')
+        }
       } else {
         alert('Failed to duplicate project')
       }
@@ -137,7 +141,7 @@ export default function DashboardClient({
   }
 
   const filteredProjects = projects.filter(project =>
-    project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (project.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
     (project.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
   )
 
@@ -200,12 +204,12 @@ export default function DashboardClient({
             >
               <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 0V4m0 16v-4m8-4h-4m-8 0H4" /></svg>
             </a>
-            {/* Enterprise Link */}
+            {/* Pricing Link */}
             <a
-              href="/enterprise"
+              href="/pricing"
               className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition text-sm font-medium"
             >
-              Enterprise
+              Upgrade
             </a>
             {/* Contact Support */}
             <a

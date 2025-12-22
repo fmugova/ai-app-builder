@@ -9,6 +9,7 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// ============ NextAuth Models ============
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -43,6 +44,7 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+// ============ USER MODEL ============
 model User {
   id                    String                 @id @default(cuid())
   name                  String?
@@ -52,31 +54,47 @@ model User {
   image                 String?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
+  
+  // User preferences
   autoSave              Boolean                @default(true)
-  discountRate          Float                  @default(0)
-  generationsLimit      Int                    @default(10)
-  generationsUsed       Int                    @default(0)
   notifications         Boolean                @default(true)
-  projectsLimit         Int                    @default(3)
-  projectsThisMonth     Int                    @default(0)
-  role                  String                 @default("user")
+  theme                 String                 @default("dark")
+  bio                   String?
+  
+  // Promo and discount
+  promoCodeUsed         String?
+  discountRate          Float                  @default(0)
+  
+  // Subscription fields (keeping in User model as per production)
+  subscriptionTier      String                 @default("free")
+  subscriptionStatus    String                 @default("active")
   stripeCustomerId      String?                @unique
   stripeSubscriptionId  String?                @unique
   subscriptionResetDate DateTime?
-  subscriptionStatus    String                 @default("active")
-  subscriptionTier      String                 @default("free")
-  theme                 String                 @default("dark")
   cancelAtPeriodEnd     Boolean                @default(false)
-  currentPeriodEnd      DateTime?
   currentPeriodStart    DateTime?
-  bio                   String?
+  currentPeriodEnd      DateTime?
+  
+  // Usage tracking
+  generationsUsed       Int                    @default(0)
+  generationsLimit      Int                    @default(10)
+  projectsThisMonth     Int                    @default(0)
+  projectsLimit         Int                    @default(3)
+  
+  // Role and integrations
+  role                  String                 @default("user")
   githubAccessToken     String?
   githubUsername        String?
-  promoCodeUsed         String?
-  resetToken            String?                @unique
-  resetTokenExpiry      DateTime?
+  
+  // Two-Factor Authentication
   twoFactorEnabled      Boolean                @default(false)
   twoFactorSecret       String?
+  
+  // Password Reset
+  resetToken            String?                @unique
+  resetTokenExpiry      DateTime?
+  
+  // Relations
   accounts              Account[]
   activities            Activity[]
   dripEnrollments       DripEnrollment[]
@@ -93,6 +111,49 @@ model User {
   deployments           Deployment[]
 }
 
+// ============ VERCEL CONNECTION MODEL ============
+model VercelConnection {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  accessToken       String   // Encrypted Vercel OAuth token
+  refreshToken      String?  // For token refresh
+  teamId            String?  // Vercel team ID (if applicable)
+  configurationId   String?  // Vercel configuration ID
+  username          String?  // Vercel username
+  email             String?
+  connectedAt       DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ============ DEPLOYMENT MODEL ============
+model Deployment {
+  id                String   @id @default(cuid())
+  projectId         String
+  userId            String
+  platform          String   @default("vercel") // "vercel", "netlify", etc
+  deploymentUrl     String?
+  deploymentId      String?  // Vercel's deployment ID
+  vercelProjectId   String?  // Vercel project ID
+  status            String   @default("pending") // pending, building, ready, error
+  errorMessage      String?
+  logs              String?  @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([userId])
+  @@index([status])
+  @@index([deploymentId])
+}
+
+// ============ Newsletter Subscriber ============
 model NewsletterSubscriber {
   id             String    @id @default(cuid())
   email          String    @unique
@@ -112,6 +173,7 @@ model NewsletterSubscriber {
   @@index([userId], map: "idx_newslettersubscriber_userid")
 }
 
+// ============ Email Campaign ============
 model EmailCampaign {
   id                String      @id @default(cuid())
   name              String
@@ -139,6 +201,7 @@ model EmailCampaign {
   @@index([createdAt])
 }
 
+// ============ Email Send ============
 model EmailSend {
   id              String        @id @default(cuid())
   campaignId      String
@@ -158,6 +221,7 @@ model EmailSend {
   @@index([user_id], map: "idx_emailsend_user_id")
 }
 
+// ============ Drip Campaign ============
 model DripCampaign {
   id          String           @id @default(cuid())
   name        String
@@ -173,6 +237,7 @@ model DripCampaign {
   @@index([trigger])
 }
 
+// ============ Drip Email ============
 model DripEmail {
   id          String       @id @default(cuid())
   campaignId  String
@@ -190,15 +255,16 @@ model DripEmail {
   @@index([order])
 }
 
+// ============ Drip Enrollment ============
 model DripEnrollment {
   id             String       @id @default(cuid())
   campaignId     String
   userEmail      String
+  userId         String
   enrolledAt     DateTime     @default(now())
   completedAt    DateTime?
   unsubscribedAt DateTime?
   emailsSent     Json?
-  userId         String
   campaign       DripCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -208,6 +274,7 @@ model DripEnrollment {
   @@index([userId])
 }
 
+// ============ PROJECT MODEL ============
 model Project {
   id             String           @id @default(cuid())
   userId         String
@@ -237,6 +304,7 @@ model Project {
   @@index([userId, updatedAt])
 }
 
+// ============ PROJECT VERSION MODEL ============
 model ProjectVersion {
   id          String   @id @default(cuid())
   projectId   String
@@ -252,6 +320,7 @@ model ProjectVersion {
   @@index([userId])
 }
 
+// ============ GENERATION MODEL ============
 model Generation {
   id        String   @id @default(cuid())
   userId    String
@@ -265,6 +334,7 @@ model Generation {
   @@index([userId])
 }
 
+// ============ ACTIVITY MODEL ============
 model Activity {
   id        String   @id @default(cuid())
   userId    String
@@ -278,6 +348,7 @@ model Activity {
   @@index([userId])
 }
 
+// ============ FEEDBACK MODEL ============
 model Feedback {
   id        String   @id @default(cuid())
   userId    String
@@ -296,6 +367,7 @@ model Feedback {
   @@index([userId])
 }
 
+// ============ PROJECT SHARE MODEL ============
 model ProjectShare {
   id         String    @id @default(cuid())
   projectId  String
@@ -310,6 +382,7 @@ model ProjectShare {
   @@index([sharedWith])
 }
 
+// ============ PROMO CODES MODEL ============
 model PromoCodes {
   id            String    @id @default(cuid())
   code          String    @unique
@@ -328,6 +401,7 @@ model PromoCodes {
   @@map("promo_codes")
 }
 
+// ============ SUBSCRIPTION MODEL ============
 model Subscription {
   id                   String    @id @default(cuid())
   userId               String    @unique
@@ -348,6 +422,7 @@ model Subscription {
   @@index([userId])
 }
 
+// ============ ANALYTICS EVENT MODEL ============
 model AnalyticsEvent {
   id         String   @id @default(cuid())
   userId     String?
@@ -358,46 +433,4 @@ model AnalyticsEvent {
   @@index([createdAt])
   @@index([event])
   @@index([userId])
-}
-
-// ============ VERCEL CONNECTION MODEL ============
-model VercelConnection {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  accessToken     String   // Encrypted Vercel OAuth token
-  refreshToken    String?  // For token refresh
-  teamId          String?  // Vercel team ID (if applicable)
-  configurationId String?  // Vercel configuration ID
-  username        String?  // Vercel username
-  email           String?
-  connectedAt     DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-}
-
-// ============ DEPLOYMENT MODEL ============
-model Deployment {
-  id              String   @id @default(cuid())
-  projectId       String
-  userId          String
-  platform        String   @default("vercel") // "vercel", "netlify", etc
-  deploymentUrl   String?
-  deploymentId    String?  // Vercel's deployment ID
-  vercelProjectId String?  // Vercel project ID
-  status          String   @default("pending") // pending, building, ready, error
-  errorMessage    String?
-  logs            String?  @db.Text
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([projectId])
-  @@index([userId])
-  @@index([status])
-  @@index([deploymentId])
 }

@@ -12,6 +12,7 @@ interface SimpleExportButtonProps {
   projectType: string
   onSuccess?: () => void
   onError?: (error: string) => void
+  size?: 'default' | 'icon'
 }
 
 export default function SimpleExportButton({
@@ -20,7 +21,8 @@ export default function SimpleExportButton({
   projectCode,
   projectType,
   onSuccess,
-  onError
+  onError,
+  size = 'default'
 }: SimpleExportButtonProps) {
   const [showModal, setShowModal] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -311,6 +313,148 @@ next-env.d.ts`
     }
   }
 
+  // Icon mode for toolbar
+  if (size === 'icon') {
+    return (
+      <>
+        <button
+          onClick={() => setShowModal(true)}
+          className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
+          title="Export Project"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+        </button>
+
+        {/* Shared modal and loading */}
+        {showModal && renderModal()}
+        {loading && renderLoading()}
+      </>
+    )
+  }
+
+  // Helper functions for rendering shared components
+  function renderModal() {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-2xl flex items-center gap-2">
+                  <span>📦</span>
+                  Export Project
+                </h3>
+                <p className="text-sm text-green-100 mt-1">
+                  {projectName}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-white hover:bg-white/20 rounded-lg p-2 transition-colors"
+              >
+                <span className="text-2xl">✕</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Options */}
+          <div className="p-6 space-y-3">
+            {/* Download ZIP */}
+            <button
+              onClick={downloadZip}
+              disabled={loading}
+              className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 rounded-xl transition-colors text-left group border-2 border-gray-100 hover:border-green-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-3 rounded-xl group-hover:scale-110 transition-transform">
+                <span className="text-white text-2xl">📁</span>
+              </div>
+              <div className="flex-1">
+                <div className="font-bold text-gray-900 text-lg">Download ZIP</div>
+                <div className="text-sm text-gray-600">
+                  Complete project with all files
+                </div>
+              </div>
+            </button>
+
+            {/* Copy Code */}
+            <button
+              onClick={copyToClipboard}
+              disabled={loading}
+              className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 rounded-xl transition-colors text-left group border-2 border-gray-100 hover:border-purple-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-3 rounded-xl group-hover:scale-110 transition-transform">
+                <span className="text-white text-2xl">📋</span>
+              </div>
+              <div className="flex-1">
+                <div className="font-bold text-gray-900 text-lg">Copy Code</div>
+                <div className="text-sm text-gray-600">
+                  Copy to clipboard
+                </div>
+              </div>
+            </button>
+
+            {/* Download Single File */}
+            <button
+              onClick={downloadSingleFile}
+              disabled={loading}
+              className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 rounded-xl transition-colors text-left group border-2 border-gray-100 hover:border-orange-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <div className="bg-gradient-to-br from-orange-500 to-orange-600 p-3 rounded-xl group-hover:scale-110 transition-transform">
+                <span className="text-white text-2xl">📄</span>
+              </div>
+              <div className="flex-1">
+                <div className="font-bold text-gray-900 text-lg">Download File</div>
+                <div className="text-sm text-gray-600">
+                  Single .tsx file only
+                </div>
+              </div>
+            </button>
+
+            {/* Push to GitHub */}
+            <button
+              onClick={pushToGitHub}
+              disabled={loading}
+              className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 rounded-xl transition-colors text-left group border-2 border-gray-100 hover:border-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <div className="bg-gradient-to-br from-gray-800 to-gray-900 p-3 rounded-xl group-hover:scale-110 transition-transform">
+                <span className="text-white text-2xl">🚀</span>
+              </div>
+              <div className="flex-1">
+                <div className="font-bold text-gray-900 text-lg">Push to GitHub</div>
+                <div className="text-sm text-gray-600">
+                  Create repository and push code
+                </div>
+              </div>
+            </button>
+          </div>
+
+          {/* Footer */}
+          <div className="border-t border-gray-100 p-4 bg-gray-50">
+            <p className="text-xs text-gray-600 text-center">
+              💡 Tip: Use ZIP download for complete setup
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  function renderLoading() {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+        <div className="bg-white rounded-2xl p-8 text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-green-600 mx-auto mb-4"></div>
+          <p className="text-lg font-medium text-gray-900">{loadingMessage}</p>
+          <p className="text-sm text-gray-600 mt-2">Please wait...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Default rendering
   return (
     <>
       {/* Simple Export Button */}
@@ -324,121 +468,10 @@ next-env.d.ts`
       </button>
 
       {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-bold text-2xl flex items-center gap-2">
-                    <span>📦</span>
-                    Export Project
-                  </h3>
-                  <p className="text-sm text-green-100 mt-1">
-                    {projectName}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="text-white hover:bg-white/20 rounded-lg p-2 transition-colors"
-                >
-                  <span className="text-2xl">✕</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Options */}
-            <div className="p-6 space-y-3">
-              {/* Download ZIP */}
-              <button
-                onClick={downloadZip}
-                disabled={loading}
-                className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 rounded-xl transition-colors text-left group border-2 border-gray-100 hover:border-green-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-3 rounded-xl group-hover:scale-110 transition-transform">
-                  <span className="text-white text-2xl">📁</span>
-                </div>
-                <div className="flex-1">
-                  <div className="font-bold text-gray-900 text-lg">Download ZIP</div>
-                  <div className="text-sm text-gray-600">
-                    Complete project with all files
-                  </div>
-                </div>
-              </button>
-
-              {/* Copy Code */}
-              <button
-                onClick={copyToClipboard}
-                disabled={loading}
-                className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 rounded-xl transition-colors text-left group border-2 border-gray-100 hover:border-purple-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-3 rounded-xl group-hover:scale-110 transition-transform">
-                  <span className="text-white text-2xl">📋</span>
-                </div>
-                <div className="flex-1">
-                  <div className="font-bold text-gray-900 text-lg">Copy Code</div>
-                  <div className="text-sm text-gray-600">
-                    Copy to clipboard
-                  </div>
-                </div>
-              </button>
-
-              {/* Download Single File */}
-              <button
-                onClick={downloadSingleFile}
-                disabled={loading}
-                className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 rounded-xl transition-colors text-left group border-2 border-gray-100 hover:border-orange-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <div className="bg-gradient-to-br from-orange-500 to-orange-600 p-3 rounded-xl group-hover:scale-110 transition-transform">
-                  <span className="text-white text-2xl">📄</span>
-                </div>
-                <div className="flex-1">
-                  <div className="font-bold text-gray-900 text-lg">Download File</div>
-                  <div className="text-sm text-gray-600">
-                    Single .tsx file only
-                  </div>
-                </div>
-              </button>
-
-              {/* Push to GitHub */}
-              <button
-                onClick={pushToGitHub}
-                disabled={loading}
-                className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 rounded-xl transition-colors text-left group border-2 border-gray-100 hover:border-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <div className="bg-gradient-to-br from-gray-800 to-gray-900 p-3 rounded-xl group-hover:scale-110 transition-transform">
-                  <span className="text-white text-2xl">🚀</span>
-                </div>
-                <div className="flex-1">
-                  <div className="font-bold text-gray-900 text-lg">Push to GitHub</div>
-                  <div className="text-sm text-gray-600">
-                    Create repository and push code
-                  </div>
-                </div>
-              </button>
-            </div>
-
-            {/* Footer */}
-            <div className="border-t border-gray-100 p-4 bg-gray-50">
-              <p className="text-xs text-gray-600 text-center">
-                💡 Tip: Use ZIP download for complete setup
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      {showModal && renderModal()}
 
       {/* Loading Overlay */}
-      {loading && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-2xl p-8 text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-green-600 mx-auto mb-4"></div>
-            <p className="text-lg font-medium text-gray-900">{loadingMessage}</p>
-            <p className="text-sm text-gray-600 mt-2">Please wait...</p>
-          </div>
-        </div>
-      )}
+      {loading && renderLoading()}
     </>
   )
 }

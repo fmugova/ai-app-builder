@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import DeployButton from '@/components/DeployButton'
 
 interface Project {
   id: string
@@ -178,6 +179,15 @@ export default function ProjectViewPage() {
             </div>
           </div>
         )}
+
+        {/* Deploy to Vercel */}
+        <div className="mt-6">
+          <DeployButton 
+            projectId={project.id} 
+            projectName={project.name}
+            size="md"
+          />
+        </div>
 
         {/* Preview Button */}
         <div className="mt-6 flex justify-center gap-4">

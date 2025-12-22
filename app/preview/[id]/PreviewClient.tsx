@@ -3,13 +3,16 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { Monitor, Tablet, Smartphone, RefreshCw, Code, Download, Copy, Trash2, Edit, X, Menu } from 'lucide-react'
+import { Monitor, Tablet, Smartphone, RefreshCw, Code, Download, Copy, Trash2, Edit, X, Menu, Package } from 'lucide-react'
+import DeployButton from '@/components/DeployButton'
+import SimpleExportButton from '@/components/SimpleExportButton'
 
 interface Project {
   id: string
   name: string
   code: string | null
   userId: string
+  type?: string
 }
 
 interface PreviewClientProps {
@@ -335,6 +338,33 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
             >
               <Download className="w-5 h-5" />
             </button>
+            
+            <div className="w-px h-6 bg-gray-700 mx-1"></div>
+            
+            {/* Deploy Button */}
+            <div className="flex items-center">
+              <DeployButton 
+                projectId={project.id} 
+                projectName={project.name}
+                size="icon"
+              />
+            </div>
+            
+            {/* Export Button */}
+            {project.code && (
+              <div className="relative group">
+                <SimpleExportButton
+                  projectId={project.id}
+                  projectName={project.name}
+                  projectCode={project.code}
+                  projectType={project.type || 'landing-page'}
+                  size="icon"
+                />
+              </div>
+            )}
+            
+            <div className="w-px h-6 bg-gray-700 mx-1"></div>
+            
             <button
               onClick={handleRefresh}
               className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
@@ -414,6 +444,16 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
               <div className="my-4 border-t border-gray-700"></div>
 
               <p className="text-xs text-gray-400 uppercase mb-2">Actions</p>
+              
+              {/* Deploy Button in Mobile Menu */}
+              <div className="mb-3">
+                <DeployButton 
+                  projectId={project.id} 
+                  projectName={project.name}
+                  size="sm"
+                />
+              </div>
+
               <button 
                 onClick={() => { handleEdit(); setIsMobileMenuOpen(false) }}
                 className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition text-white"
@@ -472,7 +512,8 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex overflow-hidden">
         {/* Preview Pane */}
         <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
           {project.code ? (
@@ -524,6 +565,7 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   )
