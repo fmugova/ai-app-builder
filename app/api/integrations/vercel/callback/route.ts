@@ -8,40 +8,32 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const code = searchParams.get('code')
-    const state = searchParams.get('state')
     const configurationId = searchParams.get('configurationId')
     const teamId = searchParams.get('teamId')
+    const next = searchParams.get('next')
 
-    console.log('Vercel callback received:', { code: !!code, state: !!state, configurationId, teamId })
+    console.log('Vercel callback received:', { code: !!code, configurationId, teamId, next })
 
-    if (!code || !state) {
-      console.error('Missing code or state')
+    if (!code) {
+      console.error('Missing code')
       return NextResponse.redirect(
-        new URL('/settings?error=missing_oauth_params', request.url)
+        new URL('/settings?error=missing_code', request.url)
       )
     }
 
-    // Verify and decode state
-    let stateData
-    try {
-      stateData = JSON.parse(Buffer.from(state, 'base64url').toString())
-    } catch (e) {
-      console.error('Invalid state format:', e)
+    // Get the user from session (they should still be logged in)
+    const { getServerSession } = await import('next-auth')
+    const { authOptions } = await import('@/lib/auth')
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user?.email) {
+      console.error('No session found in callback')
       return NextResponse.redirect(
-        new URL('/settings?error=invalid_state', request.url)
+        new URL('/auth/signin?callbackUrl=/settings', request.url)
       )
     }
 
-    const userId = stateData.userId
-    const timestamp = stateData.timestamp
-
-    // Check if state is not too old (15 minutes max)
-    if (Date.now() - timestamp > 15 * 60 * 1000) {
-      console.error('State expired')
-      return NextResponse.redirect(
-        new URL('/settings?error=oauth_expired', request.url)
-      )
-    }
+    const userId = session.user.id || session.user.email
 
     console.log('Exchanging code for token...')
 

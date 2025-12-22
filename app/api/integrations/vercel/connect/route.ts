@@ -3,7 +3,6 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import crypto from 'crypto'
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,19 +20,15 @@ export async function GET(request: NextRequest) {
     // Use email as fallback if id is not available
     const userId = session.user.id || session.user.email
     
-    // Create state with user info for verification
-    const state = Buffer.from(JSON.stringify({
-      userId: userId,
-      timestamp: Date.now(),
-      nonce: crypto.randomBytes(16).toString('hex')
-    })).toString('base64url')
-
-    // Build Vercel OAuth URL
+    // Store userId in a temporary way (we'll use configurationId from callback)
+    // For Vercel integrations, state is handled differently
+    
+    // Build Vercel Integration URL (simpler - Vercel handles OAuth internally)
     const vercelAuthUrl = new URL('https://vercel.com/integrations/buildflow-ai/new')
-    vercelAuthUrl.searchParams.set('client_id', process.env.VERCEL_CLIENT_ID!)
-    vercelAuthUrl.searchParams.set('redirect_uri', process.env.VERCEL_REDIRECT_URI!)
-    vercelAuthUrl.searchParams.set('state', state)
-
+    
+    // Store user mapping temporarily (in production, you'd use Redis or similar)
+    // For now, we'll retrieve user from session in callback
+    
     return NextResponse.redirect(vercelAuthUrl.toString())
   } catch (error) {
     console.error('Vercel connect error:', error)
