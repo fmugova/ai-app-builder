@@ -20,5 +20,14 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*']
+  matcher: [
+    /*
+     * Match all request paths except:
+     * - /api/auth/* (all auth routes including GitHub OAuth)
+     * - /_next/static
+     * - /_next/image
+     * - /favicon.ico
+     */
+    '/((?!api/auth|_next/static|_next/image|favicon.ico).*)',
+  ]
 }

@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react'
 import { Monitor, Tablet, Smartphone, RefreshCw, Code, Download, Copy, Trash2, Edit, X, Menu, Package } from 'lucide-react'
 import DeployButton from '@/components/DeployButton'
 import SimpleExportButton from '@/components/SimpleExportButton'
+import { sanitizeReactCode } from '@/lib/code-sanitizer'
 
 interface Project {
   id: string
@@ -31,7 +32,8 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
 
   // Enhanced sanitize with React support
   function sanitizeForPreview(code: string): string {
-    let sanitized = code || ''
+    // First, remove 'use client' and 'use server' directives
+    let sanitized = sanitizeReactCode(code || '')
 
     // If already complete HTML, add base target
     if (sanitized.includes('<head>')) {
