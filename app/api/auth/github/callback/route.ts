@@ -2,6 +2,32 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { headers } from 'next/headers';
+
+function getBaseUrl(): string {
+  // In production, use NEXTAUTH_URL or the request origin
+  const headersList = headers();
+  const host = headersList.get('host');
+  const protocol = headersList.get('x-forwarded-proto') || 'https';
+  
+  // Prefer NEXTAUTH_URL for production
+  if (process.env.NEXTAUTH_URL && !process.env.NEXTAUTH_URL.includes('localhost')) {
+    return process.env.NEXTAUTH_URL;
+  }
+  
+  // Fall back to NEXT_PUBLIC_APP_URL
+  if (process.env.NEXT_PUBLIC_APP_URL && !process.env.NEXT_PUBLIC_APP_URL.includes('localhost')) {
+    return process.env.NEXT_PUBLIC_APP_URL;
+  }
+  
+  // For local development or fallback, construct from host
+  if (host) {
+    return `${protocol}://${host}`;
+  }
+  
+  // Ultimate fallback
+  return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -14,20 +40,25 @@ export async function GET(request: Request) {
   // Handle OAuth errors
   if (error) {
     console.error('GitHub OAuth error:', error);
+    const baseUrl = getBaseUrl();
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?error=github_auth_denied`
+      `${baseUrl}/dashboard?error=github_auth_denied`
     );
   }
   
   if (!code) {
+    const baseUrl = getBaseUrl();
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?error=github_no_code`
+      `${baseUrl}/dashboard?error=github_no_code`
     );
   }
   
   try {
+    const baseUrl = getBaseUrl();
+    
     // Exchange code for access token
     console.log('🔄 Exchanging code for token...');
+    console.log('🔗 Base URL:', baseUrl);
     
     const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
       method: 'POST',
@@ -39,7 +70,7 @@ export async function GET(request: Request) {
         client_id: process.env.GITHUB_CLIENT_ID,
         client_secret: process.env.GITHUB_CLIENT_SECRET,
         code,
-        redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/github/callback`,
+        redirect_uri: `${baseUrl}/api/auth/github/callback`,
       }),
     });
     
@@ -79,7 +110,7 @@ export async function GET(request: Request) {
       // Store GitHub credentials temporarily in a way we can retrieve after login
       // For now, just redirect to login with a message
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL}/auth/signin?error=login_required&message=Please login to connect GitHub`
+        `${baseUrl}/auth/signin?error=login_required&message=Please login to connect GitHub`
       );
     }
     
@@ -112,13 +143,14 @@ export async function GET(request: Request) {
     console.log('🎉 Redirecting to:', redirectPath);
     
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL}${redirectPath}`
+      `${baseUrl}${redirectPath}`
     );
     
   } catch (error: any) {
     console.error('❌ GitHub OAuth callback error:', error);
+    const baseUrl = getBaseUrl();
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?error=github_connection_failed&details=${encodeURIComponent(error.message)}`
+      `${baseUrl}/dashboard?error=github_connection_failed&details=${encodeURIComponent(error.message)}`
     );
   }
 }
