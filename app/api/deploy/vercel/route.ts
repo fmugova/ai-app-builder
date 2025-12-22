@@ -1,176 +1,134 @@
-export const dynamic = 'force-dynamic'
+import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
-import { decrypt } from '@/lib/encryption'
-
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions);
     
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const { projectId } = await request.json()
-
-    if (!projectId) {
-      return NextResponse.json({ error: 'Project ID required' }, { status: 400 })
+    
+    const { projectId, githubRepoName } = await request.json();
+    
+    // Get user with GitHub and Vercel credentials
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      include: {
+        vercelConnection: true,
+      },
+    });
+    
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
-
-    // Get project
-    const project = await prisma.project.findUnique({
-      where: { 
-        id: projectId,
-        userId: session.user.id 
-      }
-    })
-
-    if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    
+    // Check GitHub connection
+    if (!user.githubAccessToken || !user.githubUsername) {
+      return NextResponse.json({ 
+        error: 'GitHub not connected',
+        needsGithubAuth: true 
+      }, { status: 400 });
     }
-
-    // Get Vercel connection
-    const vercelConnection = await prisma.vercelConnection.findUnique({
-      where: { userId: session.user.id }
-    })
-
-    if (!vercelConnection) {
+    
+    // Check Vercel connection
+    if (!user.vercelConnection?.accessToken) {
       return NextResponse.json({ 
         error: 'Vercel not connected',
-        needsAuth: true 
-      }, { status: 400 })
+        needsVercelAuth: true 
+      }, { status: 400 });
     }
-
-    // Decrypt access token
-    const accessToken = decrypt(vercelConnection.accessToken)
-
-    // Create clean deployment name (Vercel naming rules)
-    const deploymentName = project.name
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, 50) || 'buildflow-project'
-
-    console.log('Deploying project:', { projectId, deploymentName })
-
-    // Prepare deployment payload
-    const deploymentPayload = {
-      name: deploymentName,
-      files: [
-        {
-          file: 'index.html',
-          data: Buffer.from(project.code).toString('base64')
-        },
-        {
-          file: 'package.json',
-          data: Buffer.from(JSON.stringify({
-            name: deploymentName,
-            version: '1.0.0',
-            description: project.description || 'Built with BuildFlow'
-          })).toString('base64')
-        }
-      ],
-      projectSettings: {
-        framework: null,
-        buildCommand: null,
-        installCommand: null,
-        devCommand: null,
-        outputDirectory: null
-      },
-      target: 'production',
-      gitSource: null
+    
+    // Get project details
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+    });
+    
+    if (!project) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
-
-    // Add teamId if user is part of a team
-    const deployHeaders: Record<string, string> = {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    }
-
-    if (vercelConnection.teamId) {
-      deployHeaders['x-vercel-team-id'] = vercelConnection.teamId
-    }
-
-    console.log('Sending deployment request to Vercel...')
-
-    // Create deployment on Vercel
-    const deployResponse = await fetch('https://api.vercel.com/v13/deployments', {
+    
+    // Step 1: Deploy to Vercel with correct gitSource format
+    console.log('🚀 Deploying to Vercel...');
+    console.log('GitHub repo:', `${user.githubUsername}/${githubRepoName}`);
+    
+    const vercelResponse = await fetch('https://api.vercel.com/v13/deployments', {
       method: 'POST',
-      headers: deployHeaders,
-      body: JSON.stringify(deploymentPayload),
-    })
-
-    const deployData = await deployResponse.json()
-
-    console.log('Vercel response status:', deployResponse.status)
-
-    if (!deployResponse.ok) {
-      console.error('Deployment failed:', deployData)
-      throw new Error(
-        deployData.error?.message || 
-        deployData.message || 
-        'Deployment failed'
-      )
+      headers: {
+        'Authorization': `Bearer ${user.vercelConnection.accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: githubRepoName.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+        gitSource: {
+          type: 'github',
+          repo: `${user.githubUsername}/${githubRepoName}`,
+          ref: 'main', // or 'master' depending on your default branch
+        },
+        projectSettings: {
+          framework: project.framework || 'nextjs',
+          buildCommand: 'npm run build',
+          outputDirectory: '.next',
+          installCommand: 'npm install',
+        },
+      }),
+    });
+    
+    const vercelData = await vercelResponse.json();
+    
+    if (!vercelResponse.ok) {
+      console.error('Vercel API Error:', vercelData);
+      
+      // Handle specific Vercel errors
+      if (vercelData.error?.code === 'repo_not_found') {
+        return NextResponse.json({ 
+          error: 'GitHub repository not found. Please ensure it exists and is accessible.',
+          details: vercelData.error.message
+        }, { status: 400 });
+      }
+      
+      if (vercelData.error?.code === 'invalid_request') {
+        return NextResponse.json({ 
+          error: 'Invalid deployment request',
+          details: vercelData.error.message
+        }, { status: 400 });
+      }
+      
+      throw new Error(vercelData.error?.message || 'Vercel deployment failed');
     }
-
-    console.log('Deployment created:', { 
-      id: deployData.id, 
-      url: deployData.url 
-    })
-
-    // Save deployment record
+    
+    console.log('✅ Vercel deployment created:', vercelData);
+    
+    // Step 2: Save deployment to database
     const deployment = await prisma.deployment.create({
       data: {
-        projectId,
-        userId: session.user.id,
+        userId: user.id,
+        projectId: project.id,
         platform: 'vercel',
-        deploymentId: deployData.id,
-        deploymentUrl: `https://${deployData.url}`,
-        vercelProjectId: deployData.projectId,
-        status: 'building'
-      }
-    })
-
+        deploymentUrl: vercelData.url ? `https://${vercelData.url}` : null,
+        deploymentId: vercelData.id,
+        vercelProjectId: vercelData.projectId,
+        status: 'building',
+      },
+    });
+    
     return NextResponse.json({
       success: true,
       deployment: {
         id: deployment.id,
-        deploymentId: deployData.id,
-        url: deployment.deploymentUrl,
-        status: deployment.status,
-        vercelUrl: `https://vercel.com/${vercelConnection.username}/${deploymentName}`
-      }
-    })
-  } catch (error: any) {
-    console.error('Deploy error:', error)
+        vercelUrl: deployment.deploymentUrl,
+        deploymentId: vercelData.id,
+        status: 'building',
+      },
+    });
     
-    // Log deployment failure
-    try {
-      const body = await request.json()
-      const { projectId } = body
-      const session = await getServerSession(authOptions)
-      
-      if (session?.user?.id && projectId) {
-        await prisma.deployment.create({
-          data: {
-            projectId,
-            userId: session.user.id,
-            platform: 'vercel',
-            status: 'error',
-            errorMessage: error.message
-          }
-        })
-      }
-    } catch (e) {
-      console.error('Failed to log deployment error:', e)
-    }
-
+  } catch (error: any) {
+    console.error('Deployment error:', error);
     return NextResponse.json({ 
-      error: error.message || 'Deployment failed' 
-    }, { status: 500 })
+      error: error.message || 'Deployment failed',
+      details: error.toString()
+    }, { status: 500 });
   }
 }
