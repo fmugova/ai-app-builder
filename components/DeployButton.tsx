@@ -21,6 +21,7 @@ export default function DeployButton({
   const [error, setError] = useState<string | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [checkingConnection, setCheckingConnection] = useState(true)
+  const [deployStep, setDeployStep] = useState<'github' | 'vercel' | null>(null)
 
   useEffect(() => {
     checkVercelConnection()
@@ -49,10 +50,38 @@ export default function DeployButton({
     setError(null)
 
     try {
-      const res = await fetch('/api/deploy/vercel', {
+      // Step 1: Create GitHub repository first
+      console.log('📦 Step 1: Creating GitHub repository...')
+      setDeployStep('github')
+      const githubRes = await fetch('/api/github/create-repo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId })
+      })
+
+      const githubData = await githubRes.json()
+
+      if (!githubRes.ok) {
+        if (githubData.needsGithubConnection) {
+          // Redirect to GitHub OAuth
+          window.location.href = `/api/auth/github?projectId=${projectId}`
+          return
+        }
+        throw new Error(githubData.error || 'Failed to create GitHub repository')
+      }
+
+      console.log('✅ GitHub repository created:', githubData.repoUrl)
+
+      // Step 2: Deploy to Vercel using the GitHub repo
+      setDeployStep('vercel')
+      console.log('🚀 Step 2: Deploying to Vercel...')
+      const res = await fetch('/api/deploy/vercel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          projectId,
+          githubRepoName: githubData.repoName 
+        })
       })
 
       const data = await res.json()
@@ -74,6 +103,7 @@ export default function DeployButton({
     } catch (err: any) {
       setStatus('error')
       setError(err.message)
+      setDeployStep(null)
       setDeploying(false)
     }
   }
@@ -255,7 +285,8 @@ export default function DeployButton({
       className={`${sizeClasses[size]} flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed w-full font-semibold shadow-lg hover:shadow-xl`}
     >
       {deploying ? (
-        <>
+        <>{deployStep === 'github' ? 'Creating GitHub repo...' : 
+           deployStep === 'vercel' ? 'Deploying to Vercel...' : 'Deploying...'}
           <Loader2 className="w-5 h-5 animate-spin" />
           Deploying to Vercel...
         </>
