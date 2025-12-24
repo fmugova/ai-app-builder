@@ -50,8 +50,8 @@ export default function DeployButton({
     setError(null)
 
     try {
-      // Step 1: Create GitHub repository first
-      console.log('📦 Step 1: Creating GitHub repository...')
+      // Step 1: Create or get GitHub repository
+      console.log('📦 Step 1: Preparing GitHub repository...')
       setDeployStep('github')
       const githubRes = await fetch('/api/github/create-repo', {
         method: 'POST',
@@ -67,10 +67,19 @@ export default function DeployButton({
           window.location.href = `/api/auth/github?projectId=${projectId}`
           return
         }
-        throw new Error(githubData.error || 'Failed to create GitHub repository')
+        
+        // If repo already exists, that's okay - we can still deploy to it
+        if (githubRes.status === 409) {
+          console.log('ℹ️ Repository already exists, continuing with deployment...')
+          // Extract repo name from error message or generate it
+          const repoName = projectName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+          githubData.repoName = repoName
+        } else {
+          throw new Error(githubData.error || 'Failed to create GitHub repository')
+        }
       }
 
-      console.log('✅ GitHub repository created:', githubData.repoUrl)
+      console.log('✅ GitHub repository ready:', githubData.repoName)
 
       // Step 2: Deploy to Vercel using the GitHub repo
       setDeployStep('vercel')
