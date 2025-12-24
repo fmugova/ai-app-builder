@@ -29,9 +29,9 @@ export async function POST(request: NextRequest) {
     // Require user to have connected their own GitHub account
     if (!githubToken) {
       return NextResponse.json(
-        { 
-          error: 'GitHub not connected. Please sign in with GitHub to connect your account and export projects to your own repositories.',
-          needsGithubConnection: true
+        {
+          error: 'GitHub not connected. Please connect your GitHub account to export projects to your own repositories.',
+          needsGithubConnection: true,
         },
         { status: 400 }
       )

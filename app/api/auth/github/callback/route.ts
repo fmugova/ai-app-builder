@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { headers } from 'next/headers';
+import { getGithubOAuthCredentials } from '@/lib/github-oauth';
+
+const { clientId: githubClientId, clientSecret: githubClientSecret } = getGithubOAuthCredentials();
 
 // Production: https://www.buildflow-ai.app
 // Development: https://ai-app-builder-flame.vercel.app
@@ -81,8 +84,8 @@ export async function GET(request: Request) {
         'Accept': 'application/json',
       },
       body: JSON.stringify({
-        client_id: process.env.GITHUB_CLIENT_ID,
-        client_secret: process.env.GITHUB_CLIENT_SECRET,
+        client_id: githubClientId,
+        client_secret: githubClientSecret,
         code,
         redirect_uri: `${baseUrl}/api/auth/github/callback`,
       }),

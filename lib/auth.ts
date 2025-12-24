@@ -26,21 +26,17 @@ declare module 'next-auth/jwt' {
 }
 import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import GoogleProvider from 'next-auth/providers/google'
-import GitHubProvider from 'next-auth/providers/github'
 import { prisma } from './prisma'
 import bcrypt from 'bcryptjs'
+import { getGithubOAuthCredentials } from './github-oauth'
+
+// GitHub login is disabled; use Google or credentials for login.
 
 export const authOptions: NextAuthOptions = {
+  // Allow NextAuth to trust the incoming host header so
+  // preview deploys on Vercel work without a fixed NEXTAUTH_URL
+  trustHost: true,
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-    GitHubProvider({
-      clientId: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-    }),
     CredentialsProvider({
       name: 'credentials',
       credentials: {
@@ -87,7 +83,8 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account }) {
       // OAuth sign in - create user if doesn't exist
-      if (account?.provider === 'google' || account?.provider === 'github') {
+        // No OAuth user creation for now; credentials-only login
+        if (false) {
         const existingUser = await prisma.user.findUnique({
           where: { email: user.email! },
         })

@@ -56,8 +56,13 @@ export async function POST(request: NextRequest) {
 
     // Check project limit
     const plan = user.subscriptionTier || 'free'
-    const limit = plan === 'free' ? 3 : plan === 'pro' ? 50 : 999
-    
+
+    // Development: unlimited projects
+    // Production: enforce limits based on tier
+    const limit = process.env.NODE_ENV === 'development' 
+      ? 999
+      : (plan === 'free' ? 3 : plan === 'pro' ? 50 : 999)
+
     if (user._count.projects >= limit) {
       return NextResponse.json(
         { error: 'Project limit reached. Please upgrade your plan.' },

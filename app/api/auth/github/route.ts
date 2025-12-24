@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { getGithubOAuthCredentials } from '@/lib/github-oauth';
+
+const { clientId: githubClientId } = getGithubOAuthCredentials();
 
 // Production: https://www.buildflow-ai.app
 // Development: https://ai-app-builder-flame.vercel.app
@@ -54,7 +57,7 @@ export async function GET(request: Request) {
   })).toString('base64');
   
   const githubAuthUrl = new URL('https://github.com/login/oauth/authorize');
-  githubAuthUrl.searchParams.append('client_id', process.env.GITHUB_CLIENT_ID!);
+  githubAuthUrl.searchParams.append('client_id', githubClientId);
   githubAuthUrl.searchParams.append('redirect_uri', `${baseUrl}/api/auth/github/callback`);
   githubAuthUrl.searchParams.append('scope', 'repo,user:email');
   githubAuthUrl.searchParams.append('state', state);

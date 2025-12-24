@@ -1,4 +1,3 @@
-
 import { authOptions } from '@/lib/auth';
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
@@ -29,10 +28,11 @@ export async function GET(
 
     const { id } = await params
 
+    // Admins can view any project, regular users only their own
     const project = await prisma.project.findFirst({
       where: {
         id,
-        userId: user.id,
+        ...(user.role !== 'admin' && { userId: user.id }),
       },
     })
 
@@ -73,11 +73,11 @@ export async function PUT(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Verify ownership
+    // Admins can update any project, regular users only their own
     const existingProject = await prisma.project.findFirst({
       where: {
         id,
-        userId: user.id,
+        ...(user.role !== 'admin' && { userId: user.id }),
       },
     })
 
@@ -140,11 +140,11 @@ export async function DELETE(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Verify ownership before deletion
+    // Admins can delete any project, regular users only their own
     const project = await prisma.project.findFirst({
       where: {
         id,
-        userId: user.id,
+        ...(user.role !== 'admin' && { userId: user.id }),
       },
     })
 
