@@ -85,69 +85,41 @@ export async function POST(request: NextRequest) {
     }
 
 
-    const systemPrompt = `You are an expert React developer. Generate COMPLETE, PRODUCTION-READY React code that runs in the browser.
-
-OUTPUT FORMAT - Return ONLY plain React JSX component code (NO HTML wrapper):
-- Start with: export default function ComponentName() {
-- Use React 18 hooks: useState, useEffect, useRef
-- Use className (NOT class) for CSS
-- Return JSX wrapped in parentheses: return ( ... );
-- End with closing brace: }
-- NO <!DOCTYPE>, NO <html>, NO <head>, NO <script> tags
-- The code will be wrapped in proper HTML by the preview system
-
-EXAMPLE OUTPUT FORMAT:
-export default function LandingPage() {
-  const [isOpen, setIsOpen] = React.useState(false);
-  
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Your component JSX here */}
-    </div>
-  );
-}
-
-ABSOLUTE REQUIREMENTS - CODE MUST BE 100% COMPLETE:
-1. NEVER truncate or cut off code - generate the ENTIRE page from start to finish
-2. ALL JSX must be syntactically valid and complete
-3. ALL .map() functions MUST have closing parentheses: .map(() => (...))
-4. ALL opening tags MUST have closing tags: <div>...</div>
-5. ALWAYS close all braces, brackets, and parentheses
-6. Code MUST end with proper closing tags: </body></html>
-7. If you start generating content, you MUST finish it completely
-8. NO placeholder comments like "...rest of code..." or "...more content..."
-
-SYNTAX VALIDATION CHECKLIST (verify before responding):
-✓ Every opening brace { has a closing }
-✓ Every opening bracket [ has a closing ]
-✓ Every opening parenthesis ( has a closing )
-✓ Every <tag> has a </tag>
-✓ All .map() calls are complete
-✓ Footer section is included
-✓ Code ends with </body></html>
+    const systemPrompt = `Create a complete, production-ready single-file HTML page for: ${prompt}
 
 CRITICAL REQUIREMENTS:
-1. MUST include a complete professional footer section at the bottom (before closing </body> tag)
-2. Footer MUST contain:
-   - Company name and description
-   - Grid layout with multiple columns (Product, Company, Legal sections)
-   - Copyright notice with current year
-   - Social media links (Twitter, GitHub, LinkedIn)
-   - Navigation links (Features, Pricing, About, Contact, Privacy Policy, Terms)
-   - Dark background (bg-gray-900) with white text
-   - Responsive grid (grid-cols-1 md:grid-cols-4)
-   - Proper spacing and styling
+1. Must be a COMPLETE standalone HTML file starting with <!DOCTYPE html>
+2. Use React 18 loaded via CDN: https://unpkg.com/react@18/umd/react.development.js
+3. Use ReactDOM via CDN: https://unpkg.com/react-dom@18/umd/react-dom.development.js
+4. Use Babel standalone for JSX: https://unpkg.com/@babel/standalone/babel.min.js
+5. Use Tailwind CSS via CDN: https://cdn.tailwindcss.com
+6. ALL React code must be in a <script type="text/babel"> tag
+7. NO exports, NO imports, NO module syntax
+8. Render with: ReactDOM.render(<YourComponent />, document.getElementById('root'))
 
-REQUIRED Footer Template (customize text based on project):
-<footer class="bg-gray-900 text-white py-12 mt-20">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
-      <div>
-        <h3 class="text-white font-bold text-lg mb-4">[Project Name]</h3>
-        <p class="text-gray-400 text-sm">
-          [Brief description based on project purpose]
-        </p>
-      </div>
+Example structure:
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>...</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const YourComponent = () => {
+            // Your React code here
+        };
+        ReactDOM.render(<YourComponent />, document.getElementById('root'));
+    </script>
+</body>
+</html>
+
+Now create: ${prompt}`
       <div>
         <h4 class="text-white font-semibold mb-4">Product</h4>
         <ul class="space-y-2">
