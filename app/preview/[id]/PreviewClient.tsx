@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Download, Edit, Share2, Code, RefreshCw, Trash2, X, ExternalLink, Copy, Check } from 'lucide-react';
+import { Download, Edit, Share2, Code, RefreshCw, Trash2, X, Copy, Check, Rocket } from 'lucide-react';
+import SimpleExportButton from '@/components/SimpleExportButton';
+import DeployButton from '@/components/DeployButton';
 
 interface PreviewClientProps {
   projectId: string;
@@ -15,6 +17,8 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
   const [loading, setLoading] = useState(true);
   const [showCode, setShowCode] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showDeployModal, setShowDeployModal] = useState(false);
 
   useEffect(() => {
     const fetchProject = async () => {
@@ -80,7 +84,11 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
   };
 
   const handleExportGitHub = () => {
-    router.push(`/dashboard?action=export&projectId=${projectId}`);
+    setShowExportModal(true);
+  };
+
+  const handleDeploy = () => {
+    setShowDeployModal(true);
   };
 
   const handleRefresh = () => {
@@ -178,10 +186,19 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
           <button
             onClick={handleExportGitHub}
             className="flex items-center gap-2 p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
-            title="Export to GitHub"
+            title="Export Project"
           >
             <Share2 className="w-5 h-5" />
             <span className="hidden sm:inline text-sm">Export</span>
+          </button>
+
+          <button
+            onClick={handleDeploy}
+            className="flex items-center gap-2 p-2 text-blue-400 hover:text-blue-300 hover:bg-gray-800 rounded-lg transition"
+            title="Deploy to Vercel"
+          >
+            <Rocket className="w-5 h-5" />
+            <span className="hidden sm:inline text-sm">Deploy</span>
           </button>
 
           <div className="w-px h-6 bg-gray-700"></div>
@@ -252,6 +269,51 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
           </div>
         )}
       </div>
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-gray-900 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="flex items-center justify-between p-6 border-b border-gray-800">
+              <h2 className="text-xl font-bold text-white">Export Project</h2>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="p-1 hover:bg-gray-800 rounded transition"
+              >
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+            <SimpleExportButton 
+              projectId={projectId} 
+              projectName={project?.name || 'Project'}
+              projectCode={project?.code || ''}
+              projectType={project?.type || 'html'}
+              onSuccess={() => setShowExportModal(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Deploy Modal */}
+      {showDeployModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-gray-900 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="flex items-center justify-between p-6 border-b border-gray-800">
+              <h2 className="text-xl font-bold text-white">Deploy to Vercel</h2>
+              <button
+                onClick={() => setShowDeployModal(false)}
+                className="p-1 hover:bg-gray-800 rounded transition"
+              >
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+            <DeployButton 
+              projectId={projectId} 
+              projectName={project?.name || 'Project'}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
