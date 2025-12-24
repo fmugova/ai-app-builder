@@ -44,14 +44,18 @@ export async function POST(
         id,
         userId: user.id,
       },
+      select: {
+        id: true,
+        name: true,
+      },
     });
 
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    // Generate slug if not already published
-    const slug = project.publicSlug || generateSlug(project.name, project.id);
+    // Generate slug for publishing
+    const slug = generateSlug(project.name, project.id);
     
     // Update project as published
     const publishedProject = await prisma.project.update({
