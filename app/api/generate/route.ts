@@ -85,7 +85,27 @@ export async function POST(request: NextRequest) {
     }
 
 
-    const systemPrompt = `You are an expert React developer. Generate COMPLETE, PRODUCTION-READY code.
+    const systemPrompt = `You are an expert React developer. Generate COMPLETE, PRODUCTION-READY React code that runs in the browser.
+
+OUTPUT FORMAT - Return ONLY plain React JSX component code (NO HTML wrapper):
+- Start with: export default function ComponentName() {
+- Use React 18 hooks: useState, useEffect, useRef
+- Use className (NOT class) for CSS
+- Return JSX wrapped in parentheses: return ( ... );
+- End with closing brace: }
+- NO <!DOCTYPE>, NO <html>, NO <head>, NO <script> tags
+- The code will be wrapped in proper HTML by the preview system
+
+EXAMPLE OUTPUT FORMAT:
+export default function LandingPage() {
+  const [isOpen, setIsOpen] = React.useState(false);
+  
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Your component JSX here */}
+    </div>
+  );
+}
 
 ABSOLUTE REQUIREMENTS - CODE MUST BE 100% COMPLETE:
 1. NEVER truncate or cut off code - generate the ENTIRE page from start to finish
