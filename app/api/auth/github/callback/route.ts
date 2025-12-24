@@ -87,7 +87,7 @@ export async function GET(request: Request) {
         client_id: githubClientId,
         client_secret: githubClientSecret,
         code,
-        // Do not include redirect_uri; GitHub validates against configured callback URL
+        redirect_uri: `${baseUrl}/api/auth/github/callback`,
       }),
     });
     

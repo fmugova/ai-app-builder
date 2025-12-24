@@ -59,7 +59,7 @@ export async function GET(request: Request) {
   
   const githubAuthUrl = new URL('https://github.com/login/oauth/authorize');
   githubAuthUrl.searchParams.append('client_id', githubClientId);
-  // Do not override redirect_uri; must match the GitHub OAuth App configuration exactly.
+  githubAuthUrl.searchParams.append('redirect_uri', `${baseUrl}/api/auth/github/callback`);
   githubAuthUrl.searchParams.append('scope', 'repo,user:email');
   githubAuthUrl.searchParams.append('state', state);
   
