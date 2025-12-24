@@ -1,62 +1,94 @@
-import { notFound } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
+'use client';
 
-export const dynamic = 'force-dynamic';
+import { useParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
-interface PageProps {
-  params: {
-    slug: string;
+interface SiteData {
+  id: string;
+  name: string;
+  code: string;
+  type: string;
+  createdAt: string;
+  User: {
+    name: string | null;
   };
 }
 
-export default async function PublishedSitePage({ params }: PageProps) {
-  const { slug } = params;
+export default function SitePage() {
+  const params = useParams();
+  const slug = params.slug as string;
+  const [site, setSite] = useState<SiteData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Fetch the published project by publicSlug
-  const project = await prisma.project.findFirst({
-    where: {
-      publicSlug: slug,
-      isPublished: true,
-    },
-    select: {
-      id: true,
-      name: true,
-      code: true,
-      description: true,
-      createdAt: true,
-      User: {
-        select: {
-          name: true,
-        },
-      },
-    },
-  });
+  useEffect(() => {
+    async function loadSite() {
+      try {
+        const res = await fetch(`/api/sites/${slug}`);
+        if (!res.ok) {
+          throw new Error(res.status === 404 ? 'Site not found' : 'Failed to load site');
+        }
+        const data = await res.json();
+        setSite(data);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadSite();
+  }, [slug]);
 
-  if (!project || !project.code) {
-    notFound();
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading site...</p>
+        </div>
+      </div>
+    );
   }
 
-  // Increment view count
-  await prisma.project.update({
-    where: { id: project.id },
-    data: {
-      views: {
-        increment: 1,
-      },
-    },
-  });
+  if (error || !site) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-red-50 to-pink-100">
+        <div className="text-center p-8 bg-white rounded-lg shadow-lg">
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">Site Not Found</h1>
+          <p className="text-gray-600">{error || 'This site does not exist or has been unpublished.'}</p>
+        </div>
+      </div>
+    );
+  }
 
-  // Return the raw HTML directly
   return (
-    <html lang="en">
-      <head>
-        <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>{project.name || 'Published Site'}</title>
-        <meta name="description" content={project.description || `${project.name} - Built with BuildFlow`} />
-        <meta name="generator" content="BuildFlow" />
-      </head>
-      <body dangerouslySetInnerHTML={{ __html: project.code }} />
-    </html>
+    <div className="relative h-screen w-full overflow-hidden">
+      {/* BuildFlow Banner */}
+      <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-2 px-4 text-sm z-10 shadow-md">
+        <div className="flex items-center justify-between max-w-7xl mx-auto">
+          <span className="font-medium">
+            ⚡ Built with <a href="https://buildflow-ai.app" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-200">BuildFlow AI</a>
+            {site.User.name && ` by ${site.User.name}`}
+          </span>
+          <a 
+            href="https://buildflow-ai.app" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded text-xs transition-colors"
+          >
+            Create Your Own
+          </a>
+        </div>
+      </div>
+
+      {/* Site Content */}
+      <iframe
+        srcDoc={site.code}
+        className="w-full h-full border-0"
+        style={{ marginTop: '40px', height: 'calc(100vh - 40px)' }}
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+        title={site.name}
+      />
+    </div>
   );
 }

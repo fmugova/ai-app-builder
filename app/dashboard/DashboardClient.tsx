@@ -44,6 +44,9 @@ interface Project {
   type: string
   createdAt: string
   updatedAt: string
+  isPublished?: boolean
+  publicUrl?: string | null
+  views?: number
 }
 
 interface UserStats {

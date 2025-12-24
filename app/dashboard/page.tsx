@@ -43,6 +43,9 @@ export default async function DashboardPage() {
       type: true,
       createdAt: true,
       updatedAt: true,
+      isPublished: true,
+      publicUrl: true,
+      views: true,
     }
   })
 
