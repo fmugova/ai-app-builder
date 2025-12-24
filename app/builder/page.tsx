@@ -375,7 +375,6 @@ function BuilderContent() {
         : '/api/projects'
       
       const method = currentProjectId ? 'PUT' : 'POST'
-      const sanitizedCode = sanitizeForPreview(generatedCode)
 
       const res = await fetch(url, {
         method,
@@ -383,7 +382,7 @@ function BuilderContent() {
         body: JSON.stringify({
           name: projectName,
           description: projectDescription,
-          code: sanitizedCode,
+          code: generatedCode,
           type: projectType
         })
       })
