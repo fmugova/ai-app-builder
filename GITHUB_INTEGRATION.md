@@ -113,6 +113,20 @@ The app automatically selects credentials based on `VERCEL_ENV` or `NODE_ENV`.
    - `GITHUB_CLIENT_ID_PROD`
    - `GITHUB_CLIENT_SECRET_PROD`
 
+### Callback URL Checklist
+
+Ensure these callback URLs are configured exactly in your GitHub OAuth Apps:
+
+- Development (local): `http://localhost:3000/api/auth/github/callback`
+- Production (custom domain, apex): `https://buildflow-ai.app/api/auth/github/callback`
+- Vercel preview/dev: `https://<your-project>.vercel.app/api/auth/github/callback`
+
+Important notes:
+- The callback URL must match exactly; GitHub rejects mismatches with “The redirect_uri is not associated with this application”.
+- Do not include a trailing slash at the end of the callback path.
+- Use the apex domain if your site resolves without `www` (e.g., `buildflow-ai.app`), or configure the OAuth App to use `www` consistently.
+- Our OAuth requests do not override `redirect_uri` — GitHub will use the app’s configured callback.
+
 ## Repository Structure
 
 When exporting a project, BuildFlow creates the following structure:

@@ -4,15 +4,16 @@ import { getGithubOAuthCredentials } from '@/lib/github-oauth';
 
 const { clientId: githubClientId } = getGithubOAuthCredentials();
 
-// Production: https://www.buildflow-ai.app
-// Development: https://ai-app-builder-flame.vercel.app
-const PRODUCTION_URL = 'https://www.buildflow-ai.app';
-const DEVELOPMENT_URL = 'https://ai-app-builder-flame.vercel.app';
+// Production: https://buildflow-ai.app (no www)
+// Development: use current vercel host
+const PRODUCTION_URL = 'https://buildflow-ai.app';
+const DEFAULT_DEV_SUBDOMAIN = 'ai-app-builder-flame.vercel.app';
 
 function getBaseUrl(): string {
   const headersList = headers();
   const host = headersList.get('host') || '';
   const xForwardedHost = headersList.get('x-forwarded-host') || '';
+  const xForwardedProto = headersList.get('x-forwarded-proto') || 'https';
   
   // Log for debugging
   console.log('🔍 GitHub OAuth - Host header:', host);
@@ -21,15 +22,15 @@ function getBaseUrl(): string {
   // Check both host and x-forwarded-host for production domain
   const effectiveHost = xForwardedHost || host;
   
-  if (effectiveHost.includes('buildflow-ai.app') || effectiveHost.includes('buildflow-ai')) {
+  if (effectiveHost.replace(/^www\./, '').includes('buildflow-ai.app')) {
     console.log('✅ Detected PRODUCTION environment');
     return PRODUCTION_URL;
   }
   
   // Check if we're on Vercel preview/development
-  if (effectiveHost.includes('vercel.app') || effectiveHost.includes('flame')) {
+  if (effectiveHost.includes('vercel.app')) {
     console.log('✅ Detected DEVELOPMENT environment');
-    return DEVELOPMENT_URL;
+    return `${xForwardedProto}://${effectiveHost || DEFAULT_DEV_SUBDOMAIN}`;
   }
   
   // Local development
@@ -58,7 +59,7 @@ export async function GET(request: Request) {
   
   const githubAuthUrl = new URL('https://github.com/login/oauth/authorize');
   githubAuthUrl.searchParams.append('client_id', githubClientId);
-  githubAuthUrl.searchParams.append('redirect_uri', `${baseUrl}/api/auth/github/callback`);
+  // Do not override redirect_uri; must match the GitHub OAuth App configuration exactly.
   githubAuthUrl.searchParams.append('scope', 'repo,user:email');
   githubAuthUrl.searchParams.append('state', state);
   
