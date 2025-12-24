@@ -1,15 +1,20 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Download, Edit, Share2, Code, RefreshCw, Trash2, X, ExternalLink, Copy, Check } from 'lucide-react';
 
 interface PreviewClientProps {
   projectId: string;
 }
 
 export default function PreviewClient({ projectId }: PreviewClientProps) {
+  const router = useRouter();
   const [project, setProject] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showCode, setShowCode] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const fetchProject = async () => {
@@ -31,6 +36,56 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
 
     fetchProject();
   }, [projectId]);
+
+  const handleDownload = () => {
+    if (project?.code) {
+      const blob = new Blob([project.code], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${project.name || 'project'}.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  const handleCopy = async () => {
+    if (project?.code) {
+      await navigator.clipboard.writeText(project.code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleEdit = () => {
+    router.push(`/builder?project=${projectId}`);
+  };
+
+  const handleDelete = async () => {
+    if (!confirm('Are you sure you want to delete this project?')) return;
+    
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        alert('Project deleted');
+        router.push('/dashboard');
+      } else {
+        alert('Failed to delete project');
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+    }
+  };
+
+  const handleExportGitHub = () => {
+    router.push(`/dashboard?action=export&projectId=${projectId}`);
+  };
+
+  const handleRefresh = () => {
+    window.location.reload();
+  };
 
   if (loading) {
     return (
@@ -64,13 +119,139 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
   // Claude generates complete, valid HTML - just render it
   
   return (
-    <div className="w-full h-screen">
-      <iframe
-        srcDoc={project.code}
-        className="w-full h-full border-0"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"
-        title="Project Preview"
-      />
+    <div className="w-full h-screen flex flex-col bg-gray-950">
+      {/* Header with Controls */}
+      <div className="bg-gray-900 border-b border-gray-800 p-4 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <h1 className="text-white font-semibold text-lg truncate">
+            {project?.name || 'Preview'}
+          </h1>
+        </div>
+        
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleEdit}
+            className="flex items-center gap-2 p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
+            title="Edit project"
+          >
+            <Edit className="w-5 h-5" />
+            <span className="hidden sm:inline text-sm">Edit</span>
+          </button>
+
+          <button
+            onClick={() => setShowCode(!showCode)}
+            className="flex items-center gap-2 p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
+            title="View code"
+          >
+            <Code className="w-5 h-5" />
+            <span className="hidden sm:inline text-sm">Code</span>
+          </button>
+
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-2 p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
+            title="Copy code"
+          >
+            {copied ? (
+              <>
+                <Check className="w-5 h-5 text-green-500" />
+                <span className="hidden sm:inline text-sm text-green-500">Copied</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-5 h-5" />
+                <span className="hidden sm:inline text-sm">Copy</span>
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={handleDownload}
+            className="flex items-center gap-2 p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
+            title="Download as HTML"
+          >
+            <Download className="w-5 h-5" />
+            <span className="hidden sm:inline text-sm">Download</span>
+          </button>
+
+          <button
+            onClick={handleExportGitHub}
+            className="flex items-center gap-2 p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
+            title="Export to GitHub"
+          >
+            <Share2 className="w-5 h-5" />
+            <span className="hidden sm:inline text-sm">Export</span>
+          </button>
+
+          <div className="w-px h-6 bg-gray-700"></div>
+
+          <button
+            onClick={handleRefresh}
+            className="flex items-center gap-2 p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
+            title="Refresh"
+          >
+            <RefreshCw className="w-5 h-5" />
+          </button>
+
+          <button
+            onClick={handleDelete}
+            className="flex items-center gap-2 p-2 text-red-400 hover:text-red-300 hover:bg-gray-800 rounded-lg transition"
+            title="Delete project"
+          >
+            <Trash2 className="w-5 h-5" />
+          </button>
+
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="flex items-center gap-2 p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
+            title="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Preview Pane */}
+        <div className="flex-1 flex items-center justify-center p-4 overflow-auto bg-gray-950">
+          {project?.code ? (
+            <div className="w-full h-full max-w-6xl">
+              <iframe
+                srcDoc={project.code}
+                className="w-full h-full border-0 rounded-lg shadow-lg"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"
+                title="Project Preview"
+              />
+            </div>
+          ) : (
+            <div className="text-center">
+              <p className="text-gray-400 mb-4">No preview available</p>
+            </div>
+          )}
+        </div>
+
+        {/* Code Viewer Pane */}
+        {showCode && project?.code && (
+          <div className="w-96 bg-gray-900 border-l border-gray-800 overflow-auto">
+            <div className="sticky top-0 bg-gray-900 border-b border-gray-800 p-4 flex items-center justify-between">
+              <h3 className="text-white font-semibold">Code</h3>
+              <button
+                onClick={() => setShowCode(false)}
+                className="p-1 hover:bg-gray-800 rounded transition"
+              >
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+            <div className="p-4">
+              <pre className="text-xs text-gray-300 overflow-x-auto font-mono">
+                <code>{project.code}</code>
+              </pre>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
