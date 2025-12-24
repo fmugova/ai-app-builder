@@ -287,6 +287,10 @@ model Project {
   downloads      Int              @default(0)
   framework      String?
   isPublic       Boolean          @default(false)
+  isPublished    Boolean          @default(false)
+  publishedAt    DateTime?
+  publicSlug     String?          @unique
+  publicUrl      String?
   language       String?
   prompt         String?
   shareToken     String?          @unique
@@ -298,6 +302,8 @@ model Project {
   deployments    Deployment[]
 
   @@index([isPublic])
+  @@index([isPublished])
+  @@index([publicSlug])
   @@index([shareToken])
   @@index([updatedAt])
   @@index([userId])
