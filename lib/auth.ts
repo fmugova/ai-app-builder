@@ -33,9 +33,6 @@ import { getGithubOAuthCredentials } from './github-oauth'
 // GitHub login is disabled; use Google or credentials for login.
 
 export const authOptions: NextAuthOptions = {
-  // Allow NextAuth to trust the incoming host header so
-  // preview deploys on Vercel work without a fixed NEXTAUTH_URL
-  trustHost: true,
   providers: [
     CredentialsProvider({
       name: 'credentials',
