@@ -7,11 +7,18 @@ export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
     
+    console.log('🔍 Deploy attempt:', {
+      hasSession: !!session,
+      email: session?.user?.email
+    });
+    
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
     const { projectId, githubRepoName } = await request.json();
+    
+    console.log('📦 Request data:', { projectId, githubRepoName });
     
     // Get user with GitHub and Vercel credentials
     const user = await prisma.user.findUnique({
@@ -19,6 +26,13 @@ export async function POST(request: Request) {
       include: {
         vercelConnection: true,
       },
+    });
+    
+    console.log('👤 User data:', {
+      found: !!user,
+      hasGithub: !!user?.githubAccessToken,
+      hasVercel: !!user?.vercelConnection?.accessToken,
+      githubUsername: user?.githubUsername
     });
     
     if (!user) {
@@ -46,6 +60,12 @@ export async function POST(request: Request) {
       where: { id: projectId },
     });
     
+    console.log('📄 Project data:', {
+      found: !!project,
+      name: project?.name,
+      hasFramework: !!project?.framework
+    });
+    
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
@@ -54,29 +74,39 @@ export async function POST(request: Request) {
     console.log('🚀 Deploying to Vercel...');
     console.log('GitHub repo:', `${user.githubUsername}/${githubRepoName}`);
     
+    const deploymentPayload = {
+      name: githubRepoName.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+      gitSource: {
+        type: 'github',
+        repo: `${user.githubUsername}/${githubRepoName}`,
+        ref: 'main', // or 'master' depending on your default branch
+      },
+      projectSettings: {
+        framework: project.framework || 'nextjs',
+        buildCommand: 'npm run build',
+        outputDirectory: '.next',
+        installCommand: 'npm install',
+      },
+    };
+    
+    console.log('📤 Vercel API payload:', JSON.stringify(deploymentPayload, null, 2));
+    
     const vercelResponse = await fetch('https://api.vercel.com/v13/deployments', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${user.vercelConnection.accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        name: githubRepoName.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
-        gitSource: {
-          type: 'github',
-          repo: `${user.githubUsername}/${githubRepoName}`,
-          ref: 'main', // or 'master' depending on your default branch
-        },
-        projectSettings: {
-          framework: project.framework || 'nextjs',
-          buildCommand: 'npm run build',
-          outputDirectory: '.next',
-          installCommand: 'npm install',
-        },
-      }),
+      body: JSON.stringify(deploymentPayload),
     });
     
     const vercelData = await vercelResponse.json();
+    
+    console.log('📥 Vercel API response:', {
+      status: vercelResponse.status,
+      ok: vercelResponse.ok,
+      data: vercelData
+    });
     
     if (!vercelResponse.ok) {
       console.error('Vercel API Error:', vercelData);
@@ -125,10 +155,16 @@ export async function POST(request: Request) {
     });
     
   } catch (error: any) {
-    console.error('Deployment error:', error);
-    return NextResponse.json({ 
+    console.error('❌ Full deployment error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    
+    return NextResponse.json({
       error: error.message || 'Deployment failed',
-      details: error.toString()
+      details: error.toString(),
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     }, { status: 500 });
   }
 }
