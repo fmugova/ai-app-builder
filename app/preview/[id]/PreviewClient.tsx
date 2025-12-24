@@ -70,7 +70,8 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <base target="_blank">
   <title>Preview</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script>window.tailwindcss = { config: {} };</script>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>

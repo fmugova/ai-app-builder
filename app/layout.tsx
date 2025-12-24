@@ -23,7 +23,9 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://www.buildflow-ai.app'),
+  metadataBase: process.env.NEXT_PUBLIC_SITE_URL 
+    ? new URL(process.env.NEXT_PUBLIC_SITE_URL) 
+    : new URL('https://www.buildflow-ai.app'),
   title: {
     default: 'BuildFlow - AI-Powered App Builder',
     template: '%s | BuildFlow'
