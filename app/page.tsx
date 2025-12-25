@@ -24,36 +24,61 @@ export default function Page() {
         </header>
 
         {/* Hero Section */}
-        <section className="py-20 px-4">
-          <div className="max-w-6xl mx-auto text-center">
-            <h1 className="text-5xl md:text-7xl font-bold text-white mb-6">
-              Build Beautiful Apps with{' '}
-              <span className="bg-gradient-to-r from-purple-400 to-blue-400 text-transparent bg-clip-text">
-                AI Power
-              </span>
-            </h1>
-            <p className="text-xl text-gray-400 mb-8 max-w-3xl mx-auto">
-              Describe your vision, get production-ready code instantly. No coding required. 
-              Create landing pages, web apps, dashboards, and more in seconds.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Link
-                href="/auth/signin"
-                className="px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg font-semibold text-lg transition flex items-center gap-2"
-              >
-                Start Building Free
-                <span>→</span>
-              </Link>
-              <Link
-                href="/pricing"
-                className="px-8 py-4 bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-semibold text-lg transition"
-              >
-                View Pricing
-              </Link>
+        <section className="relative overflow-hidden bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+            <div className="text-center">
+              {/* Headline */}
+              <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6">
+                <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                  Build Websites
+                </span>
+                <br />
+                <span className="text-gray-900 dark:text-white">
+                  In Seconds, Not Hours
+                </span>
+              </h1>
+
+              {/* Subheadline */}
+              <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
+                Describe your idea in plain English. Our AI generates a complete, 
+                production-ready website instantly.
+              </p>
+
+              {/* Social Proof */}
+              <div className="flex items-center justify-center gap-8 mb-10 text-sm text-gray-600 dark:text-gray-400 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <div className="flex -space-x-2">
+                    <div className="w-8 h-8 rounded-full bg-purple-200 border-2 border-white dark:border-gray-800" />
+                    <div className="w-8 h-8 rounded-full bg-blue-200 border-2 border-white dark:border-gray-800" />
+                    <div className="w-8 h-8 rounded-full bg-pink-200 border-2 border-white dark:border-gray-800" />
+                  </div>
+                  <span>1,000+ projects created</span>
+                </div>
+                <span>⚡ Average build time: 30s</span>
+                <span>✨ No code required</span>
+              </div>
+
+              {/* CTA Buttons */}
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link
+                  href="/auth/signin"
+                  className="px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-semibold text-lg hover:shadow-xl transition"
+                >
+                  Start Building Free →
+                </Link>
+                <Link
+                  href="/templates"
+                  className="px-8 py-4 bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg font-semibold text-lg hover:shadow-lg transition"
+                >
+                  View Templates
+                </Link>
+              </div>
+
+              {/* Trust Badge */}
+              <p className="mt-6 text-sm text-gray-500 dark:text-gray-400">
+                No credit card required • Free tier forever
+              </p>
             </div>
-            <p className="text-sm text-gray-500 mt-4">
-              Free tier includes 3 generations per month. No credit card required.
-            </p>
           </div>
         </section>
 

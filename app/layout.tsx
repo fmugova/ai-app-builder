@@ -6,6 +6,8 @@ import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { GoogleAnalytics, GoogleTagManager } from '@next/third-parties/google'
 import { HomePageSchema } from '@/components/JsonLd'
+import SupportChat from '@/components/SupportChat'
+import FeedbackWidget from '@/components/FeedbackWidget'
 import Script from 'next/script'
 import type { Metadata, Viewport } from 'next'
 const inter = Inter({ subsets: ['latin'] })
@@ -164,6 +166,8 @@ export default function RootLayout({
         <SpeedInsights />
         <GoogleAnalytics gaId="GTM-KNTK3Z8G" />
         <GoogleTagManager gtmId="GTM-KNTK3Z8G" />
+        <SupportChat />
+        <FeedbackWidget />
       </body>
     </html>
   )

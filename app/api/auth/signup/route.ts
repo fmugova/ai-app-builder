@@ -80,6 +80,22 @@ export async function POST(request: NextRequest) {
     // Log signup analytics event (server-side)
     logAnalyticsEvent('sign_up', { method: 'email', userId: user.id })
 
+    // Auto-enroll in welcome drip campaign
+    try {
+      await prisma.dripEnrollment.create({
+        data: {
+          campaignId: 'welcome_series',
+          userEmail: user.email,
+          userId: user.id,
+          enrolledAt: new Date(),
+          emailsSent: {}
+        }
+      })
+    } catch (enrollmentError) {
+      console.error('Drip enrollment failed:', enrollmentError)
+      // Don't fail signup if enrollment fails
+    }
+
     // Send welcome email (don't await - send async)
     sendEmail({
       to: email,
