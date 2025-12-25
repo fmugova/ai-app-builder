@@ -74,3 +74,5 @@ dist/
 # Test outputs
 test-results/
 playwright-report/
+AUTH_CONFIGURATION_SCAN.md 
+*_SCAN.md 
