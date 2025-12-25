@@ -1,46 +1,47 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
+# Dependencies
 /node_modules
 /.pnp
 .pnp.js
 
-# testing
+# Testing
 /coverage
+test-results/
+playwright-report/
 
-# next.js
+# Next.js
 /.next/
 /out/
+.turbo
 
-# production
+# Production
 /build
+dist/
 
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# local env files
-.env*.local
+# Environment Variables (SECURITY CRITICAL)
 .env
-.env.production
+.env*.local
 .env.local
 .env.development.local
 .env.test.local
+.env.production
 .env.production.local
 
-# vercel
+# Security Scan Files (NEVER COMMIT)
+AUTH_CONFIGURATION_SCAN.md
+*_SCAN.md
+*_CREDENTIALS*.md
+*.credentials.*
+
+# Vercel
 .vercel
 
-# typescript
+# TypeScript
 *.tsbuildinfo
 next-env.d.ts
 
-# prisma
+# Prisma
 prisma/migrations
 
 # IDE
@@ -50,7 +51,9 @@ prisma/migrations
 *.swo
 *~
 
-# OS files
+# OS Files
+.DS_Store
+*.pem
 Thumbs.db
 ehthumbs.db
 Desktop.ini
@@ -58,21 +61,14 @@ Desktop.ini
 # Logs
 logs
 *.log
-
-# Package lock files (optional - some teams prefer to commit these)
-# package-lock.json
-# yarn.lock
-
-# Build outputs
-dist/
-.turbo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Cache
 .cache
 .eslintcache
 
-# Test outputs
-test-results/
-playwright-report/
-AUTH_CONFIGURATION_SCAN.md 
-*_SCAN.md 
+# Package Lock Files (optional - uncomment if needed)
+# package-lock.json
+# yarn.lock
