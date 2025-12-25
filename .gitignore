@@ -42,7 +42,7 @@ AUTH_CONFIGURATION_SCAN.md
 next-env.d.ts
 
 # Prisma
-prisma/migrations
+prisma/.env
 
 # IDE
 .vscode/
