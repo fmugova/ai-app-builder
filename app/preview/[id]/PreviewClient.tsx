@@ -5,14 +5,22 @@ import { useRouter } from 'next/navigation';
 import { Download, Edit, Share2, Code, RefreshCw, Trash2, X, Copy, Check, Rocket } from 'lucide-react';
 import SimpleExportButton from '@/components/SimpleExportButton';
 import DeployButton from '@/components/DeployButton';
+import { sanitizeCode } from '@/lib/sanitizeCode';
 
 interface PreviewClientProps {
   projectId: string;
 }
 
+interface Project {
+  id: string;
+  name: string;
+  code: string;
+  type?: string;
+}
+
 export default function PreviewClient({ projectId }: PreviewClientProps) {
   const router = useRouter();
-  const [project, setProject] = useState<any>(null);
+  const [project, setProject] = useState<Project | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCode, setShowCode] = useState(false);
@@ -23,22 +31,35 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
   useEffect(() => {
     const fetchProject = async () => {
       try {
+        setLoading(true);
         const response = await fetch(`/api/projects/${projectId}`);
         
         if (!response.ok) {
-          throw new Error('Project not found');
+          throw new Error('Failed to fetch project');
         }
-        
+
         const data = await response.json();
-        setProject(data);
-      } catch (err: any) {
-        setError(err.message);
+
+        // Sanitize the code before setting state
+        const sanitizedCode = sanitizeCode(data.code);
+
+        setProject({
+          ...data,
+          code: sanitizedCode
+        });
+
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error');
+        setProject(null);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProject();
+    if (projectId) {
+      fetchProject();
+    }
   }, [projectId]);
 
   const handleDownload = () => {
