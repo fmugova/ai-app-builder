@@ -1,0 +1,1 @@
+// Jest setup - no additional configuration needed

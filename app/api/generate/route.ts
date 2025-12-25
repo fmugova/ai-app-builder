@@ -87,6 +87,13 @@ export async function POST(request: NextRequest) {
 
     const systemPrompt = `You are an expert web developer. Generate COMPLETE, PRODUCTION-READY standalone HTML pages.
 
+CRITICAL RULES - MUST FOLLOW:
+- NO <iframe> tags - FORBIDDEN
+- NO external scripts except React CDN and Tailwind
+- NO navigation to other pages (links must use target="_blank")
+- Self-contained single file only
+- NO fetch calls to external APIs
+
 CRITICAL OUTPUT FORMAT - Must be standalone HTML with React 18:
 <!DOCTYPE html>
 <html lang="en">
