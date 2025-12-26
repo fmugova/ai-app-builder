@@ -167,7 +167,10 @@ function BuilderContent() {
       toast.error('Some files were skipped (unsupported format)')
     }
     setUploadedFiles(prev => [...prev, ...validFiles])
-    toast.success(`Added ${validFiles.length} file(s)`)
+    toast.success(`Added ${validFiles.length} file(s)`, {
+      duration: 2000,
+      id: 'files-added',
+    })
   }
 
   // ✨ Add URL
@@ -179,7 +182,10 @@ function BuilderContent() {
         return
       }
       setUploadedUrls(prev => [...prev, url])
-      toast.success('URL added! Include it in your next message.')
+      toast.success('URL added! Include it in your next message.', {
+        duration: 2000,
+        id: 'url-added',
+      })
     }
   }
 
@@ -241,7 +247,10 @@ function BuilderContent() {
             content: data.message || '✅ Code updated successfully!'
           }
         ])
-        toast.success('Code updated!')
+        toast.success('Code updated!', {
+          duration: 2000,
+          id: 'code-updated',
+        })
         setUploadedFiles([])
         setUploadedUrls([])
       } else {
@@ -344,7 +353,10 @@ function BuilderContent() {
         if (res.ok) {
           setGeneratedCode(data.code)
           analytics.aiGeneration(true, projectType)
-          toast.success('Code generated successfully!')
+          toast.success('Code generated successfully!', {
+            duration: 2000,
+            id: 'code-generated',
+          })
         } else {
           analytics.aiGeneration(false, projectType)
           toast.error(data.error || 'Failed to generate')
@@ -391,7 +403,10 @@ function BuilderContent() {
         if (!currentProjectId) {
           analytics.projectCreated(projectType)
         }
-        toast.success('Saved successfully!')
+        toast.success('Saved successfully!', {
+          duration: 2000,
+          id: 'builder-saved',
+        })
         router.push('/dashboard')
       } else {
         toast.error('Save failed')
@@ -525,7 +540,10 @@ function BuilderContent() {
                     setStep('build')
                     setGeneratedCode(template.code)
                     setProjectName(`${template.name} Project`)
-                    toast.success(`Loaded "${template.name}" template!`)
+                    toast.success(`Loaded "${template.name}" template!`, {
+                      duration: 2000,
+                      id: 'template-loaded',
+                    })
                   }}
                   className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-xl p-6 hover:shadow-lg transition text-left group"
                 >
@@ -568,7 +586,10 @@ function BuilderContent() {
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(generatedCode)
-                      toast.success('Code copied to clipboard!')
+                      toast.success('Code copied to clipboard!', {
+                        duration: 2000,
+                        id: 'code-copied-1',
+                      })
                     }}
                     className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 text-sm"
                   >
@@ -730,7 +751,10 @@ function BuilderContent() {
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(generatedCode)
-                      toast.success('Code copied!')
+                      toast.success('Code copied!', {
+                        duration: 2000,
+                        id: 'code-copied-2',
+                      })
                     }}
                     className="flex-1 min-w-[120px] px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium flex items-center justify-center gap-2"
                   >
@@ -769,7 +793,10 @@ function BuilderContent() {
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(generatedCode)
-                      toast.success('Code copied!')
+                      toast.success('Code copied!', {
+                        duration: 2000,
+                        id: 'code-copied-3',
+                      })
                     }}
                     className="text-sm bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg"
                   >
@@ -786,7 +813,6 @@ function BuilderContent() {
           </div>
         </div>
       </div>
-      
 
       {/* ✨ Floating Chat Button */}
       <button

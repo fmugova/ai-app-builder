@@ -51,7 +51,10 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
       });
 
       if (res.ok) {
-        toast.success('🎉 Published to BuildFlow!');
+        toast.success('🎉 Published to BuildFlow!', {
+          duration: 2000,
+          id: 'published-buildflow',
+        });
         setShareModalOpen(true);
         onRefresh?.();
       } else {
@@ -101,7 +104,10 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
         }
         
         const exportData = await exportRes.json();
-        toast.success('✅ Exported to GitHub!', { id: 'deploy-vercel' });
+        toast.success('✅ Exported to GitHub!', {
+          duration: 2000,
+          id: 'export-github-1',
+        });
         
         // Now deploy to Vercel
         await deployToVercel(exportData.repoName);
@@ -131,7 +137,10 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
 
       if (res.ok) {
         const data = await res.json();
-        toast.success('🚀 Deployed to Vercel!', { id: 'deploy-vercel' });
+        toast.success('🚀 Deployed to Vercel!', {
+          duration: 2000,
+          id: 'deployed-vercel',
+        });
         window.open(data.deploymentUrl, '_blank');
       } else {
         const errorData = await res.json();
@@ -155,7 +164,10 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
         
         if (res.ok) {
           const data = await res.json();
-          toast.success('✅ Exported to GitHub!');
+          toast.success('✅ Exported to GitHub!', {
+            duration: 2000,
+            id: 'export-github-2',
+          });
           window.open(data.repoUrl, '_blank');
         } else {
           toast.error('GitHub export failed');
@@ -168,7 +180,10 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
         a.href = url;
         a.download = `${project.name}.zip`;
         a.click();
-        toast.success('📦 Downloaded!');
+        toast.success('📦 Downloaded!', {
+          duration: 2000,
+          id: 'project-downloaded',
+        });
       }
     } catch (error) {
       toast.error('Export failed');
@@ -314,7 +329,10 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
             <button
               onClick={() => {
                 navigator.clipboard.writeText(project.publicUrl || '');
-                toast.success('URL copied!');
+                toast.success('URL copied!', {
+                  duration: 2000,
+                  id: 'url-copied',
+                });
               }}
               className="flex items-center justify-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition text-sm font-medium"
               title="Copy project URL"

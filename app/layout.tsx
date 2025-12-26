@@ -1,7 +1,6 @@
-
 import './globals.css'
 import { Inter } from 'next/font/google'
-import { Providers } from './providers'
+import Providers from './providers';
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { GoogleAnalytics, GoogleTagManager } from '@next/third-parties/google'
@@ -10,7 +9,16 @@ import SupportChat from '@/components/SupportChat'
 import FeedbackWidget from '@/components/FeedbackWidget'
 import Script from 'next/script'
 import type { Metadata, Viewport } from 'next'
+
 const inter = Inter({ subsets: ['latin'] })
+
+// Safe URL resolution
+const getBaseUrl = () => {
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL.split(',')[0].trim();
+  }
+  return 'http://localhost:3000';
+}
 
 // Viewport configuration (theme-color, etc.)
 export const viewport: Viewport = {
@@ -25,9 +33,7 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  metadataBase: process.env.NEXT_PUBLIC_SITE_URL 
-    ? new URL(process.env.NEXT_PUBLIC_SITE_URL) 
-    : new URL('https://www.buildflow-ai.app'),
+  metadataBase: new URL(getBaseUrl()),
   title: {
     default: 'BuildFlow - AI-Powered App Builder',
     template: '%s | BuildFlow'

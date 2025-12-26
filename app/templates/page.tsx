@@ -42,7 +42,10 @@ export default function TemplatesPage() {
 
       if (response.ok) {
         const data = await response.json()
-        toast.success('✅ Project created successfully!', { id: 'create' })
+        toast.success('✅ Project created successfully!', {
+          duration: 2000,
+          id: 'project-created',
+        })
         router.push(`/builder?project=${data.project.id}`)
       } else {
         throw new Error('Failed to create project')

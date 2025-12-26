@@ -35,7 +35,10 @@ export default function AIEmailWriter({ onGenerated }: AIEmailWriterProps) {
           subject: data.subject,
           body: data.body
         })
-        toast.success('Email content generated! ✨')
+        toast.success('Email content generated! ✨', {
+          duration: 2000,
+          id: 'email-generated',
+        })
         setShowModal(false)
         setPrompt('')
       } else {

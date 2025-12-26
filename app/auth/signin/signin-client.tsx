@@ -56,7 +56,10 @@ export default function SignInClient() {
       if (result?.error) {
         toast.error('Invalid email or password')
       } else {
-        toast.success('Welcome back!')
+        toast.success('Welcome back!', {
+          duration: 2000,
+          id: 'signin-welcome',
+        })
         router.push(callbackUrl)
         router.refresh()
       }

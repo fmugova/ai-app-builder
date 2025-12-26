@@ -111,7 +111,10 @@ export default function PricingPage() {
           discountValue: data.discountValue,
           discountType: data.discountType,
         })
-        toast.success(`🎉 ${data.discountValue}% discount applied!`)
+        toast.success(`🎉 ${data.discountValue}% discount applied!`, {
+          duration: 2000,
+          id: 'discount-applied',
+        })
       } else {
         toast.error(data.message || 'Invalid promo code')
       }

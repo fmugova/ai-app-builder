@@ -67,7 +67,10 @@ export default function CampaignDetailPage() {
       })
 
       if (res.ok) {
-        toast.success('Test email sent!', { id: 'test' })
+        toast.success('Test email sent!', {
+          duration: 2000,
+          id: 'test-email-sent',
+        })
       } else {
         toast.error('Failed to send test', { id: 'test' })
       }
@@ -92,7 +95,10 @@ export default function CampaignDetailPage() {
 
       if (res.ok) {
         const data = await res.json()
-        toast.success(`Campaign sent to ${data.sentCount} subscribers!`, { id: 'send' })
+        toast.success(`Campaign sent to ${data.sentCount} subscribers!`, {
+          duration: 2000,
+          id: 'campaign-sent',
+        })
         loadCampaign()
       } else {
         const error = await res.json()

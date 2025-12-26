@@ -211,7 +211,10 @@ export default function AdminDashboard() {
     a.click()
     window.URL.revokeObjectURL(url)
     
-    toast.success('✅ CSV exported successfully!')
+    toast.success('✅ CSV exported successfully!', {
+      duration: 2000,
+      id: 'csv-exported',
+    })
   }
 
   // Edit user
@@ -241,7 +244,10 @@ export default function AdminDashboard() {
         await loadData()
         setShowEditModal(false)
         setEditingUser(null)
-        toast.success('✅ User updated successfully!', { id: 'update-user' })
+        toast.success('✅ User updated successfully!', {
+          duration: 2000,
+          id: 'update-user',
+        })
       } else {
         const error = await res.json()
         toast.error(`❌ Error: ${error.error}`, { id: 'update-user' })
@@ -267,7 +273,10 @@ export default function AdminDashboard() {
 
       if (res.ok) {
         await loadData()
-        toast.success('✅ User deleted successfully!', { id: 'delete-user' })
+        toast.success('✅ User deleted successfully!', {
+          duration: 2000,
+          id: 'delete-user',
+        })
       } else {
         const error = await res.json()
         toast.error(`❌ Error: ${error.error}`, { id: 'delete-user' })
@@ -308,7 +317,10 @@ export default function AdminDashboard() {
         navigator.clipboard.writeText(data.temporaryPassword)
         
         alert(message)
-        toast.success('✅ Password reset! Copied to clipboard.', { id: 'reset-password' })
+        toast.success('✅ Password reset! Copied to clipboard.', {
+          duration: 2000,
+          id: 'reset-password',
+        })
       } else {
         const error = await res.json()
         toast.error(`❌ Error: ${error.error}`, { id: 'reset-password' })
@@ -334,7 +346,10 @@ export default function AdminDashboard() {
         await loadData()
         setShowFeedbackModal(false)
         setViewingFeedback(null)
-        toast.success('✅ Response sent!', { id: 'respond-feedback' })
+        toast.success('✅ Response sent!', {
+          duration: 2000,
+          id: 'respond-feedback',
+        })
       } else {
         toast.error('❌ Failed to send response', { id: 'respond-feedback' })
       }
@@ -370,7 +385,10 @@ export default function AdminDashboard() {
       })
 
       if (res.ok) {
-        toast.success('✅ Email sent successfully!', { id: 'send-email' })
+        toast.success('✅ Email sent successfully!', {
+          duration: 2000,
+          id: 'send-email',
+        })
         setShowQuickActionsModal(false)
       } else {
         const error = await res.json()
@@ -410,7 +428,10 @@ export default function AdminDashboard() {
       if (res.ok) {
         await loadData()
         deselectAll()
-        toast.success(`✅ Updated ${selectedUsers.size} users!`, { id: 'bulk-update' })
+        toast.success(`✅ Updated ${selectedUsers.size} users!`, {
+          duration: 2000,
+          id: 'bulk-update',
+        })
       } else {
         toast.error('❌ Bulk update failed', { id: 'bulk-update' })
       }
@@ -1191,7 +1212,10 @@ export default function AdminDashboard() {
                       })
                     })
                     if (res.ok) {
-                      toast.success('✅ Email sent!', { id: 'send-email' })
+                      toast.success('✅ Email sent!', {
+                        duration: 2000,
+                        id: 'send-email-2',
+                      })
                       setShowEmailModal(false)
                       setEmailSubject('')
                       setEmailMessage('')
@@ -1225,7 +1249,10 @@ export default function AdminDashboard() {
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(quickActionUser.email)
-                  toast.success('Email copied!')
+                  toast.success('Email copied!', {
+                    duration: 2000,
+                    id: 'email-copied',
+                  })
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg transition text-left"
               >

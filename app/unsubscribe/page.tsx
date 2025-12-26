@@ -31,7 +31,10 @@ function UnsubscribeContent() {
 
       if (res.ok) {
         setUnsubscribed(true)
-        toast.success('Successfully unsubscribed')
+        toast.success('Successfully unsubscribed', {
+          duration: 2000,
+          id: 'unsubscribed',
+        })
       } else {
         toast.error(data.error || 'Failed to unsubscribe')
       }

@@ -68,7 +68,10 @@ export default function NewCampaignPage() {
     setHtmlContent(content.body)
     setTemplateType('custom')
     setShowPreview(true) // Show preview after AI generation
-    toast.success('AI content generated! ✨ Review in preview tab.')
+    toast.success('AI content generated! ✨ Review in preview tab.', {
+      duration: 2000,
+      id: 'ai-content-generated',
+    })
   }
 
   const handleCreateCampaign = async () => {
@@ -124,7 +127,10 @@ export default function NewCampaignPage() {
 
       if (res.ok) {
         const data = await res.json()
-        toast.success('Campaign created!')
+        toast.success('Campaign created!', {
+          duration: 2000,
+          id: 'campaign-created',
+        })
         router.push(`/admin/campaigns/${data.id}`)
       } else {
         const error = await res.json()

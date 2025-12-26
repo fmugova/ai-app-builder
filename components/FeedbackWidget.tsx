@@ -31,7 +31,10 @@ export default function FeedbackWidget() {
       });
 
       if (res.ok) {
-        toast.success('Thank you for your feedback! 🙏');
+        toast.success('Thank you for your feedback! 🙏', {
+          duration: 2000,
+          id: 'feedback-sent',
+        });
         
         // CRITICAL FIX: Reset state and close modal
         setFeedback('');
