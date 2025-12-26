@@ -61,3 +61,20 @@ export function isCodeSafe(input: string): boolean {
 
   return true;
 }
+
+export function isReactCode(code: string): boolean {
+  // Check for common React patterns
+  const reactPatterns = [
+    /import\s+.*from\s+['"]react['"]/,
+    /import\s+.*from\s+['"]react-dom['"]/,
+    /<script[^>]*type\s*=\s*["']text\/babel["']/,
+    /React\./,
+    /ReactDOM\./,
+    /useState/,
+    /useEffect/,
+    /function\s+\w+\s*\([^)]*\)\s*{[\s\S]*return\s*\(/,
+    /<\w+[\s\S]*>/
+  ];
+
+  return reactPatterns.some(pattern => pattern.test(code));
+}
