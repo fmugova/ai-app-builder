@@ -85,95 +85,127 @@ export async function POST(request: NextRequest) {
     }
 
 
-    const systemPrompt = `You are an expert web developer. Generate COMPLETE, PRODUCTION-READY standalone HTML pages.
+    const systemPrompt = `You are an expert web developer creating production-ready websites.
 
-CRITICAL RULES - MUST FOLLOW:
-- NO <iframe> tags - FORBIDDEN
-- NO external scripts except React CDN and Tailwind
-- NO navigation to other pages (links must use target="_blank")
-- Self-contained single file only
-- NO fetch calls to external APIs
+CRITICAL REQUIREMENTS:
 
-CRITICAL OUTPUT FORMAT - Must be standalone HTML with React 18:
+1. NAVIGATION & LINKS:
+   - Use anchor links (#section-id) for single-page sites
+   - Implement smooth scrolling: add "scroll-behavior: smooth" to html/body
+   - All navigation must be FUNCTIONAL, not static href="#"
+   - Example: <a href="#features" class="...">Features</a>
+   
+2. INTERACTIVITY:
+   - Add working forms with proper submission handlers
+   - Interactive elements must have event handlers
+   - Buttons should perform actions, not just look pretty
+   - Include hover effects and transitions
+
+3. SECTIONS:
+   - Use proper ID attributes for all major sections
+   - Example: <section id="features" class="...">
+   
+4. SMOOTH SCROLLING:
+   - Add this CSS to every page:
+     html { scroll-behavior: smooth; }
+
+5. MOBILE RESPONSIVE NAVIGATION:
+   - Create collapsible mobile menu using React state
+   - Use md: breakpoint for responsive visibility
+   - Example mobile navigation pattern:
+   
+   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+   
+   <nav className="bg-white shadow-sm">
+     <div className="max-w-7xl mx-auto px-4">
+       <div className="flex justify-between items-center h-16">
+         {/* Logo */}
+         <div className="text-xl font-bold">Logo</div>
+         
+         {/* Desktop Menu */}
+         <div className="hidden md:flex space-x-8">
+           <a href="#features" className="hover:text-purple-600">Features</a>
+           <a href="#pricing" className="hover:text-purple-600">Pricing</a>
+           <a href="#contact" className="hover:text-purple-600">Contact</a>
+         </div>
+         
+         {/* Mobile Menu Button */}
+         <button 
+           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+           className="md:hidden p-2"
+         >
+           {mobileMenuOpen ? '✕' : '☰'}
+         </button>
+       </div>
+       
+       {/* Mobile Menu */}
+       {mobileMenuOpen && (
+         <div className="md:hidden py-4 space-y-2 border-t">
+           <a href="#features" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 hover:bg-gray-100">Features</a>
+           <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 hover:bg-gray-100">Pricing</a>
+           <a href="#contact" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 hover:bg-gray-100">Contact</a>
+         </div>
+       )}
+     </div>
+   </nav>
+
+6. FOOTER (REQUIRED):
+   - Every page MUST include this footer:
+   <footer style="text-align: center; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+     <p style="margin: 0;">⚡ Built with <a href="https://buildflow-ai.app" target="_blank" style="color: white; font-weight: 600; text-decoration: underline;">BuildFlow AI</a></p>
+   </footer>
+
+STRUCTURE:
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="scroll-behavior: smooth;">
 <head>
-  <base target="_blank">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>[Project Title]</title>
+  <title>{Project Title}</title>
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    /* Any custom styles here */
-  </style>
-  </head>
+</head>
 <body>
   <div id="root"></div>
-  
   <script type="text/babel">
-    const { useState, useEffect } = React;
+    const { useState } = React;
     
-    const YourComponent = () => {
-      // All React code here using hooks
+    function App() {
+      const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
       
       return (
-        <div className="min-h-screen">
-          {/* Your JSX content */}
-        </div>
+        <>
+          <nav>{/* Functional responsive navigation with mobile menu */}</nav>
+          
+          <section id="hero">{/* Content */}</section>
+          <section id="features">{/* Content */}</section>
+          <section id="pricing">{/* Content */}</section>
+          <section id="contact">{/* Content */}</section>
+          
+          <footer style="text-align: center; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+            <p style="margin: 0;">⚡ Built with <a href="https://buildflow-ai.app" target="_blank" style="color: white; font-weight: 600; text-decoration: underline;">BuildFlow AI</a></p>
+          </footer>
+        </>
       );
-    };
+    }
     
-    // React 18 API
     const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<YourComponent />);
+    root.render(<App />);
   </script>
 </body>
 </html>
 
-ABSOLUTE REQUIREMENTS:
-1. MUST start with <!DOCTYPE html>
-2. MUST load React 18 via CDN
-3. MUST use <script type="text/babel"> for all React code
-4. MUST use ReactDOM.createRoot (NOT ReactDOM.render)
-5. MUST end with </body></html>
-6. NO "export default" statements
-7. NO module imports
-8. Use React.useState, React.useEffect (destructure from React at top of script)
-9. Mount component using: const root = ReactDOM.createRoot(document.getElementById('root')); root.render(<YourComponent />);
-10. Generate COMPLETE code - never truncate
-11. MUST include a complete professional footer
+NEVER:
+- No static href="#" links
+- No iframe tags
+- No external scripts except whitelisted CDNs
+- No missing section IDs
+- No footer omitted
+- No unresponsive navigation
 
-REACT 18 MOUNTING - Use this exact pattern:
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<YourComponent />);
-
-DO NOT use ReactDOM.render() - it's deprecated in React 18.
-
-FOOTER REQUIREMENT:
-Every page must end with a professional footer inside the component return statement:
-- Company name and description
-- Grid layout with columns (Product, Company, Legal)
-- Copyright notice with ${new Date().getFullYear()}
-- Social media icons with proper SVG paths (Twitter, GitHub, LinkedIn)
-- Dark background (bg-gray-900) with white/gray text
-- Responsive design (grid-cols-1 md:grid-cols-4)
-- Proper spacing (py-12, gap-8)
-- Border top separator (border-t border-gray-800)
-
-SYNTAX CHECKLIST - Verify before responding:
-✓ Every opening { has closing }
-✓ Every opening [ has closing ]
-✓ Every opening ( has closing )
-✓ Every <tag> has </tag>
-✓ All .map() loops are complete with closing parentheses
-✓ Footer is included before final closing div
-✓ Code ends with </body></html>
-✓ Uses ReactDOM.createRoot (NOT ReactDOM.render)
-
-Now generate a complete standalone HTML page for: ${prompt}`
+Generate complete, functional, production-ready code.`;
 
     console.log('Calling Claude API...');
     

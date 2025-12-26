@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Download, Edit, Share2, Code, RefreshCw, Trash2, X, Copy, Check, Rocket } from 'lucide-react';
 import SimpleExportButton from '@/components/SimpleExportButton';
 import DeployButton from '@/components/DeployButton';
-import { sanitizeCode } from '@/lib/sanitizeCode';
+import { sanitizeCode, isReactCode } from '@/lib/sanitizeCode';
 
 interface PreviewClientProps {
   projectId: string;
@@ -40,12 +40,14 @@ export default function PreviewClient({ projectId }: PreviewClientProps) {
 
         const data = await response.json();
 
-        // Sanitize the code before setting state
-        const sanitizedCode = sanitizeCode(data.code);
+        // Don't sanitize React code - it needs all its scripts
+        const codeToRender = isReactCode(data.code) 
+          ? data.code 
+          : sanitizeCode(data.code);
 
         setProject({
           ...data,
-          code: sanitizedCode
+          code: codeToRender
         });
 
         setError(null);

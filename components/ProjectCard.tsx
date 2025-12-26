@@ -1,250 +1,285 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Edit, Eye, Code, Download, Copy, Trash2, Share2, ExternalLink, Globe } from 'lucide-react'
-import Link from 'next/link'
-import ShareModal from './ShareModal'
+import { useState } from 'react';
+import { 
+  Eye, 
+  Code, 
+  Download, 
+  Copy, 
+  Trash2, 
+  Globe,
+  GlobeLock,
+  ExternalLink,
+  Github,
+  Share2,
+  Rocket,
+  MoreVertical,
+  Edit3
+} from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import ShareModal from './ShareModal';
 
 interface ProjectCardProps {
   project: {
-    id: string
-    name: string
-    description: string | null
-    updatedAt: Date
-    isPublished?: boolean
-    publicUrl?: string | null
-    views?: number
-  }
-  onRefresh?: () => void
+    id: string;
+    name: string;
+    description: string;
+    type: string;
+    isPublished: boolean;
+    publicUrl: string | null;
+    views: number;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+  onDelete?: () => void;
+  onRefresh?: () => void;
 }
 
-export function ProjectCard({ project, onRefresh }: ProjectCardProps) {
-  const router = useRouter()
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [isPublishing, setIsPublishing] = useState(false)
-  const [showShareModal, setShowShareModal] = useState(false)
-
-  const handleCopy = async () => {
-    try {
-      const res = await fetch(`/api/projects/${project.id}`)
-      if (res.ok) {
-        const data = await res.json()
-        if (data.code) {
-          await navigator.clipboard.writeText(data.code)
-          alert('Code copied to clipboard!')
-        }
-      }
-    } catch (error) {
-      console.error('Copy error:', error)
-    }
-  }
-
-  const handleExport = async () => {
-    try {
-      const res = await fetch(`/api/projects/${project.id}`)
-      if (res.ok) {
-        const data = await res.json()
-        if (data.code) {
-          const blob = new Blob([data.code], { type: 'text/html' })
-          const url = URL.createObjectURL(blob)
-          const a = document.createElement('a')
-          a.href = url
-          a.download = `${project.name}.html`
-          a.click()
-          URL.revokeObjectURL(url)
-        }
-      }
-    } catch (error) {
-      console.error('Export error:', error)
-    }
-  }
-
-  const handleDelete = async () => {
-    if (!confirm(`Are you sure you want to delete "${project.name}"?`)) return
-    
-    setIsDeleting(true)
-    try {
-      const res = await fetch(`/api/projects/${project.id}`, {
-        method: 'DELETE'
-      })
-      if (res.ok) {
-        onRefresh?.() || window.location.reload()
-      } else {
-        alert('Failed to delete project')
-      }
-    } catch (error) {
-      console.error('Delete error:', error)
-      alert('Failed to delete project')
-    } finally {
-      setIsDeleting(false)
-    }
-  }
+export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCardProps) {
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [deploying, setDeploying] = useState(false);
 
   const handlePublish = async () => {
-    setIsPublishing(true)
+    setPublishing(true);
     try {
       const res = await fetch(`/api/projects/${project.id}/publish`, {
-        method: 'POST'
-      })
-      if (res.ok) {
-        const data = await res.json()
-        alert(`Published! URL: ${data.publicUrl}`)
-        onRefresh?.() || window.location.reload()
-      } else {
-        const error = await res.json()
-        alert(error.error || 'Failed to publish project')
-      }
-    } catch (error) {
-      console.error('Publish error:', error)
-      alert('Failed to publish project')
-    } finally {
-      setIsPublishing(false)
-    }
-  }
+        method: 'POST',
+      });
 
-  const handleUnpublish = async () => {
-    if (!confirm('Unpublish this project? The public URL will stop working.')) return
-    
-    setIsPublishing(true)
-    try {
-      const res = await fetch(`/api/projects/${project.id}/publish`, {
-        method: 'DELETE'
-      })
       if (res.ok) {
-        alert('Project unpublished successfully')
-        onRefresh?.() || window.location.reload()
+        toast.success('🎉 Published!');
+        setShareModalOpen(true);
+        onRefresh?.();
       } else {
-        alert('Failed to unpublish project')
+        const data = await res.json();
+        toast.error(data.error || 'Failed to publish');
       }
     } catch (error) {
-      console.error('Unpublish error:', error)
-      alert('Failed to unpublish project')
+      toast.error('Failed to publish');
     } finally {
-      setIsPublishing(false)
+      setPublishing(false);
     }
-  }
+  };
+
+  const handleDeploy = async () => {
+    setDeploying(true);
+    try {
+      const res = await fetch(`/api/deploy/vercel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: project.id })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        toast.success('🚀 Deploying to Vercel!');
+        window.open(data.deploymentUrl, '_blank');
+      } else {
+        toast.error('Deployment failed');
+      }
+    } catch (error) {
+      toast.error('Deployment failed');
+    } finally {
+      setDeploying(false);
+    }
+  };
+
+  const handleExport = async (type: 'github' | 'zip') => {
+    try {
+      if (type === 'github') {
+        const res = await fetch(`/api/export/github`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId: project.id })
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          toast.success('✅ Exported to GitHub!');
+          window.open(data.repoUrl, '_blank');
+        } else {
+          toast.error('GitHub export failed');
+        }
+      } else {
+        const res = await fetch(`/api/projects/${project.id}/download`);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${project.name}.zip`;
+        a.click();
+        toast.success('📦 Downloaded!');
+      }
+    } catch (error) {
+      toast.error('Export failed');
+    }
+  };
 
   return (
     <>
-      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden hover:border-purple-500 transition">
-        {/* Gradient Header */}
-        <div className="h-2 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500"></div>
+      <div className="group relative bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 transition-all duration-200 overflow-hidden shadow-sm hover:shadow-md">
+        {/* Gradient Top Border */}
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-600 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" />
 
-        {/* Project Info */}
+        {/* Card Content */}
         <div className="p-6">
+          {/* Header */}
           <div className="flex items-start justify-between mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-xl flex items-center justify-center">
-              <Edit className="w-6 h-6 text-white" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-2">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                  {project.name}
+                </h3>
+                {project.isPublished ? (
+                  <span className="flex items-center gap-1 px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded-full font-medium whitespace-nowrap">
+                    <Globe className="w-3 h-3" />
+                    Live
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 text-xs rounded-full font-medium whitespace-nowrap">
+                    <GlobeLock className="w-3 h-3" />
+                    Draft
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                {project.description || 'No description provided'}
+              </p>
             </div>
-            <div className="flex flex-col items-end gap-2">
-              <span className="text-xs text-gray-500">
-                {new Date(project.updatedAt).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric'
-                })}
-              </span>
-              {project.isPublished ? (
-                <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full flex items-center gap-1">
-                  <Globe className="w-3 h-3" />
-                  Published
-                </span>
-              ) : (
-                <span className="px-2 py-1 bg-gray-700 text-gray-400 text-xs rounded-full">
-                  Draft
-                </span>
+
+            {/* More Menu */}
+            <div className="relative ml-2">
+              <button
+                onClick={() => setMenuOpen(!menuOpen)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
+                aria-label="More options"
+              >
+                <MoreVertical className="w-5 h-5 text-gray-500" />
+              </button>
+
+              {menuOpen && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-10" 
+                    onClick={() => setMenuOpen(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-20">
+                    <button
+                      onClick={() => window.open(`/builder?project=${project.id}`, '_self')}
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                      Edit Project
+                    </button>
+                    <button
+                      onClick={() => handleExport('github')}
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition"
+                    >
+                      <Github className="w-4 h-4" />
+                      Export to GitHub
+                    </button>
+                    <button
+                      onClick={() => handleExport('zip')}
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition"
+                    >
+                      <Download className="w-4 h-4" />
+                      Download ZIP
+                    </button>
+                    <hr className="my-1 border-gray-200 dark:border-gray-700" />
+                    <button
+                      onClick={onDelete}
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 flex items-center gap-2 transition"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete Project
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           </div>
 
-          {/* Title - Fixed truncation */}
-          <h3 className="text-lg font-semibold text-white mb-2 line-clamp-1" title={project.name}>
-            {project.name}
-          </h3>
-
-          {/* Description - Fixed truncation */}
-          <p className="text-sm text-gray-400 mb-4 line-clamp-2 min-h-[40px]">
-            {project.description || 'No description provided'}
-          </p>
-
           {/* Stats */}
-          {project.isPublished && project.views !== undefined && (
-            <div className="mb-4 flex items-center gap-2 text-xs text-gray-500">
-              <Eye className="w-3 h-3" />
-              <span>{project.views} views</span>
+          {project.isPublished && (
+            <div className="flex items-center gap-4 mb-4 text-xs text-gray-600 dark:text-gray-400">
+              <div className="flex items-center gap-1">
+                <Eye className="w-3.5 h-3.5" />
+                <span>{project.views} views</span>
+              </div>
+              <div>
+                Published {new Date(project.createdAt).toLocaleDateString()}
+              </div>
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="grid grid-cols-2 gap-2 mb-3">
+          {/* Primary Actions */}
+          <div className="grid grid-cols-3 gap-2 mb-3">
             <button
-              onClick={() => router.push(`/builder?project=${project.id}`)}
-              className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition text-sm flex items-center justify-center gap-2"
-            >
-              <Edit className="w-4 h-4" />
-              Edit
-            </button>
-            <button
-              onClick={() => router.push(`/preview/${project.id}`)}
-              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm flex items-center justify-center gap-2"
+              onClick={() => window.open(`/preview/${project.id}`, '_blank')}
+              className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition text-sm font-medium"
+              title="Preview project"
             >
               <Eye className="w-4 h-4" />
               Preview
             </button>
+
+            <button
+              onClick={() => window.open(`/builder?project=${project.id}`, '_self')}
+              className="flex items-center justify-center gap-2 px-3 py-2 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition text-sm font-medium"
+              title="Edit project code"
+            >
+              <Code className="w-4 h-4" />
+              Code
+            </button>
+
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(project.publicUrl || '');
+                toast.success('URL copied!');
+              }}
+              className="flex items-center justify-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition text-sm font-medium"
+              title="Copy project URL"
+            >
+              <Copy className="w-4 h-4" />
+              Copy
+            </button>
           </div>
 
-          {/* Publish/Share Actions */}
-          {project.isPublished ? (
-            <div className="grid grid-cols-2 gap-2 mb-3">
+          {/* Deploy/Publish Actions */}
+          <div className="grid grid-cols-2 gap-2">
+            {project.isPublished ? (
+              <>
+                <button
+                  onClick={() => setShareModalOpen(true)}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition text-sm font-medium"
+                  title="Share project"
+                >
+                  <Share2 className="w-4 h-4" />
+                  Share
+                </button>
+                <button
+                  onClick={handleDeploy}
+                  disabled={deploying}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Deploy to Vercel"
+                >
+                  <Rocket className="w-4 h-4" />
+                  {deploying ? 'Deploying...' : 'Deploy'}
+                </button>
+              </>
+            ) : (
               <button
-                onClick={() => setShowShareModal(true)}
-                className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition text-sm flex items-center justify-center gap-2"
+                onClick={handlePublish}
+                disabled={publishing}
+                className="col-span-2 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Publish project to make it live"
               >
-                <Share2 className="w-4 h-4" />
-                Share
+                <Globe className="w-4 h-4" />
+                {publishing ? 'Publishing...' : 'Publish Now'}
               </button>
-              <button
-                onClick={handleUnpublish}
-                disabled={isPublishing}
-                className="px-3 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-lg transition text-sm flex items-center justify-center gap-2"
-              >
-                {isPublishing ? 'Unpublishing...' : 'Unpublish'}
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={handlePublish}
-              disabled={isPublishing}
-              className="w-full mb-3 px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-lg transition text-sm flex items-center justify-center gap-2"
-            >
-              <Globe className="w-4 h-4" />
-              {isPublishing ? 'Publishing...' : 'Publish Site'}
-            </button>
-          )}
-
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              onClick={handleExport}
-              className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition text-sm flex items-center justify-center gap-1"
-            >
-              <Download className="w-3 h-3" />
-              <span className="hidden sm:inline">Export</span>
-            </button>
-            <button
-              onClick={handleCopy}
-              className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition text-sm flex items-center justify-center gap-1"
-            >
-              <Copy className="w-3 h-3" />
-              <span className="hidden sm:inline">Copy</span>
-            </button>
-            <button
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="px-3 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-lg transition text-sm flex items-center justify-center gap-1"
-            >
-              <Trash2 className="w-3 h-3" />
-              <span className="hidden sm:inline">Delete</span>
-            </button>
+            )}
           </div>
         </div>
       </div>
@@ -252,13 +287,13 @@ export function ProjectCard({ project, onRefresh }: ProjectCardProps) {
       {/* Share Modal */}
       {project.isPublished && project.publicUrl && (
         <ShareModal
-          isOpen={showShareModal}
-          onClose={() => setShowShareModal(false)}
+          isOpen={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
           projectName={project.name}
           publicUrl={project.publicUrl}
           views={project.views}
         />
       )}
     </>
-  )
+  );
 }
