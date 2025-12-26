@@ -1,59 +1,113 @@
-import { authOptions } from '@/lib/auth';
+// app/api/user/settings/route.ts
+
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
-import { createRouteHandler } from 'trpc-next-server';
-import { appRouter } from '@/app/api/trpc/[trpc]';
 
 export const dynamic = 'force-dynamic';
 
-// Create a schema for validating the input data
-const SettingsSchema = z.object({
-  githubUsername: z.string().min(1, 'GitHub username is required'),
-  vercelToken: z.string().optional(),
+const settingsSchema = z.object({
+  name: z.string().optional(),
+  email: z.string().email().optional(),
+  theme: z.enum(['light', 'dark', 'system']).optional(),
+  notifications: z.boolean().optional(),
+  autoSave: z.boolean().optional(),
 });
 
-export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
-
-  if (!session) {
-    return new Response('Unauthorized', { status: 401 });
-  }
-
-  const body = await req.json();
-
-  // Validate the input data against the schema
-  const result = SettingsSchema.safeParse(body);
-
-  if (!result.success) {
-    return new Response(JSON.stringify(result.error.issues), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
-  const { githubUsername, vercelToken } = result.data;
-
+export async function GET(req: NextRequest) {
   try {
-    // Here you would typically save the settings to a database
-    // For this example, we'll just return them in the response
+    const session = await getServerSession(authOptions);
 
-    return new Response(
-      JSON.stringify({
-        githubUsername,
-        vercelToken,
-      }),
-      {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        theme: true,
+        notifications: true,
+        autoSave: true,
+        subscriptionTier: true,
+        subscriptionStatus: true,
+        generationsUsed: true,
+        generationsLimit: true,
+        projectsThisMonth: true,
+        projectsLimit: true,
+        githubUsername: true,
+        createdAt: true,
       }
-    );
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(user);
   } catch (error) {
-    return new Response('Error saving settings', { status: 500 });
+    console.error('Settings GET error:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch settings' },
+      { status: 500 }
+    );
   }
 }
 
-// Create a handler for the TRPC router
-export const { GET, POST } = createRouteHandler({
-  router: appRouter,
-  createContext: ({ req, res }) => ({ req, res }),
-});
+export async function POST(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const validatedData = settingsSchema.parse(body);
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Update user settings
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: validatedData,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        theme: true,
+        notifications: true,
+        autoSave: true,
+      }
+    });
+
+    return NextResponse.json({
+      success: true,
+      user: updatedUser
+    });
+  } catch (error) {
+    console.error('Settings POST error:', error);
+    
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Invalid data', details: error.issues },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to update settings' },
+      { status: 500 }
+    );
+  }
+}
