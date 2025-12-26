@@ -141,6 +141,23 @@ export async function POST(request: Request) {
       const repoData = await createRepoResponse.json();
       repoUrl = repoData.html_url;
       console.log('✅ Repository created:', repoUrl);
+      
+      // After successful GitHub repo creation:
+      await prisma.deployment.create({
+        data: {
+          projectId,
+          userId: user.id,
+          platform: 'github',
+          deploymentId: repoData.id.toString(),
+          deploymentUrl: repoData.html_url,
+          vercelProjectId: repoName, // IMPORTANT: Save repo name here!
+          status: 'success',
+          logs: JSON.stringify({
+            repoUrl: repoData.html_url,
+            repoName: repoName
+          })
+        }
+      });
     }
     
     // Create the file structure for a Next.js app
