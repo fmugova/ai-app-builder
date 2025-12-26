@@ -14,7 +14,8 @@ import {
   Share2,
   Rocket,
   MoreVertical,
-  Edit3
+  Edit3,
+  Zap
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import ShareModal from './ShareModal';
@@ -39,9 +40,10 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
-  const [deploying, setDeploying] = useState(false);
+  const [deployingVercel, setDeployingVercel] = useState(false);
 
-  const handlePublish = async () => {
+  // BuildFlow Hosting - Simple publish
+  const handlePublishToBuildFlow = async () => {
     setPublishing(true);
     try {
       const res = await fetch(`/api/projects/${project.id}/publish`, {
@@ -49,7 +51,7 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
       });
 
       if (res.ok) {
-        toast.success('🎉 Published!');
+        toast.success('🎉 Published to BuildFlow!');
         setShareModalOpen(true);
         onRefresh?.();
       } else {
@@ -63,26 +65,82 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
     }
   };
 
-  const handleDeploy = async () => {
-    setDeploying(true);
+  // Vercel Deployment - Requires GitHub first
+  const handleDeployToVercel = async () => {
+    setDeployingVercel(true);
+    
     try {
+      // Step 1: Check if project is on GitHub
+      const githubCheck = await fetch(`/api/projects/${project.id}/github-status`);
+      const githubData = await githubCheck.json();
+      
+      if (!githubData.hasGithubRepo) {
+        // No GitHub repo - export first!
+        const confirmExport = confirm(
+          '⚠️ Vercel requires GitHub.\n\nYour project will be:\n1. Exported to GitHub\n2. Deployed to Vercel\n\nContinue?'
+        );
+        
+        if (!confirmExport) {
+          setDeployingVercel(false);
+          return;
+        }
+        
+        // Export to GitHub first
+        toast.loading('Step 1/2: Exporting to GitHub...', { id: 'deploy-vercel' });
+        
+        const exportRes = await fetch(`/api/export/github`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId: project.id })
+        });
+        
+        if (!exportRes.ok) {
+          toast.error('GitHub export failed', { id: 'deploy-vercel' });
+          setDeployingVercel(false);
+          return;
+        }
+        
+        const exportData = await exportRes.json();
+        toast.success('✅ Exported to GitHub!', { id: 'deploy-vercel' });
+        
+        // Now deploy to Vercel
+        await deployToVercel(exportData.repoName);
+      } else {
+        // Already on GitHub - deploy directly
+        toast.loading('Deploying to Vercel...', { id: 'deploy-vercel' });
+        await deployToVercel(githubData.repoName);
+      }
+    } catch (error) {
+      toast.error('Deployment failed', { id: 'deploy-vercel' });
+      setDeployingVercel(false);
+    }
+  };
+
+  const deployToVercel = async (repoName: string) => {
+    try {
+      toast.loading('Step 2/2: Deploying to Vercel...', { id: 'deploy-vercel' });
+      
       const res = await fetch(`/api/deploy/vercel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: project.id })
+        body: JSON.stringify({ 
+          projectId: project.id,
+          githubRepoName: repoName
+        })
       });
 
       if (res.ok) {
         const data = await res.json();
-        toast.success('🚀 Deploying to Vercel!');
+        toast.success('🚀 Deployed to Vercel!', { id: 'deploy-vercel' });
         window.open(data.deploymentUrl, '_blank');
       } else {
-        toast.error('Deployment failed');
+        const errorData = await res.json();
+        toast.error(errorData.error || 'Deployment failed', { id: 'deploy-vercel' });
       }
     } catch (error) {
-      toast.error('Deployment failed');
+      toast.error('Deployment failed', { id: 'deploy-vercel' });
     } finally {
-      setDeploying(false);
+      setDeployingVercel(false);
     }
   };
 
@@ -267,42 +325,68 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
             </button>
           </div>
 
-          {/* Deploy/Publish Actions */}
-          <div className="grid grid-cols-2 gap-2">
-            {project.isPublished ? (
-              <>
-                <button
-                  onClick={() => setShareModalOpen(true)}
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition text-sm font-medium"
-                  title="Share project"
-                  type="button"
-                >
-                  <Share2 className="w-4 h-4" />
-                  Share
-                </button>
-                <button
-                  onClick={handleDeploy}
-                  disabled={deploying}
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Deploy to Vercel"
-                  type="button"
-                >
-                  <Rocket className="w-4 h-4" />
-                  {deploying ? 'Deploying...' : 'Deploy'}
-                </button>
-              </>
-            ) : (
+          {/* DISTINCT DEPLOYMENT BUTTONS */}
+          <div className="space-y-2">
+            {/* BuildFlow Hosting - Always Available */}
+            {!project.isPublished ? (
               <button
-                onClick={handlePublish}
+                onClick={handlePublishToBuildFlow}
                 disabled={publishing}
-                className="col-span-2 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Publish project to make it live"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg transition text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                title="Publish to BuildFlow hosting (instant)"
                 type="button"
               >
-                <Globe className="w-4 h-4" />
-                {publishing ? 'Publishing...' : 'Publish Now'}
+                <Zap className="w-4 h-4" />
+                {publishing ? 'Publishing...' : 'Publish to BuildFlow'}
+              </button>
+            ) : (
+              <button
+                onClick={() => setShareModalOpen(true)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition text-sm font-semibold shadow-sm"
+                title="Share your published site"
+                type="button"
+              >
+                <Share2 className="w-4 h-4" />
+                Share BuildFlow Site
               </button>
             )}
+
+            {/* Vercel Deployment - Separate, Distinct Button */}
+            <button
+              onClick={handleDeployToVercel}
+              disabled={deployingVercel}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-black hover:bg-gray-900 text-white rounded-lg transition text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed border border-gray-700"
+              title="Deploy to Vercel (requires GitHub)"
+              type="button"
+            >
+              {deployingVercel ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Deploying to Vercel...
+                </>
+              ) : (
+                <>
+                  <svg viewBox="0 0 76 76" className="w-4 h-4" fill="white">
+                    <path d="M38 0L76 76H0L38 0z" />
+                  </svg>
+                  Deploy to Vercel
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Helpful Info */}
+          <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 space-y-1">
+            <div className="flex items-center gap-1">
+              <Zap className="w-3 h-3 text-purple-500" />
+              <span>BuildFlow: Instant hosting on our domain</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <svg viewBox="0 0 76 76" className="w-3 h-3" fill="currentColor">
+                <path d="M38 0L76 76H0L38 0z" />
+              </svg>
+              <span>Vercel: Custom domains & advanced features</span>
+            </div>
           </div>
         </div>
       </div>
