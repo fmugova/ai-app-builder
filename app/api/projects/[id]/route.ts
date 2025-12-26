@@ -4,8 +4,7 @@ import { getServerSession } from "next-auth";
 import { prisma } from '@/lib/prisma';
 
 // Force dynamic rendering
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic';
 
 // GET single project
 export async function GET(

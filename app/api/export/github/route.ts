@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+export const dynamic = 'force-dynamic';
+
 // Simple sanitization for GitHub export - remove any server-side artifacts
 function sanitizeCodeForExport(code: string): string {
   if (!code) return code;
