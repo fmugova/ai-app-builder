@@ -6,6 +6,8 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { DashboardMobileMenu } from '@/components/DashboardMobileMenu'
 import { signOut } from 'next-auth/react'
+// ✅ ADDED: Import ProjectCard component
+import ProjectCard from '@/components/ProjectCard'
 
 // Lazy load heavy components
 const SimpleExportButton = dynamic(() => import('@/components/SimpleExportButton'), {
@@ -76,7 +78,7 @@ export default function DashboardClient({
   const router = useRouter()
   const [projects, setProjects] = useState<Project[]>(initialProjects)
   const [searchQuery, setSearchQuery] = useState('')
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
+  // ❌ REMOVED: showDeleteConfirm state - ProjectCard handles its own delete confirmations
   const [isDarkMode, setIsDarkMode] = useState(true)
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [exportProject, setExportProject] = useState<Project | null>(null)
@@ -101,6 +103,7 @@ export default function DashboardClient({
     }
   }, [isDarkMode])
 
+  // ✅ UPDATED: Simplified delete handler - ProjectCard handles confirmation UI
   const handleDeleteProject = async (projectId: string) => {
     try {
       const res = await fetch(`/api/projects/${projectId}`, {
@@ -109,8 +112,7 @@ export default function DashboardClient({
 
       if (res.ok) {
         setProjects(projects.filter(p => p.id !== projectId))
-        setShowDeleteConfirm(null)
-        alert('Project deleted successfully!')
+        // ProjectCard handles its own modal, no need to close anything here
       } else {
         alert('Failed to delete project')
       }
@@ -181,7 +183,6 @@ export default function DashboardClient({
   const generationsPercentage = getUsagePercentage(stats.generationsUsed, stats.generationsLimit)
 
   return (
-
     <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
       {/* Header */}
       <header className="bg-gray-900/50 backdrop-blur-sm border-b border-gray-800 sticky top-0 z-10">
@@ -251,7 +252,6 @@ export default function DashboardClient({
                       </p>
                       {isAdmin && (
                         <span className="inline-flex items-center gap-1 mt-2 px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded-full">
-                          {/* Shield icon */}
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V7l7-4z" /></svg>
                           Admin
                         </span>
@@ -263,7 +263,6 @@ export default function DashboardClient({
                         onClick={() => setShowAccountMenu(false)}
                         className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm transition"
                       >
-                        {/* Settings icon */}
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 0V4m0 16v-4m8-4h-4m-8 0H4" /></svg>
                         Settings
                       </a>
@@ -272,7 +271,6 @@ export default function DashboardClient({
                         onClick={() => setShowAccountMenu(false)}
                         className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm transition"
                       >
-                        {/* LayoutGrid icon */}
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
                         Billing
                       </a>
@@ -282,7 +280,6 @@ export default function DashboardClient({
                           onClick={() => setShowAccountMenu(false)}
                           className="flex items-center gap-2 px-4 py-2 text-yellow-400 hover:bg-gray-700 text-sm transition"
                         >
-                          {/* Shield icon */}
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V7l7-4z" /></svg>
                           Admin Panel
                         </a>
@@ -296,7 +293,6 @@ export default function DashboardClient({
                         }}
                         className="flex items-center gap-2 w-full px-4 py-2 text-red-400 hover:bg-gray-700 text-sm transition"
                       >
-                        {/* LogOut icon */}
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1" /></svg>
                         Sign Out
                       </button>
@@ -499,167 +495,27 @@ export default function DashboardClient({
             </div>
           </div>
 
-          {/* Projects Grid */}
+          {/* ✅ REPLACED: Projects Grid - Now uses ProjectCard component */}
           {filteredProjects.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {filteredProjects.map((project) => (
-                <div
+                <ProjectCard
                   key={project.id}
-                  className={`${isDarkMode ? 'bg-gray-800/50 border-gray-700/50' : 'bg-white border-gray-200'} rounded-2xl border hover:border-purple-500/50 transition-all duration-300 overflow-hidden group hover:shadow-xl hover:shadow-purple-500/10 flex flex-col h-[320px]`}
-                >
-                  {/* Card Header with Gradient */}
-                  <div className="h-2 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500"></div>
-                  
-                  {/* Card Content */}
-                  <div className="p-5 flex flex-col flex-1">
-                    {/* Top Row: Icon + Meta */}
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="w-11 h-11 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                        <span className="text-xl">📱</span>
-                      </div>
-                      <span className={`text-xs px-2 py-1 rounded-full ${isDarkMode ? 'bg-gray-700/50 text-gray-400' : 'bg-gray-100 text-gray-500'}`}>
-                        {new Date(project.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </span>
-                    </div>
-
-                    {/* Project Title - Fixed Height */}
-                    <h4 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-2 group-hover:text-purple-400 transition-colors line-clamp-1`}>
-                      {project.name}
-                    </h4>
-                    
-                    {/* Description - Fixed Height */}
-                    <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} line-clamp-2 h-10 mb-4`}>
-                      {project.description || 'No description provided'}
-                    </p>
-
-                    {/* Spacer to push actions to bottom */}
-                    <div className="flex-1"></div>
-
-                    {/* Action Buttons - Compact Grid */}
-                    <div className="space-y-2">
-                      {/* Primary Actions Row */}
-                      <div className="flex gap-2">
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            router.push(`/builder?project=${project.id}`)
-                          }}
-                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                          Edit
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            window.open(`/preview/${project.id}`, '_blank')
-                          }}
-                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                          Preview
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            setSelectedProject(project)
-                          }}
-                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-sm font-medium"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                          </svg>
-                          Code
-                        </button>
-                      </div>
-                      
-                      {/* Secondary Actions Row */}
-                      <div className="flex gap-2">
-                        {project.code && (
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              setExportProject(project)
-                            }}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                            </svg>
-                            Export
-                          </button>
-                        )}
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            handleDuplicateProject(project.id)
-                          }}
-                          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} ${isDarkMode ? 'text-white' : 'text-gray-700'} rounded-lg transition-colors text-sm font-medium`}
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                          </svg>
-                          Copy
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            setShowDeleteConfirm(project.id)
-                          }}
-                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-medium"
-                          title="Delete project"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Delete Confirmation */}
-                  {showDeleteConfirm === project.id && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                      <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 max-w-md w-full border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} shadow-2xl`}>
-                        <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </div>
-                        <h3 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-2 text-center`}>Delete Project?</h3>
-                        <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-6 text-center`}>
-                          Are you sure you want to delete <span className="font-semibold">"{project.name}"</span>? This action cannot be undone.
-                        </p>
-                        <div className="flex gap-3">
-                          <button
-                            onClick={() => setShowDeleteConfirm(null)}
-                            className={`flex-1 ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'} ${isDarkMode ? 'text-white' : 'text-gray-900'} py-2.5 rounded-xl transition font-medium`}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={() => handleDeleteProject(project.id)}
-                            className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-xl transition font-medium"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                  project={{
+                    ...project,
+                    description: project.description || '',
+                    createdAt: new Date(project.createdAt),
+                    updatedAt: new Date(project.updatedAt),
+                    isPublished: project.isPublished ?? false,
+                    publicUrl: project.publicUrl ?? null,
+                    views: project.views ?? 0,
+                  }}
+                  onDelete={() => handleDeleteProject(project.id)}
+                  onRefresh={() => {
+                    // Refresh the projects list
+                    window.location.reload()
+                  }}
+                />
               ))}
             </div>
           ) : (
@@ -670,14 +526,15 @@ export default function DashboardClient({
               <h3 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-2`}>
                 {searchQuery ? 'No projects found' : 'No projects yet'}
               </h3>
-              {/* Dark Mode Toggle */}
-              <button
-                onClick={() => setIsDarkMode && setIsDarkMode((prev: boolean) => !prev)}
-                className="p-2 hover:bg-gray-800 rounded-lg transition"
-                title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+              <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-6`}>
+                {searchQuery ? 'Try a different search term' : 'Start building your first AI-powered application'}
+              </p>
+              <Link
+                href="/builder"
+                className="inline-block px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition font-medium"
               >
-                {isDarkMode ? <SunIcon /> : <MoonIcon />}
-              </button>
+                Create Your First Project
+              </Link>
             </div>
           )}
         </div>
