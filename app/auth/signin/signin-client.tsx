@@ -57,7 +57,7 @@ export default function SignInClient() {
         toast.error('Invalid email or password')
       } else {
         toast.success('Welcome back!', {
-          duration: 2000,
+          duration: 3000,
           id: 'signin-welcome',
         })
         router.push(callbackUrl)
@@ -78,7 +78,14 @@ export default function SignInClient() {
 
   return (
     <>
-      <Toaster position="top-center" />
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          duration: 3000,
+          success: { duration: 3000 },
+          error: { duration: 4000 },
+        }}
+      />
       
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex items-center justify-center py-12 px-4">
         <div className="max-w-md w-full">
