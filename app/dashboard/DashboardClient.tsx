@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
@@ -8,6 +8,7 @@ import { DashboardMobileMenu } from '@/components/DashboardMobileMenu'
 import { signOut } from 'next-auth/react'
 // ✅ ADDED: Import ProjectCard component
 import ProjectCard from '@/components/ProjectCard'
+import type { Project } from '@/types/project'
 
 // Lazy load heavy components
 const SimpleExportButton = dynamic(() => import('@/components/SimpleExportButton'), {
@@ -35,21 +36,6 @@ const MoonIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
   </svg>
 )
-
-// Types
-interface Project {
-  id: string
-  name: string
-  description: string | null
-  code: string | null
-  prompt: string | null
-  type: string
-  createdAt: string
-  updatedAt: string
-  isPublished?: boolean
-  publicUrl?: string | null
-  views?: number
-}
 
 interface UserStats {
   projectsThisMonth: number
@@ -505,6 +491,11 @@ export default function DashboardClient({
                     ...project,
                     createdAt: new Date(project.createdAt),
                     updatedAt: new Date(project.updatedAt),
+                    description: project.description || '',
+                    type: project.type || '',
+                    isPublished: project.isPublished ?? false,
+                    publicUrl: project.publicUrl || null,
+                    views: project.views ?? 0,
                   }}
                   onDelete={() => handleDeleteProject(project.id)}
                   onRefresh={() => {
