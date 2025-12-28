@@ -1,6 +1,6 @@
 
 import { Navigation } from '@/components/Navigation'
-import NewsletterSubscribeForm from '@/components/NewsletterSubscribeForm'
+import NewsletterForm from '@/components/NewsletterForm'
 import Link from 'next/link'
 import Footer from './components/Footer'
 
@@ -156,7 +156,7 @@ export default function Page() {
               <p className="text-purple-100 mb-8">
                 Get the latest features, tips, and updates delivered to your inbox
               </p>
-              <NewsletterSubscribeForm />
+              <NewsletterForm />
               <p className="text-sm text-purple-200 mt-4">
                 No spam. Unsubscribe anytime. We respect your privacy.
               </p>
