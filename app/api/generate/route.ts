@@ -80,44 +80,51 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 })
     }
 
-    // ✅ FIXED: Use jsdelivr CDN instead of unpkg for better reliability
     const systemPrompt = `You are an expert React developer creating production-ready single-page applications.
 
-CRITICAL CDN FIX:
-Use this EXACT React Router CDN URL (it's from jsdelivr, more reliable than unpkg):
-<script crossorigin src="https://cdn.jsdelivr.net/npm/react-router-dom@6.20.1/dist/umd/react-router-dom.production.min.js"></script>
+CRITICAL REQUIREMENTS - YOU MUST INCLUDE ALL OF THESE:
 
-This CDN properly exposes window.ReactRouterDOM global!
+1. **NAVIGATION COMPONENT** - REQUIRED at the top of EVERY page:
+   - Logo/brand name on left
+   - Links: Home, About, Services, Contact
+   - Mobile hamburger menu
+   - Sticky/fixed positioning
+   
+2. **FOOTER COMPONENT** - REQUIRED at the bottom:
+   - Must include: "⚡ Built with BuildFlow AI" with link to https://buildflow-ai.app
+   - Copyright text
+   - Social links or additional info
+   
+3. **4 COMPLETE PAGES** - All functional with HashRouter:
+   - Home page (hero, features, CTA)
+   - About page (company info, team)
+   - Services page (service cards)
+   - Contact page (working form with useState)
 
-REQUIRED TEMPLATE STRUCTURE:
+TEMPLATE STRUCTURE (USE EXACTLY THIS):
 
+\`\`\`html
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{SITE_TITLE}}</title>
-  
-  <!-- CRITICAL: Load in this EXACT order with THESE CDN URLs -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script crossorigin src="https://cdn.jsdelivr.net/npm/react-router-dom@6.20.1/dist/umd/react-router-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  
   <style>
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
+    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
     .fade-in { animation: fadeIn 0.6s ease-out; }
   </style>
 </head>
-<body class="antialiased">
+<body>
   <div id="root"></div>
   
   <script type="text/babel">
-    // CRITICAL: This MUST work with jsdelivr CDN
     const { HashRouter, Routes, Route, Link, useLocation } = window.ReactRouterDOM;
     const { useState, useEffect } = React;
     
@@ -134,9 +141,7 @@ REQUIRED TEMPLATE STRUCTURE:
       }, [location]);
       
       useEffect(() => {
-        const handleScroll = () => {
-          setIsScrolled(window.scrollY > 20);
-        };
+        const handleScroll = () => setIsScrolled(window.scrollY > 20);
         window.addEventListener('scroll', handleScroll);
         return () => window.removeEventListener('scroll', handleScroll);
       }, []);
@@ -171,12 +176,6 @@ REQUIRED TEMPLATE STRUCTURE:
                     {link.label}
                   </Link>
                 ))}
-                <Link
-                  to="/contact"
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Get Started
-                </Link>
               </div>
               
               <button
@@ -195,19 +194,17 @@ REQUIRED TEMPLATE STRUCTURE:
             
             {isOpen && (
               <div className="md:hidden py-4 border-t border-gray-200">
-                <div className="flex flex-col space-y-3">
-                  {navLinks.map(link => (
-                    <Link
-                      key={link.to}
-                      to={link.to}
-                      className={\`px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg \${
-                        location.pathname === link.to ? 'bg-blue-50 text-blue-600' : ''
-                      }\`}
-                    >
-                      {link.label}
-                    </Link>
-                  ))}
-                </div>
+                {navLinks.map(link => (
+                  <Link
+                    key={link.to}
+                    to={link.to}
+                    className={\`block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg \${
+                      location.pathname === link.to ? 'bg-blue-50 text-blue-600' : ''
+                    }\`}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
               </div>
             )}
           </div>
@@ -216,12 +213,38 @@ REQUIRED TEMPLATE STRUCTURE:
     }
     
     // ==========================================
-    // HOME PAGE (REQUIRED - Fill with content)
+    // FOOTER COMPONENT (REQUIRED WITH BUILDFLOW BRANDING)
+    // ==========================================
+    function Footer() {
+      return (
+        <footer className="bg-gray-900 text-white py-12 mt-20">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="text-center">
+              <p className="text-gray-400 mb-2">© 2025 {{BRAND_NAME}}. All rights reserved.</p>
+              <p className="text-sm">
+                ⚡ Built with{' '}
+                <a 
+                  href="https://buildflow-ai.app" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:text-blue-300 font-semibold"
+                >
+                  BuildFlow AI
+                </a>
+              </p>
+            </div>
+          </div>
+        </footer>
+      );
+    }
+    
+    // ==========================================
+    // HOME PAGE (REQUIRED)
     // ==========================================
     function HomePage() {
       return (
-        <div className="min-h-screen pt-16">
-          <section className="bg-gradient-to-br from-blue-50 to-purple-50 py-20 fade-in">
+        <div className="min-h-screen">
+          <section className="bg-gradient-to-br from-blue-50 to-purple-50 py-32 mt-16 fade-in">
             <div className="max-w-7xl mx-auto px-4 text-center">
               <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
                 {{HERO_HEADLINE}}
@@ -242,17 +265,7 @@ REQUIRED TEMPLATE STRUCTURE:
             <div className="max-w-7xl mx-auto px-4">
               <h2 className="text-4xl font-bold text-center text-gray-900 mb-12">Features</h2>
               <div className="grid md:grid-cols-3 gap-8">
-                {[
-                  { icon: '⚡', title: 'Feature 1', desc: 'Description here' },
-                  { icon: '🔒', title: 'Feature 2', desc: 'Description here' },
-                  { icon: '🎯', title: 'Feature 3', desc: 'Description here' },
-                ].map((f, i) => (
-                  <div key={i} className="p-6 bg-white rounded-xl shadow-lg">
-                    <div className="text-4xl mb-4">{f.icon}</div>
-                    <h3 className="text-xl font-bold mb-2">{f.title}</h3>
-                    <p className="text-gray-600">{f.desc}</p>
-                  </div>
-                ))}
+                {{FEATURES}}
               </div>
             </div>
           </section>
@@ -265,10 +278,12 @@ REQUIRED TEMPLATE STRUCTURE:
     // ==========================================
     function AboutPage() {
       return (
-        <div className="min-h-screen pt-16 py-20 fade-in">
+        <div className="min-h-screen pt-24 py-20 fade-in">
           <div className="max-w-4xl mx-auto px-4">
             <h1 className="text-5xl font-bold mb-8">About Us</h1>
-            <p className="text-xl text-gray-600">{{ABOUT_TEXT}}</p>
+            <div className="prose prose-lg">
+              {{ABOUT_CONTENT}}
+            </div>
           </div>
         </div>
       );
@@ -279,19 +294,11 @@ REQUIRED TEMPLATE STRUCTURE:
     // ==========================================
     function ServicesPage() {
       return (
-        <div className="min-h-screen pt-16 py-20 fade-in">
+        <div className="min-h-screen pt-24 py-20 fade-in">
           <div className="max-w-7xl mx-auto px-4">
             <h1 className="text-5xl font-bold text-center mb-12">Our Services</h1>
             <div className="grid md:grid-cols-2 gap-8">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className="p-8 bg-white rounded-xl shadow-lg">
-                  <h3 className="text-2xl font-bold mb-4">Service {i}</h3>
-                  <p className="text-gray-600 mb-6">Professional service description</p>
-                  <Link to="/contact" className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                    Learn More
-                  </Link>
-                </div>
-              ))}
+              {{SERVICES}}
             </div>
           </div>
         </div>
@@ -299,7 +306,7 @@ REQUIRED TEMPLATE STRUCTURE:
     }
     
     // ==========================================
-    // CONTACT PAGE (REQUIRED)
+    // CONTACT PAGE (REQUIRED WITH FORM)
     // ==========================================
     function ContactPage() {
       const [formData, setFormData] = useState({ name: '', email: '', message: '' });
@@ -313,7 +320,7 @@ REQUIRED TEMPLATE STRUCTURE:
       };
       
       return (
-        <div className="min-h-screen pt-16 py-20 fade-in">
+        <div className="min-h-screen pt-24 py-20 fade-in">
           <div className="max-w-2xl mx-auto px-4">
             <h1 className="text-5xl font-bold text-center mb-12">Contact Us</h1>
             {submitted && (
@@ -359,25 +366,6 @@ REQUIRED TEMPLATE STRUCTURE:
     }
     
     // ==========================================
-    // FOOTER (REQUIRED)
-    // ==========================================
-    function Footer() {
-      return (
-        <footer className="bg-gray-900 text-white py-12">
-          <div className="max-w-7xl mx-auto px-4 text-center">
-            <p className="text-gray-400 mb-2">© 2025 {{BRAND_NAME}}. All rights reserved.</p>
-            <p className="text-sm">
-              ⚡ Built with{' '}
-              <a href="https://buildflow-ai.app" target="_blank" className="text-blue-400 hover:text-blue-300 font-semibold">
-                BuildFlow AI
-              </a>
-            </p>
-          </div>
-        </footer>
-      );
-    }
-    
-    // ==========================================
     // MAIN APP (REQUIRED)
     // ==========================================
     function App() {
@@ -405,18 +393,49 @@ REQUIRED TEMPLATE STRUCTURE:
   </script>
 </body>
 </html>
+\`\`\`
 
 INSTRUCTIONS:
-1. Use the EXACT CDN URL shown above for React Router (jsdelivr, not unpkg)
-2. Replace {{PLACEHOLDERS}} with content based on user request
-3. Customize colors, text, and sections for the specific industry
-4. Keep all 4 pages functional with working navigation
-5. Ensure mobile responsive with hamburger menu
-6. DO NOT remove core functionality
+1. Replace {{BRAND_NAME}} with appropriate brand name based on prompt
+2. Replace {{HERO_HEADLINE}} and {{HERO_SUBTEXT}} with compelling copy
+3. Replace {{FEATURES}} with 3 feature cards (use the template below)
+4. Replace {{ABOUT_CONTENT}} with paragraphs about the company
+5. Replace {{SERVICES}} with 4 service cards
+6. Customize colors, images, and content for the specific industry
+7. NEVER remove Navigation or Footer components
+8. ALWAYS include BuildFlow AI branding in footer
+
+FEATURE CARD TEMPLATE:
+\`\`\`jsx
+{[
+  { icon: '⚡', title: 'Feature 1', desc: 'Description' },
+  { icon: '🔒', title: 'Feature 2', desc: 'Description' },
+  { icon: '🎯', title: 'Feature 3', desc: 'Description' },
+].map((f, i) => (
+  <div key={i} className="p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition">
+    <div className="text-4xl mb-4">{f.icon}</div>
+    <h3 className="text-xl font-bold mb-2">{f.title}</h3>
+    <p className="text-gray-600">{f.desc}</p>
+  </div>
+))}
+\`\`\`
+
+SERVICE CARD TEMPLATE:
+\`\`\`jsx
+{[1, 2, 3, 4].map(i => (
+  <div key={i} className="p-8 bg-white rounded-xl shadow-lg">
+    <h3 className="text-2xl font-bold mb-4">Service {i}</h3>
+    <p className="text-gray-600 mb-6">Description</p>
+    <Link to="/contact" className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+      Learn More
+    </Link>
+  </div>
+))}
+\`\`\`
 
 USER REQUEST: Create a professional ${type} website about "${prompt}"
 
-Generate the complete HTML file with working navigation.`;
+Generate the complete HTML file following the template exactly.`;
 
     console.log('Calling Claude API...');
 

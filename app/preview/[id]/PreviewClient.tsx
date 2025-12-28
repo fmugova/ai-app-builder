@@ -12,6 +12,7 @@ import {
   Zap
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
+import { sanitizeForPreview } from '@/lib/sanitizeForPreview'
 
 interface PreviewClientProps {
   project: {
@@ -31,6 +32,9 @@ export default function PreviewClient({ project }: PreviewClientProps) {
   const [showCode, setShowCode] = useState(false)
   const [deployingVercel, setDeployingVercel] = useState(false)
   const [publishing, setPublishing] = useState(false)
+
+  // Use sanitizeForPreview to wrap React/JSX code
+  const sanitizedCode = sanitizeForPreview(project.code)
 
   // Publish to BuildFlow
   const handlePublish = async () => {
@@ -289,20 +293,20 @@ export default function PreviewClient({ project }: PreviewClientProps) {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-hidden">
+      {/* Content - FIXED: Full height iframe */}
+      <div className="flex-1 overflow-hidden relative">
         {showCode ? (
           /* Code View */
-          <div className="h-full bg-gray-900 p-4 overflow-auto">
+          <div className="absolute inset-0 bg-gray-900 p-4 overflow-auto">
             <pre className="text-sm text-gray-300 font-mono">
               <code>{project.code}</code>
             </pre>
           </div>
         ) : (
-          /* Preview View */
+          /* Preview View - FULL HEIGHT */
           <iframe
-            srcDoc={project.code}
-            className="w-full h-full border-0"
+            srcDoc={sanitizedCode}
+            className="absolute inset-0 w-full h-full border-0"
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
             title={project.name}
           />

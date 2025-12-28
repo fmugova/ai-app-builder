@@ -3,116 +3,13 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast, Toaster } from 'react-hot-toast'
+
 import { templates } from '@/lib/templates'
 import { analytics } from '@/lib/analytics'
 import { Loader2 } from 'lucide-react'
 import { EnhancedPromptInput } from '@/components/EnhancedPromptInput'
+import { sanitizeForPreview } from '@/lib/sanitizeForPreview'
 
-// Enhanced sanitize function with proper React support
-function sanitizeForPreview(code: string): string {
-  let sanitized = code
-    .replace(/<a\s+[^>]*href=["']\/dashboard["'][^>]*>[\s\S]*?<\/a>/gi, '')
-    .replace(/<a\s+[^>]*href=["']http:\/\/localhost:\d+\/dashboard["'][^>]*>[\s\S]*?<\/a>/gi, '')
-    .replace(/<a\s+[^>]*href=["']https?:\/\/[^"']*\/dashboard["'][^>]*>[\s\S]*?<\/a>/gi, '')
-    .replace(/<a\s+[^>]*href=["']\/builder["'][^>]*>[\s\S]*?<\/a>/gi, '')
-    .replace(/<a\s+[^>]*href=["']http:\/\/localhost:\d+\/builder["'][^>]*>[\s\S]*?<\/a>/gi, '')
-    .replace(/<a\s+[^>]*href=["']\/auth[^"']*["'][^>]*>[\s\S]*?<\/a>/gi, '')
-    .replace(/<a\s+[^>]*href=["']\/api[^"']*["'][^>]*>[\s\S]*?<\/a>/gi, '')
-    .replace(/href=["']\/dashboard["']/gi, 'href="#"')
-    .replace(/href=["']\/builder["']/gi, 'href="#"')
-    .replace(/href=["']\/auth[^"']*["']/gi, 'href="#"')
-    .replace(/href=["']\/api[^"']*["']/gi, 'href="#"')
-    .replace(/onclick=["'][^"']*dashboard[^"']*["']/gi, 'onclick="return false"')
-    .replace(/onclick=["'][^"']*builder[^"']*["']/gi, 'onclick="return false"')
-    .replace(/onclick=["'][^"']*router\.push[^"']*["']/gi, 'onclick="return false"')
-
-  // If already a complete HTML document, return as-is
-  if (sanitized.trim().startsWith('<!DOCTYPE') || 
-      sanitized.trim().startsWith('<html') ||
-      (sanitized.includes('<head>') && sanitized.includes('<body>'))) {
-    if (sanitized.includes('<head>') && !sanitized.includes('<base')) {
-      sanitized = sanitized.replace('<head>', '<head>\n  <base target="_blank">')
-    }
-    return sanitized
-  }
-
-  // Detect React/JSX code
-  const isReactCode = 
-    sanitized.includes('export default function') ||
-    sanitized.includes('useState') ||
-    sanitized.includes('useEffect') ||
-    sanitized.includes('className=') ||
-    sanitized.includes('```tsx') ||
-    sanitized.includes('```jsx') ||
-    /function\s+\w+\s*\([^)]*\)\s*\{[\s\S]*?return\s*\(/i.test(sanitized)
-
-  if (isReactCode) {
-    // Clean markdown code blocks
-    let reactCode = sanitized.replace(/```(?:tsx|jsx|javascript|js)?\n?/g, '')
-    
-    // Extract JSX content from component
-    const componentMatch = reactCode.match(/export\s+default\s+function\s+\w+[\s\S]*?\{[\s\S]*?return\s*\([\s\S]*?\)\s*\}/s)
-    if (componentMatch) {
-      const returnMatch = componentMatch[0].match(/return\s*\([\s\S]*?\)(?=\s*\})/s)
-      if (returnMatch) {
-        reactCode = returnMatch[0].replace(/^return\s*\(/, '').replace(/\)$/, '')
-      }
-    }
-    
-    // Wrap in HTML with React via CDN and Babel for JSX transpilation
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <base target="_blank">
-  <title>Preview</title>
-  <script>window.tailwindcss = { config: {} };</script>
-  <script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio"></script>
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <style>
-    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
-  </style>
-</head>
-<body>
-  <div id="root"></div>
-  <script type="text/babel">
-    const { useState, useEffect, useRef } = React;
-    
-    function App() {
-      return (
-        ${reactCode}
-      );
-    }
-    
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
-  </script>
-</body>
-</html>`
-  }
-
-  // Regular HTML content
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <base target="_blank">
-  <title>Preview</title>
-  <script>window.tailwindcss = { config: {} };</script>
-  <script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio"></script>
-  <style>
-    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
-  </style>
-</head>
-<body>
-  ${sanitized.trim()}
-</body>
-</html>`
-}
 
 function BuilderContent() {
   const router = useRouter()
