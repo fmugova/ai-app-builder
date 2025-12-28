@@ -129,7 +129,7 @@ function BuilderContent() {
   const [saving, setSaving] = useState(false)
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
   const [isLoadedProject, setIsLoadedProject] = useState(false)
-  const [showReactWarning, setShowReactWarning] = useState(false)
+  // ✅ REMOVED: showReactWarning state - no longer needed!
 
   // Animating generating text
   useEffect(() => {
@@ -297,17 +297,9 @@ function BuilderContent() {
         setProjectType(data.type || 'landing')
         setIsLoadedProject(true)
 
-        const isReactCode = 
-          data.code.includes('```tsx') || 
-          data.code.includes('```jsx') ||
-          data.code.includes('import React') ||
-          (data.code.includes('import {') && data.code.includes('from "react"')) ||
-          data.code.includes('useState') ||
-          data.code.includes('useEffect')
-
-        if (isReactCode) {
-          setShowReactWarning(true)
-        }
+        // ✅ REMOVED: React detection and warning logic
+        // The sanitizeForPreview function already handles React code properly!
+        // No need to warn - just render it!
       }
     } catch (err) {
       console.error('Failed to load:', err)
@@ -431,59 +423,8 @@ function BuilderContent() {
     URL.revokeObjectURL(url)
   }
 
-  if (showReactWarning) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <header className="bg-white border-b px-6 py-4">
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="text-gray-600 hover:text-gray-900"
-          >
-            ← Back to Dashboard
-          </button>
-        </header>
-
-        <div className="max-w-3xl mx-auto px-6 py-12">
-          <div className="bg-yellow-50 border-2 border-yellow-400 rounded-2xl p-8">
-            <div className="flex items-start gap-4">
-              <div className="text-5xl">⚠️</div>
-              <div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                  React/TypeScript Project Detected
-                </h3>
-                <p className="text-gray-700 mb-4">
-                  This project uses React/JSX. The preview may not render perfectly, but you can still edit the code.
-                </p>
-                <div className="flex gap-3 flex-wrap">
-                  <button
-                    onClick={() => setShowReactWarning(false)}
-                    className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-semibold"
-                  >
-                    ✏️ Edit Code Anyway
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowReactWarning(false)
-                      setPrompt(`Convert "${projectName}" to pure HTML with Tailwind CSS`)
-                    }}
-                    className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold"
-                  >
-                    🔄 Generate HTML Version
-                  </button>
-                  <button
-                    onClick={() => router.push('/dashboard')}
-                    className="bg-gray-100 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-200 font-semibold"
-                  >
-                    ← Back
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  // ✅ REMOVED: React warning screen - no longer needed!
+  // The code just renders normally now
 
   if (step === 'select-type') {
     return (
@@ -849,7 +790,7 @@ function BuilderContent() {
               <div className="text-center text-gray-500 py-8">
                 <div className="text-4xl mb-2">👋</div>
                 <p className="text-sm">Start a conversation!</p>
-                <p className="text-xs mt-2">Try: \"Add a navigation bar\" or upload a website for inspiration</p>
+                <p className="text-xs mt-2">Try: "Add a navigation bar" or upload a website for inspiration</p>
               </div>
             ) : (
               chatHistory.map((msg, i) => (
@@ -970,4 +911,3 @@ export default function Builder() {
     </Suspense>
   )
 }
-
