@@ -83,7 +83,9 @@ function sanitizeForPreview(code: string): string {
     
     function App() {
       return (
-        ${reactCode}
+        <>
+          ${reactCode}
+        </>
       );
     }
     
