@@ -22,7 +22,6 @@ async function callClaudeWithRetry(anthropic: Anthropic, messages: any[], maxRet
       const isLastAttempt = attempt === maxRetries - 1;
 
       if (isOverloaded && !isLastAttempt) {
-        // Exponential backoff: 2s, 4s, 8s
         const delay = Math.pow(2, attempt + 1) * 1000;
         console.log(`Claude overloaded, retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
@@ -41,12 +40,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Initialize Anthropic inside the route handler
     const anthropic = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY,
     });
 
-    // Rate limiting - use user email for AI requests
     const rateLimitResult = checkRateLimit(`ai:${session.user.email}`, rateLimits.aiGeneration)
     if (!rateLimitResult.allowed) {
       const resetIn = Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000)
@@ -56,7 +53,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check user limits
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       select: {
@@ -84,91 +80,44 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 })
     }
 
-    // ✅ UPDATED: Enhanced system prompt for fully functional React SPAs
+    // ✅ FIXED: Use jsdelivr CDN instead of unpkg for better reliability
     const systemPrompt = `You are an expert React developer creating production-ready single-page applications.
 
-CRITICAL REQUIREMENTS - FOLLOW EXACTLY:
+CRITICAL CDN FIX:
+Use this EXACT React Router CDN URL (it's from jsdelivr, more reliable than unpkg):
+<script crossorigin src="https://cdn.jsdelivr.net/npm/react-router-dom@6.20.1/dist/umd/react-router-dom.production.min.js"></script>
 
-1. TECHNOLOGY STACK:
-   - React 18 via CDN (production build)
-   - React Router 6 with HashRouter (for iframe compatibility)
-   - Tailwind CSS via CDN
-   - Babel Standalone for JSX compilation
-   - NO build step required - everything runs in browser
+This CDN properly exposes window.ReactRouterDOM global!
 
-2. SITE STRUCTURE - MUST INCLUDE ALL:
-   - Home page (/) - Hero section, features, CTA
-   - About page (/about) - Company/project info, mission, team
-   - Services page (/services) - Product/service offerings
-   - Contact page (/contact) - Contact form with validation
-
-3. NAVIGATION - MUST BE FUNCTIONAL:
-   - Sticky navigation bar at top
-   - Desktop menu with links
-   - Mobile hamburger menu (collapsible)
-   - Active link highlighting
-   - Smooth transitions between pages
-
-4. RESPONSIVE DESIGN:
-   - Mobile-first approach
-   - Breakpoints: sm, md, lg, xl
-   - Hamburger menu for mobile
-   - Touch-friendly buttons (min 44px)
-   - Responsive images and layouts
-
-5. UI COMPONENTS REQUIRED:
-   - Professional navigation with logo
-   - Hero section with CTA buttons
-   - Feature cards/sections
-   - Contact form with proper inputs
-   - Footer with BuildFlow badge
-
-6. INTERACTIVITY:
-   - Working form submission (console.log for demo)
-   - Mobile menu toggle functionality
-   - Hover effects on buttons/links
-   - Smooth page transitions
-   - Active link states
-
-7. CODE QUALITY:
-   - Clean, readable code
-   - Proper component structure
-   - Semantic HTML
-   - Accessible markup (aria labels)
-   - SEO-friendly meta tags
-
-EXACT TEMPLATE TO FOLLOW:
+REQUIRED TEMPLATE STRUCTURE:
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Professional website built with BuildFlow AI">
   <title>{{SITE_TITLE}}</title>
   
-  <!-- CDN Scripts - DO NOT MODIFY ORDER -->
+  <!-- CRITICAL: Load in this EXACT order with THESE CDN URLs -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/react-router-dom@6.20.0/dist/umd/react-router-dom.production.min.js"></script>
+  <script crossorigin src="https://cdn.jsdelivr.net/npm/react-router-dom@6.20.1/dist/umd/react-router-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   
   <style>
-    /* Custom animations */
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(20px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    .fade-in {
-      animation: fadeIn 0.6s ease-out;
-    }
+    .fade-in { animation: fadeIn 0.6s ease-out; }
   </style>
 </head>
 <body class="antialiased">
   <div id="root"></div>
   
   <script type="text/babel">
+    // CRITICAL: This MUST work with jsdelivr CDN
     const { HashRouter, Routes, Route, Link, useLocation } = window.ReactRouterDOM;
     const { useState, useEffect } = React;
     
@@ -180,12 +129,10 @@ EXACT TEMPLATE TO FOLLOW:
       const [isScrolled, setIsScrolled] = useState(false);
       const location = useLocation();
       
-      // Close mobile menu when route changes
       useEffect(() => {
         setIsOpen(false);
       }, [location]);
       
-      // Track scroll for navbar styling
       useEffect(() => {
         const handleScroll = () => {
           setIsScrolled(window.scrollY > 20);
@@ -207,13 +154,11 @@ EXACT TEMPLATE TO FOLLOW:
         }\`}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
-              {/* Logo */}
               <Link to="/" className="flex items-center space-x-2">
                 <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg"></div>
                 <span className="text-xl font-bold text-gray-900">{{BRAND_NAME}}</span>
               </Link>
               
-              {/* Desktop Navigation */}
               <div className="hidden md:flex items-center space-x-8">
                 {navLinks.map(link => (
                   <Link
@@ -234,11 +179,9 @@ EXACT TEMPLATE TO FOLLOW:
                 </Link>
               </div>
               
-              {/* Mobile Menu Button */}
               <button
                 onClick={() => setIsOpen(!isOpen)}
                 className="md:hidden p-2 text-gray-700 hover:text-blue-600"
-                aria-label="Toggle menu"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   {isOpen ? (
@@ -250,7 +193,6 @@ EXACT TEMPLATE TO FOLLOW:
               </button>
             </div>
             
-            {/* Mobile Menu */}
             {isOpen && (
               <div className="md:hidden py-4 border-t border-gray-200">
                 <div className="flex flex-col space-y-3">
@@ -258,19 +200,13 @@ EXACT TEMPLATE TO FOLLOW:
                     <Link
                       key={link.to}
                       to={link.to}
-                      className={\`px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors \${
+                      className={\`px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg \${
                         location.pathname === link.to ? 'bg-blue-50 text-blue-600' : ''
                       }\`}
                     >
                       {link.label}
                     </Link>
                   ))}
-                  <Link
-                    to="/contact"
-                    className="mx-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-center"
-                  >
-                    Get Started
-                  </Link>
                 </div>
               </div>
             )}
@@ -280,55 +216,41 @@ EXACT TEMPLATE TO FOLLOW:
     }
     
     // ==========================================
-    // HOME PAGE (REQUIRED)
+    // HOME PAGE (REQUIRED - Fill with content)
     // ==========================================
     function HomePage() {
       return (
         <div className="min-h-screen pt-16">
-          {/* Hero Section */}
           <section className="bg-gradient-to-br from-blue-50 to-purple-50 py-20 fade-in">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="text-center">
-                <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-                  {{HERO_HEADLINE}}
-                </h1>
-                <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-                  {{HERO_SUBTEXT}}
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <Link
-                    to="/contact"
-                    className="px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-lg font-semibold"
-                  >
-                    Get Started
-                  </Link>
-                  <Link
-                    to="/about"
-                    className="px-8 py-4 bg-white text-blue-600 border-2 border-blue-600 rounded-lg hover:bg-blue-50 transition-colors text-lg font-semibold"
-                  >
-                    Learn More
-                  </Link>
-                </div>
-              </div>
+            <div className="max-w-7xl mx-auto px-4 text-center">
+              <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
+                {{HERO_HEADLINE}}
+              </h1>
+              <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+                {{HERO_SUBTEXT}}
+              </p>
+              <Link
+                to="/contact"
+                className="inline-block px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-lg font-semibold"
+              >
+                Get Started
+              </Link>
             </div>
           </section>
           
-          {/* Features Section */}
           <section className="py-20">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <h2 className="text-4xl font-bold text-center text-gray-900 mb-12">
-                Why Choose Us
-              </h2>
+            <div className="max-w-7xl mx-auto px-4">
+              <h2 className="text-4xl font-bold text-center text-gray-900 mb-12">Features</h2>
               <div className="grid md:grid-cols-3 gap-8">
                 {[
-                  { icon: '⚡', title: 'Fast', desc: 'Lightning-fast performance' },
-                  { icon: '🔒', title: 'Secure', desc: 'Enterprise-grade security' },
-                  { icon: '🎯', title: 'Reliable', desc: '99.9% uptime guarantee' },
-                ].map((feature, i) => (
-                  <div key={i} className="p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
-                    <div className="text-4xl mb-4">{feature.icon}</div>
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">{feature.title}</h3>
-                    <p className="text-gray-600">{feature.desc}</p>
+                  { icon: '⚡', title: 'Feature 1', desc: 'Description here' },
+                  { icon: '🔒', title: 'Feature 2', desc: 'Description here' },
+                  { icon: '🎯', title: 'Feature 3', desc: 'Description here' },
+                ].map((f, i) => (
+                  <div key={i} className="p-6 bg-white rounded-xl shadow-lg">
+                    <div className="text-4xl mb-4">{f.icon}</div>
+                    <h3 className="text-xl font-bold mb-2">{f.title}</h3>
+                    <p className="text-gray-600">{f.desc}</p>
                   </div>
                 ))}
               </div>
@@ -343,21 +265,11 @@ EXACT TEMPLATE TO FOLLOW:
     // ==========================================
     function AboutPage() {
       return (
-        <div className="min-h-screen pt-16">
-          <section className="py-20 fade-in">
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-              <h1 className="text-5xl font-bold text-gray-900 mb-8">About Us</h1>
-              <div className="prose prose-lg max-w-none">
-                <p className="text-xl text-gray-600 mb-6">
-                  {{ABOUT_INTRO}}
-                </p>
-                <h2 className="text-3xl font-bold text-gray-900 mt-12 mb-4">Our Mission</h2>
-                <p className="text-gray-600">
-                  {{MISSION_STATEMENT}}
-                </p>
-              </div>
-            </div>
-          </section>
+        <div className="min-h-screen pt-16 py-20 fade-in">
+          <div className="max-w-4xl mx-auto px-4">
+            <h1 className="text-5xl font-bold mb-8">About Us</h1>
+            <p className="text-xl text-gray-600">{{ABOUT_TEXT}}</p>
+          </div>
         </div>
       );
     }
@@ -367,34 +279,21 @@ EXACT TEMPLATE TO FOLLOW:
     // ==========================================
     function ServicesPage() {
       return (
-        <div className="min-h-screen pt-16">
-          <section className="py-20 fade-in">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <h1 className="text-5xl font-bold text-center text-gray-900 mb-12">Our Services</h1>
-              <div className="grid md:grid-cols-2 gap-8">
-                {[
-                  { title: 'Service 1', desc: 'Professional service description', price: '$99' },
-                  { title: 'Service 2', desc: 'Premium service offering', price: '$199' },
-                  { title: 'Service 3', desc: 'Enterprise solution', price: '$299' },
-                  { title: 'Service 4', desc: 'Custom package', price: 'Custom' },
-                ].map((service, i) => (
-                  <div key={i} className="p-8 bg-white rounded-xl shadow-lg">
-                    <h3 className="text-2xl font-bold text-gray-900 mb-4">{service.title}</h3>
-                    <p className="text-gray-600 mb-6">{service.desc}</p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-3xl font-bold text-blue-600">{service.price}</span>
-                      <Link
-                        to="/contact"
-                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                      >
-                        Get Started
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
+        <div className="min-h-screen pt-16 py-20 fade-in">
+          <div className="max-w-7xl mx-auto px-4">
+            <h1 className="text-5xl font-bold text-center mb-12">Our Services</h1>
+            <div className="grid md:grid-cols-2 gap-8">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="p-8 bg-white rounded-xl shadow-lg">
+                  <h3 className="text-2xl font-bold mb-4">Service {i}</h3>
+                  <p className="text-gray-600 mb-6">Professional service description</p>
+                  <Link to="/contact" className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Learn More
+                  </Link>
+                </div>
+              ))}
             </div>
-          </section>
+          </div>
         </div>
       );
     }
@@ -403,11 +302,7 @@ EXACT TEMPLATE TO FOLLOW:
     // CONTACT PAGE (REQUIRED)
     // ==========================================
     function ContactPage() {
-      const [formData, setFormData] = useState({
-        name: '',
-        email: '',
-        message: ''
-      });
+      const [formData, setFormData] = useState({ name: '', email: '', message: '' });
       const [submitted, setSubmitted] = useState(false);
       
       const handleSubmit = (e) => {
@@ -417,74 +312,48 @@ EXACT TEMPLATE TO FOLLOW:
         setTimeout(() => setSubmitted(false), 3000);
       };
       
-      const handleChange = (e) => {
-        setFormData({
-          ...formData,
-          [e.target.name]: e.target.value
-        });
-      };
-      
       return (
-        <div className="min-h-screen pt-16">
-          <section className="py-20 fade-in">
-            <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-              <h1 className="text-5xl font-bold text-center text-gray-900 mb-8">Contact Us</h1>
-              <p className="text-xl text-gray-600 text-center mb-12">
-                Get in touch and let us know how we can help
-              </p>
-              
-              {submitted && (
-                <div className="mb-6 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg">
-                  Thank you! We'll get back to you soon.
-                </div>
-              )}
-              
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div>
-                  <label className="block text-gray-700 font-medium mb-2">Name</label>
-                  <input
-                    type="text"
-                    name="name"
-                    required
-                    value={formData.name}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                    placeholder="Your name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-700 font-medium mb-2">Email</label>
-                  <input
-                    type="email"
-                    name="email"
-                    required
-                    value={formData.email}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                    placeholder="your@email.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-700 font-medium mb-2">Message</label>
-                  <textarea
-                    name="message"
-                    required
-                    value={formData.message}
-                    onChange={handleChange}
-                    rows={5}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                    placeholder="How can we help you?"
-                  ></textarea>
-                </div>
-                <button
-                  type="submit"
-                  className="w-full px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-lg font-semibold"
-                >
-                  Send Message
-                </button>
-              </form>
-            </div>
-          </section>
+        <div className="min-h-screen pt-16 py-20 fade-in">
+          <div className="max-w-2xl mx-auto px-4">
+            <h1 className="text-5xl font-bold text-center mb-12">Contact Us</h1>
+            {submitted && (
+              <div className="mb-6 p-4 bg-green-100 text-green-700 rounded-lg">
+                Thank you! We'll get back to you soon.
+              </div>
+            )}
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <input
+                type="text"
+                required
+                placeholder="Name"
+                className="w-full px-4 py-3 border rounded-lg"
+                value={formData.name}
+                onChange={(e) => setFormData({...formData, name: e.target.value})}
+              />
+              <input
+                type="email"
+                required
+                placeholder="Email"
+                className="w-full px-4 py-3 border rounded-lg"
+                value={formData.email}
+                onChange={(e) => setFormData({...formData, email: e.target.value})}
+              />
+              <textarea
+                required
+                placeholder="Message"
+                rows={5}
+                className="w-full px-4 py-3 border rounded-lg"
+                value={formData.message}
+                onChange={(e) => setFormData({...formData, message: e.target.value})}
+              />
+              <button
+                type="submit"
+                className="w-full px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-lg font-semibold"
+              >
+                Send Message
+              </button>
+            </form>
+          </div>
         </div>
       );
     }
@@ -494,24 +363,15 @@ EXACT TEMPLATE TO FOLLOW:
     // ==========================================
     function Footer() {
       return (
-        <footer className="bg-gray-900 text-white py-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center">
-              <p className="text-gray-400">
-                © 2025 {{BRAND_NAME}}. All rights reserved.
-              </p>
-              <p className="mt-4 text-sm">
-                ⚡ Built with{' '}
-                <a
-                  href="https://buildflow-ai.app"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-400 hover:text-blue-300 font-semibold"
-                >
-                  BuildFlow AI
-                </a>
-              </p>
-            </div>
+        <footer className="bg-gray-900 text-white py-12">
+          <div className="max-w-7xl mx-auto px-4 text-center">
+            <p className="text-gray-400 mb-2">© 2025 {{BRAND_NAME}}. All rights reserved.</p>
+            <p className="text-sm">
+              ⚡ Built with{' '}
+              <a href="https://buildflow-ai.app" target="_blank" className="text-blue-400 hover:text-blue-300 font-semibold">
+                BuildFlow AI
+              </a>
+            </p>
           </div>
         </footer>
       );
@@ -547,20 +407,19 @@ EXACT TEMPLATE TO FOLLOW:
 </html>
 
 INSTRUCTIONS:
-1. Replace {{PLACEHOLDERS}} with actual content based on the user's request
-2. Customize colors, text, and sections to match the requested theme
-3. Add industry-specific features and content
-4. Keep all 4 pages and navigation functional
-5. Maintain mobile responsiveness
-6. DO NOT remove any core functionality
+1. Use the EXACT CDN URL shown above for React Router (jsdelivr, not unpkg)
+2. Replace {{PLACEHOLDERS}} with content based on user request
+3. Customize colors, text, and sections for the specific industry
+4. Keep all 4 pages functional with working navigation
+5. Ensure mobile responsive with hamburger menu
+6. DO NOT remove core functionality
 
 USER REQUEST: Create a professional ${type} website about "${prompt}"
 
-Generate the complete HTML file now with all pages, navigation, and features working.`;
+Generate the complete HTML file with working navigation.`;
 
     console.log('Calling Claude API...');
 
-    // Call Claude API with retry logic
     const message = await callClaudeWithRetry(
       anthropic,
       [
@@ -573,7 +432,6 @@ Generate the complete HTML file now with all pages, navigation, and features wor
 
     console.log('Claude API response received');
 
-    // Extract code
     let code = '';
     if (message.content && message.content[0]) {
       const content = message.content[0];
@@ -583,7 +441,6 @@ Generate the complete HTML file now with all pages, navigation, and features wor
       return NextResponse.json({ error: 'Invalid AI response' }, { status: 500 });
     }
 
-    // Clean up markdown code blocks
     code = code
       .replace(/```html\n?/g, '')
       .replace(/```jsx\n?/g, '')
@@ -591,21 +448,17 @@ Generate the complete HTML file now with all pages, navigation, and features wor
       .replace(/```\n?/g, '')
       .trim()
 
-    // Code should already start with DOCTYPE from prompt
-    // Only add if somehow missing
     if (!code.startsWith('<!DOCTYPE')) {
       code = `<!DOCTYPE html>\n${code}`
     }
 
     console.log('Code generated successfully, updating user stats...');
 
-    // Increment usage
     await prisma.user.update({
       where: { id: user.id },
       data: { generationsUsed: { increment: 1 } },
     })
 
-    // Log activity
     await prisma.activity.create({
       data: {
         userId: user.id,
@@ -625,7 +478,6 @@ Generate the complete HTML file now with all pages, navigation, and features wor
   } catch (error: any) {
     console.error('Generate error:', error)
 
-    // Handle overloaded errors
     if (error?.error?.type === 'overloaded_error') {
       return NextResponse.json(
         {
@@ -636,7 +488,6 @@ Generate the complete HTML file now with all pages, navigation, and features wor
       );
     }
 
-    // Handle API key errors
     if (error?.status === 401) {
       console.error('ANTHROPIC_API_KEY is invalid or missing');
       return NextResponse.json(

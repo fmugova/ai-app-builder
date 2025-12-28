@@ -1,342 +1,336 @@
-'use client';
+'use client'
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Download, Edit, Share2, Code, RefreshCw, Trash2, X, Copy, Check, Rocket } from 'lucide-react';
-import SimpleExportButton from '@/components/SimpleExportButton';
-import DeployButton from '@/components/DeployButton';
-import { sanitizeCode, isReactCode } from '@/lib/sanitizeCode';
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { 
+  Eye, 
+  Code, 
+  Download,
+  Github,
+  Share2,
+  ArrowLeft,
+  Zap
+} from 'lucide-react'
+import { toast } from 'react-hot-toast'
 
 interface PreviewClientProps {
-  projectId: string;
+  project: {
+    id: string
+    name: string
+    description: string | null
+    code: string
+    type: string
+    isPublished: boolean
+    publicUrl: string | null
+    views: number
+  }
 }
 
-interface Project {
-  id: string;
-  name: string;
-  code: string;
-  type?: string;
-}
+export default function PreviewClient({ project }: PreviewClientProps) {
+  const router = useRouter()
+  const [showCode, setShowCode] = useState(false)
+  const [deployingVercel, setDeployingVercel] = useState(false)
+  const [publishing, setPublishing] = useState(false)
 
-export default function PreviewClient({ projectId }: PreviewClientProps) {
-  const router = useRouter();
-  const [project, setProject] = useState<Project | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [showCode, setShowCode] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [showDeployModal, setShowDeployModal] = useState(false);
-
-  useEffect(() => {
-    const fetchProject = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`/api/projects/${projectId}`);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch project');
-        }
-
-        const data = await response.json();
-
-        // Don't sanitize React code - it needs all its scripts
-        const codeToRender = isReactCode(data.code) 
-          ? data.code 
-          : sanitizeCode(data.code);
-
-        setProject({
-          ...data,
-          code: codeToRender
-        });
-
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-        setProject(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (projectId) {
-      fetchProject();
-    }
-  }, [projectId]);
-
-  const handleDownload = () => {
-    if (project?.code) {
-      const blob = new Blob([project.code], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${project.name || 'project'}.html`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-  };
-
-  const handleCopy = async () => {
-    if (project?.code) {
-      await navigator.clipboard.writeText(project.code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  const handleEdit = () => {
-    router.push(`/builder?project=${projectId}`);
-  };
-
-  const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this project?')) return;
-    
+  // Publish to BuildFlow
+  const handlePublish = async () => {
+    setPublishing(true)
     try {
-      const res = await fetch(`/api/projects/${projectId}`, {
-        method: 'DELETE'
-      });
+      const res = await fetch(`/api/projects/${project.id}/publish`, {
+        method: 'POST',
+      })
+
       if (res.ok) {
-        alert('Project deleted');
-        router.push('/dashboard');
+        toast.success('🎉 Published to BuildFlow!', {
+          duration: 2000,
+        })
+        router.refresh()
       } else {
-        alert('Failed to delete project');
+        const data = await res.json()
+        toast.error(data.error || 'Failed to publish')
       }
     } catch (error) {
-      console.error('Delete error:', error);
+      toast.error('Failed to publish')
+    } finally {
+      setPublishing(false)
     }
-  };
-
-  const handleExportGitHub = () => {
-    setShowExportModal(true);
-  };
-
-  const handleDeploy = () => {
-    setShowDeployModal(true);
-  };
-
-  const handleRefresh = () => {
-    window.location.reload();
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-950">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading preview...</p>
-        </div>
-      </div>
-    );
   }
 
-  if (error || !project || !project.code) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-950">
-        <div className="bg-red-900/20 border border-red-500 rounded-lg p-8 max-w-md text-center">
-          <h2 className="text-red-500 text-xl font-bold mb-2">Preview Error</h2>
-          <p className="text-gray-300">{error || 'Project not found'}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-4 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg"
-          >
-            Reload
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // CRITICAL: Don't validate or parse the code
-  // Claude generates complete, valid HTML - just render it
-  
-  return (
-    <div className="w-full h-screen flex flex-col bg-gray-950">
-      {/* Header with Controls */}
-      <div className="bg-gray-900 border-b border-gray-800 p-4 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <h1 className="text-white font-semibold text-lg truncate">
-            {project?.name || 'Preview'}
-          </h1>
-        </div>
+  // Export to GitHub then deploy to Vercel
+  const handleDeployToVercel = async () => {
+    setDeployingVercel(true)
+    
+    try {
+      const githubCheck = await fetch(`/api/projects/${project.id}/github-status`)
+      const githubData = await githubCheck.json()
+      
+      if (!githubData.hasGithubRepo) {
+        const confirmExport = confirm(
+          '⚠️ Vercel requires GitHub.\n\nYour project will be:\n1. Exported to GitHub\n2. Deployed to Vercel\n\nContinue?'
+        )
         
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleEdit}
-            className="flex items-center gap-2 p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
-            title="Edit project"
-          >
-            <Edit className="w-5 h-5" />
-            <span className="hidden sm:inline text-sm">Edit</span>
-          </button>
+        if (!confirmExport) {
+          setDeployingVercel(false)
+          return
+        }
+        
+        toast.loading('Exporting to GitHub...', { id: 'deploy-vercel' })
+        
+        const exportRes = await fetch(`/api/export/github`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId: project.id })
+        })
+        
+        if (!exportRes.ok) {
+          toast.error('GitHub export failed', { id: 'deploy-vercel' })
+          setDeployingVercel(false)
+          return
+        }
+        
+        const exportData = await exportRes.json()
+        toast.success('✅ Exported to GitHub!', { duration: 1000, id: 'export-gh' })
+        
+        await deployToVercel(exportData.repoName)
+      } else {
+        toast.loading('Deploying to Vercel...', { id: 'deploy-vercel' })
+        await deployToVercel(githubData.repoName)
+      }
+    } catch (error) {
+      toast.error('Deployment failed', { id: 'deploy-vercel' })
+      setDeployingVercel(false)
+    }
+  }
 
-          <button
-            onClick={() => setShowCode(!showCode)}
-            className="flex items-center gap-2 p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
-            title="View code"
-          >
-            <Code className="w-5 h-5" />
-            <span className="hidden sm:inline text-sm">Code</span>
-          </button>
+  const deployToVercel = async (repoName: string) => {
+    try {
+      const res = await fetch(`/api/deploy/vercel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          projectId: project.id,
+          githubRepoName: repoName
+        })
+      })
 
-          <button
-            onClick={handleCopy}
-            className="flex items-center gap-2 p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
-            title="Copy code"
-          >
-            {copied ? (
-              <>
-                <Check className="w-5 h-5 text-green-500" />
-                <span className="hidden sm:inline text-sm text-green-500">Copied</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-5 h-5" />
-                <span className="hidden sm:inline text-sm">Copy</span>
-              </>
-            )}
-          </button>
+      if (res.ok) {
+        const data = await res.json()
+        toast.success('🚀 Deployed to Vercel!', { duration: 2000, id: 'deployed' })
+        window.open(data.deploymentUrl, '_blank')
+      } else {
+        const errorData = await res.json()
+        toast.error(errorData.error || 'Deployment failed', { id: 'deploy-vercel' })
+      }
+    } catch (error) {
+      toast.error('Deployment failed', { id: 'deploy-vercel' })
+    } finally {
+      setDeployingVercel(false)
+    }
+  }
 
-          <button
-            onClick={handleDownload}
-            className="flex items-center gap-2 p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
-            title="Download as HTML"
-          >
-            <Download className="w-5 h-5" />
-            <span className="hidden sm:inline text-sm">Download</span>
-          </button>
+  // Export to GitHub
+  const handleExportGithub = async () => {
+    try {
+      const res = await fetch(`/api/export/github`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: project.id })
+      })
+      
+      if (res.ok) {
+        const data = await res.json()
+        toast.success('✅ Exported to GitHub!')
+        window.open(data.repoUrl, '_blank')
+      } else {
+        toast.error('GitHub export failed')
+      }
+    } catch (error) {
+      toast.error('Export failed')
+    }
+  }
 
-          <button
-            onClick={handleExportGitHub}
-            className="flex items-center gap-2 p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
-            title="Export Project"
-          >
-            <Share2 className="w-5 h-5" />
-            <span className="hidden sm:inline text-sm">Export</span>
-          </button>
+  // Download ZIP
+  const handleDownload = async () => {
+    try {
+      const res = await fetch(`/api/export/zip`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          projectId: project.id,
+          projectName: project.name,
+          projectCode: project.code
+        })
+      })
+      
+      if (res.ok) {
+        const blob = await res.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${project.name.replace(/\s+/g, '-')}.zip`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+        toast.success('Downloaded!')
+      } else {
+        toast.error('Download failed')
+      }
+    } catch (error) {
+      toast.error('Download failed')
+    }
+  }
 
-          <button
-            onClick={handleDeploy}
-            className="flex items-center gap-2 p-2 text-blue-400 hover:text-blue-300 hover:bg-gray-800 rounded-lg transition"
-            title="Deploy to Vercel"
-          >
-            <Rocket className="w-5 h-5" />
-            <span className="hidden sm:inline text-sm">Deploy</span>
-          </button>
+  return (
+    <div className="min-h-screen bg-gray-900 flex flex-col">
+      {/* Header */}
+      <header className="bg-gray-800 border-b border-gray-700 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="flex items-center gap-2 text-gray-400 hover:text-white transition"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              <span>Back to Dashboard</span>
+            </button>
 
-          <div className="w-px h-6 bg-gray-700"></div>
-
-          <button
-            onClick={handleRefresh}
-            className="flex items-center gap-2 p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
-            title="Refresh"
-          >
-            <RefreshCw className="w-5 h-5" />
-          </button>
-
-          <button
-            onClick={handleDelete}
-            className="flex items-center gap-2 p-2 text-red-400 hover:text-red-300 hover:bg-gray-800 rounded-lg transition"
-            title="Delete project"
-          >
-            <Trash2 className="w-5 h-5" />
-          </button>
-
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="flex items-center gap-2 p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
-            title="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Preview Pane */}
-        <div className="flex-1 flex items-center justify-center p-4 overflow-auto bg-gray-950">
-          {project?.code ? (
-            <div className="w-full h-full max-w-6xl">
-              <iframe
-                srcDoc={project.code}
-                className="w-full h-full border-0 rounded-lg shadow-lg"
-                sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"
-                title="Project Preview"
-              />
-            </div>
-          ) : (
             <div className="text-center">
-              <p className="text-gray-400 mb-4">No preview available</p>
+              <h1 className="text-xl font-bold text-white">{project.name}</h1>
+              {project.description && (
+                <p className="text-sm text-gray-400">{project.description}</p>
+              )}
             </div>
-          )}
-        </div>
 
-        {/* Code Viewer Pane */}
-        {showCode && project?.code && (
-          <div className="w-96 bg-gray-900 border-l border-gray-800 overflow-auto">
-            <div className="sticky top-0 bg-gray-900 border-b border-gray-800 p-4 flex items-center justify-between">
-              <h3 className="text-white font-semibold">Code</h3>
+            <button
+              onClick={() => setShowCode(!showCode)}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition"
+            >
+              {showCode ? <Eye className="w-5 h-5" /> : <Code className="w-5 h-5" />}
+              {showCode ? 'Preview' : 'Code'}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Action Bar */}
+      <div className="bg-gray-800 border-b border-gray-700">
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {!project.isPublished ? (
+                <button
+                  onClick={handlePublish}
+                  disabled={publishing}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg transition text-sm font-semibold disabled:opacity-50"
+                >
+                  <Zap className="w-4 h-4" />
+                  {publishing ? 'Publishing...' : 'Publish to BuildFlow'}
+                </button>
+              ) : (
+                <div className="flex items-center gap-2 text-green-400 text-sm">
+                  <Zap className="w-4 h-4" />
+                  <span>Published</span>
+                </div>
+              )}
+
               <button
-                onClick={() => setShowCode(false)}
-                className="p-1 hover:bg-gray-800 rounded transition"
+                onClick={handleDeployToVercel}
+                disabled={deployingVercel}
+                className="flex items-center gap-2 px-4 py-2 bg-black hover:bg-gray-900 text-white rounded-lg transition text-sm font-semibold disabled:opacity-50 border border-gray-700"
               >
-                <X className="w-5 h-5 text-gray-400" />
+                {deployingVercel ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Deploying...
+                  </>
+                ) : (
+                  <>
+                    <svg viewBox="0 0 76 76" className="w-4 h-4" fill="white">
+                      <path d="M38 0L76 76H0L38 0z" />
+                    </svg>
+                    Deploy to Vercel
+                  </>
+                )}
               </button>
             </div>
-            <div className="p-4">
-              <pre className="text-xs text-gray-300 overflow-x-auto font-mono">
-                <code>{project.code}</code>
-              </pre>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleExportGithub}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition text-sm"
+              >
+                <Github className="w-4 h-4" />
+                Export to GitHub
+              </button>
+
+              {project.isPublished && project.publicUrl && (
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(project.publicUrl!)
+                    toast.success('URL copied!', { duration: 2000 })
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm"
+                >
+                  <Share2 className="w-4 h-4" />
+                  Share
+                </button>
+              )}
+
+              <button
+                onClick={handleDownload}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition text-sm"
+              >
+                <Download className="w-4 h-4" />
+                Download
+              </button>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-hidden">
+        {showCode ? (
+          /* Code View */
+          <div className="h-full bg-gray-900 p-4 overflow-auto">
+            <pre className="text-sm text-gray-300 font-mono">
+              <code>{project.code}</code>
+            </pre>
+          </div>
+        ) : (
+          /* Preview View */
+          <iframe
+            srcDoc={project.code}
+            className="w-full h-full border-0"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+            title={project.name}
+          />
         )}
       </div>
 
-      {/* Export Modal */}
-      {showExportModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-gray-900 rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div className="flex items-center justify-between p-6 border-b border-gray-800">
-              <h2 className="text-xl font-bold text-white">Export Project</h2>
-              <button
-                onClick={() => setShowExportModal(false)}
-                className="p-1 hover:bg-gray-800 rounded transition"
+      {/* Info Footer */}
+      <div className="bg-gray-800 border-t border-gray-700 py-2 px-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between text-xs text-gray-400">
+          <div className="flex items-center gap-4">
+            <span>Type: {project.type}</span>
+            <span>•</span>
+            <span>Views: {project.views}</span>
+          </div>
+          <div>
+            {project.isPublished && project.publicUrl && (
+              <a
+                href={project.publicUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-400 hover:text-blue-300"
               >
-                <X className="w-5 h-5 text-gray-400" />
-              </button>
-            </div>
-            <SimpleExportButton 
-              projectId={projectId} 
-              projectName={project?.name || 'Project'}
-              projectCode={project?.code || ''}
-              projectType={project?.type || 'html'}
-              onSuccess={() => setShowExportModal(false)}
-            />
+                {project.publicUrl}
+              </a>
+            )}
           </div>
         </div>
-      )}
-
-      {/* Deploy Modal */}
-      {showDeployModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-gray-900 rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div className="flex items-center justify-between p-6 border-b border-gray-800">
-              <h2 className="text-xl font-bold text-white">Deploy to Vercel</h2>
-              <button
-                onClick={() => setShowDeployModal(false)}
-                className="p-1 hover:bg-gray-800 rounded transition"
-              >
-                <X className="w-5 h-5 text-gray-400" />
-              </button>
-            </div>
-            <DeployButton 
-              projectId={projectId} 
-              projectName={project?.name || 'Project'}
-            />
-          </div>
-        </div>
-      )}
+      </div>
     </div>
-  );
+  )
 }

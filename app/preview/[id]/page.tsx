@@ -1,27 +1,64 @@
-import { Suspense } from 'react'
-import { Loader2 } from 'lucide-react'
+import { getServerSession } from 'next-auth'
+import { redirect } from 'next/navigation'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 import PreviewClient from './PreviewClient'
 
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
+export default async function PreviewPage({
+  params,
+}: {
+  params: { id: string }
+}) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.email) {
+    redirect('/auth/signin')
+  }
 
-function PreviewLoading() {
-  return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-      <div className="text-center">
-        <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-4" />
-        <p className="text-gray-400">Loading preview...</p>
+  const user = await prisma.user.findUnique({
+    where: { email: session.user.email },
+    select: { id: true }
+  })
+
+  if (!user) {
+    redirect('/auth/signin')
+  }
+
+  // Fetch project
+  const project = await prisma.project.findFirst({
+    where: {
+      id: params.id,
+      userId: user.id
+    },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      code: true,
+      type: true,
+      isPublished: true,
+      publicUrl: true,
+      views: true
+    }
+  })
+
+  if (!project) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
+        <div className="text-center">
+          <p className="text-xl mb-4">Project not found</p>
+          <a href="/dashboard" className="px-6 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg">
+            Back to Dashboard
+          </a>
+        </div>
       </div>
-    </div>
-  )
-}
+    )
+  }
 
-export default async function PreviewPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  
-  return (
-    <Suspense fallback={<PreviewLoading />}>
-      <PreviewClient projectId={id} />
-    </Suspense>
-  )
+  // Increment views
+  await prisma.project.update({
+    where: { id: project.id },
+    data: { views: { increment: 1 } }
+  })
+
+  return <PreviewClient project={project} />
 }
