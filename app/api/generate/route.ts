@@ -143,18 +143,51 @@ export async function POST(request: NextRequest) {
         const [isOpen, setIsOpen] = useState(false);
         const location = useLocation();
         useEffect(() => setIsOpen(false), [location]);
+        
         const links = [
           { to: '/', label: 'Home' },
           { to: '/about', label: 'About' },
           { to: '/services', label: 'Services' },
           { to: '/contact', label: 'Contact' }
         ];
+        
         return React.createElement('nav', { className: 'fixed top-0 left-0 right-0 z-50 bg-white shadow' },
           React.createElement('div', { className: 'max-w-7xl mx-auto px-4' },
             React.createElement('div', { className: 'flex justify-between items-center h-16' },
               React.createElement(Link, { to: '/', className: 'flex items-center space-x-2' },
                 React.createElement('div', { className: 'w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg' }),
                 React.createElement('span', { className: 'text-xl font-bold' }, 'BRAND_NAME_PLACEHOLDER')
+              ),
+              React.createElement('div', { className: 'hidden md:flex space-x-8' },
+                links.map(link =>
+                  React.createElement(Link, {
+                    key: link.to,
+                    to: link.to,
+                    className: 'text-gray-700 hover:text-blue-600 font-medium transition-colors ' + (location.pathname === link.to ? 'text-blue-600' : '')
+                  }, link.label)
+                )
+              ),
+              React.createElement('button', {
+                onClick: () => setIsOpen(!isOpen),
+                className: 'md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors',
+                'aria-label': 'Toggle menu'
+              }, React.createElement('svg', {
+                className: 'w-6 h-6',
+                fill: 'none',
+                stroke: 'currentColor',
+                viewBox: '0 0 24 24'
+              }, isOpen ?
+                React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M6 18L18 6M6 6l12 12' }) :
+                React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M4 6h16M4 12h16M4 18h16' })
+              ))
+            ),
+            isOpen && React.createElement('div', { className: 'md:hidden pb-4 border-t' },
+              links.map(link =>
+                React.createElement(Link, {
+                  key: link.to,
+                  to: link.to,
+                  className: 'block px-4 py-3 text-gray-700 hover:bg-gray-100 transition-colors ' + (location.pathname === link.to ? 'text-blue-600 bg-blue-50' : '')
+                }, link.label)
               )
             )
           )
@@ -165,7 +198,15 @@ export async function POST(request: NextRequest) {
         return React.createElement('footer', { className: 'bg-gray-900 text-white py-12 mt-20' },
           React.createElement('div', { className: 'max-w-7xl mx-auto px-4 text-center' },
             React.createElement('p', { className: 'text-gray-400 mb-2' }, '© 2025 BRAND_NAME_PLACEHOLDER. All rights reserved.'),
-            React.createElement('p', { className: 'text-sm' }, '⚡ Built with BuildFlow AI')
+            React.createElement('p', { className: 'text-sm' },
+              '⚡ Built with ',
+              React.createElement('a', {
+                href: 'https://buildflow-ai.app',
+                target: '_blank',
+                rel: 'noopener noreferrer',
+                className: 'text-blue-400 hover:text-blue-300 font-semibold'
+              }, 'BuildFlow AI')
+            )
           )
         );
       }
@@ -174,27 +215,36 @@ export async function POST(request: NextRequest) {
         return React.createElement('div', { className: 'min-h-screen pt-16' },
           React.createElement('section', { className: 'bg-gradient-to-br from-blue-50 to-purple-50 py-32' },
             React.createElement('div', { className: 'max-w-7xl mx-auto px-4 text-center' },
-              React.createElement('h1', { className: 'text-5xl font-bold mb-6' }, 'HERO_TITLE_PLACEHOLDER'),
-              React.createElement('p', { className: 'text-xl text-gray-600 mb-8' }, 'HERO_TEXT_PLACEHOLDER'),
-              React.createElement(Link, { to: '/contact', className: 'inline-block px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-lg font-semibold' }, 'Get Started')
+              React.createElement('h1', { className: 'text-5xl md:text-6xl font-bold mb-6' }, 'HERO_TITLE_PLACEHOLDER'),
+              React.createElement('p', { className: 'text-xl text-gray-600 mb-8 max-w-3xl mx-auto' }, 'HERO_TEXT_PLACEHOLDER'),
+              React.createElement(Link, { to: '/contact', className: 'inline-block px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-lg font-semibold transition-colors shadow-lg hover:shadow-xl' }, 'Get Started')
+            )
+          ),
+          React.createElement('section', { className: 'py-20 bg-white' },
+            React.createElement('div', { className: 'max-w-7xl mx-auto px-4' },
+              React.createElement('h2', { className: 'text-4xl font-bold text-center mb-12' }, 'Features'),
+              React.createElement('div', { className: 'grid md:grid-cols-3 gap-8' }, 'FEATURES_PLACEHOLDER')
             )
           )
         );
       }
       
       function AboutPage() {
-        return React.createElement('div', { className: 'min-h-screen pt-24 py-20' },
+        return React.createElement('div', { className: 'min-h-screen pt-24 py-20 bg-gray-50' },
           React.createElement('div', { className: 'max-w-4xl mx-auto px-4' },
-            React.createElement('h1', { className: 'text-5xl font-bold mb-8' }, 'About Us'),
-            React.createElement('p', { className: 'text-xl text-gray-600' }, 'ABOUT_TEXT_PLACEHOLDER')
+            React.createElement('h1', { className: 'text-5xl font-bold mb-8 text-center' }, 'About Us'),
+            React.createElement('div', { className: 'bg-white rounded-lg shadow-lg p-8 md:p-12' },
+              React.createElement('p', { className: 'text-xl text-gray-600 leading-relaxed' }, 'ABOUT_TEXT_PLACEHOLDER')
+            )
           )
         );
       }
       
       function ServicesPage() {
-        return React.createElement('div', { className: 'min-h-screen pt-24 py-20' },
+        return React.createElement('div', { className: 'min-h-screen pt-24 py-20 bg-gray-50' },
           React.createElement('div', { className: 'max-w-7xl mx-auto px-4' },
-            React.createElement('h1', { className: 'text-5xl font-bold text-center mb-12' }, 'Our Services'),
+            React.createElement('h1', { className: 'text-5xl font-bold text-center mb-4' }, 'Our Services'),
+            React.createElement('p', { className: 'text-xl text-gray-600 text-center mb-12 max-w-3xl mx-auto' }, 'Discover what we can do for you'),
             React.createElement('div', { className: 'grid md:grid-cols-2 gap-8' }, 'SERVICES_PLACEHOLDER')
           )
         );
@@ -203,16 +253,36 @@ export async function POST(request: NextRequest) {
       function ContactPage() {
         const [formData, setFormData] = useState({ name: '', email: '', message: '' });
         const [submitted, setSubmitted] = useState(false);
-        const handleSubmit = (e) => { e.preventDefault(); setSubmitted(true); setTimeout(() => setSubmitted(false), 3000); };
-        return React.createElement('div', { className: 'min-h-screen pt-24 py-20' },
+        const handleSubmit = (e) => { 
+          e.preventDefault(); 
+          setSubmitted(true); 
+          setTimeout(() => {
+            setSubmitted(false);
+            setFormData({ name: '', email: '', message: '' });
+          }, 3000); 
+        };
+        
+        return React.createElement('div', { className: 'min-h-screen pt-24 py-20 bg-gray-50' },
           React.createElement('div', { className: 'max-w-2xl mx-auto px-4' },
-            React.createElement('h1', { className: 'text-5xl font-bold text-center mb-12' }, 'Contact Us'),
-            submitted && React.createElement('div', { className: 'mb-6 p-4 bg-green-100 text-green-700 rounded-lg' }, 'Thank you!'),
-            React.createElement('form', { onSubmit: handleSubmit, className: 'space-y-6' },
-              React.createElement('input', { type: 'text', required: true, placeholder: 'Name', className: 'w-full px-4 py-3 border rounded-lg', value: formData.name, onChange: (e) => setFormData({...formData, name: e.target.value}) }),
-              React.createElement('input', { type: 'email', required: true, placeholder: 'Email', className: 'w-full px-4 py-3 border rounded-lg', value: formData.email, onChange: (e) => setFormData({...formData, email: e.target.value}) }),
-              React.createElement('textarea', { required: true, placeholder: 'Message', rows: 5, className: 'w-full px-4 py-3 border rounded-lg', value: formData.message, onChange: (e) => setFormData({...formData, message: e.target.value}) }),
-              React.createElement('button', { type: 'submit', className: 'w-full px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-lg font-semibold' }, 'Send')
+            React.createElement('h1', { className: 'text-5xl font-bold text-center mb-4' }, 'Contact Us'),
+            React.createElement('p', { className: 'text-xl text-gray-600 text-center mb-12' }, 'Get in touch with us today'),
+            React.createElement('div', { className: 'bg-white rounded-lg shadow-lg p-8 md:p-12' },
+              submitted && React.createElement('div', { className: 'mb-6 p-4 bg-green-100 text-green-700 rounded-lg text-center font-semibold' }, '✓ Thank you! We\'ll be in touch soon.'),
+              React.createElement('form', { onSubmit: handleSubmit, className: 'space-y-6' },
+                React.createElement('div', null,
+                  React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Name'),
+                  React.createElement('input', { type: 'text', required: true, placeholder: 'Your name', className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent', value: formData.name, onChange: (e) => setFormData({...formData, name: e.target.value}) })
+                ),
+                React.createElement('div', null,
+                  React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Email'),
+                  React.createElement('input', { type: 'email', required: true, placeholder: 'your@email.com', className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent', value: formData.email, onChange: (e) => setFormData({...formData, email: e.target.value}) })
+                ),
+                React.createElement('div', null,
+                  React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Message'),
+                  React.createElement('textarea', { required: true, placeholder: 'How can we help you?', rows: 5, className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none', value: formData.message, onChange: (e) => setFormData({...formData, message: e.target.value}) })
+                ),
+                React.createElement('button', { type: 'submit', className: 'w-full px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-lg font-semibold transition-colors shadow-lg hover:shadow-xl' }, 'Send Message')
+              )
             )
           )
         );
