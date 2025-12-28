@@ -1,74 +1,64 @@
-import { Suspense } from 'react'
-import { notFound } from 'next/navigation'
 import { getServerSession } from 'next-auth'
+import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import PreviewClient from './PreviewClient'
 
-export const dynamic = 'force-dynamic'
-
-interface PageProps {
-  params: Promise<{ id: string }>
-}
-
-export default async function PreviewPage({ params }: PageProps) {
+export default async function PreviewPage({
+  params,
+}: {
+  params: { id: string }
+}) {
   const session = await getServerSession(authOptions)
-  
   if (!session?.user?.email) {
-    notFound()
+    redirect('/auth/signin')
   }
 
-  const { id } = await params
+  const user = await prisma.user.findUnique({
+    where: { email: session.user.email },
+    select: { id: true }
+  })
 
-  // Fetch project from database
-  const project = await prisma.project.findUnique({
-    where: { id },
-    include: {
-      User: {
-        select: {
-          email: true
-        }
-      }
+  if (!user) {
+    redirect('/auth/signin')
+  }
+
+  // Fetch project
+  const project = await prisma.project.findFirst({
+    where: {
+      id: params.id,
+      userId: user.id
+    },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      code: true,
+      type: true,
+      isPublished: true,
+      publicUrl: true,
+      views: true
     }
   })
 
   if (!project) {
-    notFound()
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
+        <div className="text-center">
+          <p className="text-xl mb-4">Project not found</p>
+          <a href="/dashboard" className="px-6 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg">
+            Back to Dashboard
+          </a>
+        </div>
+      </div>
+    )
   }
 
-  // Check if user has access (owner or admin)
-  const isOwner = project.User.email === session.user.email
-  const isAdmin = session.user.email === process.env.ADMIN_EMAIL
-
-  if (!isOwner && !isAdmin) {
-    notFound()
-  }
-
-  // Increment view count
+  // Increment views
   await prisma.project.update({
-    where: { id },
-    data: {
-      views: {
-        increment: 1
-      }
-    }
+    where: { id: project.id },
+    data: { views: { increment: 1 } }
   })
 
-  // Prepare project data for client
-  const projectData = {
-    id: project.id,
-    name: project.name,
-    description: project.description,
-    code: project.code,
-    type: project.type,
-    isPublished: project.isPublished,
-    publicUrl: project.publicUrl,
-    views: project.views + 1 // Include the incremented view
-  }
-
-  return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">Loading preview...</div>}>
-      <PreviewClient projectId={projectData.id} />
-    </Suspense>
-  )
+  return <PreviewClient project={project} />
 }
