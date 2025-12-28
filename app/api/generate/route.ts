@@ -104,20 +104,18 @@ export async function POST(request: NextRequest) {
   </div>
   
   <script type="text/babel">
-    // ULTRA-DEFENSIVE: Wait for ALL dependencies before executing
     (function initApp() {
       let attempts = 0;
-      const maxAttempts = 50; // 5 seconds total
+      const maxAttempts = 50;
       
       function checkDependencies() {
         attempts++;
         
-        // Check all dependencies are loaded AND initialized
-        const reactReady = window.React && typeof window.React.createElement === 'function';
-        const reactDOMReady = window.ReactDOM && typeof window.ReactDOM.createRoot === 'function';
-        const routerReady = window.ReactRouterDOM && 
-                           typeof window.ReactRouterDOM.HashRouter === 'function' &&
-                           typeof window.ReactRouterDOM.Routes === 'function';
+        // SAFE: Use optional chaining to prevent errors
+        const reactReady = typeof window.React?.createElement === 'function';
+        const reactDOMReady = typeof window.ReactDOM?.createRoot === 'function';
+        const routerReady = typeof window.ReactRouterDOM?.HashRouter === 'function' &&
+                           typeof window.ReactRouterDOM?.Routes === 'function';
         
         console.log('Attempt', attempts, ':', {
           React: reactReady,
@@ -357,7 +355,7 @@ For SERVICES_PLACEHOLDER, use React.createElement to build the JSX structure.
 
 USER REQUEST: "${prompt}"
 
-Generate the complete HTML file with all placeholders replaced. The initialization code is bulletproof and will handle CDN loading issues automatically.`;
+Generate the complete HTML file with all placeholders replaced.`;
 
     const message = await callClaudeWithRetry(anthropic, [{ role: 'user', content: systemPrompt }]);
 
