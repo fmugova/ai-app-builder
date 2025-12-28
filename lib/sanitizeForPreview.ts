@@ -14,28 +14,21 @@ export function sanitizeForPreview(code: string): string {
   
   if (isCompleteHTML) {
     console.log('✅ Complete HTML detected - returning as-is');
-    
-    // Only add <base target="_blank"> if not already present
-    if (trimmed.includes('<head>') && !trimmed.includes('<base')) {
-      return trimmed.replace('<head>', '<head>\n  <base target="_blank">');
-    }
-    
+    // Return complete HTML documents UNCHANGED - no modifications!
     return trimmed;
   }
   
   console.log('⚠️ Code fragment detected - wrapping with React infrastructure');
   
   // For fragments, wrap with minimal React infrastructure
-  // This handles old saved projects or partial code
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <base target="_blank">
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script crossorigin src="https://cdn.jsdelivr.net/npm/react-router-dom@6.20.1/dist/umd/react-router-dom.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-router-dom@6.20.1/dist/umd/react-router-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -52,7 +45,6 @@ export function sanitizeForPreview(code: string): string {
  * Check if code is safe (for security)
  */
 export function isCodeSafe(code: string): boolean {
-  // Basic security checks
   const dangerous = [
     /<script[^>]*src=["'](?!https:\/\/(unpkg\.com|cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com|cdn\.tailwindcss\.com))/i,
     /javascript:/i,
