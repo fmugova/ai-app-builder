@@ -111,11 +111,34 @@ export async function POST(request: NextRequest) {
       function checkDependencies() {
         attempts++;
         
-        // SAFE: Use optional chaining to prevent errors
-        const reactReady = typeof window.React?.createElement === 'function';
-        const reactDOMReady = typeof window.ReactDOM?.createRoot === 'function';
-        const routerReady = typeof window.ReactRouterDOM?.HashRouter === 'function' &&
-                           typeof window.ReactRouterDOM?.Routes === 'function';
+        // OLD-SCHOOL DEFENSIVE CHECKS - No optional chaining!
+        let reactReady = false;
+        let reactDOMReady = false;
+        let routerReady = false;
+        
+        try {
+          reactReady = !!(window.React && window.React.createElement && typeof window.React.createElement === 'function');
+        } catch (e) {
+          reactReady = false;
+        }
+        
+        try {
+          reactDOMReady = !!(window.ReactDOM && window.ReactDOM.createRoot && typeof window.ReactDOM.createRoot === 'function');
+        } catch (e) {
+          reactDOMReady = false;
+        }
+        
+        try {
+          routerReady = !!(
+            window.ReactRouterDOM && 
+            window.ReactRouterDOM.HashRouter && 
+            window.ReactRouterDOM.Routes &&
+            typeof window.ReactRouterDOM.HashRouter === 'function' &&
+            typeof window.ReactRouterDOM.Routes === 'function'
+          );
+        } catch (e) {
+          routerReady = false;
+        }
         
         console.log('Attempt', attempts, ':', {
           React: reactReady,
