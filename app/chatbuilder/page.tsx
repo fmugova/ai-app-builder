@@ -27,6 +27,7 @@ export default function ChatBuilderPage() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [publishing, setPublishing] = useState(false)
   const [currentCode, setCurrentCode] = useState<string | null>(null)
   const [projectId, setProjectId] = useState<string | null>(null)
   const [projectName, setProjectName] = useState<string>('')
@@ -36,10 +37,19 @@ export default function ChatBuilderPage() {
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px'
+    }
+  }, [input])
 
   // Get filtered templates
   const filteredTemplates = selectedCategory === 'all' 
@@ -49,8 +59,51 @@ export default function ChatBuilderPage() {
   // Get unique categories
   const categories = ['all', ...new Set(templates.map(t => t.category))]
 
+  // Detect URLs in input and fetch content
+  const detectAndFetchUrls = async (text: string): Promise<string> => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g
+    const urls = text.match(urlRegex)
+    
+    if (!urls || urls.length === 0) return text
+    
+    let enhancedPrompt = text
+    
+    for (const url of urls) {
+      try {
+        const response = await fetch('/api/fetch-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          enhancedPrompt += `\n\n--- Content from ${url} ---\n${data.content.substring(0, 5000)}`
+        }
+      } catch (error) {
+        console.error(`Failed to fetch ${url}:`, error)
+      }
+    }
+    
+    return enhancedPrompt
+  }
+
   const handleSend = async () => {
     if ((!input.trim() && uploadedFiles.length === 0) || loading) return
+
+    // Detect and fetch URLs if present
+    let enhancedInput = input
+    if (input.includes('http')) {
+      const urlMessage: Message = {
+        id: Date.now().toString(),
+        role: 'system',
+        content: '🔍 Detected URL in your message. Fetching content...',
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, urlMessage])
+      
+      enhancedInput = await detectAndFetchUrls(input)
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -67,9 +120,9 @@ export default function ChatBuilderPage() {
       const isIteration = currentCode !== null
 
       if (isIteration) {
-        // ITERATION (would use /api/chat/iterate when created)
+        // ITERATION
         const formData = new FormData()
-        formData.append('message', input)
+        formData.append('message', enhancedInput)
         formData.append('currentCode', currentCode)
         formData.append('projectId', projectId || '')
         formData.append('conversationHistory', JSON.stringify(messages.slice(-5)))
@@ -107,7 +160,7 @@ export default function ChatBuilderPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            prompt: input,
+            prompt: enhancedInput,
             type: 'landing-page'
           })
         })
@@ -161,7 +214,7 @@ export default function ChatBuilderPage() {
     }
   }
 
-  const handleSaveAndPublish = async () => {
+  const handleSave = async () => {
     if (!currentCode) {
       alert('No code to save. Generate a site first!')
       return
@@ -182,8 +235,7 @@ export default function ChatBuilderPage() {
         })
 
         if (response.ok) {
-          alert('Project saved successfully!')
-          router.push('/dashboard')
+          alert('✅ Project saved as draft!')
         } else {
           throw new Error('Failed to save project')
         }
@@ -202,8 +254,7 @@ export default function ChatBuilderPage() {
         if (response.ok) {
           const data = await response.json()
           setProjectId(data.project.id)
-          alert('Project saved successfully!')
-          router.push('/dashboard')
+          alert('✅ Project saved as draft!')
         } else {
           throw new Error('Failed to create project')
         }
@@ -212,6 +263,39 @@ export default function ChatBuilderPage() {
       alert(`Failed to save: ${error.message}`)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handlePublish = async () => {
+    if (!projectId) {
+      alert('Please save your project first!')
+      return
+    }
+
+    setPublishing(true)
+
+    try {
+      // Update project and mark as published
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: currentCode,
+          name: projectName,
+          published: true
+        })
+      })
+
+      if (response.ok) {
+        alert('🚀 Project published successfully!')
+        router.push('/dashboard')
+      } else {
+        throw new Error('Failed to publish project')
+      }
+    } catch (error: any) {
+      alert(`Failed to publish: ${error.message}`)
+    } finally {
+      setPublishing(false)
     }
   }
 
@@ -346,8 +430,8 @@ export default function ChatBuilderPage() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input */}
-        <div className="p-4 border-t border-gray-200">
+        {/* Input Area - Bigger like Replit */}
+        <div className="p-4 border-t border-gray-200 bg-white">
           {/* Uploaded files preview */}
           {uploadedFiles.length > 0 && (
             <div className="mb-3 flex flex-wrap gap-2">
@@ -365,64 +449,88 @@ export default function ChatBuilderPage() {
             </div>
           )}
 
-          <div className="flex space-x-2">
-            <input
-              type="text"
+          {/* Larger Textarea Input */}
+          <div className="flex gap-2 items-end">
+            <textarea
+              ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  handleSend()
+                }
+              }}
               placeholder={
                 currentCode
-                  ? "Tell me what to change, or upload files..."
-                  : "What do you want to build?"
+                  ? "Tell me what to change, upload files, or paste URLs..."
+                  : "What do you want to build? (Paste URLs or upload files)"
               }
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none min-h-[60px] max-h-[200px]"
               disabled={loading}
+              rows={1}
             />
             <button
               onClick={handleSend}
               disabled={loading || (!input.trim() && uploadedFiles.length === 0)}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium h-[60px]"
             >
               {loading ? 'Thinking...' : currentCode ? 'Update' : 'Generate'}
             </button>
           </div>
           
-          <div className="mt-3 flex items-center justify-between text-sm">
+          {/* Action Buttons Row - Raised Position */}
+          <div className="mt-3 flex items-center justify-between text-sm pb-2">
             <div className="flex items-center space-x-3">
               <input
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept=".html,.js,.jsx,.tsx,.css,.zip"
+                accept=".html,.js,.jsx,.tsx,.css,.zip,.txt"
                 onChange={handleFileUpload}
                 className="hidden"
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="text-gray-600 hover:text-blue-600 transition-colors flex items-center gap-1"
+                className="flex items-center gap-1 px-3 py-2 text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                 disabled={loading}
               >
-                📎 Upload broken code
+                📎 Upload Files
               </button>
               <span className="text-gray-300">•</span>
               <button
                 onClick={() => setShowTemplates(!showTemplates)}
-                className="text-gray-600 hover:text-blue-600 transition-colors"
+                className="flex items-center gap-1 px-3 py-2 text-gray-700 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
                 disabled={loading}
               >
                 📋 Templates
               </button>
             </div>
+            
+            {/* Separate Save & Publish Buttons */}
             {currentCode && (
-              <button
-                onClick={handleSaveAndPublish}
-                disabled={saving}
-                className="text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
-              >
-                {saving ? 'Saving...' : '✓ Save & Publish →'}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex items-center gap-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg font-medium transition-all disabled:opacity-50"
+                >
+                  {saving ? '💾 Saving...' : '💾 Save Draft'}
+                </button>
+                <button
+                  onClick={handlePublish}
+                  disabled={publishing || !projectId}
+                  className="flex items-center gap-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all disabled:opacity-50"
+                  title={!projectId ? 'Save first, then publish' : 'Publish to live site'}
+                >
+                  {publishing ? '🚀 Publishing...' : '🚀 Publish'}
+                </button>
+              </div>
             )}
+          </div>
+          
+          <div className="text-xs text-gray-500 mt-2">
+            💡 Tip: Press Enter to send, Shift+Enter for new line. Paste URLs to analyze websites.
           </div>
         </div>
       </div>
@@ -443,24 +551,24 @@ export default function ChatBuilderPage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleDownload}
-                  className="px-3 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                  className="flex items-center gap-1 px-3 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
                   title="Download HTML"
                 >
                   ⬇️ Download
                 </button>
                 <button
                   onClick={handleExportToGitHub}
-                  className="px-3 py-2 text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors"
+                  className="flex items-center gap-1 px-3 py-2 text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors"
                   title="Export to GitHub"
                 >
-                  <svg className="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
                   </svg>
                   GitHub
                 </button>
                 <button
                   onClick={handleDeployToVercel}
-                  className="px-3 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-900 transition-colors"
+                  className="flex items-center gap-1 px-3 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-900 transition-colors"
                   title="Deploy to Vercel"
                 >
                   ▲ Vercel
@@ -488,6 +596,7 @@ export default function ChatBuilderPage() {
                   <p className="text-gray-500">• "Create a coffee shop website"</p>
                   <p className="text-gray-500">• "Build a gym landing page"</p>
                   <p className="text-gray-500">• Upload broken Replit code to fix</p>
+                  <p className="text-gray-500">• Paste website URL to analyze</p>
                 </div>
               </div>
             </div>
@@ -532,10 +641,10 @@ export default function ChatBuilderPage() {
                 <button
                   key={template.id}
                   onClick={() => handleLoadTemplate(template)}
-                  className="p-6 border-2 border-gray-200 rounded-lg hover:border-blue-500 transition-all text-left group"
+                  className="p-6 border-2 border-gray-200 rounded-lg hover:border-purple-500 transition-all text-left group"
                 >
                   <div className="text-4xl mb-3">{getCategoryIcon(template.category)}</div>
-                  <h3 className="font-bold mb-2 group-hover:text-blue-600">{template.name}</h3>
+                  <h3 className="font-bold mb-2 group-hover:text-purple-600">{template.name}</h3>
                   <p className="text-sm text-gray-600 mb-3">{template.description}</p>
                   <div className="flex flex-wrap gap-1">
                     {template.tags?.slice(0, 2).map((tag, i) => (
@@ -556,7 +665,7 @@ export default function ChatBuilderPage() {
                 <p className="text-gray-600">No templates found in this category</p>
                 <button
                   onClick={() => setSelectedCategory('all')}
-                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
                 >
                   View All Templates
                 </button>
