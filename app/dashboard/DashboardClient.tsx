@@ -452,6 +452,25 @@ export default function DashboardClient({
           </button>
         </div>
 
+        {/* Builder Navigation Section */}
+        <div className="grid grid-cols-2 gap-4 mb-8">
+          {/* Existing Builder */}
+          <Link href="/builder">
+            <div className="p-6 border rounded-lg">
+              <h3 className="font-bold">Traditional Builder</h3>
+              <p className="text-sm text-gray-600">Your current workflow</p>
+            </div>
+          </Link>
+
+          {/* New Chat Builder */}
+          <Link href="/chatbuilder">
+            <div className="p-6 border rounded-lg bg-blue-50">
+              <h3 className="font-bold">Chat Builder 🆕</h3>
+              <p className="text-sm text-blue-600">Upload files • Iterate with AI</p>
+            </div>
+          </Link>
+        </div>
+
         {/* Projects Section */}
         <div className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl p-6 border`}>
           {/* Projects Header */}
