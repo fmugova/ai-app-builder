@@ -194,6 +194,11 @@ export function Navigation({ variant = 'dashboard' }: NavigationProps) {
   return (
     <>
       <div className="hidden lg:flex items-center gap-3">
+        <Link href="/builder">
+          <button className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            ✨ New Project
+          </button>
+        </Link>
         <Link 
           href="/dashboard"
           className={`px-4 py-2 rounded-lg transition ${

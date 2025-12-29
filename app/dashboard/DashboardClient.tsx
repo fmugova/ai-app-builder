@@ -306,6 +306,24 @@ export default function DashboardClient({
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Builder Navigation Cards */}
+        <div className="grid grid-cols-2 gap-4 mb-8">
+          {/* Existing Builder */}
+          <Link href="/builder">
+            <div className="p-6 border rounded-lg hover:shadow transition bg-white dark:bg-gray-800 dark:border-gray-700">
+              <h3 className="font-bold">Traditional Builder</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-300">Your current workflow</p>
+            </div>
+          </Link>
+
+          {/* New Chat Builder */}
+          <Link href="/chatbuilder">
+            <div className="p-6 border rounded-lg bg-blue-50 dark:bg-blue-900/30 hover:shadow transition dark:border-blue-700">
+              <h3 className="font-bold">Chat Builder 🆕</h3>
+              <p className="text-sm text-blue-600 dark:text-blue-200">Upload files • Iterate with AI</p>
+            </div>
+          </Link>
+        </div>
         {/* Welcome Section */}
         <div className="mb-8">
           <h2 className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-2`}>
