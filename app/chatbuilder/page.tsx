@@ -234,11 +234,15 @@ export default function ChatBuilderPage() {
           })
         })
 
-        if (response.ok) {
-          alert('✅ Project saved as draft!')
-        } else {
-          throw new Error('Failed to save project')
+        const data = await response.json()
+
+        if (!response.ok) {
+          console.error('Save error:', data)
+          throw new Error(data.error || data.message || 'Failed to save project')
         }
+
+        alert('✅ Project saved as draft!')
+        console.log('Project updated:', data)
       } else {
         // Create new project
         const response = await fetch('/api/projects', {
@@ -246,36 +250,82 @@ export default function ChatBuilderPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: projectName || 'Chat Builder Project',
+            description: `Created with Chat Builder on ${new Date().toLocaleDateString()}`,
             code: currentCode,
             type: 'landing-page'
           })
         })
 
-        if (response.ok) {
-          const data = await response.json()
+        const data = await response.json()
+
+        if (!response.ok) {
+          console.error('Create error:', data)
+          throw new Error(data.error || data.message || 'Failed to create project')
+        }
+
+        if (data.project && data.project.id) {
           setProjectId(data.project.id)
           alert('✅ Project saved as draft!')
+          console.log('Project created:', data.project.id)
+        } else if (data.id) {
+          setProjectId(data.id)
+          alert('✅ Project saved as draft!')
+          console.log('Project created:', data.id)
         } else {
-          throw new Error('Failed to create project')
+          throw new Error('No project ID in response')
         }
       }
     } catch (error: any) {
-      alert(`Failed to save: ${error.message}`)
+      console.error('Save failed:', error)
+      alert(`❌ Failed to save: ${error.message}`)
     } finally {
       setSaving(false)
     }
   }
 
   const handlePublish = async () => {
-    if (!projectId) {
-      alert('Please save your project first!')
+    if (!currentCode) {
+      alert('No code to publish. Generate a site first!')
       return
     }
 
     setPublishing(true)
 
     try {
-      // Update project and mark as published
+      // If no projectId, create project first
+      if (!projectId) {
+        const createResponse = await fetch('/api/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: projectName || 'Chat Builder Project',
+            description: `Created with Chat Builder on ${new Date().toLocaleDateString()}`,
+            code: currentCode,
+            type: 'landing-page',
+            published: true
+          })
+        })
+
+        const createData = await createResponse.json()
+
+        if (!createResponse.ok) {
+          console.error('Create error:', createData)
+          throw new Error(createData.error || createData.message || 'Failed to create project')
+        }
+
+        const newProjectId = createData.project?.id || createData.id
+        if (!newProjectId) {
+          throw new Error('No project ID in response')
+        }
+
+        setProjectId(newProjectId)
+        alert('🚀 Project published successfully!')
+        console.log('Project created and published:', newProjectId)
+        router.push('/dashboard')
+        return
+      }
+
+      // Update existing project and publish
       const response = await fetch(`/api/projects/${projectId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -286,14 +336,19 @@ export default function ChatBuilderPage() {
         })
       })
 
-      if (response.ok) {
-        alert('🚀 Project published successfully!')
-        router.push('/dashboard')
-      } else {
-        throw new Error('Failed to publish project')
+      const data = await response.json()
+
+      if (!response.ok) {
+        console.error('Publish error:', data)
+        throw new Error(data.error || data.message || 'Failed to publish project')
       }
+
+      alert('🚀 Project published successfully!')
+      console.log('Project published:', projectId)
+      router.push('/dashboard')
     } catch (error: any) {
-      alert(`Failed to publish: ${error.message}`)
+      console.error('Publish failed:', error)
+      alert(`❌ Failed to publish: ${error.message}`)
     } finally {
       setPublishing(false)
     }
@@ -430,8 +485,57 @@ export default function ChatBuilderPage() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Area - Bigger like Replit */}
-        <div className="p-4 border-t border-gray-200 bg-white">
+        {/* Input Area - Buttons MOVED TO TOP, mb-16 to clear feedback widget */}
+        <div className="p-4 border-t border-gray-200 bg-white mb-16">
+          {/* Action Buttons Row - NOW AT TOP */}
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".html,.js,.jsx,.tsx,.css,.zip,.txt"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors font-medium shadow-sm"
+                disabled={loading}
+              >
+                📎 Upload Files
+              </button>
+              <button
+                onClick={() => setShowTemplates(!showTemplates)}
+                className="flex items-center gap-1 px-4 py-2 bg-purple-600 text-white hover:bg-purple-700 rounded-lg transition-colors font-medium shadow-sm"
+                disabled={loading}
+              >
+                📋 Templates
+              </button>
+            </div>
+            
+            {/* Separate Save & Publish Buttons */}
+            {currentCode && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex items-center gap-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg font-medium transition-all disabled:opacity-50 shadow-sm"
+                >
+                  {saving ? '💾 Saving...' : '💾 Save Draft'}
+                </button>
+                <button
+                  onClick={handlePublish}
+                  disabled={publishing}
+                  className="flex items-center gap-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all disabled:opacity-50 shadow-sm"
+                  title="Save and publish to live site"
+                >
+                  {publishing ? '🚀 Publishing...' : '🚀 Publish'}
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Uploaded files preview */}
           {uploadedFiles.length > 0 && (
             <div className="mb-3 flex flex-wrap gap-2">
@@ -477,56 +581,6 @@ export default function ChatBuilderPage() {
             >
               {loading ? 'Thinking...' : currentCode ? 'Update' : 'Generate'}
             </button>
-          </div>
-          
-          {/* Action Buttons Row - Raised Position */}
-          <div className="mt-3 flex items-center justify-between text-sm pb-2">
-            <div className="flex items-center space-x-3">
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept=".html,.js,.jsx,.tsx,.css,.zip,.txt"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-1 px-3 py-2 text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                disabled={loading}
-              >
-                📎 Upload Files
-              </button>
-              <span className="text-gray-300">•</span>
-              <button
-                onClick={() => setShowTemplates(!showTemplates)}
-                className="flex items-center gap-1 px-3 py-2 text-gray-700 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                disabled={loading}
-              >
-                📋 Templates
-              </button>
-            </div>
-            
-            {/* Separate Save & Publish Buttons */}
-            {currentCode && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="flex items-center gap-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg font-medium transition-all disabled:opacity-50"
-                >
-                  {saving ? '💾 Saving...' : '💾 Save Draft'}
-                </button>
-                <button
-                  onClick={handlePublish}
-                  disabled={publishing || !projectId}
-                  className="flex items-center gap-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all disabled:opacity-50"
-                  title={!projectId ? 'Save first, then publish' : 'Publish to live site'}
-                >
-                  {publishing ? '🚀 Publishing...' : '🚀 Publish'}
-                </button>
-              </div>
-            )}
           </div>
           
           <div className="text-xs text-gray-500 mt-2">
