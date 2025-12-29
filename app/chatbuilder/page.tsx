@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { templates, getTemplatesByCategory } from '@/lib/templates'
 
 interface Message {
   id: string
@@ -11,7 +12,7 @@ interface Message {
   timestamp: Date
 }
 
-export default function UnifiedBuilderPage() {
+export default function ChatBuilderPage() {
   const { data: session } = useSession()
   const router = useRouter()
   
@@ -25,10 +26,13 @@ export default function UnifiedBuilderPage() {
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [currentCode, setCurrentCode] = useState<string | null>(null)
   const [projectId, setProjectId] = useState<string | null>(null)
+  const [projectName, setProjectName] = useState<string>('')
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
-  const [urls, setUrls] = useState<string[]>([])
+  const [showTemplates, setShowTemplates] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState('all')
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -37,10 +41,17 @@ export default function UnifiedBuilderPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // Get filtered templates
+  const filteredTemplates = selectedCategory === 'all' 
+    ? templates 
+    : getTemplatesByCategory(selectedCategory)
+
+  // Get unique categories
+  const categories = ['all', ...new Set(templates.map(t => t.category))]
+
   const handleSend = async () => {
     if ((!input.trim() && uploadedFiles.length === 0) || loading) return
 
-    // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -53,17 +64,15 @@ export default function UnifiedBuilderPage() {
     setLoading(true)
 
     try {
-      // Determine if this is initial generation or iteration
       const isIteration = currentCode !== null
 
       if (isIteration) {
-        // ITERATION: Modify existing code
+        // ITERATION (would use /api/chat/iterate when created)
         const formData = new FormData()
         formData.append('message', input)
         formData.append('currentCode', currentCode)
         formData.append('projectId', projectId || '')
         formData.append('conversationHistory', JSON.stringify(messages.slice(-5)))
-        formData.append('urls', JSON.stringify(urls))
         
         uploadedFiles.forEach(file => {
           formData.append('files', file)
@@ -93,7 +102,7 @@ export default function UnifiedBuilderPage() {
           throw new Error(data.error || 'Failed to iterate')
         }
       } else {
-        // INITIAL GENERATION: Create new site
+        // INITIAL GENERATION
         const response = await fetch('/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -115,21 +124,10 @@ export default function UnifiedBuilderPage() {
 
           setMessages(prev => [...prev, assistantMessage])
           setCurrentCode(data.code)
-
-          // Create project
-          const projectResponse = await fetch('/api/projects', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: input.slice(0, 50) || 'New Project',
-              code: data.code,
-              type: 'landing-page'
-            })
-          })
-
-          if (projectResponse.ok) {
-            const projectData = await projectResponse.json()
-            setProjectId(projectData.id)
+          
+          // Set default project name from prompt
+          if (!projectName) {
+            setProjectName(input.slice(0, 50) || 'New Project')
           }
         } else {
           throw new Error(data.error || 'Failed to generate')
@@ -153,7 +151,6 @@ export default function UnifiedBuilderPage() {
       const filesArray = Array.from(e.target.files)
       setUploadedFiles(prev => [...prev, ...filesArray])
       
-      // Add message about uploaded files
       const fileMessage: Message = {
         id: Date.now().toString(),
         role: 'user',
@@ -164,9 +161,116 @@ export default function UnifiedBuilderPage() {
     }
   }
 
-  const handlePublish = () => {
-    if (projectId) {
-      router.push(`/dashboard`)
+  const handleSaveAndPublish = async () => {
+    if (!currentCode) {
+      alert('No code to save. Generate a site first!')
+      return
+    }
+
+    setSaving(true)
+
+    try {
+      if (projectId) {
+        // Update existing project
+        const response = await fetch(`/api/projects/${projectId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: currentCode,
+            name: projectName
+          })
+        })
+
+        if (response.ok) {
+          alert('Project saved successfully!')
+          router.push('/dashboard')
+        } else {
+          throw new Error('Failed to save project')
+        }
+      } else {
+        // Create new project
+        const response = await fetch('/api/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: projectName || 'Chat Builder Project',
+            code: currentCode,
+            type: 'landing-page'
+          })
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setProjectId(data.project.id)
+          alert('Project saved successfully!')
+          router.push('/dashboard')
+        } else {
+          throw new Error('Failed to create project')
+        }
+      }
+    } catch (error: any) {
+      alert(`Failed to save: ${error.message}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDownload = () => {
+    if (!currentCode) return
+    
+    const blob = new Blob([currentCode], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${projectName || 'website'}.html`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleExportToGitHub = async () => {
+    if (!projectId) {
+      alert('Please save your project first!')
+      return
+    }
+    
+    router.push(`/builder?project=${projectId}#export`)
+  }
+
+  const handleDeployToVercel = async () => {
+    if (!projectId) {
+      alert('Please save your project first!')
+      return
+    }
+    
+    router.push(`/builder?project=${projectId}#deploy`)
+  }
+
+  const handleLoadTemplate = (template: typeof templates[0]) => {
+    setShowTemplates(false)
+    setCurrentCode(template.code)
+    setProjectName(template.name)
+    
+    const templateMessage: Message = {
+      id: Date.now().toString(),
+      role: 'assistant',
+      content: `Loaded template: ${template.name}. You can now customize it by chatting with me!`,
+      timestamp: new Date()
+    }
+    setMessages(prev => [...prev, templateMessage])
+  }
+
+  // Helper function for category icons
+  function getCategoryIcon(category: string): string {
+    switch (category.toLowerCase()) {
+      case 'landing-page': return '🚀'
+      case 'dashboard': return '📊'
+      case 'blog': return '📝'
+      case 'portfolio': return '💼'
+      case 'e-commerce': return '🛒'
+      case 'saas': return '⚡'
+      case 'marketing': return '📈'
+      case 'startup': return '🎯'
+      default: return '📄'
     }
   }
 
@@ -176,10 +280,31 @@ export default function UnifiedBuilderPage() {
       <div className="w-1/2 flex flex-col border-r border-gray-200 bg-white">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200">
-          <h1 className="text-2xl font-bold">BuildFlow AI</h1>
-          <p className="text-sm text-gray-600">
-            {currentCode ? 'Chat to iterate on your site' : 'Chat to build your site'}
-          </p>
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h1 className="text-2xl font-bold">BuildFlow AI Chat</h1>
+              <p className="text-sm text-gray-600">
+                {currentCode ? 'Chat to iterate on your site' : 'Chat to build your site'}
+              </p>
+            </div>
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="text-gray-600 hover:text-gray-900"
+            >
+              ← Back
+            </button>
+          </div>
+          
+          {/* Project Name Input */}
+          {currentCode && (
+            <input
+              type="text"
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              placeholder="Project name..."
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          )}
         </div>
 
         {/* Messages */}
@@ -264,7 +389,7 @@ export default function UnifiedBuilderPage() {
           </div>
           
           <div className="mt-3 flex items-center justify-between text-sm">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -280,17 +405,22 @@ export default function UnifiedBuilderPage() {
               >
                 📎 Upload broken code
               </button>
-              <span className="text-gray-400">•</span>
-              <button className="text-gray-600 hover:text-blue-600 transition-colors">
-                🔗 Add URL
+              <span className="text-gray-300">•</span>
+              <button
+                onClick={() => setShowTemplates(!showTemplates)}
+                className="text-gray-600 hover:text-blue-600 transition-colors"
+                disabled={loading}
+              >
+                📋 Templates
               </button>
             </div>
             {currentCode && (
               <button
-                onClick={handlePublish}
-                className="text-blue-600 hover:text-blue-700 font-medium"
+                onClick={handleSaveAndPublish}
+                disabled={saving}
+                className="text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
               >
-                ✓ Save & Publish →
+                {saving ? 'Saving...' : '✓ Save & Publish →'}
               </button>
             )}
           </div>
@@ -300,13 +430,47 @@ export default function UnifiedBuilderPage() {
       {/* Preview Section */}
       <div className="w-1/2 flex flex-col bg-gray-50">
         <div className="px-6 py-4 border-b border-gray-200 bg-white">
-          <h2 className="text-lg font-semibold">Live Preview</h2>
-          {projectId && (
-            <p className="text-sm text-gray-600">Project ID: {projectId}</p>
-          )}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Live Preview</h2>
+              {projectId && (
+                <p className="text-sm text-gray-600">ID: {projectId}</p>
+              )}
+            </div>
+            
+            {/* Action Buttons */}
+            {currentCode && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDownload}
+                  className="px-3 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                  title="Download HTML"
+                >
+                  ⬇️ Download
+                </button>
+                <button
+                  onClick={handleExportToGitHub}
+                  className="px-3 py-2 text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors"
+                  title="Export to GitHub"
+                >
+                  <svg className="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                  </svg>
+                  GitHub
+                </button>
+                <button
+                  onClick={handleDeployToVercel}
+                  className="px-3 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-900 transition-colors"
+                  title="Deploy to Vercel"
+                >
+                  ▲ Vercel
+                </button>
+              </div>
+            )}
+          </div>
         </div>
         
-        <div className="flex-1 p-4">
+        <div className="flex-1 p-4 relative">
           {currentCode ? (
             <iframe
               srcDoc={currentCode}
@@ -330,6 +494,77 @@ export default function UnifiedBuilderPage() {
           )}
         </div>
       </div>
+
+      {/* Template Modal */}
+      {showTemplates && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-6xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold">Start from a Template</h2>
+              <button
+                onClick={() => setShowTemplates(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Category Filter */}
+            <div className="flex flex-wrap gap-2 mb-6">
+              {categories.map((category) => (
+                <button
+                  key={category}
+                  onClick={() => setSelectedCategory(category)}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all capitalize ${
+                    selectedCategory === category
+                      ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {category === 'all' ? '🎨 All' : `${getCategoryIcon(category)} ${category}`}
+                </button>
+              ))}
+            </div>
+            
+            {/* Template Grid */}
+            <div className="grid md:grid-cols-3 gap-4">
+              {filteredTemplates.map(template => (
+                <button
+                  key={template.id}
+                  onClick={() => handleLoadTemplate(template)}
+                  className="p-6 border-2 border-gray-200 rounded-lg hover:border-blue-500 transition-all text-left group"
+                >
+                  <div className="text-4xl mb-3">{getCategoryIcon(template.category)}</div>
+                  <h3 className="font-bold mb-2 group-hover:text-blue-600">{template.name}</h3>
+                  <p className="text-sm text-gray-600 mb-3">{template.description}</p>
+                  <div className="flex flex-wrap gap-1">
+                    {template.tags?.slice(0, 2).map((tag, i) => (
+                      <span
+                        key={i}
+                        className="px-2 py-1 bg-purple-50 text-purple-600 rounded text-xs"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {filteredTemplates.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-gray-600">No templates found in this category</p>
+                <button
+                  onClick={() => setSelectedCategory('all')}
+                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  View All Templates
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
