@@ -55,7 +55,8 @@ export default function AnalyticsPage() {
       setLoading(true)
       setError(null)
 
-      const params = new URLSearchParams({ days: days.toString() })
+      // FIX: Ensure correct API URL with type=site-stats
+      const params = new URLSearchParams({ type: 'site-stats', days: days.toString() })
       if (selectedProject !== 'all') {
         params.append('projectId', selectedProject)
       }
@@ -171,86 +172,106 @@ export default function AnalyticsPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="bg-white rounded-lg border border-gray-200 p-6">
                 <div className="text-sm font-medium text-gray-600 mb-1">Total Events</div>
-                <div className="text-3xl font-bold text-gray-900">{analytics.summary.totalEvents.toLocaleString()}</div>
+                <div className="text-3xl font-bold text-gray-900">
+                  {Number(analytics?.summary?.totalEvents || 0).toLocaleString()}
+                </div>
               </div>
 
               <div className="bg-white rounded-lg border border-gray-200 p-6">
                 <div className="text-sm font-medium text-gray-600 mb-1">Page Views</div>
-                <div className="text-3xl font-bold text-purple-600">{analytics.summary.pageViews.toLocaleString()}</div>
+                <div className="text-3xl font-bold text-purple-600">
+                  {Number(analytics?.summary?.pageViews || 0).toLocaleString()}
+                </div>
               </div>
 
               <div className="bg-white rounded-lg border border-gray-200 p-6">
                 <div className="text-sm font-medium text-gray-600 mb-1">Form Submissions</div>
-                <div className="text-3xl font-bold text-green-600">{analytics.summary.formSubmissions.toLocaleString()}</div>
+                <div className="text-3xl font-bold text-green-600">
+                  {Number(analytics?.summary?.formSubmissions || 0).toLocaleString()}
+                </div>
               </div>
 
               <div className="bg-white rounded-lg border border-gray-200 p-6">
                 <div className="text-sm font-medium text-gray-600 mb-1">Conversion Rate</div>
-                <div className="text-3xl font-bold text-blue-600">{analytics.summary.conversionRate}%</div>
+                <div className="text-3xl font-bold text-blue-600">
+                  {analytics?.summary?.conversionRate || '0'}%
+                </div>
               </div>
             </div>
 
             {/* Events by Day Chart */}
             <div className="bg-white rounded-lg border border-gray-200 p-6">
               <h3 className="text-lg font-bold text-gray-900 mb-4">Activity Over Time</h3>
-              <div className="space-y-2">
-                {analytics.eventsByDay.map((day, index) => (
-                  <div key={index} className="flex items-center gap-4">
-                    <div className="w-24 text-sm text-gray-600">
-                      {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </div>
-                    <div className="flex-1 bg-gray-100 rounded-full h-8 relative overflow-hidden">
-                      <div
-                        className="bg-purple-500 h-full rounded-full flex items-center justify-end px-3"
-                        style={{
-                          width: `${Math.max((day.count / Math.max(...analytics.eventsByDay.map(d => d.count))) * 100, 5)}%`
-                        }}
-                      >
-                        <span className="text-sm font-medium text-white">{day.count}</span>
+              {analytics?.eventsByDay && analytics.eventsByDay.length > 0 ? (
+                <div className="space-y-2">
+                  {analytics.eventsByDay.map((day, index) => (
+                    <div key={index} className="flex items-center gap-4">
+                      <div className="w-24 text-sm text-gray-600">
+                        {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </div>
+                      <div className="flex-1 bg-gray-100 rounded-full h-8 relative overflow-hidden">
+                        <div
+                          className="bg-purple-500 h-full rounded-full flex items-center justify-end px-3"
+                          style={{
+                            width: `${Math.max((day.count / Math.max(...analytics.eventsByDay.map(d => d.count))) * 100, 5)}%`
+                          }}
+                        >
+                          <span className="text-sm font-medium text-white">{day.count}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-center py-8">No activity data yet</p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Top Events */}
               <div className="bg-white rounded-lg border border-gray-200 p-6">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Top Events</h3>
-                <div className="space-y-3">
-                  {analytics.topEvents.map((event, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-medium text-sm">
-                          {index + 1}
+                {analytics?.topEvents && analytics.topEvents.length > 0 ? (
+                  <div className="space-y-3">
+                    {analytics.topEvents.map((event, index) => (
+                      <div key={index} className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-medium text-sm">
+                            {index + 1}
+                          </div>
+                          <span className="text-gray-900 font-medium">{event.event}</span>
                         </div>
-                        <span className="text-gray-900 font-medium">{event.event}</span>
+                        <span className="text-gray-600 font-medium">{event.count}</span>
                       </div>
-                      <span className="text-gray-600 font-medium">{event.count}</span>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-8">No events yet</p>
+                )}
               </div>
 
               {/* Traffic Sources */}
               <div className="bg-white rounded-lg border border-gray-200 p-6">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Traffic Sources</h3>
-                <div className="space-y-3">
-                  {analytics.topReferrers.map((referrer, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center text-green-600 font-medium text-sm">
-                          {index + 1}
+                {analytics?.topReferrers && analytics.topReferrers.length > 0 ? (
+                  <div className="space-y-3">
+                    {analytics.topReferrers.map((referrer, index) => (
+                      <div key={index} className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center text-green-600 font-medium text-sm">
+                            {index + 1}
+                          </div>
+                          <span className="text-gray-900 font-medium truncate max-w-[200px]">
+                            {referrer.source}
+                          </span>
                         </div>
-                        <span className="text-gray-900 font-medium truncate max-w-[200px]">
-                          {referrer.source}
-                        </span>
+                        <span className="text-gray-600 font-medium">{referrer.count}</span>
                       </div>
-                      <span className="text-gray-600 font-medium">{referrer.count}</span>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-8">No traffic sources yet</p>
+                )}
               </div>
             </div>
           </div>
