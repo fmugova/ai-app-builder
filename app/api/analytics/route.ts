@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -23,11 +24,11 @@ export async function GET(request: NextRequest) {
     }
     
     const { searchParams } = new URL(request.url)
-    const type = searchParams.get('type') || 'dashboard' // 'dashboard' or 'site-stats'
+    const type = searchParams.get('type') || 'dashboard'
     const projectId = searchParams.get('projectId')
     const days = parseInt(searchParams.get('days') || '30')
     
-    // DASHBOARD STATS (for homepage)
+    // DASHBOARD STATS
     if (type === 'dashboard') {
       const projectCount = await prisma.project.count({
         where: { userId: user.id }
@@ -63,7 +64,7 @@ export async function GET(request: NextRequest) {
       })
     }
     
-    // SITE TRAFFIC ANALYTICS (for analytics page)
+    // SITE TRAFFIC ANALYTICS
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
     
@@ -100,19 +101,37 @@ export async function GET(request: NextRequest) {
       }
     })
     
-    // Get events by day
-    const eventsByDay = await prisma.$queryRaw<Array<{date: Date, count: bigint}>>`
-      SELECT 
-        DATE("createdAt") as date,
-        COUNT(*) as count
-      FROM "AnalyticsEvent"
-      WHERE "userId" = ${user.id}
-        AND "createdAt" >= ${startDate}
-        ${projectId ? prisma.$queryRawUnsafe(`AND properties->>'projectId' = '${projectId}'`) : prisma.$queryRawUnsafe('')}
-      GROUP BY DATE("createdAt")
-      ORDER BY date DESC
-      LIMIT 30
-    `
+    // Get events by day - FIXED QUERY
+    let eventsByDay: Array<{date: Date, count: number}> = []
+    
+    if (projectId) {
+      // Query with projectId filter
+      eventsByDay = await prisma.$queryRaw<Array<{date: Date, count: bigint}>>`
+        SELECT 
+          DATE("createdAt") as date,
+          COUNT(*) as count
+        FROM "AnalyticsEvent"
+        WHERE "userId" = ${user.id}
+          AND "createdAt" >= ${startDate}
+          AND properties->>'projectId' = ${projectId}
+        GROUP BY DATE("createdAt")
+        ORDER BY date DESC
+        LIMIT 30
+      `.then(results => results.map(r => ({ date: r.date, count: Number(r.count) })))
+    } else {
+      // Query without projectId filter
+      eventsByDay = await prisma.$queryRaw<Array<{date: Date, count: bigint}>>`
+        SELECT 
+          DATE("createdAt") as date,
+          COUNT(*) as count
+        FROM "AnalyticsEvent"
+        WHERE "userId" = ${user.id}
+          AND "createdAt" >= ${startDate}
+        GROUP BY DATE("createdAt")
+        ORDER BY date DESC
+        LIMIT 30
+      `.then(results => results.map(r => ({ date: r.date, count: Number(r.count) })))
+    }
     
     // Get top events
     const topEvents = await prisma.analyticsEvent.groupBy({
@@ -139,11 +158,25 @@ export async function GET(request: NextRequest) {
       take: 1000
     })
     
+    // Process referrers
     const referrerCounts: Record<string, number> = {}
     events.forEach(event => {
-      const referrer = (event.properties as any)?.referrer || 'Direct'
-      const domain = referrer === 'Direct' ? 'Direct' : new URL(referrer).hostname
-      referrerCounts[domain] = (referrerCounts[domain] || 0) + 1
+      try {
+        const referrer = (event.properties as any)?.referrer || 'Direct'
+        let domain = 'Direct'
+        
+        if (referrer !== 'Direct' && referrer) {
+          try {
+            domain = new URL(referrer).hostname
+          } catch {
+            domain = referrer.substring(0, 50) // Truncate invalid URLs
+          }
+        }
+        
+        referrerCounts[domain] = (referrerCounts[domain] || 0) + 1
+      } catch (err) {
+        // Skip invalid entries
+      }
     })
     
     const topReferrers = Object.entries(referrerCounts)
@@ -158,10 +191,7 @@ export async function GET(request: NextRequest) {
         formSubmissions,
         conversionRate: pageViews > 0 ? ((formSubmissions / pageViews) * 100).toFixed(2) : '0'
       },
-      eventsByDay: eventsByDay.map(row => ({
-        date: row.date,
-        count: Number(row.count)
-      })),
+      eventsByDay,
       topEvents: topEvents.map(e => ({
         event: e.event,
         count: e._count
@@ -172,7 +202,10 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Analytics API error:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch analytics' },
+      { 
+        error: 'Failed to fetch analytics',
+        message: error.message 
+      },
       { status: 500 }
     )
   }
