@@ -386,15 +386,19 @@ USER REQUEST: "${prompt}"`;
     })
 
     // --- CREATE PROJECT IN DB ---
-    // If you already create a project in DB, use that project object.
-    // If not, you need to create it here to get the project.id.
-    // Example:
-    // const project = await prisma.project.create({ ... });
-    // For this snippet, let's assume you have a `project` object with an `id` property.
+    // Create a new project in the database and get its id.
+    const project = await prisma.project.create({
+      data: {
+        userId: user.id,
+        name: prompt.substring(0, 50) || 'Untitled Project',
+        type: type || 'landing-page',
+        code: code, // Add the generated code as required by the schema
+        // Add other fields as needed
+      }
+    });
 
     // --- INJECT ACTUAL SITE ID ---
     // Replace SITE_ID_PLACEHOLDER with the actual project id
-    // If you have a project object, do this:
     code = code.replace('SITE_ID_PLACEHOLDER', project.id);
 
     return NextResponse.json({ code })

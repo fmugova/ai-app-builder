@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     try {
       await resend.emails.send({
         from: 'BuildFlow AI <noreply@buildflow-ai.app>',
-        to: project.user.email,
+        to: project.User.email,
         subject: `New contact form submission from ${project.name}`,
         html: `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
