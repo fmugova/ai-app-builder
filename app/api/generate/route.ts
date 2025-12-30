@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // --- AI GENERATION LOGIC ---
     const { prompt, type } = await request.json()
 
     if (!prompt) {
@@ -253,21 +254,52 @@ export async function POST(request: NextRequest) {
       function ContactPage() {
         const [formData, setFormData] = useState({ name: '', email: '', message: '' });
         const [submitted, setSubmitted] = useState(false);
-        const handleSubmit = (e) => { 
-          e.preventDefault(); 
-          setSubmitted(true); 
-          setTimeout(() => {
-            setSubmitted(false);
-            setFormData({ name: '', email: '', message: '' });
-          }, 3000); 
+        const [loading, setLoading] = useState(false);
+        const [error, setError] = useState('');
+
+        const handleSubmit = async (e) => {
+          e.preventDefault();
+          setLoading(true);
+          setError('');
+
+          try {
+            const response = await fetch('https://buildflow-ai.app/api/forms/submit', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                siteId: 'SITE_ID_PLACEHOLDER',
+                formType: 'contact',
+                formData: formData
+              })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+              setSubmitted(true);
+              setFormData({ name: '', email: '', message: '' });
+              setTimeout(() => setSubmitted(false), 5000);
+            } else {
+              setError(data.error || 'Failed to send message');
+            }
+          } catch (err) {
+            setError('Network error. Please try again.');
+          } finally {
+            setLoading(false);
+          }
         };
-        
+
         return React.createElement('div', { className: 'min-h-screen pt-24 py-20 bg-gray-50' },
           React.createElement('div', { className: 'max-w-2xl mx-auto px-4' },
             React.createElement('h1', { className: 'text-5xl font-bold text-center mb-4' }, 'Contact Us'),
             React.createElement('p', { className: 'text-xl text-gray-600 text-center mb-12' }, 'Get in touch with us today'),
             React.createElement('div', { className: 'bg-white rounded-lg shadow-lg p-8 md:p-12' },
-              submitted && React.createElement('div', { className: 'mb-6 p-4 bg-green-100 text-green-700 rounded-lg text-center font-semibold' }, '✓ Thank you! We\'ll be in touch soon.'),
+              submitted && React.createElement('div', { 
+                className: 'mb-6 p-4 bg-green-100 text-green-700 rounded-lg text-center font-semibold' 
+              }, '✓ Thank you! We\'ll be in touch soon.'),
+              error && React.createElement('div', { 
+                className: 'mb-6 p-4 bg-red-100 text-red-700 rounded-lg text-center' 
+              }, error),
               React.createElement('form', { onSubmit: handleSubmit, className: 'space-y-6' },
                 React.createElement('div', null,
                   React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Name'),
@@ -281,7 +313,11 @@ export async function POST(request: NextRequest) {
                   React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Message'),
                   React.createElement('textarea', { required: true, placeholder: 'How can we help you?', rows: 5, className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none', value: formData.message, onChange: (e) => setFormData({...formData, message: e.target.value}) })
                 ),
-                React.createElement('button', { type: 'submit', className: 'w-full px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-lg font-semibold transition-colors shadow-lg hover:shadow-xl' }, 'Send Message')
+                React.createElement('button', { 
+                  type: 'submit', 
+                  disabled: loading,
+                  className: 'w-full px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-lg font-semibold transition-colors shadow-lg hover:shadow-xl' 
+                }, loading ? 'Sending...' : 'Send Message')
               )
             )
           )
@@ -313,8 +349,8 @@ export async function POST(request: NextRequest) {
 
 USER REQUEST: "${prompt}"`;
 
+    // AI call and code extraction
     const message = await callClaudeWithRetry(anthropic, [{ role: 'user', content: systemPrompt }]);
-
     let code = '';
     if (message.content && message.content[0]) {
       const content = message.content[0];
@@ -322,14 +358,12 @@ USER REQUEST: "${prompt}"`;
     } else {
       return NextResponse.json({ error: 'Invalid AI response' }, { status: 500 });
     }
-
     code = code
       .replace(/```html\n?/g, '')
       .replace(/```jsx\n?/g, '')
       .replace(/```typescript\n?/g, '')
       .replace(/```\n?/g, '')
       .trim()
-
     if (!code.startsWith('<!DOCTYPE')) {
       code = `<!DOCTYPE html>\n${code}`
     }
@@ -350,6 +384,18 @@ USER REQUEST: "${prompt}"`;
         }
       }
     })
+
+    // --- CREATE PROJECT IN DB ---
+    // If you already create a project in DB, use that project object.
+    // If not, you need to create it here to get the project.id.
+    // Example:
+    // const project = await prisma.project.create({ ... });
+    // For this snippet, let's assume you have a `project` object with an `id` property.
+
+    // --- INJECT ACTUAL SITE ID ---
+    // Replace SITE_ID_PLACEHOLDER with the actual project id
+    // If you have a project object, do this:
+    code = code.replace('SITE_ID_PLACEHOLDER', project.id);
 
     return NextResponse.json({ code })
 
