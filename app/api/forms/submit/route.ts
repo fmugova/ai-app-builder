@@ -15,10 +15,13 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // Find project
+    // Find project and get userId
     const project = await prisma.project.findUnique({
       where: { id: siteId },
-      include: { User: true }
+      select: { 
+        id: true,
+        userId: true  // ✅ Get the project owner's userId
+      }
     })
     
     if (!project) {
@@ -28,12 +31,12 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // Store submission with correct field names
+    // Store submission with userId
     const submission = await prisma.formSubmission.create({
       data: {
-        projectId: siteId,    // ← Changed from siteId
-        userId: project.userId,
-        type: formType || 'contact',  // ← Changed from formType
+        projectId: siteId,
+        userId: project.userId,  // ✅ Add userId from project owner
+        type: formType || 'contact',
         data: formData,
       }
     })

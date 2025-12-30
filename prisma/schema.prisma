@@ -83,6 +83,7 @@ model User {
   dripEnrollments       DripEnrollment[]
   createdCampaigns      EmailCampaign[]        @relation("CreatedCampaigns")
   feedback              Feedback[]
+  formSubmissions       FormSubmission[]
   generations           Generation[]
   newsletterSubscribers NewsletterSubscriber[]
   projects              Project[]
@@ -91,7 +92,6 @@ model User {
   sessions              Session[]
   subscriptions         Subscription?
   vercelConnection      VercelConnection?
-  formSubmissions       FormSubmission[]
 }
 
 model VercelConnection {
@@ -248,31 +248,31 @@ model DripEnrollment {
 }
 
 model Project {
-  id              String           @id @default(cuid())
-  userId          String
-  name            String
-  description     String?
-  type            String
-  code            String
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @default(now()) @updatedAt
-  downloads       Int              @default(0)
-  framework       String?
-  isPublic        Boolean          @default(false)
-  isPublished     Boolean          @default(false)
-  publishedAt     DateTime?
-  publicSlug      String?          @unique
-  publicUrl       String?
-  language        String?
-  prompt          String?
-  shareToken      String?          @unique
-  tags            String[]         @default([])
-  views           Int              @default(0)
-  deployments     Deployment[]
-  User            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ProjectShare    ProjectShare[]
-  ProjectVersion  ProjectVersion[]
-  formSubmissions FormSubmission[]
+  id             String           @id @default(cuid())
+  userId         String
+  name           String
+  description    String?
+  type           String
+  code           String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  downloads      Int              @default(0)
+  framework      String?
+  isPublic       Boolean          @default(false)
+  isPublished    Boolean          @default(false)
+  publishedAt    DateTime?
+  publicSlug     String?          @unique
+  publicUrl      String?
+  language       String?
+  prompt         String?
+  shareToken     String?          @unique
+  tags           String[]         @default([])
+  views          Int              @default(0)
+  deployments    Deployment[]
+  FormSubmission FormSubmission[]
+  User           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ProjectShare   ProjectShare[]
+  ProjectVersion ProjectVersion[]
 
   @@index([isPublic])
   @@index([isPublished])
@@ -408,17 +408,17 @@ model AnalyticsEvent {
 
 model FormSubmission {
   id          String   @id @default(cuid())
-  projectId   String
+  siteId      String
   userId      String
-  type        String
+  formType    String
   data        Json
   submittedAt DateTime @default(now())
-  read        Boolean  @default(false)
+  userEmail   String?
+  status      String   @default("new")
+  Project     Project  @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  User        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  Project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  User    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([projectId])
-  @@index([userId])
+  @@index([siteId, submittedAt(sort: Desc)])
+  @@index([userId, submittedAt(sort: Desc)])
   @@map("FormSubmission")
 }
