@@ -14,6 +14,13 @@ export function DashboardMobileMenu() {
     setIsOpen(false);
   };
 
+  // Hash navigation handler for mobile browsers
+  const handleNavClick = (e: React.MouseEvent, to: string) => {
+    e.preventDefault();
+    window.location.hash = to === '/' ? '' : to;
+    setIsOpen(false);
+  };
+
   return (
     <>
       {/* Hamburger Button */}
@@ -50,7 +57,7 @@ export function DashboardMobileMenu() {
             <nav className="space-y-2">
               {/* New Project */}
               <button 
-                onClick={() => handleAction(() => router.push('/builder'))}
+                onClick={(e) => handleNavClick(e, '/builder')}
                 className="w-full flex items-center gap-3 p-3 rounded-lg bg-purple-600 hover:bg-purple-700 transition text-left text-white font-medium"
               >
                 <Plus className="w-5 h-5" />
@@ -63,21 +70,21 @@ export function DashboardMobileMenu() {
               <div className="mb-6">
                 <p className="text-xs text-gray-400 uppercase mb-2">Navigation</p>
                 <button 
-                  onClick={() => handleAction(() => router.push('/dashboard'))}
+                  onClick={(e) => handleNavClick(e, '/dashboard')}
                   className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition text-left text-white"
                 >
                   <Home className="w-5 h-5" />
                   <span>Dashboard</span>
                 </button>
                 <button 
-                  onClick={() => handleAction(() => router.push('/projects'))}
+                  onClick={(e) => handleNavClick(e, '/projects')}
                   className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition text-left text-white"
                 >
                   <FolderOpen className="w-5 h-5" />
                   <span>My Projects</span>
                 </button>
                 <button 
-                  onClick={() => handleAction(() => router.push('/settings'))}
+                  onClick={(e) => handleNavClick(e, '/settings')}
                   className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition text-left text-white"
                 >
                   <Settings className="w-5 h-5" />
@@ -93,7 +100,7 @@ export function DashboardMobileMenu() {
                 <a 
                   href="/contact"
                   className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition text-left text-blue-400"
-                  onClick={() => setIsOpen(false)}
+                  onClick={(e) => handleNavClick(e, '/contact')}
                 >
                   <Mail className="w-5 h-5" />
                   <span>Contact Support</span>
