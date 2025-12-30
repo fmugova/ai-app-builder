@@ -248,30 +248,30 @@ model DripEnrollment {
 }
 
 model Project {
-  id             String           @id @default(cuid())
-  userId         String
-  name           String
-  description    String?
-  type           String
-  code           String
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  downloads      Int              @default(0)
-  framework      String?
-  isPublic       Boolean          @default(false)
-  isPublished    Boolean          @default(false)
-  publishedAt    DateTime?
-  publicSlug     String?          @unique
-  publicUrl      String?
-  language       String?
-  prompt         String?
-  shareToken     String?          @unique
-  tags           String[]         @default([])
-  views          Int              @default(0)
-  deployments    Deployment[]
-  User           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ProjectShare   ProjectShare[]
-  ProjectVersion ProjectVersion[]
+  id              String           @id @default(cuid())
+  userId          String
+  name            String
+  description     String?
+  type            String
+  code            String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @default(now()) @updatedAt
+  downloads       Int              @default(0)
+  framework       String?
+  isPublic        Boolean          @default(false)
+  isPublished     Boolean          @default(false)
+  publishedAt     DateTime?
+  publicSlug      String?          @unique
+  publicUrl       String?
+  language        String?
+  prompt          String?
+  shareToken      String?          @unique
+  tags            String[]         @default([])
+  views           Int              @default(0)
+  deployments     Deployment[]
+  User            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ProjectShare    ProjectShare[]
+  ProjectVersion  ProjectVersion[]
   formSubmissions FormSubmission[]
 
   @@index([isPublic])
@@ -408,19 +408,17 @@ model AnalyticsEvent {
 
 model FormSubmission {
   id          String   @id @default(cuid())
-  siteId      String
+  projectId   String
   userId      String
-
-  formType    String
+  type        String
   data        Json
-
   submittedAt DateTime @default(now())
-  userEmail   String?
-  status      String   @default("new")
+  read        Boolean  @default(false)
 
-  site        Project  @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  User    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([siteId, submittedAt(sort: Desc)])
-  @@index([userId, submittedAt(sort: Desc)])
+  @@index([projectId])
+  @@index([userId])
+  @@map("FormSubmission")
 }
