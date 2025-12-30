@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       where: { id: siteId },
       select: { 
         id: true,
-        userId: true  // ✅ Get the project owner's userId
+        userId: true
       }
     })
     
@@ -31,13 +31,17 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // Store submission with userId
+    // ✅ Use relation syntax with connect
     const submission = await prisma.formSubmission.create({
       data: {
-        projectId: siteId,
-        userId: project.userId,  // ✅ Add userId from project owner
-        type: formType || 'contact',
         data: formData,
+        formType: formType,
+        Project: {
+          connect: { id: siteId }
+        },
+        User: {
+          connect: { id: project.userId }
+        }
       }
     })
     
