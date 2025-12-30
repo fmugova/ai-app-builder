@@ -225,11 +225,18 @@ export default function ChatBuilderPage() {
     try {
       if (projectId) {
         // Update existing project
+        // If code still contains SITE_ID_PLACEHOLDER, replace it with projectId
+        let codeToSave = currentCode;
+        if (currentCode.includes('SITE_ID_PLACEHOLDER')) {
+          codeToSave = currentCode.replace('SITE_ID_PLACEHOLDER', projectId);
+          setCurrentCode(codeToSave);
+        }
+
         const response = await fetch(`/api/projects/${projectId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            code: currentCode,
+            code: codeToSave,
             name: projectName
           })
         })

@@ -21,7 +21,15 @@ export default function SubmissionsPage() {
   
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8">Form Submissions</h1>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-3xl font-bold">Form Submissions</h1>
+        <button
+          onClick={() => router.push('/dashboard')}
+          className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition"
+        >
+          ← Back to Dashboard
+        </button>
+      </div>
       
       {submissions.length === 0 ? (
         <div className="text-center py-12 bg-gray-50 rounded-lg">
