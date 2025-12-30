@@ -177,13 +177,7 @@ export default function DashboardClient({
             BuildFlow
           </a>
           <div className="flex items-center gap-3">
-            {/* Add Form Submissions link */}
-            <Link
-              href="/dashboard/submissions"
-              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition text-sm font-medium"
-            >
-              Form Submissions
-            </Link>
+            {/* ...existing code... */}
             {/* Theme Toggle */}
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
@@ -301,17 +295,15 @@ export default function DashboardClient({
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Builder Navigation Cards */}
         <div className="grid grid-cols-2 gap-4 mb-8">
-          {/* Existing Builder */}
           <Link href="/builder">
-            <div className="p-6 border rounded-lg hover:shadow transition bg-white dark:bg-gray-800 dark:border-gray-700">
+            <div className="p-6 border rounded-lg hover:shadow transition bg-white dark:bg-gray-800">
               <h3 className="font-bold">Traditional Builder</h3>
               <p className="text-sm text-gray-600 dark:text-gray-300">Your current workflow</p>
             </div>
           </Link>
 
-          {/* New Chat Builder */}
           <Link href="/chatbuilder">
-            <div className="p-6 border rounded-lg bg-blue-50 dark:bg-blue-900/30 hover:shadow transition dark:border-blue-700">
+            <div className="p-6 border rounded-lg bg-blue-50 dark:bg-blue-900/30 hover:shadow transition">
               <h3 className="font-bold">Chat Builder 🆕</h3>
               <p className="text-sm text-blue-600 dark:text-blue-200">Upload files • Iterate with AI</p>
             </div>
@@ -475,33 +467,6 @@ export default function DashboardClient({
               <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Email support</p>
             </div>
           </button>
-        </div>
-
-        {/* Builder Navigation Section */}
-        <div className="grid grid-cols-2 gap-4 mb-8">
-          {/* Existing Builder */}
-          <Link href="/builder">
-            <div className="p-6 border rounded-lg">
-              <h3 className="font-bold">Traditional Builder</h3>
-              <p className="text-sm text-gray-600">Your current workflow</p>
-            </div>
-          </Link>
-
-          {/* New Chat Builder */}
-          <Link href="/chatbuilder">
-            <div className="p-6 border rounded-lg bg-blue-50">
-              <h3 className="font-bold">Chat Builder 🆕</h3>
-              <p className="text-sm text-blue-600">Upload files • Iterate with AI</p>
-            </div>
-          </Link>
-
-          {/* Form Submissions */}
-          <Link href="/dashboard/submissions">
-            <div className="p-6 border rounded-lg bg-green-50">
-              <h3 className="font-bold">Form Submissions</h3>
-              <p className="text-sm text-green-600">View all form entries</p>
-            </div>
-          </Link>
         </div>
 
         {/* Projects Section */}

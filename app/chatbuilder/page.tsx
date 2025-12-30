@@ -34,6 +34,39 @@ export default function ChatBuilderPage() {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [showTemplates, setShowTemplates] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('all')
+
+  // Load project from URL parameter
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const projectId = urlParams.get('project')
+    if (projectId) {
+      loadProject(projectId)
+    }
+  }, [])
+
+  const loadProject = async (projectId: string) => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}`)
+      const data = await res.json()
+
+      if (data.code) {
+        setProjectId(projectId)
+        setProjectName(data.name || 'Untitled Project')
+        setCurrentCode(data.code)
+
+        const loadMessage: Message = {
+          id: Date.now().toString(),
+          role: 'system',
+          content: `✅ Loaded: ${data.name}. Ready to iterate!`,
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, loadMessage])
+      }
+    } catch (err) {
+      console.error('Failed to load project:', err)
+      alert('Failed to load project')
+    }
+  }
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)

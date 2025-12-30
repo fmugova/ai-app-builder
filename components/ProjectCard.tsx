@@ -240,17 +240,13 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
                     onClick={() => setMenuOpen(false)}
                   />
                   <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-20">
-                    <button
-                      onClick={() => {
-                        window.open(`/builder?project=${project.id}`, '_self');
-                        setMenuOpen(false);
-                      }}
+                    <a
+                      href={`/chatbuilder?project=${project.id}`}
                       className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition"
-                      type="button"
                     >
                       <Edit3 className="w-4 h-4" />
                       Edit Project
-                    </button>
+                    </a>
                     <button
                       onClick={() => {
                         handleExport('github');
@@ -316,15 +312,15 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
               Preview
             </button>
 
-            <button
-              onClick={() => window.open(`/builder?project=${project.id}`, '_self')}
+            {/* ✅ NEW - Goes to chat builder with AI iteration */}
+            <a
+              href={`/chatbuilder?project=${project.id}`}
               className="flex items-center justify-center gap-2 px-3 py-2 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition text-sm font-medium"
               title="Edit project code"
-              type="button"
             >
               <Code className="w-4 h-4" />
               Code
-            </button>
+            </a>
 
             <button
               onClick={() => {
