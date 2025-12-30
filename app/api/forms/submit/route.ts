@@ -110,6 +110,5 @@ export async function OPTIONS(request: NextRequest) {
       'Access-Control-Allow-Headers': 'Content-Type',
     },
   });
-}
 
-// No changes needed. All schema fields are handled correctly.
+}

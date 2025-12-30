@@ -1,19 +1,11 @@
+// Deprecated: Use functions from '@/lib/sanitizeCode' instead.
+// Keep lightweight adapters to avoid breaking imports while reducing duplication.
+import { sanitizeCode } from './sanitizeCode'
+
 export function sanitizeReactCode(code: string): string {
-  // Remove 'use client' directive for preview
-  let sanitized = code.replace(/^['"]use client['"]\s*;?\s*/gm, '');
-  
-  // Remove 'use server' directive
-  sanitized = sanitized.replace(/^['"]use server['"]\s*;?\s*/gm, '');
-  
-  // Ensure proper JSX syntax
-  sanitized = sanitized.trim();
-  
-  return sanitized;
+  return sanitizeCode(code)
 }
 
 export function prepareCodeForPreview(code: string, type: string): string {
-  if (type === 'react' || type === 'nextjs') {
-    return sanitizeReactCode(code);
-  }
-  return code;
+  return sanitizeCode(code)
 }

@@ -9,7 +9,7 @@ export function DashboardMobileMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
 
-  // Add explicit hash navigation handler
+  // Hash navigation handler for mobile browsers
   const handleNavClick = (e: React.MouseEvent, to: string) => {
     e.preventDefault();
     window.location.hash = to === '/' ? '' : to;
@@ -57,7 +57,7 @@ export function DashboardMobileMenu() {
             <nav className="space-y-2">
               {/* New Project */}
               <button 
-                onClick={() => handleAction(() => router.push('/builder'))}
+                onClick={(e) => handleNavClick(e, '/builder')}
                 className="w-full flex items-center gap-3 p-3 rounded-lg bg-purple-600 hover:bg-purple-700 transition text-left text-white font-medium"
               >
                 <Plus className="w-5 h-5" />
