@@ -71,6 +71,18 @@ export default function DashboardClient({
   // Account menu state
   const [showAccountMenu, setShowAccountMenu] = useState(false)
 
+  // Log dashboard analytics event on mount
+  useEffect(() => {
+    fetch('/api/analytics?type=dashboard').catch(() => {})
+  }, [])
+
+  // Analytics fetch for analytics page
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.pathname === '/dashboard/analytics') {
+      fetch('/api/analytics?type=site-stats&days=30&projectId=abc123').catch(() => {})
+    }
+  }, [])
+
   // Load dark mode preference from localStorage
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme')
@@ -184,6 +196,12 @@ export default function DashboardClient({
             >
               Forms Submissions
             </a>
+            <Link 
+              href="/dashboard/analytics"
+              className="px-4 py-2 text-gray-700 hover:text-gray-900 font-medium flex items-center gap-2"
+            >
+              📊 Analytics
+            </Link>
             {/* Theme Toggle */}
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}

@@ -4,6 +4,7 @@ import Anthropic from "@anthropic-ai/sdk"
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { checkRateLimit, rateLimits } from '@/lib/rateLimit'
+import { getAnalyticsScript } from '@/lib/analytics-script'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +31,15 @@ async function callClaudeWithRetry(anthropic: Anthropic, messages: any[], maxRet
     }
   }
   throw new Error('Max retries exceeded');
+}
+
+// Helper to inject analytics script
+function injectAnalytics(code: string, projectId: string): string {
+  const analyticsScript = getAnalyticsScript(projectId)
+  if (code.includes('</body>')) {
+    return code.replace('</body>', `${analyticsScript}\n</body>`)
+  }
+  return code + '\n' + analyticsScript
 }
 
 export async function POST(request: NextRequest) {
@@ -453,8 +463,13 @@ Generate the complete HTML now:`;
       }
     })
 
+    // Inject analytics script if you have a projectId (replace with actual projectId if available)
+    // Example: const codeWithAnalytics = injectAnalytics(code, project.id)
+    // For now, if you have no projectId, you can skip or use a placeholder
+    // const codeWithAnalytics = injectAnalytics(code, 'PROJECT_ID_PLACEHOLDER')
+
     console.log('Generation successful, code length:', code.length)
-    return NextResponse.json({ code })
+    return NextResponse.json({ code /* or codeWithAnalytics if you use it */ })
 
   } catch (error: any) {
     console.error('Generate error:', error)
