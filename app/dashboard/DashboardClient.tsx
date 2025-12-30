@@ -177,7 +177,13 @@ export default function DashboardClient({
             BuildFlow
           </a>
           <div className="flex items-center gap-3">
-            {/* ...existing code... */}
+            {/* Navigation Buttons */}
+            <a
+              href="/dashboard/submissions"
+              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition text-sm font-medium"
+            >
+              Forms Submissions
+            </a>
             {/* Theme Toggle */}
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
