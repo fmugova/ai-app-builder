@@ -4,13 +4,15 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 
+// ✅ FIXED INTERFACE - matches Prisma schema
 interface Submission {
   id: string
-  siteId: string
-  formType: string
+  projectId: string      // ← Changed from siteId
+  userId: string
+  type: string          // ← Changed from formType
   data: any
-  userEmail: string
-  createdAt: string
+  submittedAt: string   // ← Changed from createdAt
+  read: boolean
   Project: {
     id: string
     name: string
@@ -141,11 +143,11 @@ export default function SubmissionsPage() {
                       {submission.Project?.name || 'Unknown Project'}
                     </h3>
                     <p className="text-sm text-gray-500">
-                      {new Date(submission.createdAt).toLocaleString()}
+                      {new Date(submission.submittedAt).toLocaleString()}
                     </p>
                   </div>
                   <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                    {submission.formType}
+                    {submission.type}
                   </span>
                 </div>
 
