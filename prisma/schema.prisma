@@ -91,6 +91,7 @@ model User {
   sessions              Session[]
   subscriptions         Subscription?
   vercelConnection      VercelConnection?
+  formSubmissions       FormSubmission[]
 }
 
 model VercelConnection {
@@ -271,6 +272,7 @@ model Project {
   User           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   ProjectShare   ProjectShare[]
   ProjectVersion ProjectVersion[]
+  formSubmissions FormSubmission[]
 
   @@index([isPublic])
   @@index([isPublished])
@@ -402,4 +404,23 @@ model AnalyticsEvent {
   @@index([createdAt])
   @@index([event])
   @@index([userId])
+}
+
+model FormSubmission {
+  id          String   @id @default(cuid())
+  siteId      String
+  userId      String
+
+  formType    String
+  data        Json
+
+  submittedAt DateTime @default(now())
+  userEmail   String?
+  status      String   @default("new")
+
+  site        Project  @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([siteId, submittedAt(sort: Desc)])
+  @@index([userId, submittedAt(sort: Desc)])
 }

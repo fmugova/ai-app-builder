@@ -253,35 +253,98 @@ export async function POST(request: NextRequest) {
       function ContactPage() {
         const [formData, setFormData] = useState({ name: '', email: '', message: '' });
         const [submitted, setSubmitted] = useState(false);
-        const handleSubmit = (e) => { 
-          e.preventDefault(); 
-          setSubmitted(true); 
-          setTimeout(() => {
-            setSubmitted(false);
-            setFormData({ name: '', email: '', message: '' });
-          }, 3000); 
+        const [loading, setLoading] = useState(false);
+        const [error, setError] = useState('');
+
+        const handleChange = (e) => {
+          setFormData({ ...formData, [e.target.name]: e.target.value });
         };
-        
+
+        const handleSubmit = async (e) => {
+          e.preventDefault();
+          setLoading(true);
+          setError('');
+
+          try {
+            const response = await fetch('https://buildflow-ai.app/api/forms/submit', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                siteId: 'SITE_ID_PLACEHOLDER',
+                formType: 'contact',
+                formData: formData
+              })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+              setSubmitted(true);
+              setFormData({ name: '', email: '', message: '' });
+              setTimeout(() => setSubmitted(false), 5000);
+            } else {
+              setError(data.error || 'Failed to send message');
+            }
+          } catch (err) {
+            setError('Network error. Please try again.');
+          } finally {
+            setLoading(false);
+          }
+        };
+
         return React.createElement('div', { className: 'min-h-screen pt-24 py-20 bg-gray-50' },
           React.createElement('div', { className: 'max-w-2xl mx-auto px-4' },
             React.createElement('h1', { className: 'text-5xl font-bold text-center mb-4' }, 'Contact Us'),
             React.createElement('p', { className: 'text-xl text-gray-600 text-center mb-12' }, 'Get in touch with us today'),
             React.createElement('div', { className: 'bg-white rounded-lg shadow-lg p-8 md:p-12' },
-              submitted && React.createElement('div', { className: 'mb-6 p-4 bg-green-100 text-green-700 rounded-lg text-center font-semibold' }, '✓ Thank you! We\'ll be in touch soon.'),
+              submitted && React.createElement('div', {
+                className: 'mb-6 p-4 bg-green-100 text-green-700 rounded-lg text-center font-semibold'
+              }, '✓ Thank you! We\'ll be in touch soon.'),
+              error && React.createElement('div', {
+                className: 'mb-6 p-4 bg-red-100 text-red-700 rounded-lg text-center'
+              }, error),
               React.createElement('form', { onSubmit: handleSubmit, className: 'space-y-6' },
                 React.createElement('div', null,
-                  React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Name'),
-                  React.createElement('input', { type: 'text', required: true, placeholder: 'Your name', className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent', value: formData.name, onChange: (e) => setFormData({...formData, name: e.target.value}) })
+                  React.createElement('label', { htmlFor: 'name', className: 'block text-lg font-medium mb-2' }, 'Name'),
+                  React.createElement('input', {
+                    type: 'text',
+                    id: 'name',
+                    name: 'name',
+                    value: formData.name,
+                    onChange: handleChange,
+                    required: true,
+                    className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg'
+                  })
                 ),
                 React.createElement('div', null,
-                  React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Email'),
-                  React.createElement('input', { type: 'email', required: true, placeholder: 'your@email.com', className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent', value: formData.email, onChange: (e) => setFormData({...formData, email: e.target.value}) })
+                  React.createElement('label', { htmlFor: 'email', className: 'block text-lg font-medium mb-2' }, 'Email'),
+                  React.createElement('input', {
+                    type: 'email',
+                    id: 'email',
+                    name: 'email',
+                    value: formData.email,
+                    onChange: handleChange,
+                    required: true,
+                    className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg'
+                  })
                 ),
                 React.createElement('div', null,
-                  React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Message'),
-                  React.createElement('textarea', { required: true, placeholder: 'How can we help you?', rows: 5, className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none', value: formData.message, onChange: (e) => setFormData({...formData, message: e.target.value}) })
+                  React.createElement('label', { htmlFor: 'message', className: 'block text-lg font-medium mb-2' }, 'Message'),
+                  React.createElement('textarea', {
+                    id: 'message',
+                    name: 'message',
+                    value: formData.message,
+                    onChange: handleChange,
+                    required: true,
+                    rows: 5,
+                    className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg'
+                  })
                 ),
-                React.createElement('button', { type: 'submit', className: 'w-full px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-lg font-semibold transition-colors shadow-lg hover:shadow-xl' }, 'Send Message')
+                React.createElement('button', {
+                  type: 'submit',
+                  disabled: loading,
+                  className: 'w-full px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-lg font-semibold transition-colors shadow-lg hover:shadow-xl'
+                }, loading ? 'Sending...' : 'Send Message')
               )
             )
           )
@@ -334,6 +397,12 @@ USER REQUEST: "${prompt}"`;
       code = `<!DOCTYPE html>\n${code}`
     }
 
+    // After creating the project:
+    const finalCode = code.replace(
+      'SITE_ID_PLACEHOLDER',
+      user.id // The actual project ID
+    );
+
     await prisma.user.update({
       where: { id: user.id },
       data: { generationsUsed: { increment: 1 } },
@@ -351,7 +420,7 @@ USER REQUEST: "${prompt}"`;
       }
     })
 
-    return NextResponse.json({ code })
+    return NextResponse.json({ code: finalCode })
 
   } catch (error: any) {
     console.error('Generate error:', error)
