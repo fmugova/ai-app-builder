@@ -469,6 +469,14 @@ export default function DashboardClient({
               <p className="text-sm text-blue-600">Upload files • Iterate with AI</p>
             </div>
           </Link>
+
+          {/* Form Submissions */}
+          <Link href="/dashboard/submissions">
+            <div className="p-6 border rounded-lg bg-green-50">
+              <h3 className="font-bold">Form Submissions</h3>
+              <p className="text-sm text-green-600">View all form entries</p>
+            </div>
+          </Link>
         </div>
 
         {/* Projects Section */}
