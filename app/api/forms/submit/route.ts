@@ -32,18 +32,19 @@ export async function POST(request: NextRequest) {
     }
     
     // ✅ Use relation syntax with connect
-    const submission = await prisma.formSubmission.create({
-      data: {
-        data: formData,
-        formType: formType,
-        Project: {
-          connect: { id: siteId }
-        },
-        User: {
-          connect: { id: project.userId }
-        }
-      }
-    })
+const submission = await prisma.formSubmission.create({
+  data: {
+    type: formType || 'contact',  // ✅ Correct field name
+    data: formData,
+    read: false,  // ✅ Add this required field
+    Project: {
+      connect: { id: siteId }
+    },
+    User: {
+      connect: { id: project.userId }
+    }
+  }
+})
     
     return NextResponse.json({ 
       success: true, 
