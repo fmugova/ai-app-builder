@@ -251,29 +251,33 @@ export default function ChatBuilderPage() {
           body: JSON.stringify({
             name: projectName || 'Chat Builder Project',
             description: `Created with Chat Builder on ${new Date().toLocaleDateString()}`,
-            code: currentCode,
+            code: currentCode, // Code with SITE_ID_PLACEHOLDER
             type: 'landing-page'
           })
         })
 
         const data = await response.json()
+        const newProjectId = data.project?.id || data.id
 
-        if (!response.ok) {
-          console.error('Create error:', data)
-          throw new Error(data.error || data.message || 'Failed to create project')
-        }
+        // ✅ INJECT SITE ID HERE:
+        const codeWithSiteId = currentCode.replace(
+          'SITE_ID_PLACEHOLDER',
+          newProjectId
+        )
 
-        if (data.project && data.project.id) {
-          setProjectId(data.project.id)
-          alert('✅ Project saved as draft!')
-          console.log('Project created:', data.project.id)
-        } else if (data.id) {
-          setProjectId(data.id)
-          alert('✅ Project saved as draft!')
-          console.log('Project created:', data.id)
-        } else {
-          throw new Error('No project ID in response')
-        }
+        // Update project with injected code
+        await fetch(`/api/projects/${newProjectId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: codeWithSiteId
+          })
+        })
+
+        setProjectId(newProjectId)
+        setCurrentCode(codeWithSiteId)  // ← Update local state
+        alert('✅ Project saved!')
+        console.log('Project created:', newProjectId)
       }
     } catch (error: any) {
       console.error('Save failed:', error)

@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 })
     }
 
-    // Using regular template string - will be inserted into Claude prompt
+    // HTML Template with all fixes
     const htmlTemplate = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -151,6 +151,14 @@ export async function POST(request: NextRequest) {
           { to: '/contact', label: 'Contact' }
         ];
         
+        // FIXED: Mobile navigation click handler to prevent nesting
+        const handleNavClick = (e, to) => {
+          e.preventDefault();
+          e.stopPropagation();
+          window.location.hash = to === '/' ? '' : to;
+          setIsOpen(false);
+        };
+        
         return React.createElement('nav', { className: 'fixed top-0 left-0 right-0 z-50 bg-white shadow' },
           React.createElement('div', { className: 'max-w-7xl mx-auto px-4' },
             React.createElement('div', { className: 'flex justify-between items-center h-16' },
@@ -183,9 +191,10 @@ export async function POST(request: NextRequest) {
             ),
             isOpen && React.createElement('div', { className: 'md:hidden pb-4 border-t' },
               links.map(link =>
-                React.createElement(Link, {
+                React.createElement('a', {
                   key: link.to,
-                  to: link.to,
+                  href: '#' + (link.to === '/' ? '' : link.to),
+                  onClick: (e) => handleNavClick(e, link.to),
                   className: 'block px-4 py-3 text-gray-700 hover:bg-gray-100 transition-colors ' + (location.pathname === link.to ? 'text-blue-600 bg-blue-50' : '')
                 }, link.label)
               )
@@ -253,13 +262,39 @@ export async function POST(request: NextRequest) {
       function ContactPage() {
         const [formData, setFormData] = useState({ name: '', email: '', message: '' });
         const [submitted, setSubmitted] = useState(false);
-        const handleSubmit = (e) => { 
-          e.preventDefault(); 
-          setSubmitted(true); 
-          setTimeout(() => {
-            setSubmitted(false);
-            setFormData({ name: '', email: '', message: '' });
-          }, 3000); 
+        const [loading, setLoading] = useState(false);
+        const [error, setError] = useState('');
+        
+        const handleSubmit = async (e) => {
+          e.preventDefault();
+          setLoading(true);
+          setError('');
+          
+          try {
+            const response = await fetch('https://buildflow-ai.app/api/forms/submit', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                siteId: 'SITE_ID_PLACEHOLDER',
+                formType: 'contact',
+                formData: formData
+              })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+              setSubmitted(true);
+              setFormData({ name: '', email: '', message: '' });
+              setTimeout(() => setSubmitted(false), 5000);
+            } else {
+              setError(data.error || 'Failed to send message. Please try again.');
+            }
+          } catch (err) {
+            setError('Network error. Please try again.');
+          } finally {
+            setLoading(false);
+          }
         };
         
         return React.createElement('div', { className: 'min-h-screen pt-24 py-20 bg-gray-50' },
@@ -267,21 +302,51 @@ export async function POST(request: NextRequest) {
             React.createElement('h1', { className: 'text-5xl font-bold text-center mb-4' }, 'Contact Us'),
             React.createElement('p', { className: 'text-xl text-gray-600 text-center mb-12' }, 'Get in touch with us today'),
             React.createElement('div', { className: 'bg-white rounded-lg shadow-lg p-8 md:p-12' },
-              submitted && React.createElement('div', { className: 'mb-6 p-4 bg-green-100 text-green-700 rounded-lg text-center font-semibold' }, '✓ Thank you! We\'ll be in touch soon.'),
+              submitted && React.createElement('div', { 
+                className: 'mb-6 p-4 bg-green-100 text-green-700 rounded-lg text-center font-semibold' 
+              }, '✓ Thank you! We\'ll be in touch soon.'),
+              error && React.createElement('div', { 
+                className: 'mb-6 p-4 bg-red-100 text-red-700 rounded-lg text-center' 
+              }, error),
               React.createElement('form', { onSubmit: handleSubmit, className: 'space-y-6' },
                 React.createElement('div', null,
                   React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Name'),
-                  React.createElement('input', { type: 'text', required: true, placeholder: 'Your name', className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent', value: formData.name, onChange: (e) => setFormData({...formData, name: e.target.value}) })
+                  React.createElement('input', { 
+                    type: 'text', 
+                    required: true, 
+                    placeholder: 'Your name', 
+                    className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent', 
+                    value: formData.name, 
+                    onChange: (e) => setFormData({...formData, name: e.target.value}) 
+                  })
                 ),
                 React.createElement('div', null,
                   React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Email'),
-                  React.createElement('input', { type: 'email', required: true, placeholder: 'your@email.com', className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent', value: formData.email, onChange: (e) => setFormData({...formData, email: e.target.value}) })
+                  React.createElement('input', { 
+                    type: 'email', 
+                    required: true, 
+                    placeholder: 'your@email.com', 
+                    className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent', 
+                    value: formData.email, 
+                    onChange: (e) => setFormData({...formData, email: e.target.value}) 
+                  })
                 ),
                 React.createElement('div', null,
                   React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Message'),
-                  React.createElement('textarea', { required: true, placeholder: 'How can we help you?', rows: 5, className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none', value: formData.message, onChange: (e) => setFormData({...formData, message: e.target.value}) })
+                  React.createElement('textarea', { 
+                    required: true, 
+                    placeholder: 'How can we help you?', 
+                    rows: 5, 
+                    className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none', 
+                    value: formData.message, 
+                    onChange: (e) => setFormData({...formData, message: e.target.value}) 
+                  })
                 ),
-                React.createElement('button', { type: 'submit', className: 'w-full px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-lg font-semibold transition-colors shadow-lg hover:shadow-xl' }, 'Send Message')
+                React.createElement('button', { 
+                  type: 'submit', 
+                  disabled: loading,
+                  className: 'w-full px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-lg font-semibold transition-colors shadow-lg hover:shadow-xl' 
+                }, loading ? 'Sending...' : 'Send Message')
               )
             )
           )
@@ -309,9 +374,41 @@ export async function POST(request: NextRequest) {
 </body>
 </html>`;
 
-    const systemPrompt = `You are an expert React developer. Generate a complete HTML file based on the template, replacing all placeholders with appropriate content.
+    // UPDATED SYSTEM PROMPT with better instructions
+    const systemPrompt = `You are an expert React developer. Generate a complete, professional HTML file for: "${prompt}"
 
-USER REQUEST: "${prompt}"`;
+CRITICAL RULES:
+1. Use the provided HTML template structure exactly
+2. Replace ALL placeholders with real, relevant content:
+   - SITE_TITLE_PLACEHOLDER → Actual site title
+   - BRAND_NAME_PLACEHOLDER → Brand/company name
+   - HERO_TITLE_PLACEHOLDER → Compelling hero headline
+   - HERO_TEXT_PLACEHOLDER → Engaging hero description
+   - FEATURES_PLACEHOLDER → 3 feature cards with icons, titles, descriptions
+   - ABOUT_TEXT_PLACEHOLDER → Comprehensive about section (3-4 paragraphs)
+   - SERVICES_PLACEHOLDER → 4-6 service cards with details
+   - SITE_ID_PLACEHOLDER → KEEP AS-IS (injected later)
+
+3. FORBIDDEN IN FOOTER:
+   - NO "This uses modals" or technical descriptions
+   - NO "Built with React" explanations
+   - ONLY copyright + BuildFlow link
+
+4. Features must be React elements:
+   Example: React.createElement('div', { className: 'bg-white p-6 rounded-lg shadow' },
+     React.createElement('div', { className: 'text-4xl mb-4' }, '🚀'),
+     React.createElement('h3', { className: 'text-xl font-bold mb-2' }, 'Fast Performance'),
+     React.createElement('p', { className: 'text-gray-600' }, 'Lightning-fast load times')
+   )
+
+5. Services must be React elements with detailed cards
+
+6. Generate COMPLETE, PRODUCTION-READY code
+7. NO explanatory text in HTML
+8. NO placeholder text that says "[Add content here]"
+9. ALL content must be fully fleshed out and relevant to: "${prompt}"
+
+Generate the complete HTML now:`;
 
     const message = await callClaudeWithRetry(anthropic, [{ role: 'user', content: systemPrompt }]);
 
@@ -320,9 +417,11 @@ USER REQUEST: "${prompt}"`;
       const content = message.content[0];
       code = content.type === 'text' ? content.text : '';
     } else {
+      console.error('Invalid AI response structure:', message)
       return NextResponse.json({ error: 'Invalid AI response' }, { status: 500 });
     }
 
+    // Clean up code blocks
     code = code
       .replace(/```html\n?/g, '')
       .replace(/```jsx\n?/g, '')
@@ -330,15 +429,18 @@ USER REQUEST: "${prompt}"`;
       .replace(/```\n?/g, '')
       .trim()
 
+    // Ensure DOCTYPE
     if (!code.startsWith('<!DOCTYPE')) {
       code = `<!DOCTYPE html>\n${code}`
     }
 
+    // Update user stats
     await prisma.user.update({
       where: { id: user.id },
       data: { generationsUsed: { increment: 1 } },
     })
 
+    // Log activity
     await prisma.activity.create({
       data: {
         userId: user.id,
@@ -351,10 +453,17 @@ USER REQUEST: "${prompt}"`;
       }
     })
 
+    console.log('Generation successful, code length:', code.length)
     return NextResponse.json({ code })
 
   } catch (error: any) {
     console.error('Generate error:', error)
+    console.error('Error details:', {
+      message: error.message,
+      type: error?.error?.type,
+      status: error?.status,
+      stack: error.stack
+    })
 
     if (error?.error?.type === 'overloaded_error') {
       return NextResponse.json(
