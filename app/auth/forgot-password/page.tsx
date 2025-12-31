@@ -35,6 +35,9 @@ export default function ForgotPasswordPage() {
           duration: 2000,
           id: 'reset-link-sent',
         })
+        setTimeout(() => {
+          toast.dismiss('reset-link-sent');
+        }, 2000);
       } else {
         toast.error(data.error || 'Failed to send reset link')
       }

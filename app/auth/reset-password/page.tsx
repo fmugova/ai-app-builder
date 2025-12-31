@@ -54,7 +54,10 @@ function ResetPasswordForm() {
           duration: 2000,
           id: 'password-reset-success',
         })
-        setTimeout(() => router.push('/auth/signin'), 2000)
+        setTimeout(() => {
+          toast.dismiss('password-reset-success');
+          router.push('/auth/signin');
+        }, 2000)
       } else {
         toast.error(data.error || 'Failed to reset password')
       }

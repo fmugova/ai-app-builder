@@ -35,6 +35,9 @@ function UnsubscribeContent() {
           duration: 2000,
           id: 'unsubscribed',
         })
+        setTimeout(() => {
+          toast.dismiss('unsubscribed');
+        }, 2000);
       } else {
         toast.error(data.error || 'Failed to unsubscribe')
       }

@@ -115,6 +115,9 @@ export default function PricingPage() {
           duration: 2000,
           id: 'discount-applied',
         })
+        setTimeout(() => {
+          toast.dismiss('discount-applied');
+        }, 2000);
       } else {
         toast.error(data.message || 'Invalid promo code')
       }

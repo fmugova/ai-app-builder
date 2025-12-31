@@ -46,6 +46,9 @@ export default function TemplatesPage() {
           duration: 2000,
           id: 'project-created',
         })
+        setTimeout(() => {
+          toast.dismiss('project-created');
+        }, 2000);
         router.push(`/builder?project=${data.project.id}`)
       } else {
         throw new Error('Failed to create project')
