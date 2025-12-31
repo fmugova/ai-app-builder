@@ -16,17 +16,34 @@ export async function GET() {
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: {
-        projects: {
-          orderBy: { createdAt: 'desc' },
-        },
-      },
+      where: { email: session.user.email }
     })
 
-    return NextResponse.json(user?.projects || [])
-  } catch (error) {
-    console.error('Fetch projects error:', error)
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const projects = await prisma.project.findMany({
+      where: { userId: user.id },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        publishedAt: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    })
+
+    // ✅ MAKE SURE IT RETURNS { projects: [...] }
+    return NextResponse.json({ 
+      projects,
+      count: projects.length 
+    })
+
+  } catch (error: any) {
+    console.error('Projects GET error:', error)
     return NextResponse.json(
       { error: 'Failed to fetch projects' },
       { status: 500 }
