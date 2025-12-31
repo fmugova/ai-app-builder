@@ -273,6 +273,7 @@ model Project {
   User            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   ProjectShare    ProjectShare[]
   ProjectVersion  ProjectVersion[]
+  customDomains   CustomDomain[]
 
   @@index([isPublic])
   @@index([isPublished])
@@ -421,4 +422,24 @@ model FormSubmission {
   @@index([projectId])
   @@index([userId])
   @@map("FormSubmission")
+}
+
+model CustomDomain {
+  id              String    @id @default(cuid())
+  projectId       String
+  domain          String    @unique
+  status          String    @default("pending") // pending, verifying, active, failed
+  verificationKey String?   // TXT record value for verification
+  verifiedAt      DateTime?
+  sslStatus       String    @default("pending") // pending, active, failed
+  sslIssuedAt     DateTime?
+  errorMessage    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([domain])
+  @@index([status])
 }

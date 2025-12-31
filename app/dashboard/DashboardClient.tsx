@@ -202,6 +202,12 @@ export default function DashboardClient({
             >
               📊 Analytics
             </Link>
+            <Link 
+              href="/dashboard/domains"
+              className="px-4 py-2 text-gray-700 hover:text-gray-900 font-medium flex items-center gap-2"
+            >
+              🌐 Custom Domains
+            </Link>
             {/* Theme Toggle */}
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
