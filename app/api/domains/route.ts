@@ -142,9 +142,22 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error: any) {
-    console.error('Domain POST error:', error)
+    console.error('=== DOMAIN ERROR DEBUG ===')
+    console.error('Error message:', error.message)
+    console.error('Error stack:', error.stack)
+    console.error('Vercel token exists:', !!process.env.VERCEL_API_TOKEN)
+    console.error('Vercel project ID:', process.env.VERCEL_PROJECT_ID)
+    console.error('=========================')
+
     return NextResponse.json(
-      { error: 'Failed to add domain', message: error.message },
+      { 
+        error: 'Failed to add domain', 
+        message: error.message,
+        debug: {
+          hasToken: !!process.env.VERCEL_API_TOKEN,
+          hasProjectId: !!process.env.VERCEL_PROJECT_ID
+        }
+      },
       { status: 500 }
     )
   }
