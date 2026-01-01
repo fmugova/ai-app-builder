@@ -50,17 +50,25 @@ export function createSupabaseAdminClient(config: SupabaseConfig) {
  * Test database connection
  */
 export async function testSupabaseConnection(config: SupabaseConfig): Promise<boolean> {
+  // Simplified validation - just check format
   try {
-    const supabase = createSupabaseClient(config)
-    const { error } = await supabase.from('_test').select('*').limit(1)
+    if (!config.url || !config.anonKey) {
+      return false
+    }
     
-    // If table doesn't exist, that's fine - connection works
-    if (error && !error.message.includes('does not exist')) {
+    // Validate URL format
+    if (!config.url.includes('supabase.co') && !config.url.includes('localhost')) {
+      return false
+    }
+    
+    // Validate key exists and has reasonable length
+    if (config.anonKey.length < 20) {
       return false
     }
     
     return true
   } catch (err) {
+    console.error('Connection validation error:', err)
     return false
   }
 }

@@ -81,12 +81,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Test connection
+    // Debug logging
+    console.log('=== TESTING SUPABASE CONNECTION ===')
+    console.log('URL:', supabaseUrl)
+    console.log('Anon Key Length:', supabaseAnonKey?.length)
+    console.log('Service Key Length:', supabaseServiceKey?.length)
+
     const isValid = await testSupabaseConnection({
       url: supabaseUrl,
       anonKey: supabaseAnonKey,
       serviceKey: supabaseServiceKey
     })
+
+    console.log('Connection test result:', isValid)
+    console.log('=== END TEST ===')
 
     if (!isValid) {
       return NextResponse.json(
