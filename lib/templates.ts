@@ -566,6 +566,21 @@ export default function AuthForms() {
   )
 }`
   },
+
+  {
+    id: 'supabase-app',
+    name: 'Full-Stack App with Database',
+    description: 'Complete app with Supabase database, auth, and real-time features',
+    type: 'webapp',
+    category: 'saas',
+    icon: '🗄️',
+    tags: ['supabase', 'database', 'auth', 'realtime', 'fullstack', 'saas'],
+    preview: '/templates/supabase-app.png',
+    code: `
+    <!-- Supabase-powered app template -->
+    <!-- Includes: Database, Auth, Real-time -->
+    `
+  },
 ]
 
 export function getTemplatesByCategory(category?: string) {

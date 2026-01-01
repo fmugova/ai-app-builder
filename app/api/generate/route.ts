@@ -384,6 +384,98 @@ export async function POST(request: NextRequest) {
 </body>
 </html>`;
 
+    const GENERATION_SYSTEM_PROMPT = `
+You are an expert web developer generating production-ready code.
+
+CRITICAL RULES:
+1. Generate SINGLE-FILE React components only
+2. Use React 18+ with functional components and hooks
+3. For routing, use hash-based routing or state-based navigation (NOT React Router)
+4. All JavaScript must be in <script> tags (no separate files)
+5. All CSS must be in <style> tags (use Tailwind CDN)
+6. No build tools required - must run directly in browser
+7. Use CDN imports only (React, Tailwind, etc.)
+
+FRAMEWORK SETUP:
+- React 18: https://unpkg.com/react@18/umd/react.production.min.js
+- React DOM: https://unpkg.com/react-dom@18/umd/react-dom.production.min.js
+- Tailwind CSS: https://cdn.tailwindcss.com
+- Babel Standalone: https://unpkg.com/@babel/standalone/babel.min.js
+
+CODE STRUCTURE:
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generated App</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    
+    function App() {
+      const [currentPage, setCurrentPage] = useState('home');
+      
+      // Your app logic here
+      
+      return (
+        <div className="min-h-screen bg-gray-50">
+          {/* Your UI here */}
+        </div>
+      );
+    }
+    
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
+
+ROUTING SOLUTION (NO REACT ROUTER):
+Instead of React Router, use state-based navigation:
+
+function App() {
+  const [page, setPage] = useState('home');
+  
+  const pages = {
+    home: <HomePage />,
+    about: <AboutPage />,
+    contact: <ContactPage />
+  };
+  
+  return (
+    <div>
+      <nav>
+        <button onClick={() => setPage('home')}>Home</button>
+        <button onClick={() => setPage('about')}>About</button>
+        <button onClick={() => setPage('contact')}>Contact</button>
+      </nav>
+      {pages[page]}
+    </div>
+  );
+}
+
+NEVER use:
+- import/export statements (use CDN)
+- React Router (use state-based navigation)
+- npm packages (use CDN only)
+- Build steps (must run in browser)
+- Separate .js/.css files (single HTML file)
+
+ALWAYS include:
+- Responsive design (mobile-first)
+- Loading states
+- Error handling
+- Accessibility (ARIA labels)
+- Clean, modern UI with Tailwind
+`;
+
     // UPDATED SYSTEM PROMPT with better instructions
     const systemPrompt = `You are an expert React developer. Generate a complete, professional HTML file for: "${prompt}"
 
@@ -500,3 +592,26 @@ Generate the complete HTML now:`;
     );
   }
 }
+
+const GENERATION_PROMPT = `
+Generate a complete web application with the following requirements:
+
+\${userPrompt}
+
+Requirements:
+- Include Supabase database setup if data persistence is needed
+- Add authentication if user accounts are mentioned
+- Use React hooks for state management
+- Include real-time updates if collaborative features mentioned
+- Add proper error handling and loading states
+
+Database Schema (if needed):
+- Generate SQL for Supabase
+- Include RLS policies
+- Add example queries
+
+Authentication (if needed):
+- Use Supabase Auth
+- Include login/signup forms
+- Protected routes
+`
