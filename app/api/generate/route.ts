@@ -512,20 +512,51 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { prompt, type } = await request.json()
-    if (!prompt) {
-      return NextResponse.json({ error: 'Prompt is required' }, { status: 400 })
+    const { prompt, type, projectId } = await request.json()
+
+    // Get user's database connection if they have one
+    let databaseConfig = null
+    if (projectId) {
+      const dbConnection = await prisma.databaseConnection.findFirst({
+        where: {
+          OR: [
+            { projectId: projectId },
+            { userId: user.id }
+          ]
+        },
+        orderBy: { createdAt: 'desc' }
+      })
+      
+      if (dbConnection) {
+        databaseConfig = {
+          url: dbConnection.supabaseUrl,
+          anonKey: dbConnection.supabaseAnonKey
+        }
+      }
     }
 
-    // Create the user prompt
-    const userPrompt = `Generate a complete, production-ready single-file HTML application for: "${prompt}"
+    // Update system prompt with database config
+    let enhancedPrompt = `${GENERATION_SYSTEM_PROMPT}\n\n`
+    
+    if (databaseConfig) {
+      enhancedPrompt += `
+IMPORTANT: User has a connected Supabase database. Use these credentials:
+
+const SUPABASE_URL = '${databaseConfig.url}';
+const SUPABASE_ANON_KEY = '${databaseConfig.anonKey}';
+
+DO NOT ask user to enter credentials. The app should work immediately.
+`
+    }
+    
+    enhancedPrompt += `Generate a complete, production-ready single-file HTML application for: "${prompt}"
 
 Make it visually stunning, fully functional, and ready to deploy immediately.`
 
     const message = await callClaudeWithRetry(anthropic, [
       { 
         role: 'user', 
-        content: userPrompt 
+        content: enhancedPrompt 
       }
     ]);
 
