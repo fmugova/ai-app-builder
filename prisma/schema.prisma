@@ -92,6 +92,7 @@ model User {
   sessions              Session[]
   subscriptions         Subscription?
   vercelConnection      VercelConnection?
+  DatabaseConnections   DatabaseConnection[]
 }
 
 model VercelConnection {
@@ -274,6 +275,7 @@ model Project {
   ProjectShare    ProjectShare[]
   ProjectVersion  ProjectVersion[]
   customDomains   CustomDomain[]
+  DatabaseConnection  DatabaseConnection?
 
   @@index([isPublic])
   @@index([isPublished])
@@ -442,4 +444,46 @@ model CustomDomain {
   @@index([projectId])
   @@index([domain])
   @@index([status])
+}
+
+// Database Connection Configuration
+model DatabaseConnection {
+  id              String    @id @default(cuid())
+  userId          String
+  projectId       String?   @unique
+  name            String
+  provider        String    @default("supabase") // supabase, postgres, mysql
+  host            String?
+  port            Int?
+  database        String?
+  username        String?
+  password        String?   // Encrypted
+  supabaseUrl     String?
+  supabaseAnonKey String?
+  supabaseServiceKey String? // Encrypted
+  status          String    @default("connected") // connected, disconnected, error
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  User            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Project         Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  Tables          DatabaseTable[]
+
+  @@index([userId])
+  @@index([projectId])
+}
+
+// Database Tables
+model DatabaseTable {
+  id                    String    @id @default(cuid())
+  databaseConnectionId  String
+  name                  String
+  schema                Json      // Table schema definition
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  DatabaseConnection    DatabaseConnection @relation(fields: [databaseConnectionId], references: [id], onDelete: Cascade)
+
+  @@unique([databaseConnectionId, name])
+  @@index([databaseConnectionId])
 }

@@ -42,6 +42,435 @@ function injectAnalytics(code: string, projectId: string): string {
   return code + '\n' + analyticsScript
 }
 
+const GENERATION_SYSTEM_PROMPT = `
+You are an expert full-stack web developer generating production-ready applications.
+
+CRITICAL RULES:
+1. Generate SINGLE-FILE HTML documents only
+2. Use React 18+ with functional components and hooks via CDN
+3. For multi-page navigation, use state-based routing (NOT React Router)
+4. All JavaScript must be in <script type="text/babel"> tags
+5. All CSS must use Tailwind CSS via CDN
+6. No build tools required - must run directly in browser
+7. Use CDN imports only
+
+REQUIRED CDN LIBRARIES:
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generated App</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Include Supabase if data persistence or auth is needed -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    const { createClient } = supabase;
+    
+    // Supabase configuration (if needed)
+    const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
+    function App() {
+      // Your app logic here
+      
+      return (
+        <div className="min-h-screen bg-gray-50">
+          {/* Your UI here */}
+        </div>
+      );
+    }
+    
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DATABASE & AUTHENTICATION INTEGRATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+WHEN TO INCLUDE SUPABASE:
+- User mentions: database, data storage, saving data, user accounts, login, authentication
+- App requires: persistent storage, user profiles, real-time features, collaborative features
+- Examples: todo lists, dashboards, social apps, booking systems, CRM, analytics
+
+IF DATABASE IS NEEDED:
+1. Add Supabase CDN script to <head>
+2. Include commented SQL schema for reference
+3. Provide setup instructions in comments
+4. Generate complete CRUD operations
+5. Include error handling for database operations
+
+DATABASE SETUP TEMPLATE:
+<script type="text/babel">
+  const { useState, useEffect } = React;
+  const { createClient } = supabase;
+  
+  // ⚠️ SETUP REQUIRED: Replace with your Supabase credentials
+  // Get these from: https://supabase.com → Project Settings → API
+  const SUPABASE_URL = 'https://your-project.supabase.co';
+  const SUPABASE_ANON_KEY = 'your-anon-key-here';
+  const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  
+  /*
+  SQL SCHEMA - Run this in Supabase SQL Editor:
+  
+  CREATE TABLE your_table (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+  );
+  
+  -- Enable Row Level Security
+  ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;
+  
+  -- Create policies
+  CREATE POLICY "Users can read their own data"
+    ON your_table FOR SELECT
+    USING (auth.uid() = user_id);
+  
+  CREATE POLICY "Users can insert their own data"
+    ON your_table FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+  
+  CREATE POLICY "Users can update their own data"
+    ON your_table FOR UPDATE
+    USING (auth.uid() = user_id);
+  
+  CREATE POLICY "Users can delete their own data"
+    ON your_table FOR DELETE
+    USING (auth.uid() = user_id);
+  */
+  
+  function App() {
+    const [data, setData] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    
+    // Fetch data from Supabase
+    async function fetchData() {
+      try {
+        setLoading(true);
+        const { data, error } = await supabaseClient
+          .from('your_table')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        setData(data || []);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    // Create new record
+    async function createRecord(newData) {
+      try {
+        const { data, error } = await supabaseClient
+          .from('your_table')
+          .insert([newData])
+          .select()
+          .single();
+        
+        if (error) throw error;
+        setData([data, ...data]);
+        return data;
+      } catch (err) {
+        setError(err.message);
+        throw err;
+      }
+    }
+    
+    // Update record
+    async function updateRecord(id, updates) {
+      try {
+        const { data, error } = await supabaseClient
+          .from('your_table')
+          .update(updates)
+          .eq('id', id)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        setData(prev => prev.map(item => item.id === id ? data : item));
+        return data;
+      } catch (err) {
+        setError(err.message);
+        throw err;
+      }
+    }
+    
+    // Delete record
+    async function deleteRecord(id) {
+      try {
+        const { error } = await supabaseClient
+          .from('your_table')
+          .delete()
+          .eq('id', id);
+        
+        if (error) throw error;
+        setData(prev => prev.filter(item => item.id !== id));
+      } catch (err) {
+        setError(err.message);
+        throw err;
+      }
+    }
+    
+    useEffect(() => {
+      fetchData();
+      
+      // Real-time subscription (optional)
+      const subscription = supabaseClient
+        .channel('your_table_changes')
+        .on('postgres_changes', 
+          { event: '*', schema: 'public', table: 'your_table' },
+          (payload) => {
+            console.log('Change received!', payload);
+            fetchData(); // Refresh data
+          }
+        )
+        .subscribe();
+      
+      return () => {
+        subscription.unsubscribe();
+      };
+    }, []);
+    
+    // Your UI here
+  }
+</script>
+
+IF AUTHENTICATION IS NEEDED:
+1. Include Supabase Auth setup
+2. Provide login/signup forms
+3. Implement protected routes
+4. Handle session management
+
+AUTHENTICATION TEMPLATE:
+<script type="text/babel">
+  const { useState, useEffect } = React;
+  const { createClient } = supabase;
+  
+  const SUPABASE_URL = 'https://your-project.supabase.co';
+  const SUPABASE_ANON_KEY = 'your-anon-key-here';
+  const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  
+  function App() {
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+    
+    // Check if user is logged in
+    useEffect(() => {
+      supabaseClient.auth.getSession().then(({ data: { session } }) => {
+        setUser(session?.user ?? null);
+        setLoading(false);
+      });
+      
+      const { data: { subscription } } = supabaseClient.auth.onAuthStateChange(
+        (event, session) => {
+          setUser(session?.user ?? null);
+        }
+      );
+      
+      return () => subscription.unsubscribe();
+    }, []);
+    
+    // Sign up
+    async function signUp(email, password) {
+      const { data, error } = await supabaseClient.auth.signUp({
+        email,
+        password
+      });
+      if (error) throw error;
+      return data;
+    }
+    
+    // Sign in
+    async function signIn(email, password) {
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email,
+        password
+      });
+      if (error) throw error;
+      return data;
+    }
+    
+    // Sign out
+    async function signOut() {
+      const { error } = await supabaseClient.auth.signOut();
+      if (error) throw error;
+    }
+    
+    if (loading) {
+      return <div>Loading...</div>;
+    }
+    
+    // Show login screen if not authenticated
+    if (!user) {
+      return <LoginForm onSignIn={signIn} onSignUp={signUp} />;
+    }
+    
+    // Show protected content
+    return (
+      <div>
+        <nav>
+          <span>Welcome, {user.email}</span>
+          <button onClick={signOut}>Sign Out</button>
+        </nav>
+        <YourProtectedContent />
+      </div>
+    );
+  }
+  
+  function LoginForm({ onSignIn, onSignUp }) {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [isSignUp, setIsSignUp] = useState(false);
+    
+    async function handleSubmit(e) {
+      e.preventDefault();
+      try {
+        if (isSignUp) {
+          await onSignUp(email, password);
+          alert('Check your email for confirmation!');
+        } else {
+          await onSignIn(email, password);
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+    
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <form onSubmit={handleSubmit} className="bg-white p-8 rounded-lg shadow-md w-96">
+          <h2 className="text-2xl font-bold mb-6">
+            {isSignUp ? 'Sign Up' : 'Sign In'}
+          </h2>
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full px-4 py-2 border rounded mb-4"
+            required
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full px-4 py-2 border rounded mb-4"
+            required
+          />
+          <button className="w-full bg-blue-600 text-white py-2 rounded">
+            {isSignUp ? 'Sign Up' : 'Sign In'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsSignUp(!isSignUp)}
+            className="w-full mt-2 text-blue-600"
+          >
+            {isSignUp ? 'Already have an account?' : 'Need an account?'}
+          </button>
+        </form>
+      </div>
+    );
+  }
+</script>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MULTI-PAGE NAVIGATION (NO REACT ROUTER)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Use state-based page switching:
+
+function App() {
+  const [currentPage, setCurrentPage] = useState('home');
+  
+  const renderPage = () => {
+    switch(currentPage) {
+      case 'home': return <HomePage />;
+      case 'about': return <AboutPage />;
+      case 'contact': return <ContactPage />;
+      default: return <HomePage />;
+    }
+  };
+  
+  return (
+    <div>
+      <nav className="bg-white shadow-md">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex gap-4">
+          <button 
+            onClick={() => setCurrentPage('home')} 
+            className={currentPage === 'home' ? 'font-bold' : ''}
+          >
+            Home
+          </button>
+          <button 
+            onClick={() => setCurrentPage('about')}
+            className={currentPage === 'about' ? 'font-bold' : ''}
+          >
+            About
+          </button>
+        </div>
+      </nav>
+      <main>{renderPage()}</main>
+    </div>
+  );
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REQUIREMENTS FOR ALL GENERATED APPS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+NEVER use:
+- import/export statements (use CDN only)
+- React Router library
+- npm packages
+- Build tools (webpack, vite, etc.)
+- Separate .js/.css files
+- Module bundlers
+
+ALWAYS include:
+- Responsive design (mobile-first with Tailwind)
+- Loading states for async operations
+- Error handling with try/catch
+- Form validation where applicable
+- Accessibility (ARIA labels, semantic HTML)
+- Clean, modern UI with proper spacing
+- Smooth animations and transitions
+- Comments explaining Supabase setup steps
+
+SUPABASE SETUP INSTRUCTIONS:
+Always include clear comments explaining:
+1. How to get Supabase credentials
+2. What SQL to run in Supabase SQL Editor
+3. How to configure Row Level Security
+4. Example database operations
+
+IMPORTANT:
+- All code must be self-contained in a single HTML file
+- Must work when opened directly in a browser
+- No external dependencies beyond CDN scripts
+- Include placeholder credentials with clear instructions to replace
+- Provide complete SQL schemas in comments
+- Include RLS policies for security
+`;
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -84,435 +513,21 @@ export async function POST(request: NextRequest) {
     }
 
     const { prompt, type } = await request.json()
-
     if (!prompt) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 })
     }
 
-    // HTML Template with all fixes
-    const htmlTemplate = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SITE_TITLE_PLACEHOLDER</title>
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body { margin: 0; font-family: system-ui; }
-    @keyframes spin { to { transform: rotate(360deg); }}
-  </style>
-</head>
-<body>
-  <div id="root">
-    <div style="padding:40px;text-align:center;">
-      <div style="width:40px;height:40px;border:4px solid #e5e7eb;border-top-color:#3b82f6;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 20px;"></div>
-      <p style="color:#666;">Loading React Router...</p>
-    </div>
-  </div>
-  
-  <script>
-    (function loadReactRouter() {
-      console.log('Loading React Router with CDN fallback...');
-      const script1 = document.createElement('script');
-      script1.crossOrigin = 'anonymous';
-      script1.src = 'https://unpkg.com/react-router-dom@6.20.1/dist/umd/react-router-dom.production.min.js';
-      script1.onload = function() { console.log('React Router loaded'); if(window.initApp) window.initApp(); };
-      script1.onerror = function() {
-        console.error('Failed to load React Router');
-        document.getElementById('root').innerHTML = '<div style="padding:40px;text-align:center;"><h1 style="color:red;">Failed to load React Router</h1><button onclick="location.reload()" style="padding:10px 20px;background:#3b82f6;color:white;border:none;border-radius:6px;cursor:pointer;">Retry</button></div>';
-      };
-      document.head.appendChild(script1);
-    })();
-  </script>
-  
-  <script type="text/babel">
-    window.initApp = function() {
-      let attempts = 0;
-      const check = setInterval(() => {
-        attempts++;
-        const ready = window.React && window.ReactDOM && window.ReactRouterDOM;
-        console.log('Check', attempts, ':', { ready });
-        if (ready) {
-          clearInterval(check);
-          startApp();
-        } else if (attempts > 30) {
-          clearInterval(check);
-          document.getElementById('root').innerHTML = '<div style="padding:40px;text-align:center;"><h1 style="color:red;">Timeout</h1></div>';
-        }
-      }, 100);
-    };
-    
-    function startApp() {
-      const { useState, useEffect } = React;
-      const { HashRouter, Routes, Route, Link, useLocation } = window.ReactRouterDOM;
-      
-      function Navigation() {
-        const [isOpen, setIsOpen] = useState(false);
-        const location = useLocation();
-        useEffect(() => setIsOpen(false), [location]);
-        
-        const links = [
-          { to: '/', label: 'Home' },
-          { to: '/about', label: 'About' },
-          { to: '/services', label: 'Services' },
-          { to: '/contact', label: 'Contact' }
-        ];
-        
-        // FIXED: Mobile navigation click handler to prevent nesting
-        const handleNavClick = (e, to) => {
-          e.preventDefault();
-          e.stopPropagation();
-          window.location.hash = to === '/' ? '' : to;
-          setIsOpen(false);
-        };
-        
-        return React.createElement('nav', { className: 'fixed top-0 left-0 right-0 z-50 bg-white shadow' },
-          React.createElement('div', { className: 'max-w-7xl mx-auto px-4' },
-            React.createElement('div', { className: 'flex justify-between items-center h-16' },
-              React.createElement(Link, { to: '/', className: 'flex items-center space-x-2' },
-                React.createElement('div', { className: 'w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg' }),
-                React.createElement('span', { className: 'text-xl font-bold' }, 'BRAND_NAME_PLACEHOLDER')
-              ),
-              React.createElement('div', { className: 'hidden md:flex space-x-8' },
-                links.map(link =>
-                  React.createElement(Link, {
-                    key: link.to,
-                    to: link.to,
-                    className: 'text-gray-700 hover:text-blue-600 font-medium transition-colors ' + (location.pathname === link.to ? 'text-blue-600' : '')
-                  }, link.label)
-                )
-              ),
-              React.createElement('button', {
-                onClick: () => setIsOpen(!isOpen),
-                className: 'md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors',
-                'aria-label': 'Toggle menu'
-              }, React.createElement('svg', {
-                className: 'w-6 h-6',
-                fill: 'none',
-                stroke: 'currentColor',
-                viewBox: '0 0 24 24'
-              }, isOpen ?
-                React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M6 18L18 6M6 6l12 12' }) :
-                React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M4 6h16M4 12h16M4 18h16' })
-              ))
-            ),
-            isOpen && React.createElement('div', { className: 'md:hidden pb-4 border-t' },
-              links.map(link =>
-                React.createElement('a', {
-                  key: link.to,
-                  href: '#' + (link.to === '/' ? '' : link.to),
-                  onClick: (e) => handleNavClick(e, link.to),
-                  className: 'block px-4 py-3 text-gray-700 hover:bg-gray-100 transition-colors ' + (location.pathname === link.to ? 'text-blue-600 bg-blue-50' : '')
-                }, link.label)
-              )
-            )
-          )
-        );
+    // Create the user prompt
+    const userPrompt = `Generate a complete, production-ready single-file HTML application for: "${prompt}"
+
+Make it visually stunning, fully functional, and ready to deploy immediately.`
+
+    const message = await callClaudeWithRetry(anthropic, [
+      { 
+        role: 'user', 
+        content: userPrompt 
       }
-      
-      function Footer() {
-        return React.createElement('footer', { className: 'bg-gray-900 text-white py-12 mt-20' },
-          React.createElement('div', { className: 'max-w-7xl mx-auto px-4 text-center' },
-            React.createElement('p', { className: 'text-gray-400 mb-2' }, '© 2025 BRAND_NAME_PLACEHOLDER. All rights reserved.'),
-            React.createElement('p', { className: 'text-sm' },
-              '⚡ Built with ',
-              React.createElement('a', {
-                href: 'https://buildflow-ai.app',
-                target: '_blank',
-                rel: 'noopener noreferrer',
-                className: 'text-blue-400 hover:text-blue-300 font-semibold'
-              }, 'BuildFlow AI')
-            )
-          )
-        );
-      }
-      
-      function HomePage() {
-        return React.createElement('div', { className: 'min-h-screen pt-16' },
-          React.createElement('section', { className: 'bg-gradient-to-br from-blue-50 to-purple-50 py-32' },
-            React.createElement('div', { className: 'max-w-7xl mx-auto px-4 text-center' },
-              React.createElement('h1', { className: 'text-5xl md:text-6xl font-bold mb-6' }, 'HERO_TITLE_PLACEHOLDER'),
-              React.createElement('p', { className: 'text-xl text-gray-600 mb-8 max-w-3xl mx-auto' }, 'HERO_TEXT_PLACEHOLDER'),
-              React.createElement(Link, { to: '/contact', className: 'inline-block px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-lg font-semibold transition-colors shadow-lg hover:shadow-xl' }, 'Get Started')
-            )
-          ),
-          React.createElement('section', { className: 'py-20 bg-white' },
-            React.createElement('div', { className: 'max-w-7xl mx-auto px-4' },
-              React.createElement('h2', { className: 'text-4xl font-bold text-center mb-12' }, 'Features'),
-              React.createElement('div', { className: 'grid md:grid-cols-3 gap-8' }, 'FEATURES_PLACEHOLDER')
-            )
-          )
-        );
-      }
-      
-      function AboutPage() {
-        return React.createElement('div', { className: 'min-h-screen pt-24 py-20 bg-gray-50' },
-          React.createElement('div', { className: 'max-w-4xl mx-auto px-4' },
-            React.createElement('h1', { className: 'text-5xl font-bold mb-8 text-center' }, 'About Us'),
-            React.createElement('div', { className: 'bg-white rounded-lg shadow-lg p-8 md:p-12' },
-              React.createElement('p', { className: 'text-xl text-gray-600 leading-relaxed' }, 'ABOUT_TEXT_PLACEHOLDER')
-            )
-          )
-        );
-      }
-      
-      function ServicesPage() {
-        return React.createElement('div', { className: 'min-h-screen pt-24 py-20 bg-gray-50' },
-          React.createElement('div', { className: 'max-w-7xl mx-auto px-4' },
-            React.createElement('h1', { className: 'text-5xl font-bold text-center mb-4' }, 'Our Services'),
-            React.createElement('p', { className: 'text-xl text-gray-600 text-center mb-12 max-w-3xl mx-auto' }, 'Discover what we can do for you'),
-            React.createElement('div', { className: 'grid md:grid-cols-2 gap-8' }, 'SERVICES_PLACEHOLDER')
-          )
-        );
-      }
-      
-      function ContactPage() {
-        const [formData, setFormData] = useState({ name: '', email: '', message: '' });
-        const [submitted, setSubmitted] = useState(false);
-        const [loading, setLoading] = useState(false);
-        const [error, setError] = useState('');
-        
-        const handleSubmit = async (e) => {
-          e.preventDefault();
-          setLoading(true);
-          setError('');
-          
-          try {
-            const response = await fetch('https://buildflow-ai.app/api/forms/submit', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                siteId: 'SITE_ID_PLACEHOLDER',
-                formType: 'contact',
-                formData: formData
-              })
-            });
-            
-            const data = await response.json();
-            
-            if (response.ok) {
-              setSubmitted(true);
-              setFormData({ name: '', email: '', message: '' });
-              setTimeout(() => setSubmitted(false), 5000);
-            } else {
-              setError(data.error || 'Failed to send message. Please try again.');
-            }
-          } catch (err) {
-            setError('Network error. Please try again.');
-          } finally {
-            setLoading(false);
-          }
-        };
-        
-        return React.createElement('div', { className: 'min-h-screen pt-24 py-20 bg-gray-50' },
-          React.createElement('div', { className: 'max-w-2xl mx-auto px-4' },
-            React.createElement('h1', { className: 'text-5xl font-bold text-center mb-4' }, 'Contact Us'),
-            React.createElement('p', { className: 'text-xl text-gray-600 text-center mb-12' }, 'Get in touch with us today'),
-            React.createElement('div', { className: 'bg-white rounded-lg shadow-lg p-8 md:p-12' },
-              submitted && React.createElement('div', { 
-                className: 'mb-6 p-4 bg-green-100 text-green-700 rounded-lg text-center font-semibold' 
-              }, '✓ Thank you! We\'ll be in touch soon.'),
-              error && React.createElement('div', { 
-                className: 'mb-6 p-4 bg-red-100 text-red-700 rounded-lg text-center' 
-              }, error),
-              React.createElement('form', { onSubmit: handleSubmit, className: 'space-y-6' },
-                React.createElement('div', null,
-                  React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Name'),
-                  React.createElement('input', { 
-                    type: 'text', 
-                    required: true, 
-                    placeholder: 'Your name', 
-                    className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent', 
-                    value: formData.name, 
-                    onChange: (e) => setFormData({...formData, name: e.target.value}) 
-                  })
-                ),
-                React.createElement('div', null,
-                  React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Email'),
-                  React.createElement('input', { 
-                    type: 'email', 
-                    required: true, 
-                    placeholder: 'your@email.com', 
-                    className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent', 
-                    value: formData.email, 
-                    onChange: (e) => setFormData({...formData, email: e.target.value}) 
-                  })
-                ),
-                React.createElement('div', null,
-                  React.createElement('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Message'),
-                  React.createElement('textarea', { 
-                    required: true, 
-                    placeholder: 'How can we help you?', 
-                    rows: 5, 
-                    className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none', 
-                    value: formData.message, 
-                    onChange: (e) => setFormData({...formData, message: e.target.value}) 
-                  })
-                ),
-                React.createElement('button', { 
-                  type: 'submit', 
-                  disabled: loading,
-                  className: 'w-full px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-lg font-semibold transition-colors shadow-lg hover:shadow-xl' 
-                }, loading ? 'Sending...' : 'Send Message')
-              )
-            )
-          )
-        );
-      }
-      
-      function App() {
-        return React.createElement(HashRouter, null,
-          React.createElement(Navigation),
-          React.createElement(Routes, null,
-            React.createElement(Route, { path: '/', element: React.createElement(HomePage) }),
-            React.createElement(Route, { path: '/about', element: React.createElement(AboutPage) }),
-            React.createElement(Route, { path: '/services', element: React.createElement(ServicesPage) }),
-            React.createElement(Route, { path: '/contact', element: React.createElement(ContactPage) })
-          ),
-          React.createElement(Footer)
-        );
-      }
-      
-      const root = ReactDOM.createRoot(document.getElementById('root'));
-      root.render(React.createElement(App));
-      console.log('App rendered!');
-    }
-  </script>
-</body>
-</html>`;
-
-    const GENERATION_SYSTEM_PROMPT = `
-You are an expert web developer generating production-ready code.
-
-CRITICAL RULES:
-1. Generate SINGLE-FILE React components only
-2. Use React 18+ with functional components and hooks
-3. For routing, use hash-based routing or state-based navigation (NOT React Router)
-4. All JavaScript must be in <script> tags (no separate files)
-5. All CSS must be in <style> tags (use Tailwind CDN)
-6. No build tools required - must run directly in browser
-7. Use CDN imports only (React, Tailwind, etc.)
-
-FRAMEWORK SETUP:
-- React 18: https://unpkg.com/react@18/umd/react.production.min.js
-- React DOM: https://unpkg.com/react-dom@18/umd/react-dom.production.min.js
-- Tailwind CSS: https://cdn.tailwindcss.com
-- Babel Standalone: https://unpkg.com/@babel/standalone/babel.min.js
-
-CODE STRUCTURE:
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Generated App</title>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body>
-  <div id="root"></div>
-  
-  <script type="text/babel">
-    const { useState, useEffect } = React;
-    
-    function App() {
-      const [currentPage, setCurrentPage] = useState('home');
-      
-      // Your app logic here
-      
-      return (
-        <div className="min-h-screen bg-gray-50">
-          {/* Your UI here */}
-        </div>
-      );
-    }
-    
-    ReactDOM.render(<App />, document.getElementById('root'));
-  </script>
-</body>
-</html>
-
-ROUTING SOLUTION (NO REACT ROUTER):
-Instead of React Router, use state-based navigation:
-
-function App() {
-  const [page, setPage] = useState('home');
-  
-  const pages = {
-    home: <HomePage />,
-    about: <AboutPage />,
-    contact: <ContactPage />
-  };
-  
-  return (
-    <div>
-      <nav>
-        <button onClick={() => setPage('home')}>Home</button>
-        <button onClick={() => setPage('about')}>About</button>
-        <button onClick={() => setPage('contact')}>Contact</button>
-      </nav>
-      {pages[page]}
-    </div>
-  );
-}
-
-NEVER use:
-- import/export statements (use CDN)
-- React Router (use state-based navigation)
-- npm packages (use CDN only)
-- Build steps (must run in browser)
-- Separate .js/.css files (single HTML file)
-
-ALWAYS include:
-- Responsive design (mobile-first)
-- Loading states
-- Error handling
-- Accessibility (ARIA labels)
-- Clean, modern UI with Tailwind
-`;
-
-    // UPDATED SYSTEM PROMPT with better instructions
-    const systemPrompt = `You are an expert React developer. Generate a complete, professional HTML file for: "${prompt}"
-
-CRITICAL RULES:
-1. Use the provided HTML template structure exactly
-2. Replace ALL placeholders with real, relevant content:
-   - SITE_TITLE_PLACEHOLDER → Actual site title
-   - BRAND_NAME_PLACEHOLDER → Brand/company name
-   - HERO_TITLE_PLACEHOLDER → Compelling hero headline
-   - HERO_TEXT_PLACEHOLDER → Engaging hero description
-   - FEATURES_PLACEHOLDER → 3 feature cards with icons, titles, descriptions
-   - ABOUT_TEXT_PLACEHOLDER → Comprehensive about section (3-4 paragraphs)
-   - SERVICES_PLACEHOLDER → 4-6 service cards with details
-   - SITE_ID_PLACEHOLDER → KEEP AS-IS (injected later)
-
-3. FORBIDDEN IN FOOTER:
-   - NO "This uses modals" or technical descriptions
-   - NO "Built with React" explanations
-   - ONLY copyright + BuildFlow link
-
-4. Features must be React elements:
-   Example: React.createElement('div', { className: 'bg-white p-6 rounded-lg shadow' },
-     React.createElement('div', { className: 'text-4xl mb-4' }, '🚀'),
-     React.createElement('h3', { className: 'text-xl font-bold mb-2' }, 'Fast Performance'),
-     React.createElement('p', { className: 'text-gray-600' }, 'Lightning-fast load times')
-   )
-
-5. Services must be React elements with detailed cards
-
-6. Generate COMPLETE, PRODUCTION-READY code
-7. NO explanatory text in HTML
-8. NO placeholder text that says "[Add content here]"
-9. ALL content must be fully fleshed out and relevant to: "${prompt}"
-
-Generate the complete HTML now:`;
-
-    const message = await callClaudeWithRetry(anthropic, [{ role: 'user', content: systemPrompt }]);
+    ]);
 
     let code = '';
     if (message.content && message.content[0]) {
@@ -528,6 +543,7 @@ Generate the complete HTML now:`;
       .replace(/```html\n?/g, '')
       .replace(/```jsx\n?/g, '')
       .replace(/```typescript\n?/g, '')
+      .replace(/```javascript\n?/g, '')
       .replace(/```\n?/g, '')
       .trim()
 
@@ -535,6 +551,30 @@ Generate the complete HTML now:`;
     if (!code.startsWith('<!DOCTYPE')) {
       code = `<!DOCTYPE html>\n${code}`
     }
+
+    // Inject analytics with placeholder
+    const codeWithAnalytics = injectAnalytics(code, 'SITE_ID_PLACEHOLDER')
+
+    // Auto-create project
+    const project = await prisma.project.create({
+      data: {
+        userId: user.id,
+        name: prompt.substring(0, 100) || 'Generated Project',
+        description: `Generated: ${new Date().toLocaleDateString()}`,
+        code: codeWithAnalytics,
+        type: type || 'landing-page',
+        publishedAt: null
+      }
+    })
+
+    // Replace placeholder with actual project ID
+    const finalCode = codeWithAnalytics.replace(/SITE_ID_PLACEHOLDER/g, project.id)
+
+    // Update project with actual code
+    await prisma.project.update({
+      where: { id: project.id },
+      data: { code: finalCode }
+    })
 
     // Update user stats
     await prisma.user.update({
@@ -550,18 +590,18 @@ Generate the complete HTML now:`;
         action: 'generated',
         metadata: {
           promptPreview: prompt.substring(0, 100),
-          generationType: type || 'landing-page'
+          generationType: type || 'landing-page',
+          projectId: project.id
         }
       }
     })
 
-    // Inject analytics script if you have a projectId (replace with actual projectId if available)
-    // Example: const codeWithAnalytics = injectAnalytics(code, project.id)
-    // For now, if you have no projectId, you can skip or use a placeholder
-    // const codeWithAnalytics = injectAnalytics(code, 'PROJECT_ID_PLACEHOLDER')
-
-    console.log('Generation successful, code length:', code.length)
-    return NextResponse.json({ code /* or codeWithAnalytics if you use it */ })
+    console.log('Generation successful, project created:', project.id)
+    
+    return NextResponse.json({ 
+      code: finalCode,
+      projectId: project.id
+    })
 
   } catch (error: any) {
     console.error('Generate error:', error)
@@ -592,26 +632,3 @@ Generate the complete HTML now:`;
     );
   }
 }
-
-const GENERATION_PROMPT = `
-Generate a complete web application with the following requirements:
-
-\${userPrompt}
-
-Requirements:
-- Include Supabase database setup if data persistence is needed
-- Add authentication if user accounts are mentioned
-- Use React hooks for state management
-- Include real-time updates if collaborative features mentioned
-- Add proper error handling and loading states
-
-Database Schema (if needed):
-- Generate SQL for Supabase
-- Include RLS policies
-- Add example queries
-
-Authentication (if needed):
-- Use Supabase Auth
-- Include login/signup forms
-- Protected routes
-`

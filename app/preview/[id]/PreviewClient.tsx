@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { 
   Eye, 
   Code, 
@@ -13,6 +12,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { sanitizeForPreview } from '@/lib/sanitizeForPreview'
+import { useRouter } from 'next/navigation'
 
 interface PreviewClientProps {
   project: {
@@ -28,10 +28,10 @@ interface PreviewClientProps {
 }
 
 export default function PreviewClient({ project }: PreviewClientProps) {
-  const router = useRouter()
   const [showCode, setShowCode] = useState(false)
   const [deployingVercel, setDeployingVercel] = useState(false)
   const [publishing, setPublishing] = useState(false)
+  const router = useRouter()
 
   // Use sanitizeForPreview to wrap React/JSX code
   const sanitizedCode = sanitizeForPreview(project.code)
@@ -338,3 +338,50 @@ export default function PreviewClient({ project }: PreviewClientProps) {
     </div>
   )
 }
+
+// Replace React Router code with state-based navigation example
+// Example usage for your generated previews (not used in this file, but for reference):
+/*
+function App() {
+  const [currentPage, setCurrentPage] = useState('home');
+
+  const renderPage = () => {
+    switch(currentPage) {
+      case 'home': return <HomePage />;
+      case 'about': return <AboutPage />;
+      case 'contact': return <ContactPage />;
+      default: return <HomePage />;
+    }
+  };
+
+  return (
+    <div>
+      <nav className="bg-white shadow">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex gap-4">
+          <button 
+            onClick={() => setCurrentPage('home')}
+            className="px-4 py-2 rounded hover:bg-gray-100"
+          >
+            Home
+          </button>
+          <button 
+            onClick={() => setCurrentPage('about')}
+            className="px-4 py-2 rounded hover:bg-gray-100"
+          >
+            About
+          </button>
+          <button 
+            onClick={() => setCurrentPage('contact')}
+            className="px-4 py-2 rounded hover:bg-gray-100"
+          >
+            Contact
+          </button>
+        </div>
+      </nav>
+      <main>
+        {renderPage()}
+      </main>
+    </div>
+  );
+}
+*/
