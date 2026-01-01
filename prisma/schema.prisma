@@ -276,6 +276,8 @@ model Project {
   ProjectVersion  ProjectVersion[]
   customDomains   CustomDomain[]
   DatabaseConnection  DatabaseConnection?
+  multiPage       Boolean          @default(false)
+  Pages           Page[]
 
   @@index([isPublic])
   @@index([isPublished])
@@ -284,6 +286,30 @@ model Project {
   @@index([updatedAt])
   @@index([userId])
   @@index([userId, updatedAt])
+}
+
+model Page {
+  id          String   @id @default(cuid())
+  projectId   String
+  name        String   // "Home", "About", "Contact"
+  slug        String   // "home", "about", "contact"
+  title       String?  // Page title for SEO
+  description String?  // Meta description for SEO
+  content     String   @db.Text // HTML/React content
+  isHome      Boolean  @default(false)
+  published   Boolean  @default(true)
+  order       Int      @default(0)
+  seoTitle    String?
+  seoKeywords String?
+  ogImage     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  Project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, slug])
+  @@index([projectId])
+  @@index([slug])
 }
 
 model ProjectVersion {

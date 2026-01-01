@@ -538,23 +538,45 @@ export default function DashboardClient({
           {filteredProjects.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {filteredProjects.map((project) => (
-                <ProjectCard
-                  key={project.id}
-                  project={{
-                    ...project,
-                    createdAt: new Date(project.createdAt),
-                    updatedAt: new Date(project.updatedAt),
-                    description: project.description || '',
-                    type: project.type || '',
-                    isPublished: project.isPublished ?? false,
-                    publicUrl: project.publicUrl || null,
-                    views: project.views ?? 0,
-                  }}
-                  onDelete={() => handleDeleteProject(project.id)}
-                  onRefresh={() => {
-                    window.location.reload()
-                  }}
-                />
+                <div key={project.id} className="relative">
+                  <ProjectCard
+                    project={{
+                      ...project,
+                      createdAt: new Date(project.createdAt),
+                      updatedAt: new Date(project.updatedAt),
+                      description: project.description || '',
+                      type: project.type || '',
+                      isPublished: project.isPublished ?? false,
+                      publicUrl: project.publicUrl || null,
+                      views: project.views ?? 0,
+                    }}
+                    onDelete={() => handleDeleteProject(project.id)}
+                    onRefresh={() => {
+                      window.location.reload()
+                    }}
+                  />
+                  {/* Navigation Links for Multi-Page Features */}
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <Link
+                      href={`/dashboard/projects/${project.id}/pages`}
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded text-gray-700"
+                    >
+                      📄 Pages
+                    </Link>
+                    <Link
+                      href={`/dashboard/projects/${project.id}/navigation`}
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded text-gray-700"
+                    >
+                      🧭 Navigation
+                    </Link>
+                    <Link
+                      href={`/dashboard/projects/${project.id}/seo`}
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded text-gray-700"
+                    >
+                      🔍 SEO
+                    </Link>
+                  </div>
+                </div>
               ))}
             </div>
           ) : (
