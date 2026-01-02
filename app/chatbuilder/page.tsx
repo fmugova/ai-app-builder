@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useToast } from '@/hooks/use-toast'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { templates, getTemplatesByCategory } from '@/lib/templates'
 
@@ -13,6 +14,7 @@ interface Message {
 }
 
 export default function ChatBuilderPage() {
+  const toast = useToast()
   const { data: session } = useSession()
   const router = useRouter()
 
@@ -87,41 +89,21 @@ export default function ChatBuilderPage() {
     }
   }, [input])
 
+  // Get all categories from templates
+  const categories = ['all', ...Array.from(new Set(templates.map(t => t.category)))];
+
   // Get filtered templates
   const filteredTemplates = selectedCategory === 'all' 
     ? templates 
-    : getTemplatesByCategory(selectedCategory)
+    : getTemplatesByCategory(selectedCategory);
 
-  // Get unique categories
-  const categories = ['all', ...new Set(templates.map(t => t.category))]
-
-  // Detect URLs in input and fetch content
-  const detectAndFetchUrls = async (text: string): Promise<string> => {
-    const urlRegex = /(https?:\/\/[^\s]+)/g
-    const urls = text.match(urlRegex)
-    
-    if (!urls || urls.length === 0) return text
-    
-    let enhancedPrompt = text
-    
-    for (const url of urls) {
-      try {
-        const response = await fetch('/api/fetch-url', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url })
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          enhancedPrompt += `\n\n--- Content from ${url} ---\n${data.content.substring(0, 5000)}`
-        }
-      } catch (error) {
-        console.error(`Failed to fetch ${url}:`, error)
-      }
-    }
-    
-    return enhancedPrompt
+  // Helper: Detect and fetch URLs from input
+  async function detectAndFetchUrls(text: string): Promise<string> {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const urls = text.match(urlRegex);
+    // You can add logic here to fetch and process URLs if needed
+    // For now, just return the original text
+    return text;
   }
 
   const handleSend = async () => {
@@ -250,81 +232,93 @@ export default function ChatBuilderPage() {
     }
   }
 
+  // Helper: sanitize generated code before saving/updating
+  const sanitizeCode = (code: string) => {
+    if (!code) return code
+    let clean = code
+    // Remove BuildFlow navigation that got captured
+    clean = clean.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
+    clean = clean.replace(/<header[^>]*class="[^"]*buildflow[^"]*"[^>]*>[\s\S]*?<\/header>/gi, '')
+    // Remove these specific menu items that are appearing
+    const menuItems = ['Dashboard', 'Analytics', 'Submissions', 'Download', 'GitHub', 'Vercel']
+    menuItems.forEach(item => {
+      // Only remove if it's in a list/menu context (has emoji or is in a nav structure)
+      const pattern = new RegExp(`<[^>]*>\\s*[📊📈📋📥🐙▲]?\\s*${item}\\s*<\\/[^>]*>`, 'gi')
+      clean = clean.replace(pattern, '')
+    })
+    // Remove feedback buttons
+    clean = clean.replace(/<[^>]*feedback[^>]*>[\s\S]*?<\/[^ 0]*>/gi, '')
+    return clean.trim()
+  }
+
   const handleSave = async () => {
     if (!currentCode) {
-      alert('No code to save. Generate a site first!')
+      toast.toast({
+        variant: 'destructive',
+        description: 'No code to save. Generate a site first!'
+      })
       return
     }
-
     setSaving(true)
-
+    const cleanCode = sanitizeCode(currentCode)
     try {
       if (projectId) {
-        // Update existing project
-        // If code still contains SITE_ID_PLACEHOLDER, replace it with projectId
-        let codeToSave = currentCode;
-        if (currentCode.includes('SITE_ID_PLACEHOLDER')) {
-          codeToSave = currentCode.replace('SITE_ID_PLACEHOLDER', projectId);
-          setCurrentCode(codeToSave);
-        }
-
-        const response = await fetch(`/api/projects/${projectId}`, {
-          method: 'PATCH',
+        // UPDATE existing project
+        const res = await fetch(`/api/projects/${projectId}`, {
+          method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            code: codeToSave,
-            name: projectName
+            name: projectName,
+            code: cleanCode
           })
         })
-
-        const data = await response.json()
-
-        if (!response.ok) {
-          console.error('Save error:', data)
-          throw new Error(data.error || data.message || 'Failed to save project')
+        if (res.ok) {
+          toast.toast({
+            variant: 'default',
+            description: 'Project updated!'
+          })
+        } else {
+          const error = await res.text()
+          console.error('Save failed:', error)
+          toast.toast({
+            variant: 'destructive',
+            description: 'Failed to save'
+          })
         }
-
-        alert('✅ Project saved as draft!')
-        console.log('Project updated:', data)
       } else {
-        // Create new project
-        const response = await fetch('/api/projects', {
+        // CREATE new project
+        const res = await fetch('/api/projects', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            name: projectName || 'Chat Builder Project',
-            description: `Created with Chat Builder on ${new Date().toLocaleDateString()}`,
-            code: currentCode, // Code with SITE_ID_PLACEHOLDER
-            type: 'landing-page'
+            name: projectName,
+            code: cleanCode,
+            type: 'website'
           })
         })
-
-        const data = await response.json()
-        const newProjectId = data.project?.id || data.id
-
-        // ✅ INJECT SITE ID HERE:
-        const codeWithSiteId = currentCode.replace(
-          'SITE_ID_PLACEHOLDER',
-          newProjectId
-        )
-
-        // Update project with injected code
-        await fetch(`/api/projects/${newProjectId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            code: codeWithSiteId
+        if (res.ok) {
+          const data = await res.json()
+          window.history.pushState({}, '', `/chatbuilder?project=${data.id}`)
+          setProjectId(data.id)
+          toast.toast({
+            variant: 'default',
+            description: 'Project created!'
           })
-        })
-
-        setProjectId(newProjectId)
-        setCurrentCode(codeWithSiteId)  // ← Update local state
-        alert('✅ Project saved!')
-        console.log('Project created:', newProjectId)
+        } else {
+          const error = await res.text()
+          console.error('Save failed:', error)
+          toast.toast({
+            variant: 'destructive',
+            description: 'Failed to save'
+          })
+        }
       }
-    } catch (error: any) {
-      console.error('Save failed:', error)
-      alert(`❌ Failed to save: ${error.message}`)
+    } catch (error) {
+      console.error('Save error:', error)
+      toast.toast({
+        variant: 'destructive',
+        description: 'Error saving project'
+      })
     } finally {
       setSaving(false)
     }
@@ -332,70 +326,76 @@ export default function ChatBuilderPage() {
 
   const handlePublish = async () => {
     if (!currentCode) {
-      alert('No code to publish. Generate a site first!')
+      toast.toast({
+        variant: 'destructive',
+        description: 'No code to publish. Generate a site first!'
+      })
       return
     }
-
     setPublishing(true)
-
+    const cleanCode = sanitizeCode(currentCode)
     try {
-      // If no projectId, create project first
       if (!projectId) {
-        const createResponse = await fetch('/api/projects', {
+        // CREATE and publish new project
+        const res = await fetch('/api/projects', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            name: projectName || 'Chat Builder Project',
-            description: `Created with Chat Builder on ${new Date().toLocaleDateString()}`,
-            code: currentCode,
-            type: 'landing-page',
+            name: projectName,
+            code: cleanCode,
+            type: 'website',
             published: true
           })
         })
-
-        const createData = await createResponse.json()
-
-        if (!createResponse.ok) {
-          console.error('Create error:', createData)
-          throw new Error(createData.error || createData.message || 'Failed to create project')
+        if (res.ok) {
+          const data = await res.json()
+          window.history.pushState({}, '', `/chatbuilder?project=${data.id}`)
+          setProjectId(data.id)
+          toast.toast({
+            variant: 'default',
+            description: 'Project published!'
+          })
+          router.push('/dashboard')
+        } else {
+          const error = await res.text()
+          console.error('Publish failed:', error)
+          toast.toast({
+            variant: 'destructive',
+            description: 'Failed to publish'
+          })
         }
-
-        const newProjectId = createData.project?.id || createData.id
-        if (!newProjectId) {
-          throw new Error('No project ID in response')
-        }
-
-        setProjectId(newProjectId)
-        alert('🚀 Project published successfully!')
-        console.log('Project created and published:', newProjectId)
-        router.push('/dashboard')
-        return
-      }
-
-      // Update existing project and publish
-      const response = await fetch(`/api/projects/${projectId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code: currentCode,
-          name: projectName,
-          published: true
+      } else {
+        // UPDATE and publish existing project
+        const res = await fetch(`/api/projects/${projectId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: projectName,
+            code: cleanCode,
+            published: true
+          })
         })
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        console.error('Publish error:', data)
-        throw new Error(data.error || data.message || 'Failed to publish project')
+        if (res.ok) {
+          toast.toast({
+            variant: 'default',
+            description: 'Project published!'
+          })
+          router.push('/dashboard')
+        } else {
+          const error = await res.text()
+          console.error('Publish failed:', error)
+          toast.toast({
+            variant: 'destructive',
+            description: 'Failed to publish'
+          })
+        }
       }
-
-      alert('🚀 Project published successfully!')
-      console.log('Project published:', projectId)
-      router.push('/dashboard')
-    } catch (error: any) {
-      console.error('Publish failed:', error)
-      alert(`❌ Failed to publish: ${error.message}`)
+    } catch (error) {
+      console.error('Publish error:', error)
+      toast.toast({
+        variant: 'destructive',
+        description: 'Error publishing project'
+      })
     } finally {
       setPublishing(false)
     }
@@ -467,7 +467,6 @@ export default function ChatBuilderPage() {
     setShowTemplates(false)
     setCurrentCode(template.code)
     setProjectName(template.name)
-    
     const templateMessage: Message = {
       id: Date.now().toString(),
       role: 'assistant',
@@ -475,6 +474,14 @@ export default function ChatBuilderPage() {
       timestamp: new Date()
     }
     setMessages(prev => [...prev, templateMessage])
+  }
+
+  // Clean code for existing projects
+  const cleanExistingProject = async () => {
+    if (!projectId || !currentCode) return
+    const cleanCode = sanitizeCode(currentCode)
+    setCurrentCode(cleanCode)
+    await handleSave()
   }
 
   // Helper function for category icons
@@ -490,6 +497,23 @@ export default function ChatBuilderPage() {
       case 'startup': return '🎯'
       default: return '📄'
     }
+  }
+
+  // Helper: wrap preview code in full HTML document
+  function getPreviewHTML(code: string) {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <script src="https://cdn.tailwindcss.com"></script>
+        </head>
+        <body>
+          ${code}
+        </body>
+      </html>
+    `
   }
 
   return (
@@ -700,6 +724,14 @@ export default function ChatBuilderPage() {
                 >
                   {publishing ? '🚀 Publishing...' : '🚀 Publish'}
                 </button>
+                <button
+                  onClick={cleanExistingProject}
+                  disabled={saving || !projectId}
+                  className="flex items-center gap-1 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-medium transition-all disabled:opacity-50 shadow-sm"
+                  title="Clean navigation and menu from code"
+                >
+                  🧹 Clean Code
+                </button>
               </div>
             )}
           </div>
@@ -778,26 +810,30 @@ export default function ChatBuilderPage() {
                 >
                   ⬇️ Download
                 </button>
-                <button
-                  onClick={handleExportToGitHub}
+                <a
+                  href="https://github.com/new"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition"
                   title="Export to GitHub"
                 >
                   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
                   </svg>
-                  Export to GitHub
-                </button>
-                <button
-                  onClick={handleDeployToVercel}
+                  GitHub
+                </a>
+                <a
+                  href="https://vercel.com/new"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition"
                   title="Deploy to Vercel"
                 >
                   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M24 22.525H0l12-21.05 12 21.05z"/>
                   </svg>
-                  Deploy to Vercel
-                </button>
+                  Vercel
+                </a>
               </div>
             )}
           </div>
@@ -806,9 +842,10 @@ export default function ChatBuilderPage() {
         <div className="flex-1 p-4 relative">
           {currentCode ? (
             <iframe
-              srcDoc={currentCode}
+              srcDoc={getPreviewHTML(currentCode)}
               className="w-full h-full bg-white rounded-lg shadow-lg border border-gray-200"
               title="Preview"
+              sandbox="allow-scripts allow-same-origin"
             />
           ) : (
             <div className="h-full flex items-center justify-center text-gray-400">
