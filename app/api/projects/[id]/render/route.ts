@@ -5,15 +5,17 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { searchParams } = new URL(request.url)
     const slug = searchParams.get('slug') || 'home'
 
+    const { id } = await params
+
     // Get project
     const project = await prisma.project.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         pages: {
           where: { isPublished: true },
@@ -57,6 +59,10 @@ export async function GET(
         active: p.id === page.id
       }))
 
+    // Use SEO fields with fallbacks
+    const pageTitle = page.metaTitle || page.title
+    const pageDescription = page.metaDescription || page.description || ''
+
     // Generate complete HTML with navigation
     const html = `
 <!DOCTYPE html>
@@ -64,11 +70,11 @@ export async function GET(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${page.title}</title>
-  ${page.description ? `<meta name="description" content="${page.description}">` : ''}
+  <title>${pageTitle}</title>
+  ${pageDescription ? `<meta name="description" content="${pageDescription}">` : ''}
   ${page.ogImage ? `<meta property="og:image" content="${page.ogImage}">` : ''}
-  <meta property="og:title" content="${page.title}">
-  <meta property="og:description" content="${page.description || ''}">
+  <meta property="og:title" content="${pageTitle}">
+  <meta property="og:description" content="${pageDescription}">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
