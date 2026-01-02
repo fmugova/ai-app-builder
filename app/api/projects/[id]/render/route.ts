@@ -15,7 +15,7 @@ export async function GET(
     const project = await prisma.project.findUnique({
       where: { id: params.id },
       include: {
-        Pages: {
+        pages: {
           where: { published: true },
           orderBy: { order: 'asc' }
         }
