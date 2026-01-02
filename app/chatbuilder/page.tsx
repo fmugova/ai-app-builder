@@ -1,4 +1,3 @@
-
 'use client'
 
 import PromptGuide from '@/components/PromptGuide'
@@ -20,6 +19,10 @@ export default function ChatBuilderPage() {
   const toast = useToast()
   const { data: session } = useSession()
   const router = useRouter()
+  const searchParams = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search)
+    : null;
+  const pageId = searchParams?.get('page') || null;
 
   // Auto-open PromptGuide on first visit
   const [showGuideOnLoad, setShowGuideOnLoad] = useState(false)
@@ -54,14 +57,39 @@ export default function ChatBuilderPage() {
   const [showTemplates, setShowTemplates] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('all')
 
-  // Load project from URL parameter
+  // Load project or page from URL parameter
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const projectId = urlParams.get('project')
-    if (projectId) {
+    const pageId = urlParams.get('page')
+    if (projectId && pageId) {
+      loadPage(projectId, pageId)
+    } else if (projectId) {
       loadProject(projectId)
     }
   }, [])
+
+  const loadPage = async (projectId: string, pageId: string) => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/pages/${pageId}`)
+      const data = await res.json()
+      if (data.content) {
+        setProjectId(projectId)
+        setProjectName(data.title || 'Untitled Page')
+        setCurrentCode(data.content)
+        const loadMessage: Message = {
+          id: Date.now().toString(),
+          role: 'system',
+          content: `✅ Loaded page: ${data.title || 'Untitled Page'}. Ready to iterate!`,
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, loadMessage])
+      }
+    } catch (err) {
+      console.error('Failed to load page:', err)
+      alert('Failed to load page')
+    }
+  }
 
   const loadProject = async (projectId: string) => {
     try {
@@ -276,7 +304,30 @@ export default function ChatBuilderPage() {
     setSaving(true)
     const cleanCode = sanitizeCode(currentCode)
     try {
-      if (projectId) {
+      if (projectId && pageId) {
+        // UPDATE existing page
+        const res = await fetch(`/api/projects/${projectId}/pages/${pageId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: projectName,
+            content: cleanCode
+          })
+        })
+        if (res.ok) {
+          toast.toast({
+            variant: 'default',
+            description: 'Page updated!'
+          })
+        } else {
+          const error = await res.text()
+          console.error('Save failed:', error)
+          toast.toast({
+            variant: 'destructive',
+            description: 'Failed to save'
+          })
+        }
+      } else if (projectId) {
         // UPDATE existing project
         const res = await fetch(`/api/projects/${projectId}`, {
           method: 'PUT',
@@ -349,7 +400,32 @@ export default function ChatBuilderPage() {
     setPublishing(true)
     const cleanCode = sanitizeCode(currentCode)
     try {
-      if (!projectId) {
+      if (projectId && pageId) {
+        // UPDATE and publish existing page
+        const res = await fetch(`/api/projects/${projectId}/pages/${pageId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: projectName,
+            content: cleanCode,
+            isPublished: true
+          })
+        })
+        if (res.ok) {
+          toast.toast({
+            variant: 'default',
+            description: 'Page published!'
+          })
+          router.push('/dashboard')
+        } else {
+          const error = await res.text()
+          console.error('Publish failed:', error)
+          toast.toast({
+            variant: 'destructive',
+            description: 'Failed to publish'
+          })
+        }
+      } else if (!projectId) {
         // CREATE and publish new project
         const res = await fetch('/api/projects', {
           method: 'POST',
