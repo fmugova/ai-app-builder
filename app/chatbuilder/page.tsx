@@ -1,4 +1,7 @@
+
 'use client'
+
+import PromptGuide from '@/components/PromptGuide'
 
 import { useState, useRef, useEffect } from 'react'
 import { useToast } from '@/hooks/use-toast'
@@ -17,6 +20,17 @@ export default function ChatBuilderPage() {
   const toast = useToast()
   const { data: session } = useSession()
   const router = useRouter()
+
+  // Auto-open PromptGuide on first visit
+  const [showGuideOnLoad, setShowGuideOnLoad] = useState(false)
+  useEffect(() => {
+    // Check if user has seen the guide
+    const hasSeenGuide = typeof window !== 'undefined' && localStorage.getItem('hasSeenPromptGuide')
+    if (!hasSeenGuide) {
+      setShowGuideOnLoad(true)
+      localStorage.setItem('hasSeenPromptGuide', 'true')
+    }
+  }, [])
 
   // Mobile menu state
   const [showMobileMenu, setShowMobileMenu] = useState(false)
@@ -681,7 +695,7 @@ export default function ChatBuilderPage() {
         <div className="p-4 border-t border-gray-200 bg-white mb-16">
           {/* Action Buttons Row - NOW AT TOP */}
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex gap-3 items-center">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -704,8 +718,9 @@ export default function ChatBuilderPage() {
               >
                 📋 Templates
               </button>
+              {/* Prompt Guide with autoOpen */}
+              <PromptGuide autoOpen={showGuideOnLoad} />
             </div>
-            
             {/* Separate Save & Publish Buttons */}
             {currentCode && (
               <div className="flex items-center gap-2">

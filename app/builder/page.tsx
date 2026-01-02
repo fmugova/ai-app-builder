@@ -8,7 +8,9 @@ import { templates } from '@/lib/templates'
 import { analytics } from '@/lib/analytics'
 import { Loader2 } from 'lucide-react'
 import { EnhancedPromptInput } from '@/components/EnhancedPromptInput'
+
 import { sanitizeForPreview } from '@/lib/sanitizeForPreview'
+import PromptGuide from '@/components/PromptGuide'
 
 
 function BuilderContent() {
@@ -418,7 +420,8 @@ function BuilderContent() {
               ← Dashboard
             </button>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              {/* Other buttons */}
               {generatedCode && (
                 <>
                   <button
@@ -433,14 +436,12 @@ function BuilderContent() {
                   >
                     📋 Copy
                   </button>
-                  
                   <button
                     onClick={downloadCode}
                     className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 text-sm"
                   >
                     💾 Download
                   </button>
-                  
                   {currentProjectId && (
                     <button
                       onClick={() => window.open(`/preview/${currentProjectId}`, '_blank', 'noopener,noreferrer')}
@@ -451,7 +452,7 @@ function BuilderContent() {
                   )}
                 </>
               )}
-              
+              <PromptGuide />
               <button
                 onClick={handleSave}
                 disabled={saving || !generatedCode}
