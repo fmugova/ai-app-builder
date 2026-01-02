@@ -64,11 +64,10 @@ export async function GET(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${page.title || page.name}</title>
+  <title>${page.title}</title>
   ${page.description ? `<meta name="description" content="${page.description}">` : ''}
-  ${page.seoKeywords ? `<meta name="keywords" content="${page.seoKeywords}">` : ''}
   ${page.ogImage ? `<meta property="og:image" content="${page.ogImage}">` : ''}
-  <meta property="og:title" content="${page.title || page.name}">
+  <meta property="og:title" content="${page.title}">
   <meta property="og:description" content="${page.description || ''}">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
