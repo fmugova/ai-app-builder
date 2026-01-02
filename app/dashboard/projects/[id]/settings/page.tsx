@@ -2,7 +2,7 @@ import { authOptions } from '@/lib/auth'
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
-import ProjectOverviewClient from './ProjectOverviewClient'
+import ProjectSettingsClient from './ProjectSettingsClient'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,7 +10,7 @@ interface PageProps {
   params: Promise<{ id: string }>
 }
 
-export default async function ProjectOverviewPage({ params }: PageProps) {
+export default async function ProjectSettingsPage({ params }: PageProps) {
   const session = await getServerSession(authOptions)
   
   if (!session?.user?.email) {
@@ -39,24 +39,8 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
     redirect('/dashboard?error=Project+not+found')
   }
 
-  // Get project analytics
-  const totalViews = project.views || 0
-  
-  // Get recent activity for this project
-  const recentActivity = await prisma.activity.findMany({
-    where: {
-      userId: user.id,
-      metadata: {
-        path: ['projectId'],
-        equals: project.id,
-      },
-    },
-    orderBy: { createdAt: 'desc' },
-    take: 10,
-  })
-
   return (
-    <ProjectOverviewClient
+    <ProjectSettingsClient
       project={{
         ...project,
         createdAt: project.createdAt.toISOString(),
@@ -66,16 +50,6 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
         name: user.name || '',
         email: user.email,
         isAdmin: user.role === 'admin',
-      }}
-      analytics={{
-        totalViews,
-        recentActivity: recentActivity.map(a => ({
-          id: a.id,
-          type: a.type,
-          action: a.action,
-          createdAt: a.createdAt.toISOString(),
-          metadata: a.metadata as any,
-        })),
       }}
     />
   )

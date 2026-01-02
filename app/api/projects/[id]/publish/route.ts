@@ -1,74 +1,52 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { authOptions } from '@/lib/auth'
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { prisma } from '@/lib/prisma'
 
-// Force dynamic rendering
-export const dynamic = 'force-dynamic';
+export const dynamic = 'force-dynamic'
 
-// Helper to generate unique slug
-function generateSlug(projectName: string, projectId: string): string {
-  const cleanName = projectName
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .substring(0, 50);
-  
-  const shortId = projectId.substring(0, 8);
-  return `${cleanName}-${shortId}`;
-}
-
+// POST - Publish project
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    
+    const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-    });
+    })
 
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const { id } = params;
+    const { id } = await params
 
-    // Get the project and verify ownership
     const project = await prisma.project.findFirst({
       where: {
         id,
-        userId: user.id,
+        ...(user.role !== 'admin' && { userId: user.id }),
       },
-      select: {
-        id: true,
-        name: true,
-      },
-    });
+    })
 
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
 
-    // Generate slug for publishing
-    const slug = generateSlug(project.name, project.id);
-    
-    // Update project as published
-    const publishedProject = await prisma.project.update({
+    // Generate public URL if not exists
+    const publicUrl = project.publicUrl || `https://buildflow-ai.app/p/${id}`
+
+    const updatedProject = await prisma.project.update({
       where: { id },
       data: {
         isPublished: true,
-        publishedAt: new Date(),
-        publicSlug: slug,
-        publicUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://buildflow-ai.app'}/sites/${slug}`,
+        publicUrl,
       },
-      select: { publicUrl: true, publicSlug: true }
-    });
+    })
 
     // Log activity
     await prisma.activity.create({
@@ -79,70 +57,78 @@ export async function POST(
         metadata: {
           projectId: project.id,
           projectName: project.name,
-          publicUrl: publishedProject.publicUrl,
         },
       },
-    });
+    })
 
-    return NextResponse.json({
-      success: true,
-      url: publishedProject.publicUrl,
-      slug: publishedProject.publicSlug,
-      message: 'Project published successfully! 🎉',
-    });
-
+    return NextResponse.json(updatedProject)
   } catch (error: any) {
-    console.error('❌ Publish error:', error);
+    console.error('Publish error:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to publish' },
+      { error: error.message || 'Failed to publish project' },
       { status: 500 }
-    );
+    )
   }
 }
 
-// Unpublish endpoint
+// DELETE - Unpublish project
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    
+    const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-    });
+    })
 
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const { id } = params;
+    const { id } = await params
 
-    // Update project as unpublished
-    await prisma.project.updateMany({
+    const project = await prisma.project.findFirst({
       where: {
         id,
-        userId: user.id,
+        ...(user.role !== 'admin' && { userId: user.id }),
       },
+    })
+
+    if (!project) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    }
+
+    const updatedProject = await prisma.project.update({
+      where: { id },
       data: {
         isPublished: false,
       },
-    });
+    })
 
-    return NextResponse.json({
-      success: true,
-      message: 'Project unpublished',
-    });
+    // Log activity
+    await prisma.activity.create({
+      data: {
+        userId: user.id,
+        type: 'project',
+        action: 'unpublished',
+        metadata: {
+          projectId: project.id,
+          projectName: project.name,
+        },
+      },
+    })
 
+    return NextResponse.json(updatedProject)
   } catch (error: any) {
-    console.error('❌ Unpublish error:', error);
+    console.error('Unpublish error:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to unpublish' },
+      { error: error.message || 'Failed to unpublish project' },
       { status: 500 }
-    );
+    )
   }
 }
