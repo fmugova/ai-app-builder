@@ -27,18 +27,18 @@ export async function GET(
     }
 
     // If not multi-page, return the main project code
-    if (!project.multiPage || !project.Pages.length) {
+    if (!project.multiPage || !project.pages.length) {
       return new NextResponse(project.code || '<h1>No content</h1>', {
         headers: { 'Content-Type': 'text/html' }
       })
     }
 
     // Find the requested page
-    let page = project.Pages.find(p => p.slug === slug)
-    
+    let page = project.pages.find(p => p.slug === slug)
+
     // If not found, try home page
     if (!page) {
-      page = project.Pages.find(p => p.isHome) || project.Pages[0]
+      page = project.pages.find(p => p.isHomepage) || project.pages[0]
     }
 
     if (!page) {
@@ -49,10 +49,10 @@ export async function GET(
     }
 
     // Build navigation
-    const navLinks = project.Pages
-      .filter(p => p.published)
+    const navLinks = project.pages
+      .filter(p => p.isPublished)
       .map(p => ({
-        name: p.name,
+        name: p.title,
         slug: p.slug,
         active: p.id === page.id
       }))
