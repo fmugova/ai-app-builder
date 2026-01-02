@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
     const { searchParams } = new URL(request.url)
@@ -13,7 +13,7 @@ export async function GET(
 
     // Get project
     const project = await prisma.project.findUnique({
-      where: { id: params.projectId },
+      where: { id: params.id },
       include: {
         Pages: {
           where: { published: true },

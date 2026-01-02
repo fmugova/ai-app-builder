@@ -22,7 +22,7 @@ export default function ProjectPagesPage() {
   const params = useParams()
   const { data: session, status } = useSession()
   
-  const projectId = params.projectId as string
+  const projectId = params.id as string
   
   const [pages, setPages] = useState<Page[]>([])
   const [loading, setLoading] = useState(true)
@@ -146,23 +146,15 @@ export default function ProjectPagesPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Pages</h1>
             <p className="text-sm text-gray-600 mt-1">
-              {pages.length} page{pages.length !== 1 ? 's' : ''}
+              Manage all pages for this project
             </p>
           </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setShowPageBuilder(true)}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
-            >
-              + Add Page
-            </button>
-            <button
-              onClick={() => router.push(`/dashboard/projects/${projectId}`)}
-              className="px-4 py-2 text-gray-600 hover:text-gray-900"
-            >
-              ← Back
-            </button>
-          </div>
+          <button
+            onClick={() => router.push(`/dashboard/projects/${projectId}`)}
+            className="px-4 py-2 text-gray-600 hover:text-gray-900"
+          >
+            ← Back to Project Overview
+          </button>
         </div>
       </header>
 

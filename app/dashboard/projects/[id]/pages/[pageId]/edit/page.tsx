@@ -24,7 +24,7 @@ export default function PageEditorPage() {
   const params = useParams()
   const { data: session, status } = useSession()
   
-  const projectId = params.projectId as string
+  const projectId = params.id as string
   const pageId = params.pageId as string
   
   const [page, setPage] = useState<Page | null>(null)
@@ -151,10 +151,10 @@ export default function PageEditorPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => router.push(`/dashboard/projects/${projectId}/pages`)}
+                onClick={() => router.push(`/dashboard/projects/${projectId}`)}
                 className="text-gray-600 hover:text-gray-900"
               >
-                ← Back
+                ← Back to Project Overview
               </button>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">{page.name}</h1>

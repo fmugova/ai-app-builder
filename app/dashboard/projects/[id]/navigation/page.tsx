@@ -18,7 +18,7 @@ export default function NavigationBuilderPage() {
   const params = useParams()
   const { data: session, status } = useSession()
   
-  const projectId = params.projectId as string
+  const projectId = params.id as string
   
   const [pages, setPages] = useState<Page[]>([])
   const [loading, setLoading] = useState(true)
@@ -162,10 +162,10 @@ export default function NavigationBuilderPage() {
             </p>
           </div>
           <button
-            onClick={() => router.push(`/dashboard/projects/${projectId}/pages`)}
+            onClick={() => router.push(`/dashboard/projects/${projectId}`)}
             className="px-4 py-2 text-gray-600 hover:text-gray-900"
           >
-            ← Back to Pages
+            ← Back to Project Overview
           </button>
         </div>
       </header>

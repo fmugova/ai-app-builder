@@ -1,12 +1,10 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { DashboardMobileMenu } from '@/components/DashboardMobileMenu'
 import { signOut } from 'next-auth/react'
-// ✅ ADDED: Import ProjectCard component
 import ProjectCard from '@/components/ProjectCard'
 import type { Project } from '@/types/project'
 
@@ -37,6 +35,12 @@ const MoonIcon = () => (
   </svg>
 )
 
+const StarIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+  </svg>
+)
+
 interface UserStats {
   projectsThisMonth: number
   projectsLimit: number
@@ -54,6 +58,12 @@ interface DashboardClientProps {
   isAdmin: boolean
 }
 
+interface Toast {
+  id: number
+  message: string
+  type: 'success' | 'error' | 'info'
+}
+
 export default function DashboardClient({
   initialProjects,
   stats,
@@ -62,28 +72,61 @@ export default function DashboardClient({
   isAdmin,
 }: DashboardClientProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [projects, setProjects] = useState<Project[]>(initialProjects)
   const [searchQuery, setSearchQuery] = useState('')
-  // ❌ REMOVED: showDeleteConfirm state - ProjectCard handles its own delete confirmations
   const [isDarkMode, setIsDarkMode] = useState(true)
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [exportProject, setExportProject] = useState<Project | null>(null)
-  // Account menu state
   const [showAccountMenu, setShowAccountMenu] = useState(false)
+  const [toasts, setToasts] = useState<Toast[]>([])
+  const [showTutorial, setShowTutorial] = useState(false)
 
-  // Log dashboard analytics event on mount
+  // Toast notification system
+  const addToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    const id = Date.now()
+    setToasts(prev => [...prev, { id, message, type }])
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id))
+    }, 4000) // 4 seconds
+  }
+
+  const removeToast = (id: number) => {
+    setToasts(prev => prev.filter(t => t.id !== id))
+  }
+
+  // Check for success messages in URL params
+  useEffect(() => {
+    const created = searchParams?.get('created')
+    const published = searchParams?.get('published')
+    const welcome = searchParams?.get('welcome')
+
+    if (created === 'true') {
+      addToast('🎉 Project created successfully!', 'success')
+      // Clean up URL
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, '', newUrl)
+    }
+
+    if (published === 'true') {
+      addToast('✨ Project published successfully!', 'success')
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, '', newUrl)
+    }
+
+    if (welcome === 'true') {
+      setTimeout(() => {
+        addToast(`👋 Welcome back, ${userName || 'Developer'}!`, 'info')
+      }, 500)
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, '', newUrl)
+    }
+  }, [searchParams, userName])
+
   useEffect(() => {
     fetch('/api/analytics?type=dashboard').catch(() => {})
   }, [])
 
-  // Analytics fetch for analytics page
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.pathname === '/dashboard/analytics') {
-      fetch('/api/analytics?type=site-stats&days=30&projectId=abc123').catch(() => {})
-    }
-  }, [])
-
-  // Load dark mode preference from localStorage
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme')
     if (savedTheme) {
@@ -91,7 +134,6 @@ export default function DashboardClient({
     }
   }, [])
 
-  // Save dark mode preference to localStorage and update document
   useEffect(() => {
     localStorage.setItem('theme', isDarkMode ? 'dark' : 'light')
     if (isDarkMode) {
@@ -101,7 +143,6 @@ export default function DashboardClient({
     }
   }, [isDarkMode])
 
-  // ✅ UPDATED: Simplified delete handler - ProjectCard handles confirmation UI
   const handleDeleteProject = async (projectId: string) => {
     try {
       const res = await fetch(`/api/projects/${projectId}`, {
@@ -110,36 +151,13 @@ export default function DashboardClient({
 
       if (res.ok) {
         setProjects(projects.filter(p => p.id !== projectId))
-        // ProjectCard handles its own modal, no need to close anything here
+        addToast('Project deleted successfully', 'success')
       } else {
-        alert('Failed to delete project')
+        addToast('Failed to delete project', 'error')
       }
     } catch (error) {
       console.error('Delete error:', error)
-      alert('Failed to delete project')
-    }
-  }
-
-  const handleDuplicateProject = async (projectId: string) => {
-    try {
-      const res = await fetch(`/api/projects/${projectId}/duplicate`, {
-        method: 'POST'
-      })
-
-      if (res.ok) {
-        const data = await res.json()
-        if (data.project) {
-          setProjects([data.project, ...projects])
-          alert('Project duplicated successfully!')
-        } else {
-          alert('Failed to duplicate project')
-        }
-      } else {
-        alert('Failed to duplicate project')
-      }
-    } catch (error) {
-      console.error('Duplicate error:', error)
-      alert('Failed to duplicate project')
+      addToast('Failed to delete project', 'error')
     }
   }
 
@@ -167,21 +185,40 @@ export default function DashboardClient({
     }
   }
 
-  const getTierBadge = (tier: string) => {
-    switch (tier) {
-      case 'enterprise': return { text: 'Enterprise', color: 'bg-purple-900 text-purple-200 border-purple-700' }
-      case 'business': return { text: 'Business', color: 'bg-blue-900 text-blue-200 border-blue-700' }
-      case 'pro': return { text: 'Pro', color: 'bg-green-900 text-green-200 border-green-700' }
-      default: return { text: 'Free', color: 'bg-gray-700 text-gray-300 border-gray-600' }
-    }
-  }
-
-  const tierBadge = getTierBadge(stats.subscriptionTier)
   const projectsPercentage = getUsagePercentage(stats.projectsThisMonth, stats.projectsLimit)
   const generationsPercentage = getUsagePercentage(stats.generationsUsed, stats.generationsLimit)
 
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
+      {/* Toast Notifications */}
+      <div className="fixed top-4 right-4 z-50 space-y-2">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`px-6 py-3 rounded-lg shadow-lg backdrop-blur-sm border animate-slide-in-right ${
+              toast.type === 'success' 
+                ? 'bg-green-900/90 border-green-700 text-green-100' 
+                : toast.type === 'error'
+                ? 'bg-red-900/90 border-red-700 text-red-100'
+                : 'bg-blue-900/90 border-blue-700 text-blue-100'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-lg">
+                {toast.type === 'success' ? '✓' : toast.type === 'error' ? '✕' : 'ℹ'}
+              </span>
+              <p className="font-medium">{toast.message}</p>
+              <button
+                onClick={() => removeToast(toast.id)}
+                className="ml-2 hover:opacity-70 transition"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* Header */}
       <header className="bg-gray-900/50 backdrop-blur-sm border-b border-gray-800 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -189,135 +226,77 @@ export default function DashboardClient({
             BuildFlow
           </a>
           <div className="flex items-center gap-3">
-            {/* Navigation Buttons */}
-            <a
-              href="/dashboard/submissions"
-              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition text-sm font-medium"
-            >
+            <Link href="/dashboard/submissions" className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition text-sm font-medium">
               Forms Submissions
-            </a>
-            <Link 
-              href="/dashboard/analytics"
-              className="px-4 py-2 text-gray-700 hover:text-gray-900 font-medium flex items-center gap-2"
-            >
+            </Link>
+            <Link href="/dashboard/analytics" className="px-4 py-2 text-gray-300 hover:text-white text-sm flex items-center gap-2">
               📊 Analytics
             </Link>
-            <Link 
-              href="/dashboard/domains"
-              className="px-4 py-2 text-gray-700 hover:text-gray-900 font-medium flex items-center gap-2"
-            >
+            <Link href="/dashboard/domains" className="px-4 py-2 text-gray-300 hover:text-white text-sm flex items-center gap-2">
               🌐 Custom Domains
             </Link>
-            <Link 
-              href="/dashboard/database"
-              className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition"
-            >
+            <Link href="/dashboard/database" className="px-4 py-2 text-gray-300 hover:text-white text-sm flex items-center gap-2">
               🗄️ Database
             </Link>
-            {/* Theme Toggle */}
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
               className="p-2 hover:bg-gray-800 rounded-lg transition"
               aria-label="Toggle theme"
-              title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
             >
               {isDarkMode ? <SunIcon /> : <MoonIcon />}
             </button>
-            {/* Settings */}
-            <a
-              href="/settings"
-              className="p-2 hover:bg-gray-800 rounded-lg transition"
-              title="Settings"
+            <button
+              className="p-2 hover:bg-gray-800 rounded-lg transition text-gray-300"
+              aria-label="Favorites"
             >
-              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 0V4m0 16v-4m8-4h-4m-8 0H4" /></svg>
-            </a>
-            {/* Pricing Link */}
-            <a
-              href="/pricing"
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition text-sm font-medium"
-            >
+              <StarIcon />
+            </button>
+            <Link href="/pricing" className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition text-sm font-medium">
               Upgrade
-            </a>
-            {/* Contact Support */}
-            <a
-              href="/contact"
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm font-medium"
-            >
+            </Link>
+            <Link href="/contact" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm font-medium">
               Contact Support
-            </a>
-            {/* Account Dropdown */}
+            </Link>
             <div className="relative">
               <button
-                onClick={() => setShowAccountMenu && setShowAccountMenu((v: boolean) => !v)}
-                className="flex items-center gap-2 p-2 hover:bg-gray-800 rounded-lg transition"
+                onClick={() => setShowAccountMenu(!showAccountMenu)}
+                className="flex items-center gap-2 px-3 py-2 hover:bg-gray-800 rounded-lg transition bg-green-900/30 border border-green-700"
               >
+                <span className="text-green-400 text-sm">✓</span>
+                <span className="text-white text-sm font-medium">Welcome back!</span>
                 <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
                   <span className="text-white text-sm font-bold">
                     {userName?.charAt(0).toUpperCase() || 'U'}
                   </span>
                 </div>
               </button>
-              {typeof setShowAccountMenu === 'function' && showAccountMenu && (
+              {showAccountMenu && (
                 <>
-                  {/* Backdrop */}
-                  <div 
-                    className="fixed inset-0 z-10" 
-                    onClick={() => setShowAccountMenu(false)}
-                  />
-                  {/* Dropdown Menu */}
+                  <div className="fixed inset-0 z-10" onClick={() => setShowAccountMenu(false)} />
                   <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20">
                     <div className="p-3 border-b border-gray-700">
-                      <p className="text-white font-medium text-sm truncate">
-                        {userName || 'User'}
-                      </p>
-                      <p className="text-gray-400 text-xs truncate">
-                        {userEmail}
-                      </p>
-                      {isAdmin && (
-                        <span className="inline-flex items-center gap-1 mt-2 px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded-full">
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V7l7-4z" /></svg>
-                          Admin
-                        </span>
-                      )}
+                      <p className="text-white font-medium text-sm truncate">{userName || 'User'}</p>
+                      <p className="text-gray-400 text-xs truncate">{userEmail}</p>
                     </div>
                     <div className="py-1">
-                      <a
-                        href="/settings"
-                        onClick={() => setShowAccountMenu(false)}
-                        className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm transition"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 0V4m0 16v-4m8-4h-4m-8 0H4" /></svg>
-                        Settings
-                      </a>
-                      <a
-                        href="/settings/billing"
-                        onClick={() => setShowAccountMenu(false)}
-                        className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm transition"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
-                        Billing
-                      </a>
+                      <Link href="/settings" className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm">
+                        ⚙️ Settings
+                      </Link>
+                      <Link href="/billing" className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm">
+                        💳 Billing
+                      </Link>
                       {isAdmin && (
-                        <a
-                          href="/admin"
-                          onClick={() => setShowAccountMenu(false)}
-                          className="flex items-center gap-2 px-4 py-2 text-yellow-400 hover:bg-gray-700 text-sm transition"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V7l7-4z" /></svg>
-                          Admin Panel
-                        </a>
+                        <Link href="/admin" className="flex items-center gap-2 px-4 py-2 text-yellow-400 hover:bg-gray-700 text-sm">
+                          👑 Admin Panel
+                        </Link>
                       )}
                     </div>
                     <div className="border-t border-gray-700">
                       <button
-                        onClick={() => {
-                          setShowAccountMenu(false)
-                          signOut()
-                        }}
-                        className="flex items-center gap-2 w-full px-4 py-2 text-red-400 hover:bg-gray-700 text-sm transition"
+                        onClick={() => signOut()}
+                        className="flex items-center gap-2 w-full px-4 py-2 text-red-400 hover:bg-gray-700 text-sm"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1" /></svg>
-                        Sign Out
+                        🚪 Sign Out
                       </button>
                     </div>
                   </div>
@@ -329,26 +308,22 @@ export default function DashboardClient({
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Builder Navigation Cards */}
+        {/* Builder Navigation */}
         <div className="grid grid-cols-2 gap-4 mb-8">
-          <Link href="/builder">
-            <div className="p-6 border rounded-lg hover:shadow transition bg-white dark:bg-gray-800">
-              <h3 className="font-bold">Traditional Builder</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-300">Your current workflow</p>
-            </div>
+          <Link href="/builder" className={`p-6 border rounded-lg hover:shadow transition ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+            <h3 className={`font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Traditional Builder</h3>
+            <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Your current workflow</p>
           </Link>
-
-          <Link href="/chatbuilder">
-            <div className="p-6 border rounded-lg bg-blue-50 dark:bg-blue-900/30 hover:shadow transition">
-              <h3 className="font-bold">Chat Builder 🆕</h3>
-              <p className="text-sm text-blue-600 dark:text-blue-200">Upload files • Iterate with AI</p>
-            </div>
+          <Link href="/chatbuilder" className={`p-6 border rounded-lg hover:shadow transition ${isDarkMode ? 'bg-blue-900/30 border-blue-800' : 'bg-blue-50 border-blue-200'}`}>
+            <h3 className={`font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Chat Builder 🆕</h3>
+            <p className={`text-sm ${isDarkMode ? 'text-blue-200' : 'text-blue-600'}`}>Upload files • Iterate with AI</p>
           </Link>
         </div>
-        {/* Welcome Section */}
+
+        {/* Welcome */}
         <div className="mb-8">
           <h2 className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-2`}>
-            Welcome back, {userName || 'Developer'}! 👋
+            Welcome back, {userName || 'Fidelis Mugova'}! 👋
           </h2>
           <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>
             {projects.length === 0 
@@ -358,10 +333,9 @@ export default function DashboardClient({
           </p>
         </div>
 
-        {/* Usage Stats Cards */}
+        {/* Usage Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Projects Usage */}
-          <div className={`${isDarkMode ? 'bg-gray-800 border-gray-700 hover:border-gray-600' : 'bg-white border-gray-200 hover:border-gray-300'} rounded-2xl p-6 border transition`}>
+          <div className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl p-6 border`}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className={`w-12 h-12 ${isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'} rounded-xl flex items-center justify-center`}>
@@ -377,19 +351,13 @@ export default function DashboardClient({
             </div>
             <div className="space-y-2">
               <div className={`w-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'} rounded-full h-2`}>
-                <div
-                  className={`h-2 rounded-full transition-all ${getUsageColor(projectsPercentage)}`}
-                  style={{ width: `${projectsPercentage}%` }}
-                ></div>
+                <div className={`h-2 rounded-full ${getUsageColor(projectsPercentage)}`} style={{ width: `${projectsPercentage}%` }}></div>
               </div>
-              <p className="text-xs text-gray-400">
-                {projectsPercentage.toFixed(0)}% used this month
-              </p>
+              <p className="text-xs text-gray-400">{projectsPercentage.toFixed(0)}% used this month</p>
             </div>
           </div>
 
-          {/* Generations Usage */}
-          <div className={`${isDarkMode ? 'bg-gray-800 border-gray-700 hover:border-gray-600' : 'bg-white border-gray-200 hover:border-gray-300'} rounded-2xl p-6 border transition`}>
+          <div className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl p-6 border`}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className={`w-12 h-12 ${isDarkMode ? 'bg-purple-900/30' : 'bg-purple-100'} rounded-xl flex items-center justify-center`}>
@@ -405,18 +373,12 @@ export default function DashboardClient({
             </div>
             <div className="space-y-2">
               <div className={`w-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'} rounded-full h-2`}>
-                <div
-                  className={`h-2 rounded-full transition-all ${getUsageColor(generationsPercentage)}`}
-                  style={{ width: `${generationsPercentage}%` }}
-                ></div>
+                <div className={`h-2 rounded-full ${getUsageColor(generationsPercentage)}`} style={{ width: `${generationsPercentage}%` }}></div>
               </div>
-              <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                {generationsPercentage.toFixed(0)}% used this month
-              </p>
+              <p className="text-xs text-gray-400">{generationsPercentage.toFixed(0)}% used this month</p>
             </div>
           </div>
 
-          {/* Subscription Status */}
           <div className={`bg-gradient-to-br ${getTierColor(stats.subscriptionTier)} rounded-2xl p-6 border border-gray-700`}>
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -428,10 +390,7 @@ export default function DashboardClient({
               </div>
             </div>
             {stats.subscriptionTier === 'free' && (
-              <Link
-                href="/pricing"
-                className="block w-full bg-white text-gray-900 hover:bg-gray-100 py-2 rounded-lg transition font-semibold text-sm text-center"
-              >
+              <Link href="/pricing" className="block w-full bg-white text-gray-900 hover:bg-gray-100 py-2 rounded-lg transition font-semibold text-sm text-center">
                 Upgrade to Pro
               </Link>
             )}
@@ -440,9 +399,8 @@ export default function DashboardClient({
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {/* New Project */}
-          <button
-            onClick={() => router.push('/builder')}
+          <button 
+            onClick={() => router.push('/builder')} 
             className="flex items-center gap-3 p-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-xl transition group"
           >
             <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition">
@@ -454,60 +412,92 @@ export default function DashboardClient({
             </div>
           </button>
 
-          {/* Templates */}
-          <button
+          <button 
             onClick={() => router.push('/templates')}
-            className={`flex items-center gap-3 p-4 ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700 border-gray-700' : 'bg-white hover:bg-gray-50 border-gray-200'} border hover:border-purple-500 rounded-xl transition group`}
+            className={`flex items-center gap-3 p-4 rounded-xl transition group ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-50'} border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}
           >
-            <div className={`w-10 h-10 ${isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'} rounded-lg flex items-center justify-center group-hover:scale-110 transition`}>
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center group-hover:scale-110 transition ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
               <span className="text-2xl">📋</span>
             </div>
             <div className="text-left">
-              <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'} group-hover:text-blue-400 transition`}>Templates</p>
-              <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>6 ready to use</p>
+              <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Templates</p>
+              <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>6 ready to use</p>
             </div>
           </button>
 
-          {/* Tutorial */}
-          <button
-            onClick={() => {
-              localStorage.removeItem('buildflow_onboarding_completed')
-              window.location.reload()
-            }}
-            className={`flex items-center gap-3 p-4 ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700 border-gray-700' : 'bg-white hover:bg-gray-50 border-gray-200'} border hover:border-green-500 rounded-xl transition group`}
+          <button 
+            onClick={() => setShowTutorial(true)}
+            className={`flex items-center gap-3 p-4 rounded-xl transition group ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-50'} border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}
           >
-            <div className={`w-10 h-10 ${isDarkMode ? 'bg-green-900/30' : 'bg-green-100'} rounded-lg flex items-center justify-center group-hover:scale-110 transition`}>
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center group-hover:scale-110 transition ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
               <span className="text-2xl">🎓</span>
             </div>
             <div className="text-left">
-              <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'} group-hover:text-green-400 transition`}>Tutorial</p>
-              <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Learn the basics</p>
+              <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Tutorial</p>
+              <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Learn the basics</p>
             </div>
           </button>
 
-          {/* Get Help */}
-          <button
-            onClick={() => {
-              const email = userEmail || ''
-              const subject = 'BuildFlow Support Request'
-              const body = `Hi BuildFlow Team,\n\nI need help with:\n\n[Describe your issue here]\n\nUser: ${email}\nProjects: ${projects.length}`
-              window.location.href = `mailto:support@buildflow-ai.app?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-            }}
-            className={`flex items-center gap-3 p-4 ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700 border-gray-700' : 'bg-white hover:bg-gray-50 border-gray-200'} border hover:border-orange-500 rounded-xl transition group`}
+          <button 
+            onClick={() => window.location.href = 'mailto:support@buildflow-ai.app'}
+            className={`flex items-center gap-3 p-4 rounded-xl transition group ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-50'} border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}
           >
-            <div className={`w-10 h-10 ${isDarkMode ? 'bg-orange-900/30' : 'bg-orange-100'} rounded-lg flex items-center justify-center group-hover:scale-110 transition`}>
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center group-hover:scale-110 transition ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
               <span className="text-2xl">💬</span>
             </div>
             <div className="text-left">
-              <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'} group-hover:text-orange-400 transition`}>Get Help</p>
-              <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Email support</p>
+              <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Get Help</p>
+              <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Email support</p>
             </div>
           </button>
         </div>
 
+        {/* Multi-Page Features Banner */}
+        {projects.length > 0 && (
+          <div className={`mb-8 ${isDarkMode ? 'bg-gradient-to-r from-purple-900/30 to-blue-900/30 border-purple-800' : 'bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200'} rounded-2xl p-6 border`}>
+            <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-4`}>
+              🚀 Multi-Page Project Tools
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-gray-800/50' : 'bg-white'}`}>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center">
+                    <span className="text-xl">📄</span>
+                  </div>
+                  <h4 className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Pages Manager</h4>
+                </div>
+                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Create and organize multiple pages
+                </p>
+              </div>
+              <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-gray-800/50' : 'bg-white'}`}>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                    <span className="text-xl">🧭</span>
+                  </div>
+                  <h4 className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Navigation</h4>
+                </div>
+                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Design site navigation
+                </p>
+              </div>
+              <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-gray-800/50' : 'bg-white'}`}>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
+                    <span className="text-xl">🔍</span>
+                  </div>
+                  <h4 className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>SEO</h4>
+                </div>
+                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Optimize for search engines
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Projects Section */}
         <div className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-2xl p-6 border`}>
-          {/* Projects Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-1`}>Your Projects</h3>
@@ -515,30 +505,25 @@ export default function DashboardClient({
                 {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''} found
               </p>
             </div>
-
             <div className="flex gap-3">
               <input
                 type="text"
                 placeholder="Search projects..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={`px-4 py-2 ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-gray-100 border-gray-300 text-gray-900 placeholder-gray-500'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                className={`px-4 py-2 ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-gray-100 border-gray-300 placeholder-gray-500'} border rounded-lg`}
               />
-              <Link
-                href="/builder"
-                className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition font-medium flex items-center gap-2"
-              >
-                <span>✨</span>
-                <span>New Project</span>
+              <Link href="/builder" className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition font-medium flex items-center gap-2">
+                <span className="text-lg">✨</span>
+                New Project
               </Link>
             </div>
           </div>
 
-          {/* ✅ REPLACED: Projects Grid - Now uses ProjectCard component */}
           {filteredProjects.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredProjects.map((project) => (
-                <div key={project.id} className="relative">
+                <div key={project.id}>
                   <ProjectCard
                     project={{
                       ...project,
@@ -551,30 +536,26 @@ export default function DashboardClient({
                       views: project.views ?? 0,
                     }}
                     onDelete={() => handleDeleteProject(project.id)}
-                    onRefresh={() => {
-                      window.location.reload()
-                    }}
+                    onRefresh={() => window.location.reload()}
                   />
-                  {/* Navigation Links for Multi-Page Features */}
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    <Link
-                      href={`/dashboard/projects/${project.id}/pages`}
-                      className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded text-gray-700"
-                    >
-                      📄 Pages
-                    </Link>
-                    <Link
-                      href={`/dashboard/projects/${project.id}/navigation`}
-                      className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded text-gray-700"
-                    >
-                      🧭 Navigation
-                    </Link>
-                    <Link
-                      href={`/dashboard/projects/${project.id}/seo`}
-                      className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded text-gray-700"
-                    >
-                      🔍 SEO
-                    </Link>
+                  <div className={`mt-3 p-3 rounded-lg border ${isDarkMode ? 'bg-gray-800/50 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
+                    <p className={`text-xs font-medium mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      Manage
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Link href={`/dashboard/projects/${project.id}`} className={`px-3 py-1.5 text-xs rounded-md ${isDarkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'} transition`}>
+                        ⚙️ Overview
+                      </Link>
+                      <Link href={`/dashboard/projects/${project.id}/pages`} className={`px-3 py-1.5 text-xs rounded-md ${isDarkMode ? 'bg-purple-900/50 text-purple-300 hover:bg-purple-900/70' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'} transition`}>
+                        📄 Pages
+                      </Link>
+                      <Link href={`/dashboard/projects/${project.id}/navigation`} className={`px-3 py-1.5 text-xs rounded-md ${isDarkMode ? 'bg-blue-900/50 text-blue-300 hover:bg-blue-900/70' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'} transition`}>
+                        🧭 Nav
+                      </Link>
+                      <Link href={`/dashboard/projects/${project.id}/seo`} className={`px-3 py-1.5 text-xs rounded-md ${isDarkMode ? 'bg-green-900/50 text-green-300 hover:bg-green-900/70' : 'bg-green-100 text-green-700 hover:bg-green-200'} transition`}>
+                        🔍 SEO
+                      </Link>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -585,167 +566,38 @@ export default function DashboardClient({
                 <span className="text-5xl">📭</span>
               </div>
               <h3 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-2`}>
-                {searchQuery ? 'No projects found' : 'No projects yet'}
+                {searchQuery ? 'No projects match your search' : 'No projects yet'}
               </h3>
-              <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-6`}>
-                {searchQuery ? 'Try a different search term' : 'Start building your first AI-powered application'}
+              <p className={`mb-6 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                {searchQuery ? 'Try a different search term' : "Let's create your first AI-powered project"}
               </p>
-              <Link
-                href="/builder"
-                className="inline-block px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition font-medium"
-              >
+              <Link href="/builder" className="inline-block px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition font-medium">
                 Create Your First Project
               </Link>
             </div>
           )}
         </div>
-
-        {/* Upgrade CTA for Free Users */}
-        {stats.subscriptionTier === 'free' && projects.length > 0 && (
-          <div className="mt-8 bg-gradient-to-r from-purple-900/50 to-pink-900/50 rounded-2xl p-8 border border-purple-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-2xl font-bold text-white mb-2">
-                  Ready to build more? 🚀
-                </h3>
-                <p className="text-gray-300 mb-4">
-                  Upgrade to Pro for unlimited projects, faster AI generations, and priority support.
-                </p>
-                <ul className="space-y-2 text-sm text-gray-300">
-                  <li className="flex items-center gap-2">
-                    <span className="text-green-400">✓</span>
-                    <span>Unlimited projects</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="text-green-400">✓</span>
-                    <span>500 AI generations/month</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="text-green-400">✓</span>
-                    <span>Priority support</span>
-                  </li>
-                </ul>
-              </div>
-              <div className="text-right">
-                <Link
-                  href="/pricing"
-                  className="inline-block px-8 py-4 bg-white text-gray-900 hover:bg-gray-100 rounded-lg transition font-bold text-lg mb-2"
-                >
-                  Upgrade to Pro
-                </Link>
-                <p className="text-sm text-gray-400">Starting at $29/month</p>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Onboarding Tutorial - Auto-shows on first visit */}
       <OnboardingTutorial />
-      
-      {/* Quick Tips - Shows helpful tips periodically */}
       <QuickTips />
 
-      {/* Code Preview Modal */}
-      {selectedProject && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} shadow-2xl flex flex-col`}>
-            {/* Header */}
-            <div className={`px-6 py-4 border-b ${isDarkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gray-50'} flex items-center justify-between`}>
-              <div>
-                <h3 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                  {selectedProject.name}
-                </h3>
-                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                  View and copy your project code
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={async () => {
-                    if (selectedProject.code) {
-                      await navigator.clipboard.writeText(selectedProject.code)
-                      alert('Code copied to clipboard!')
-                    }
-                  }}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium flex items-center gap-2"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                  Copy Code
-                </button>
-                <button
-                  onClick={() => setSelectedProject(null)}
-                  className={`p-2 ${isDarkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-200 text-gray-600'} rounded-lg transition-colors`}
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            {/* Code Content */}
-            <div className="flex-1 overflow-auto p-6">
-              {selectedProject.code ? (
-                <pre className={`text-sm ${isDarkMode ? 'bg-gray-900 text-gray-300' : 'bg-gray-100 text-gray-800'} p-4 rounded-lg overflow-x-auto`}>
-                  <code>{selectedProject.code}</code>
-                </pre>
-              ) : (
-                <div className="text-center py-12">
-                  <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    No code available for this project
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Export Modal */}
-      {exportProject && exportProject.code && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl max-w-md w-full border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} shadow-2xl overflow-hidden`}>
-            {/* Header */}
-            <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xl font-bold flex items-center gap-2">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    Export Project
-                  </h3>
-                  <p className="text-sm text-green-100 mt-1">{exportProject.name}</p>
-                </div>
-                <button
-                  onClick={() => setExportProject(null)}
-                  className="text-white hover:bg-white/20 rounded-lg p-2 transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            {/* Render the SimpleExportButton component here */}
-            <div className="p-4">
-              <SimpleExportButton
-                projectId={exportProject.id}
-                projectName={exportProject.name}
-                projectCode={exportProject.code}
-                projectType="nextjs"
-                onSuccess={() => {
-                  console.log('Export successful')
-                  setExportProject(null)
-                }}
-                onError={(error) => console.error('Export error:', error)}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Add CSS for toast animation */}
+      <style jsx global>{`
+        @keyframes slide-in-right {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        .animate-slide-in-right {
+          animation: slide-in-right 0.3s ease-out;
+        }
+      `}</style>
     </div>
   )
 }
