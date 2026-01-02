@@ -1,12 +1,14 @@
 generator client {
   provider      = "prisma-client-js"
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+  schemas   = ["public", "auth"]
 }
 
 model Account {
@@ -25,6 +27,7 @@ model Account {
   User              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@schema("public")
 }
 
 model Session {
@@ -33,6 +36,7 @@ model Session {
   userId       String
   expires      DateTime
   User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@schema("public")
 }
 
 model VerificationToken {
@@ -41,6 +45,7 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+  @@schema("public")
 }
 
 model User {
@@ -93,9 +98,11 @@ model User {
   subscriptions         Subscription?
   vercelConnection      VercelConnection?
   DatabaseConnections   DatabaseConnection[]
+  @@schema("public")
 }
 
 model VercelConnection {
+    @@schema("auth")
   id              String   @id @default(cuid())
   userId          String   @unique
   accessToken     String
@@ -112,6 +119,7 @@ model VercelConnection {
 }
 
 model Deployment {
+    @@schema("auth")
   id              String   @id @default(cuid())
   projectId       String
   userId          String
@@ -134,6 +142,7 @@ model Deployment {
 }
 
 model NewsletterSubscriber {
+    @@schema("auth")
   id             String    @id @default(cuid())
   email          String    @unique
   name           String?
@@ -153,6 +162,7 @@ model NewsletterSubscriber {
 }
 
 model EmailCampaign {
+    @@schema("auth")
   id                String      @id @default(cuid())
   name              String
   subject           String
@@ -180,6 +190,7 @@ model EmailCampaign {
 }
 
 model EmailSend {
+    @@schema("auth")
   id              String        @id @default(cuid())
   campaignId      String
   subscriberEmail String
@@ -199,6 +210,7 @@ model EmailSend {
 }
 
 model DripCampaign {
+    @@schema("auth")
   id          String           @id @default(cuid())
   name        String
   description String?
@@ -214,6 +226,7 @@ model DripCampaign {
 }
 
 model DripEmail {
+    @@schema("auth")
   id          String       @id @default(cuid())
   campaignId  String
   name        String
@@ -231,6 +244,7 @@ model DripEmail {
 }
 
 model DripEnrollment {
+    @@schema("auth")
   id             String       @id @default(cuid())
   campaignId     String
   userEmail      String
@@ -249,6 +263,7 @@ model DripEnrollment {
 }
 
 model Project {
+    @@schema("public")
   id              String           @id @default(cuid())
   userId          String
   name            String
@@ -289,6 +304,7 @@ model Project {
 }
 
 model Page {
+    @@schema("public")
   id          String   @id @default(cuid())
   title       String
   slug        String
@@ -315,6 +331,7 @@ model Page {
 }
 
 model ProjectVersion {
+    @@schema("public")
   id          String   @id @default(cuid())
   projectId   String
   version     Int
@@ -330,6 +347,7 @@ model ProjectVersion {
 }
 
 model Generation {
+    @@schema("public")
   id        String   @id @default(cuid())
   userId    String
   createdAt DateTime @default(now())
@@ -343,6 +361,7 @@ model Generation {
 }
 
 model Activity {
+    @@schema("public")
   id        String   @id @default(cuid())
   userId    String
   type      String
@@ -356,6 +375,7 @@ model Activity {
 }
 
 model Feedback {
+    @@schema("public")
   id        String   @id @default(cuid())
   userId    String
   type      String
@@ -374,6 +394,7 @@ model Feedback {
 }
 
 model ProjectShare {
+    @@schema("public")
   id         String    @id @default(cuid())
   projectId  String
   sharedWith String
@@ -388,6 +409,7 @@ model ProjectShare {
 }
 
 model PromoCodes {
+    @@schema("public")
   id            String    @id @default(cuid())
   code          String    @unique
   discountType  String
@@ -406,6 +428,7 @@ model PromoCodes {
 }
 
 model Subscription {
+    @@schema("public")
   id                   String    @id @default(cuid())
   userId               String    @unique
   stripeCustomerId     String?   @unique
@@ -426,6 +449,7 @@ model Subscription {
 }
 
 model AnalyticsEvent {
+    @@schema("public")
   id         String   @id @default(cuid())
   userId     String?
   event      String
@@ -438,6 +462,7 @@ model AnalyticsEvent {
 }
 
 model FormSubmission {
+    @@schema("public")
   id          String   @id @default(cuid())
   projectId   String
   userId      String
@@ -455,6 +480,7 @@ model FormSubmission {
 }
 
 model CustomDomain {
+    @@schema("public")
   id              String    @id @default(cuid())
   projectId       String
   domain          String    @unique
@@ -476,6 +502,7 @@ model CustomDomain {
 
 // Database Connection Configuration
 model DatabaseConnection {
+    @@schema("public")
   id              String    @id @default(cuid())
   userId          String
   projectId       String?   @unique
@@ -503,6 +530,7 @@ model DatabaseConnection {
 
 // Database Tables
 model DatabaseTable {
+    @@schema("public")
   id                    String    @id @default(cuid())
   databaseConnectionId  String
   name                  String
