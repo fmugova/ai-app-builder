@@ -16,7 +16,7 @@ export async function GET(
       where: { id: params.id },
       include: {
         pages: {
-          where: { published: true },
+          where: { isPublished: true },
           orderBy: { order: 'asc' }
         }
       }
