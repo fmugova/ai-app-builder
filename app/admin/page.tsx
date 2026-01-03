@@ -1069,7 +1069,9 @@ export default function AdminDashboard() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-400 mb-1">Message</label>
-                <p className="text-white bg-gray-900 p-4 rounded-lg">{viewingFeedback.message}</p>
+                <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                  <p className="whitespace-pre-wrap text-gray-900 dark:text-white">{viewingFeedback.message}</p>
+                </div>
               </div>
 
               {viewingFeedback.response && (

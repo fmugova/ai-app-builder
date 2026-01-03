@@ -1,4 +1,5 @@
 import './globals.css'
+import MobileDashboardNav from '@/components/MobileDashboardNav'
 import { Inter } from 'next/font/google'
 import Providers from './providers';
 import { Analytics } from '@vercel/analytics/next'
@@ -167,7 +168,10 @@ export default function RootLayout({
         />
       </head>
       <body className={inter.className}>
-        <Providers>{children}</Providers>
+        <MobileDashboardNav />
+        <main className="pt-16">
+          <Providers>{children}</Providers>
+        </main>
         <Analytics />
         <SpeedInsights />
         <GoogleAnalytics gaId="GTM-KNTK3Z8G" />

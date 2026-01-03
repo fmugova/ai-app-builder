@@ -83,8 +83,11 @@ export default function DashboardClient({
   const [showTutorial, setShowTutorial] = useState(false)
 
   // Toast notification system
+  // Reliable toast id counter
+  const toastIdRef = React.useRef(0)
   const addToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    const id = Date.now()
+    toastIdRef.current += 1
+    const id = toastIdRef.current
     setToasts(prev => [...prev, { id, message, type }])
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id))
