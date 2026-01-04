@@ -147,6 +147,7 @@ export async function POST(request: Request) {
       // After successful GitHub repo creation:
       await prisma.deployment.create({
         data: {
+          id: crypto.randomUUID(),
           projectId,
           userId: user.id,
           platform: 'github',
@@ -157,7 +158,8 @@ export async function POST(request: Request) {
           logs: JSON.stringify({
             repoUrl: repoData.html_url,
             repoName: repoName
-          })
+          }),
+          updatedAt: new Date()
         }
       });
     }
