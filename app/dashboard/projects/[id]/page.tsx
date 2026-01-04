@@ -29,7 +29,7 @@ export default async function ProjectOverviewPage({ params }: ProjectPageProps) 
 
   const { id } = await params
 
-  // Get project
+  // Get project - using CORRECT Prisma field names
   const project = await prisma.project.findFirst({
     where: {
       id,
@@ -40,10 +40,8 @@ export default async function ProjectOverviewPage({ params }: ProjectPageProps) 
       name: true,
       description: true,
       code: true,
-      published: true,
-      publishedUrl: true,
-      deployedUrl: true,
-      githubUrl: true,
+      isPublished: true,      // Prisma uses isPublished
+      publicUrl: true,        // Prisma uses publicUrl
       createdAt: true,
       updatedAt: true,
     }
@@ -66,7 +64,14 @@ export default async function ProjectOverviewPage({ params }: ProjectPageProps) 
       <div className="pt-0">
         <ProjectOverviewClient
           project={{
-            ...project,
+            id: project.id,
+            name: project.name,
+            description: project.description,
+            code: project.code,
+            published: project.isPublished,           // Map isPublished → published
+            publishedUrl: project.publicUrl,          // Map publicUrl → publishedUrl
+            deployedUrl: null,                        // These might not exist
+            githubUrl: null,
             createdAt: project.createdAt.toISOString(),
             updatedAt: project.updatedAt.toISOString(),
           }}
