@@ -73,6 +73,7 @@ export async function POST(
         // Track send
         await prisma.emailSend.create({
           data: {
+            id: crypto.randomUUID(),
             campaignId: campaign.id,
             subscriberEmail: subscriber.email,
             user_id: session.user.id
