@@ -1,5 +1,8 @@
 import './globals.css'
-import MobileDashboardNav from '@/components/MobileDashboardNav'
+import UnifiedMobileNav from '@/components/UnifiedMobileNav'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 import { Inter } from 'next/font/google'
 import Providers from './providers';
 import { Analytics } from '@vercel/analytics/next'
@@ -146,11 +149,11 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const session = await getServerSession(authOptions)
+  // Check if user is admin
+  const isAdmin = session?.user?.email ? await checkIfAdmin(session.user.email) : false
+
   return (
     <html lang="en">
       <head>
@@ -168,7 +171,13 @@ export default function RootLayout({
         />
       </head>
       <body className={inter.className}>
-        <MobileDashboardNav />
+        {session && (
+          <UnifiedMobileNav
+            userName={session.user?.name || undefined}
+            userEmail={session.user?.email || undefined}
+            isAdmin={isAdmin}
+          />
+        )}
         <main className="pt-16">
           <Providers>{children}</Providers>
         </main>
@@ -181,4 +190,13 @@ export default function RootLayout({
       </body>
     </html>
   )
+}
+
+// Helper function
+async function checkIfAdmin(email: string) {
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { role: true }
+  })
+  return user?.role === 'admin'
 }

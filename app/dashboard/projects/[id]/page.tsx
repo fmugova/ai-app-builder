@@ -2,7 +2,8 @@ import { authOptions } from '@/lib/auth'
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
-import ProjectOverviewClient from './ProjectOverviewClient'
+import UnifiedMobileNav from '@/components/UnifiedMobileNav'
+import React from 'react'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,27 +57,39 @@ export default async function ProjectOverviewPage({ params }: PageProps) {
   })
 
   return (
-    <ProjectOverviewClient
-      project={{
-        ...project,
-        createdAt: project.createdAt.toISOString(),
-        updatedAt: project.updatedAt.toISOString(),
-      }}
-      user={{
-        name: user.name || '',
-        email: user.email,
-        isAdmin: user.role === 'admin',
-      }}
-      analytics={{
-        totalViews,
-        recentActivity: recentActivity.map(a => ({
-          id: a.id,
-          type: a.type,
-          action: a.action,
-          createdAt: a.createdAt.toISOString(),
-          metadata: a.metadata as any,
-        })),
-      }}
-    />
+    <>
+      {/* Override root nav with project context */}
+      <UnifiedMobileNav
+        userName={user.name || undefined}
+        userEmail={user.email}
+        isAdmin={user.role === 'admin'}
+        currentProjectId={project.id}
+        currentProjectName={project.name}
+      />
+      <div className="pt-0">
+        <ProjectOverviewClient
+          project={{
+            ...project,
+            createdAt: project.createdAt.toISOString(),
+            updatedAt: project.updatedAt.toISOString(),
+          }}
+          user={{
+            name: user.name || '',
+            email: user.email,
+            isAdmin: user.role === 'admin',
+          }}
+          analytics={{
+            totalViews,
+            recentActivity: recentActivity.map(a => ({
+              id: a.id,
+              type: a.type,
+              action: a.action,
+              createdAt: a.createdAt.toISOString(),
+              metadata: a.metadata as any,
+            })),
+          }}
+        />
+      </div>
+    </>
   )
 }
