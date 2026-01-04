@@ -49,11 +49,20 @@ export default async function CustomDomainsPage({ params }: DomainsPageProps) {
     orderBy: { createdAt: 'desc' }
   })
 
+  // Convert dates to strings for serialization
+  const serializedDomains = domains.map(domain => ({
+    ...domain,
+    createdAt: domain.createdAt.toISOString(),
+    updatedAt: domain.updatedAt.toISOString(),
+    verifiedAt: domain.verifiedAt?.toISOString() || null,
+    sslIssuedAt: domain.sslIssuedAt?.toISOString() || null,
+  }))
+
   return (
     <DomainsClient
       projectId={projectId}
       projectName={project.name}
-      initialDomains={domains}
+      initialDomains={serializedDomains}
     />
   )
 }
