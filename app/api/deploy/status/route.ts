@@ -21,10 +21,10 @@ export async function GET(request: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-      include: { vercelConnection: true }
+      include: { VercelConnection: true }
     });
 
-    if (!user?.vercelConnection) {
+    if (!user?.VercelConnection) {
       return NextResponse.json({ error: 'Vercel not connected' }, { status: 400 });
     }
 
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
       `https://api.vercel.com/v13/deployments/${deploymentId}`,
       {
         headers: {
-          'Authorization': `Bearer ${user.vercelConnection.accessToken}`
+          'Authorization': `Bearer ${user.VercelConnection.accessToken}`
         }
       }
     );
