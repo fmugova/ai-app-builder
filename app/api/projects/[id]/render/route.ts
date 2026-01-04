@@ -11,25 +11,51 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { searchParams } = new URL(request.url)
-    const slug = searchParams.get('slug') || 'home'
+    const hostname = request.headers.get('host') || ''
 
-    const { id } = await params
-
-    // Get project
-    const project = await prisma.project.findUnique({
-      where: { id },
+    // Check if this is a custom domain
+    const customDomain = await prisma.customDomain.findFirst({
+      where: {
+        domain: hostname,
+        status: 'active'
+      },
       include: {
-        pages: {
-          where: { isPublished: true },
-          orderBy: { order: 'asc' }
+        project: {
+          include: {
+            pages: {
+              where: { isPublished: true },
+              orderBy: { order: 'asc' }
+            }
+          }
         }
       }
     })
 
+    let project
+    if (customDomain) {
+      // Serve project via custom domain
+      project = customDomain.project
+    } else {
+      // Regular buildflow.ai subdomain
+      const { searchParams } = new URL(request.url)
+      const { id } = await params
+      project = await prisma.project.findUnique({
+        where: { id },
+        include: {
+          pages: {
+            where: { isPublished: true },
+            orderBy: { order: 'asc' }
+          }
+        }
+      })
+    }
+
     if (!project) {
       return new NextResponse('Project not found', { status: 404 })
     }
+
+    const { searchParams } = new URL(request.url)
+    const slug = searchParams.get('slug') || 'home'
 
     // If not multi-page, return the main project code
     if (!project.multiPage || !project.pages.length) {
