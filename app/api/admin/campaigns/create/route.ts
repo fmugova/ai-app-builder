@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
 
     const campaign = await prisma.emailCampaign.create({
       data: {
+        id: crypto.randomUUID(),
         name,
         subject,
         previewText,
