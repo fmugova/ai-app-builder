@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       include: { 
-        vercelConnection: true 
+        VercelConnection: true 
       }
     });
 
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check Vercel connection
-    if (!user.vercelConnection) {
+    if (!user.VercelConnection) {
       return NextResponse.json(
         { 
           error: 'Vercel not connected', 
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     const vercelRes = await fetch('https://api.vercel.com/v13/deployments', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${user.vercelConnection.accessToken}`,
+        'Authorization': `Bearer ${user.VercelConnection.accessToken}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -117,6 +117,7 @@ export async function POST(request: NextRequest) {
     // Save deployment record
     const dbDeployment = await prisma.deployment.create({
       data: {
+        id: crypto.randomUUID(),
         projectId,
         userId: user.id,
         platform: 'vercel',
@@ -128,7 +129,8 @@ export async function POST(request: NextRequest) {
           githubRepo: `${user.githubUsername}/${githubRepoName}`,
           vercelUrl: deployment.url,
           deploymentId: deployment.id
-        })
+        }),
+        updatedAt: new Date()
       }
     });
 
