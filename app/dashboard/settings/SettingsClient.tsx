@@ -282,10 +282,8 @@ export default function SettingsClient({ user: initialUser }: SettingsClientProp
                     )}
                   </div>
                 </div>
-                <Link
-                  href="/integrations/github"
-                  className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition text-sm font-medium"
-                >
+                {/* GitHub integration */}
+                <Link href="/integrations/github">
                   {user.githubUsername ? 'Manage' : 'Connect'}
                 </Link>
               </div>
@@ -305,10 +303,8 @@ export default function SettingsClient({ user: initialUser }: SettingsClientProp
                     </p>
                   </div>
                 </div>
-                <Link
-                  href="/integrations/vercel"
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition text-sm font-medium"
-                >
+                {/* Vercel integration */}
+                <Link href="/integrations/vercel">
                   Configure
                 </Link>
               </div>
