@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation';
 
 type Submission = {
   id: string | number
@@ -15,6 +16,7 @@ interface SubmissionsClientProps {
 }
 
 export default function SubmissionsClient({ submissions, projectId }: SubmissionsClientProps) {
+  const router = useRouter();
   const [filter, setFilter] = useState('all')
   
   const filtered = filter === 'all' 
@@ -23,6 +25,12 @@ export default function SubmissionsClient({ submissions, projectId }: Submission
 
   return (
     <div className="max-w-7xl mx-auto p-6">
+      <button
+        onClick={() => router.back()}
+        className="mb-4 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded text-gray-700"
+      >
+        ← Back
+      </button>
       <h1 className="text-2xl font-bold mb-6">Form Submissions</h1>
       
       {/* Filter */}
