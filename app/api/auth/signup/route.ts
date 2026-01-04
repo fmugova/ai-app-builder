@@ -84,6 +84,7 @@ export async function POST(request: NextRequest) {
     try {
       await prisma.dripEnrollment.create({
         data: {
+          id: crypto.randomUUID(),
           campaignId: 'welcome_series',
           userEmail: user.email,
           userId: user.id,
