@@ -254,6 +254,12 @@ export default function ProjectOverviewClient({
             >
               ✏️ Edit
             </Link>
+            <Link
+              href={`/dashboard/projects/${project.id}/submissions`}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-indigo-900/30 hover:bg-indigo-900/50 border border-indigo-800 text-indigo-300 rounded-lg transition text-sm font-medium"
+            >
+              📨 Submissions
+            </Link>
             
             <button
               onClick={() => setShowCode(!showCode)}

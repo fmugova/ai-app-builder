@@ -1,5 +1,8 @@
+
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 
 export const dynamic = 'force-dynamic'
 
@@ -64,12 +67,17 @@ export async function GET(
     const pageDescription = page.metaDescription || page.description || ''
 
     // Generate complete HTML with navigation
+    const formHandlerScript = readFileSync(
+      join(process.cwd(), 'public', 'buildflow-forms.js'),
+      'utf-8'
+    )
     const html = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="buildflow-project-id" content="${project.id}">
   <title>${pageTitle}</title>
   ${pageDescription ? `<meta name="description" content="${pageDescription}">` : ''}
   ${page.ogImage ? `<meta property="og:image" content="${page.ogImage}">` : ''}
@@ -131,7 +139,10 @@ export async function GET(
         Built with BuildFlow AI
       </p>
     </div>
+
   </footer>
+  <!-- BuildFlow Form Handler (inlined) -->
+  <script>${formHandlerScript}</script>
 </body>
 </html>
     `
