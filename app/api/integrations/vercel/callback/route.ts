@@ -101,12 +101,14 @@ export async function GET(request: NextRequest) {
     await prisma.vercelConnection.upsert({
       where: { userId },
       create: {
+        id: crypto.randomUUID(),
         userId,
         accessToken: encryptedAccessToken,
         teamId: teamId || tokenData.team_id,
         configurationId: configurationId,
         username: userData.user?.username,
         email: userData.user?.email,
+        updatedAt: new Date(),
       },
       update: {
         accessToken: encryptedAccessToken,
