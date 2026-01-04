@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
     // Create new subscriber
     const subscriber = await prisma.newsletterSubscriber.create({
       data: {
+        id: crypto.randomUUID(),
         email,
         name,
         source: source || 'website',
