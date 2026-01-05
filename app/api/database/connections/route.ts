@@ -1,18 +1,23 @@
 import { compose, withAuth, withSubscription, withUsageCheck, withRateLimit } from '@/lib/api-middleware'
 import { logSecurityEvent } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { z } from 'zod'
+import { testSupabaseConnection } from '@/lib/supabase-integration'
 
 const createConnectionSchema = z.object({
   name: z.string().min(1).max(100),
-  type: z.enum(['postgres', 'mysql', 'mongodb', 'sqlite']),
-  host: z.string().min(1),
-  port: z.number().int().min(1).max(65535),
-  database: z.string().min(1),
-  username: z.string().min(1),
-  password: z.string().min(1),
-  ssl: z.boolean().optional().default(false),
+  provider: z.enum(['supabase', 'postgres', 'mysql', 'mongodb', 'sqlite']).default('supabase'),
+  host: z.string().optional(),
+  port: z.number().int().min(1).max(65535).optional(),
+  database: z.string().optional(),
+  username: z.string().optional(),
+  password: z.string().optional(),
+  supabaseUrl: z.string().optional(),
+  supabaseAnonKey: z.string().optional(),
+  supabaseServiceKey: z.string().optional(),
 })
 
 export const dynamic = 'force-dynamic'

@@ -6,12 +6,15 @@ import { z } from 'zod'
 
 const updateConnectionSchema = z.object({
   name: z.string().min(1).max(100).optional(),
-  host: z.string().min(1).optional(),
+  provider: z.enum(['supabase', 'postgres', 'mysql', 'mongodb', 'sqlite']).optional(),
+  host: z.string().optional(),
   port: z.number().int().min(1).max(65535).optional(),
-  database: z.string().min(1).optional(),
-  username: z.string().min(1).optional(),
-  password: z.string().min(1).optional(),
-  ssl: z.boolean().optional(),
+  database: z.string().optional(),
+  username: z.string().optional(),
+  password: z.string().optional(),
+  supabaseUrl: z.string().optional(),
+  supabaseAnonKey: z.string().optional(),
+  supabaseServiceKey: z.string().optional(),
 })
 
 export const GET = compose(
@@ -24,12 +27,11 @@ export const GET = compose(
     select: {
       id: true,
       name: true,
-      type: true,
+      provider: true,
       host: true,
       port: true,
       database: true,
       username: true,
-      ssl: true,
       status: true,
       createdAt: true,
       updatedAt: true,
@@ -65,12 +67,11 @@ export const PUT = compose(
       select: {
         id: true,
         name: true,
-        type: true,
+        provider: true,
         host: true,
         port: true,
         database: true,
         username: true,
-        ssl: true,
         status: true,
         updatedAt: true,
       },
