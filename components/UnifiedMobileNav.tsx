@@ -179,7 +179,7 @@ export default function UnifiedMobileNav({
                         }`}
                       >
                         <span className="text-xl">{item.icon}</span>
-                        <span className="font-medium hidden sm:inline">{item.label}</span>
+                        <span className="font-medium text-xs hidden sm:inline">{item.label}</span>
                       </Link>
                     ))}
                   </nav>
@@ -204,7 +204,7 @@ export default function UnifiedMobileNav({
                       }`}
                     >
                       <span className="text-xl">{item.icon}</span>
-                      <span className="font-medium hidden sm:inline">{item.label}</span>
+                      <span className="font-medium text-xs hidden sm:inline">{item.label}</span>
                     </Link>
                   ))}
                 </nav>
