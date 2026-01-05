@@ -1,7 +1,7 @@
 import { compose, withAuth, withRateLimit, withUsageCheck } from '@/lib/api-middleware'
 import { incrementUsage } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
 const createProjectSchema = z.object({
@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic'
 export const GET = compose(
   withRateLimit(100),
   withAuth
-)(async (req, context, session) => {
+)(async (req: NextRequest, context: { params: any }, session: any) => {
   const projects = await prisma.project.findMany({
     where: { userId: session.user.id },
     orderBy: { createdAt: 'desc' },
@@ -30,7 +30,7 @@ export const POST = compose(
   withRateLimit(20),
   withUsageCheck('create_project'),
   withAuth
-)(async (req, context, session) => {
+)(async (req: NextRequest, context: { params: any }, session: any) => {
   const body = await req.json()
 
   // Validate input
@@ -44,8 +44,11 @@ export const POST = compose(
 
   const project = await prisma.project.create({
     data: {
-      ...result.data,
+      name: result.data.name,
+      description: result.data.description,
       userId: session.user.id,
+      type: '',
+      code: '',
     },
   })
 

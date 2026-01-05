@@ -1,7 +1,7 @@
 import { compose, withAuth, withSubscription, withResourceOwnership, withRateLimit } from '@/lib/api-middleware'
 import { logSecurityEvent } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
 const updateConnectionSchema = z.object({
@@ -18,7 +18,7 @@ export const GET = compose(
   withResourceOwnership('database', (params) => params.id),
   withSubscription('pro'),
   withAuth
-)(async (req, context, session) => {
+)(async (req: NextRequest, context: { params: any }, session: any) => {
   const connection = await prisma.databaseConnection.findUnique({
     where: { id: context.params.id },
     select: {
@@ -45,7 +45,7 @@ export const PUT = compose(
   withResourceOwnership('database', (params) => params.id),
   withSubscription('pro'),
   withAuth
-)(async (req, context, session) => {
+)(async (req: NextRequest, context: { params: any }, session: any) => {
   try {
     const body = await req.json()
     
@@ -97,7 +97,7 @@ export const DELETE = compose(
   withResourceOwnership('database', (params) => params.id),
   withSubscription('pro'),
   withAuth
-)(async (req, context, session) => {
+)(async (req: NextRequest, context: { params: any }, session: any) => {
   try {
     await prisma.databaseConnection.delete({
       where: { id: context.params.id },

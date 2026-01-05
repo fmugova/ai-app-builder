@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { 
   withAuth, 
   withAdmin, 
@@ -9,7 +9,7 @@ import {
 } from '@/lib/api-middleware'
 
 // Simple authenticated route
-export const GET = withAuth(async (req, context, session) => {
+export const GET = withAuth(async (req: NextRequest, context: { params: any }, session: any) => {
   return NextResponse.json({ 
     message: 'Authenticated!',
     user: session.user 
@@ -22,7 +22,7 @@ export const POST = compose(
   withUsageCheck('create_project'),
   withSubscription('pro'),
   withAuth
-)(async (req, context, session) => {
+)(async (req: NextRequest, context: { params: any }, session: any) => {
   const body = await req.json()
   
   return NextResponse.json({ 

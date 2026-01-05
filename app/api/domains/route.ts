@@ -1,7 +1,7 @@
 import { compose, withAuth, withSubscription, withUsageCheck, withRateLimit } from '@/lib/api-middleware'
 import { logSecurityEvent } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
 const createDomainSchema = z.object({
@@ -19,7 +19,7 @@ export const GET = compose(
   withRateLimit(100),
   withSubscription('pro'),
   withAuth
-)(async (req, context, session) => {
+)(async (req: NextRequest, context: { params: any }, session: any) => {
   const domains = await prisma.customDomain.findMany({
     where: {
       project: {
@@ -46,7 +46,7 @@ export const POST = compose(
   withUsageCheck('add_domain'),
   withSubscription('pro'),
   withAuth
-)(async (req, context, session) => {
+)(async (req: NextRequest, context: { params: any }, session: any) => {
   try {
     const body = await req.json()
     
@@ -93,7 +93,6 @@ export const POST = compose(
       data: {
         domain,
         projectId,
-        verified: false,
         status: 'pending',
       },
       include: {

@@ -1,6 +1,6 @@
 import { compose, withAuth, withSubscription, withUsageCheck } from '@/lib/api-middleware'
 import { prisma } from '@/lib/prisma'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
 const createDatabaseSchema = z.object({
@@ -16,7 +16,7 @@ const createDatabaseSchema = z.object({
 export const GET = compose(
   withSubscription('pro'),
   withAuth
-)(async (req, context, session) => {
+)(async (req: NextRequest, context: { params: any }, session: any) => {
   const databases = await prisma.databaseConnection.findMany({
     where: { userId: session.user.id },
   })
@@ -28,7 +28,7 @@ export const POST = compose(
   withUsageCheck('create_database'),
   withSubscription('pro'),
   withAuth
-)(async (req, context, session) => {
+)(async (req: NextRequest, context: { params: any }, session: any) => {
   const body = await req.json()
   
   const result = createDatabaseSchema.safeParse(body)

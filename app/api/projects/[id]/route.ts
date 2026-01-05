@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 export const GET = compose(
   withResourceOwnership('project', (params) => params.id),
   withAuth
-)(async (req, context, session) => {
+)(async (req: NextRequest, context: { params: any }, session: any) => {
   const project = await prisma.project.findUnique({
     where: { id: context.params.id },
     include: {
@@ -28,7 +28,7 @@ export const PUT = compose(
   withRateLimit(30),
   withResourceOwnership('project', (params) => params.id),
   withAuth
-)(async (req, context, session) => {
+)(async (req: NextRequest, context: { params: any }, session: any) => {
   const body = await req.json()
   
   const project = await prisma.project.update({
@@ -43,7 +43,7 @@ export const PUT = compose(
 export const DELETE = compose(
   withResourceOwnership('project', (params) => params.id),
   withAuth
-)(async (req, context, session) => {
+)(async (req: NextRequest, context: { params: any }, session: any) => {
   // User ownership verified!
   await prisma.project.delete({
     where: { id: context.params.id },

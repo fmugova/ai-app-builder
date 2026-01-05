@@ -1,13 +1,13 @@
 import { compose, withAuth, withSubscription, withResourceOwnership, withRateLimit } from '@/lib/api-middleware'
 import { logSecurityEvent } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 export const GET = compose(
   withResourceOwnership('domain', (params) => params.id),
   withSubscription('pro'),
   withAuth
-)(async (req, context, session) => {
+)(async (req: NextRequest, context: { params: any }, session: any) => {
   const domain = await prisma.customDomain.findUnique({
     where: { id: context.params.id },
     include: {
