@@ -1,9 +1,6 @@
-import { compose, withAuth, withSubscription, withUsageCheck, withRateLimit } from '@/lib/api-middleware'
-import { logSecurityEvent } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import { withAuth } from '@/lib/api-middleware'
 import { z } from 'zod'
 import { testSupabaseConnection } from '@/lib/supabase-integration'
 
@@ -23,23 +20,10 @@ const createConnectionSchema = z.object({
 export const dynamic = 'force-dynamic'
 
 // GET: List database connections
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (req, context, session) => {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
     const connections = await prisma.databaseConnection.findMany({
-      where: { userId: user.id },
+      where: { userId: session.user.id },
       include: {
         Project: {
           select: {
@@ -60,7 +44,6 @@ export async function GET(request: NextRequest) {
     }))
 
     return NextResponse.json({ connections: sanitized })
-
   } catch (error: any) {
     console.error('Database connections GET error:', error)
     return NextResponse.json(
@@ -68,25 +51,40 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})
 
 // POST: Create new database connection
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (req, context, session) => {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Check Pro subscription
+    if (!['pro', 'business', 'enterprise'].includes(session.user.subscriptionTier)) {
+      return NextResponse.json(
+        { error: 'Pro subscription required for database connections' },
+        { status: 403 }
+      )
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
+    // Check limit
+    const dbCount = await prisma.databaseConnection.count({
+      where: { userId: session.user.id }
     })
 
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    const limits = {
+      free: 0,
+      pro: 3,
+      business: 10,
+      enterprise: -1
     }
 
-    const body = await request.json()
+    const limit = limits[session.user.subscriptionTier as keyof typeof limits]
+    if (limit !== -1 && dbCount >= limit) {
+      return NextResponse.json(
+        { error: 'Database connection limit reached' },
+        { status: 429 }
+      )
+    }
+
+    const body = await req.json()
     const { name, projectId, supabaseUrl, supabaseAnonKey, supabaseServiceKey } = body
 
     if (!name || !supabaseUrl || !supabaseAnonKey) {
@@ -121,7 +119,7 @@ export async function POST(request: NextRequest) {
     // Create connection
     const connection = await prisma.databaseConnection.create({
       data: {
-        userId: user.id,
+        userId: session.user.id,
         projectId: projectId || null,
         name,
         provider: 'supabase',
@@ -141,12 +139,12 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json({
+      success: true,
       connection: {
         ...connection,
         supabaseServiceKey: undefined
       }
     })
-
   } catch (error: any) {
     console.error('Database connection POST error:', error)
     return NextResponse.json(
@@ -154,4 +152,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})

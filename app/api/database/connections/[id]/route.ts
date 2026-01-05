@@ -1,4 +1,4 @@
-import { compose, withAuth, withSubscription, withResourceOwnership, withRateLimit } from '@/lib/api-middleware'
+import { withAuth } from '@/lib/api-middleware'
 import { logSecurityEvent } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
@@ -17,38 +17,79 @@ const updateConnectionSchema = z.object({
   supabaseServiceKey: z.string().optional(),
 })
 
-export const GET = compose(
-  withResourceOwnership('database', (params) => params.id),
-  withSubscription('pro'),
-  withAuth
-)(async (req: NextRequest, context: { params: any }, session: any) => {
-  const connection = await prisma.databaseConnection.findUnique({
-    where: { id: context.params.id },
-    select: {
-      id: true,
-      name: true,
-      provider: true,
-      host: true,
-      port: true,
-      database: true,
-      username: true,
-      status: true,
-      createdAt: true,
-      updatedAt: true,
-      // Don't return password
-    },
-  })
-  
-  return NextResponse.json({ success: true, connection })
+export const GET = withAuth(async (req, context, session) => {
+  try {
+    // Check Pro subscription
+    if (!['pro', 'business', 'enterprise'].includes(session.user.subscriptionTier)) {
+      return NextResponse.json(
+        { error: 'Pro subscription required' },
+        { status: 403 }
+      )
+    }
+
+    // Check ownership
+    const connection = await prisma.databaseConnection.findFirst({
+      where: {
+        id: context.params.id,
+        userId: session.user.id
+      },
+      select: {
+        id: true,
+        name: true,
+        provider: true,
+        host: true,
+        port: true,
+        database: true,
+        username: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        // Don't return password
+      },
+    })
+
+    if (!connection) {
+      return NextResponse.json(
+        { error: 'Connection not found' },
+        { status: 404 }
+      )
+    }
+    
+    return NextResponse.json({ success: true, connection })
+  } catch (error) {
+    console.error('Failed to fetch connection:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch connection' },
+      { status: 500 }
+    )
+  }
 })
 
-export const PUT = compose(
-  withRateLimit(30),
-  withResourceOwnership('database', (params) => params.id),
-  withSubscription('pro'),
-  withAuth
-)(async (req: NextRequest, context: { params: any }, session: any) => {
+export const PUT = withAuth(async (req, context, session) => {
   try {
+    // Check Pro subscription
+    if (!['pro', 'business', 'enterprise'].includes(session.user.subscriptionTier)) {
+      return NextResponse.json(
+        { error: 'Pro subscription required' },
+        { status: 403 }
+      )
+    }
+
+    // Check ownership
+    const existing = await prisma.databaseConnection.findFirst({
+      where: {
+        id: context.params.id,
+        userId: session.user.id
+      }
+    })
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: 'Connection not found' },
+        { status: 404 }
+      )
+    }
+
     const body = await req.json()
     
     // Validate input
@@ -94,12 +135,31 @@ export const PUT = compose(
   }
 })
 
-export const DELETE = compose(
-  withResourceOwnership('database', (params) => params.id),
-  withSubscription('pro'),
-  withAuth
-)(async (req: NextRequest, context: { params: any }, session: any) => {
+export const DELETE = withAuth(async (req, context, session) => {
   try {
+    // Check Pro subscription
+    if (!['pro', 'business', 'enterprise'].includes(session.user.subscriptionTier)) {
+      return NextResponse.json(
+        { error: 'Pro subscription required' },
+        { status: 403 }
+      )
+    }
+
+    // Check ownership
+    const connection = await prisma.databaseConnection.findFirst({
+      where: {
+        id: context.params.id,
+        userId: session.user.id
+      }
+    })
+
+    if (!connection) {
+      return NextResponse.json(
+        { error: 'Connection not found' },
+        { status: 404 }
+      )
+    }
+
     await prisma.databaseConnection.delete({
       where: { id: context.params.id },
     })

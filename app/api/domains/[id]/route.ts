@@ -1,54 +1,41 @@
-import { compose, withAuth, withSubscription, withResourceOwnership, withRateLimit } from '@/lib/api-middleware'
-import { logSecurityEvent } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { withAuth } from '@/lib/api-middleware'
 
-export const GET = compose(
-  withResourceOwnership('domain', (params) => params.id),
-  withSubscription('pro'),
-  withAuth
-)(async (req: NextRequest, context: { params: any }, session: any) => {
-  const domain = await prisma.customDomain.findUnique({
-    where: { id: context.params.id },
-    include: {
-      project: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
-    },
-  })
-  
-  return NextResponse.json({ success: true, domain })
-})
-
-export const DELETE = compose(
-  withResourceOwnership('domain', (params) => params.id),
-  withSubscription('pro'),
-  withAuth
-)(async (req, context, session) => {
+export const DELETE = withAuth(async (req, context, session) => {
   try {
-    const domain = await prisma.customDomain.findUnique({
-      where: { id: context.params.id },
+    // 1. Check subscription tier
+    if (session.user.subscriptionTier === 'free') {
+      return NextResponse.json(
+        { error: 'Pro subscription required' },
+        { status: 403 }
+      )
+    }
+
+    // 2. Check ownership
+    const domain = await prisma.customDomain.findFirst({
+      where: {
+        id: context.params.id,
+        project: { userId: session.user.id }
+      }
     })
-    
+
+    if (!domain) {
+      return NextResponse.json(
+        { error: 'Domain not found' },
+        { status: 404 }
+      )
+    }
+
+    // 3. Delete domain
     await prisma.customDomain.delete({
-      where: { id: context.params.id },
+      where: { id: context.params.id }
     })
-    
-    // Log security event
-    await logSecurityEvent(session.user.id, 'custom_domain_deleted', {
-      domainId: context.params.id,
-      domain: domain?.domain,
-    })
-    
+
     return NextResponse.json({ success: true })
-    
-  } catch (error) {
-    console.error('Failed to delete custom domain:', error)
+  } catch (error: any) {
     return NextResponse.json(
-      { error: 'Failed to delete custom domain' },
+      { error: 'Failed to delete domain' },
       { status: 500 }
     )
   }
