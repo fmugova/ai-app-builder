@@ -45,9 +45,14 @@ export default function UnifiedMobileNav({
   // Main menu items (when NOT in project)
   const mainMenuItems = [
     { href: '/dashboard', label: 'Dashboard', icon: '📊', active: pathname === '/dashboard' },
+    { href: '/dashboard/submissions', label: 'Form Submissions', icon: '📬', active: pathname === '/dashboard/submissions' },
     { href: '/dashboard/analytics', label: 'Analytics', icon: '📈', active: pathname === '/dashboard/analytics' },
+    { href: '/dashboard/database', label: 'Database', icon: '🗄️', active: pathname === '/dashboard/database' },
+    { href: '/dashboard/domains', label: 'Custom Domains', icon: '🌐', active: pathname === '/dashboard/domains' },
     { href: '/dashboard/settings', label: 'Settings', icon: '⚙️', active: pathname === '/dashboard/settings' },
     { href: '/dashboard/billing', label: 'Billing', icon: '💳', active: pathname === '/dashboard/billing' },
+    { href: '/contact', label: 'Contact Support', icon: '💬', active: pathname === '/contact' },
+    { href: '/pricing', label: 'Upgrade', icon: '⭐', active: pathname === '/pricing' },
   ]
 
   // Add admin link if user is admin

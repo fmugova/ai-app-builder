@@ -67,7 +67,8 @@ export default function UserProjectsPage() {
       // Get user's projects
       const projectsRes = await fetch(`/api/admin/users/${userId}/projects`)
       if (projectsRes.ok) {
-        setProjects(await projectsRes.json())
+        const projectsData = await projectsRes.json()
+        setProjects(Array.isArray(projectsData) ? projectsData : [])
       }
     } catch (error) {
       console.error('Failed to load user projects:', error)

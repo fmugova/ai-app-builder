@@ -1,85 +1,61 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { redirect } from 'next/navigation'
 import DashboardClient from './DashboardClient'
-import Footer from '../components/Footer'
 
-// Server Component - NO 'use client'
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardPage() {
+  // Get session
   const session = await getServerSession(authOptions)
   
   if (!session?.user?.email) {
-    redirect('/auth/signin')
+    redirect('/auth/signin?callbackUrl=/dashboard')
   }
 
+  // Get user from database
   const user = await prisma.user.findUnique({
     where: { email: session.user.email },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      generationsUsed: true,
-      generationsLimit: true,
-      stripeSubscriptionId: true,
-    }
+    include: {
+      subscriptions: true,
+    },
   })
 
   if (!user) {
-    redirect('/auth/signin')
+    redirect('/auth/signin?error=User+not+found')
   }
 
+  // Fetch user's projects
   const projects = await prisma.project.findMany({
-    where: { userId: user.id },
-    orderBy: { updatedAt: 'desc' },
-    take: 100, // Get more projects for client-side filtering
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      code: true,
-      prompt: true,
-      type: true,
-      createdAt: true,
-      updatedAt: true,
-      isPublished: true,
-      publicUrl: true,
-      views: true,
-    }
+    where: {
+      userId: user.id,
+    },
+    orderBy: {
+      updatedAt: 'desc',
+    },
   })
 
-  const projectCount = await prisma.project.count({
-    where: { userId: user.id }
-  })
+  // Calculate stats
+  const now = new Date()
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
-  // Map to DashboardClient props
   const stats = {
-    projectsThisMonth: projectCount,
-    projectsLimit: 999,
+    projectsThisMonth: user.projectsThisMonth || 0,
+    projectsLimit: user.projectsLimit || 3,
     generationsUsed: user.generationsUsed || 0,
     generationsLimit: user.generationsLimit || 10,
-    subscriptionTier: user.role === 'admin' ? 'enterprise' : (user.stripeSubscriptionId ? 'pro' : 'free'),
-    subscriptionStatus: user.stripeSubscriptionId ? 'active' : 'inactive',
+    subscriptionTier: user.subscriptions?.plan || user.subscriptionTier || 'free',
+    subscriptionStatus: user.subscriptions?.status || user.subscriptionStatus || 'active',
   }
 
-  // Serialize dates for client component
-  const serializedProjects = projects.map(p => ({
-    ...p,
-    createdAt: p.createdAt.toISOString(),
-    updatedAt: p.updatedAt.toISOString(),
-  }))
-
   return (
-    <div className="min-h-screen bg-gray-950">
-      <DashboardClient
-        initialProjects={serializedProjects}
-        stats={stats}
-        userName={user.name}
-        userEmail={user.email}
-        isAdmin={user.role === 'admin'}
-      />
-      <Footer />
-    </div>
+    <DashboardClient
+      initialProjects={projects}
+      stats={stats}
+      userName={user.name}
+      userEmail={user.email}
+      isAdmin={user.role === 'admin'}
+    />
   )
 }

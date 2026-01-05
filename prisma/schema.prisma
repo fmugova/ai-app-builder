@@ -95,6 +95,7 @@ model User {
   feedback              Feedback[]
   formSubmissions       FormSubmission[]
   generations           Generation[]
+  generationHistory     GenerationHistory[]
   NewsletterSubscriber  NewsletterSubscriber[]
   projects              Project[]
   projectSharesReceived ProjectShare[]         @relation("UserProjectShares")
@@ -182,17 +183,21 @@ model ProjectVersion {
 
   @@index([projectId])
   @@index([userId])
+  @@index([createdAt])
   @@schema("public")
 }
 
 model Generation {
-  id        String   @id @default(cuid())
-  userId    String
-  createdAt DateTime @default(now())
-  code      String
-  prompt    String
-  type      String
-  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  userId     String
+  projectId  String?
+  prompt     String
+  code       String
+  type       String
+  tokensUsed Int      @default(0)
+  success    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  User       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([createdAt])
   @@index([userId])
@@ -284,6 +289,7 @@ model Subscription {
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
   @@index([userId])
+  @@index([status])
   @@schema("public")
 }
 
@@ -377,7 +383,183 @@ model DatabaseTable {
   @@schema("public")
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model Deployment {
+  id              String   @id
+  projectId       String
+  userId          String
+  platform        String   @default("vercel")
+  deploymentUrl   String?
+  deploymentId    String?
+  vercelProjectId String?
+  status          String   @default("pending")
+  errorMessage    String?
+  logs            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime
+  Project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  User            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([deploymentId])
+  @@index([projectId])
+  @@index([status])
+  @@index([userId])
+  @@schema("public")
+}
+
+model DripCampaign {
+  id             String           @id
+  name           String
+  description    String?
+  status         String           @default("active")
+  trigger        String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @default(now())
+  DripEmail      DripEmail[]
+  DripEnrollment DripEnrollment[]
+
+  @@index([status])
+  @@index([trigger])
+  @@schema("public")
+}
+
+model DripEmail {
+  id           String       @id
+  campaignId   String
+  name         String
+  subject      String
+  htmlContent  String
+  delayDays    Int
+  delayHours   Int          @default(0)
+  order        Int          @default(0)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @default(now())
+  DripCampaign DripCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([order])
+  @@schema("public")
+}
+
+model DripEnrollment {
+  id             String       @id
+  campaignId     String
+  userEmail      String
+  userId         String
+  enrolledAt     DateTime     @default(now())
+  completedAt    DateTime?
+  unsubscribedAt DateTime?
+  emailsSent     Json?
+  DripCampaign   DripCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  User           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([enrolledAt])
+  @@index([userEmail])
+  @@index([userId])
+  @@schema("public")
+}
+
+model EmailCampaign {
+  id                String      @id
+  name              String
+  subject           String
+  previewText       String?
+  htmlContent       String
+  status            String      @default("draft")
+  scheduledFor      DateTime?
+  sentAt            DateTime?
+  segment           String      @default("all")
+  totalSent         Int         @default(0)
+  totalOpened       Int         @default(0)
+  totalClicked      Int         @default(0)
+  totalBounced      Int         @default(0)
+  totalUnsubscribed Int         @default(0)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @default(now())
+  createdBy         String
+  User              User        @relation(fields: [createdBy], references: [id])
+  EmailSend         EmailSend[]
+
+  @@index([createdAt])
+  @@index([scheduledFor])
+  @@index([status])
+  @@index([createdBy], map: "idx_emailcampaign_createdby")
+  @@schema("public")
+}
+
+model EmailSend {
+  id              String        @id
+  campaignId      String
+  subscriberEmail String
+  sentAt          DateTime      @default(now())
+  openedAt        DateTime?
+  clickedAt       DateTime?
+  bouncedAt       DateTime?
+  unsubscribedAt  DateTime?
+  metadata        Json?
+  user_id         String        @db.Uuid
+  EmailCampaign   EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([sentAt])
+  @@index([subscriberEmail])
+  @@index([user_id], map: "idx_emailsend_user_id")
+  @@schema("public")
+}
+
+model NewsletterSubscriber {
+  id             String    @id
+  email          String    @unique
+  name           String?
+  status         String    @default("active")
+  source         String?
+  subscribedAt   DateTime  @default(now())
+  unsubscribedAt DateTime?
+  preferences    Json?
+  metadata       Json?
+  userId         String?
+  User           User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([subscribedAt])
+  @@index([email], map: "idx_newslettersubscriber_email")
+  @@index([userId], map: "idx_newslettersubscriber_userid")
+  @@schema("public")
+}
+
+model VercelConnection {
+  id              String   @id
+  userId          String   @unique
+  accessToken     String
+  refreshToken    String?
+  teamId          String?
+  configurationId String?
+  username        String?
+  email           String?
+  connectedAt     DateTime @default(now())
+  updatedAt       DateTime
+  User            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@schema("public")
+}
+
+model GenerationHistory {
+  id         String   @id @default(cuid())
+  userId     String
+  projectId  String?
+  prompt     String   @db.Text
+  tokensUsed Int      @default(0)
+  success    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@schema("public")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model audit_log_entries {
   instance_id String?   @db.Uuid
@@ -390,7 +572,7 @@ model audit_log_entries {
   @@schema("auth")
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model or at least one of its fields has comments in the database, and requires additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model flow_state {
   id                     String                @id @db.Uuid
@@ -413,7 +595,7 @@ model flow_state {
   @@schema("auth")
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model or at least one of its fields has comments in the database, and requires additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model identities {
   provider_id     String
@@ -525,7 +707,7 @@ model oauth_authorizations {
   @@schema("auth")
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model or at least one of its fields has comments in the database, and requires additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model oauth_client_states {
   id            String   @id @db.Uuid
   provider_type String
@@ -592,7 +774,7 @@ model one_time_tokens {
   @@schema("auth")
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model or at least one of its fields has comments in the database, and requires additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model refresh_tokens {
   instance_id String?   @db.Uuid
@@ -777,167 +959,6 @@ model users {
   @@index([instance_id])
   @@index([is_anonymous])
   @@schema("auth")
-}
-
-model Deployment {
-  id              String   @id
-  projectId       String
-  userId          String
-  platform        String   @default("vercel")
-  deploymentUrl   String?
-  deploymentId    String?
-  vercelProjectId String?
-  status          String   @default("pending")
-  errorMessage    String?
-  logs            String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime
-  Project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  User            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([deploymentId])
-  @@index([projectId])
-  @@index([status])
-  @@index([userId])
-  @@schema("public")
-}
-
-model DripCampaign {
-  id             String           @id
-  name           String
-  description    String?
-  status         String           @default("active")
-  trigger        String
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @default(now())
-  DripEmail      DripEmail[]
-  DripEnrollment DripEnrollment[]
-
-  @@index([status])
-  @@index([trigger])
-  @@schema("public")
-}
-
-model DripEmail {
-  id           String       @id
-  campaignId   String
-  name         String
-  subject      String
-  htmlContent  String
-  delayDays    Int
-  delayHours   Int          @default(0)
-  order        Int          @default(0)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @default(now())
-  DripCampaign DripCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-
-  @@index([campaignId])
-  @@index([order])
-  @@schema("public")
-}
-
-model DripEnrollment {
-  id             String       @id
-  campaignId     String
-  userEmail      String
-  userId         String
-  enrolledAt     DateTime     @default(now())
-  completedAt    DateTime?
-  unsubscribedAt DateTime?
-  emailsSent     Json?
-  DripCampaign   DripCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  User           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([campaignId])
-  @@index([enrolledAt])
-  @@index([userEmail])
-  @@index([userId])
-  @@schema("public")
-}
-
-model EmailCampaign {
-  id                String      @id
-  name              String
-  subject           String
-  previewText       String?
-  htmlContent       String
-  status            String      @default("draft")
-  scheduledFor      DateTime?
-  sentAt            DateTime?
-  segment           String      @default("all")
-  totalSent         Int         @default(0)
-  totalOpened       Int         @default(0)
-  totalClicked      Int         @default(0)
-  totalBounced      Int         @default(0)
-  totalUnsubscribed Int         @default(0)
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @default(now())
-  createdBy         String
-  User              User        @relation(fields: [createdBy], references: [id])
-  EmailSend         EmailSend[]
-
-  @@index([createdAt])
-  @@index([scheduledFor])
-  @@index([status])
-  @@index([createdBy], map: "idx_emailcampaign_createdby")
-  @@schema("public")
-}
-
-model EmailSend {
-  id              String        @id
-  campaignId      String
-  subscriberEmail String
-  sentAt          DateTime      @default(now())
-  openedAt        DateTime?
-  clickedAt       DateTime?
-  bouncedAt       DateTime?
-  unsubscribedAt  DateTime?
-  metadata        Json?
-  user_id         String        @db.Uuid
-  EmailCampaign   EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-
-  @@index([campaignId])
-  @@index([sentAt])
-  @@index([subscriberEmail])
-  @@index([user_id], map: "idx_emailsend_user_id")
-  @@schema("public")
-}
-
-model NewsletterSubscriber {
-  id             String    @id
-  email          String    @unique
-  name           String?
-  status         String    @default("active")
-  source         String?
-  subscribedAt   DateTime  @default(now())
-  unsubscribedAt DateTime?
-  preferences    Json?
-  metadata       Json?
-  userId         String?
-  User           User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([status])
-  @@index([subscribedAt])
-  @@index([email], map: "idx_newslettersubscriber_email")
-  @@index([userId], map: "idx_newslettersubscriber_userid")
-  @@schema("public")
-}
-
-model VercelConnection {
-  id              String   @id
-  userId          String   @unique
-  accessToken     String
-  refreshToken    String?
-  teamId          String?
-  configurationId String?
-  username        String?
-  email           String?
-  connectedAt     DateTime @default(now())
-  updatedAt       DateTime
-  User            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@schema("public")
 }
 
 enum aal_level {

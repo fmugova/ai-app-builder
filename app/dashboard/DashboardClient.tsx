@@ -7,6 +7,19 @@ import dynamic from 'next/dynamic'
 import { signOut } from 'next-auth/react'
 import ProjectCard from '@/components/ProjectCard'
 import type { Project } from '@/types/project'
+import UnifiedMobileNav from '@/components/UnifiedMobileNav'
+import { useSession } from 'next-auth/react'
+import { TIER_LIMITS } from '@/lib/auth'
+import { UsageDashboard } from '@/components/usage/UsageDashboard'
+import { ProjectLimitBanner } from '@/components/usage/ProjectLimitBanner'
+import { Button } from '@/components/ui/button'
+import {
+  FolderIcon,
+  DatabaseIcon,
+  GlobeIcon,
+  SparklesIcon,
+  ArrowUpIcon
+} from 'lucide-react'
 
 // Lazy load heavy components
 const SimpleExportButton = dynamic(() => import('@/components/SimpleExportButton'), {
@@ -65,15 +78,15 @@ interface Toast {
 }
 
 export default function DashboardClient({
-  initialProjects,
+  initialProjects = [],
   stats,
   userName,
   userEmail,
-  isAdmin,
+  isAdmin = false,
 }: DashboardClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [projects, setProjects] = useState<Project[]>(initialProjects)
+  const [projects, setProjects] = useState<Project[]>(initialProjects || [])
   const [searchQuery, setSearchQuery] = useState('')
   const [isDarkMode, setIsDarkMode] = useState(true)
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
@@ -164,7 +177,7 @@ export default function DashboardClient({
     }
   }
 
-  const filteredProjects = projects.filter(project =>
+  const filteredProjects = (projects || []).filter(project =>
     (project.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
     (project.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
   )
@@ -190,6 +203,51 @@ export default function DashboardClient({
 
   const projectsPercentage = getUsagePercentage(stats.projectsThisMonth, stats.projectsLimit)
   const generationsPercentage = getUsagePercentage(stats.generationsUsed, stats.generationsLimit)
+
+  const { data: session } = useSession()
+  const tier = session?.user.subscriptionTier as keyof typeof TIER_LIMITS
+  const limits = TIER_LIMITS[tier] ?? TIER_LIMITS.free
+  const projectsUsed = session?.user.projectsThisMonth || 0
+  const generationsUsed = session?.user.generationsUsed || 0
+
+  const usageStats = [
+    {
+      label: 'Projects',
+      used: projectsUsed,
+      limit: limits.projectsPerMonth,
+      icon: FolderIcon,
+      color: 'blue',
+      href: '/dashboard/projects',
+    },
+    {
+      label: 'AI Generations',
+      used: generationsUsed,
+      limit: limits.generationsPerMonth,
+      icon: SparklesIcon,
+      color: 'purple',
+      href: '/dashboard/generate',
+    },
+    {
+      label: 'Databases',
+      used: 0, // TODO: Fetch actual count
+      limit: limits.databases,
+      icon: DatabaseIcon,
+      color: 'green',
+      href: '/dashboard/database',
+      requiresPro: true,
+    },
+    {
+      label: 'Custom Domains',
+      used: 0, // TODO: Fetch actual count
+      limit: limits.customDomains,
+      icon: GlobeIcon,
+      color: 'orange',
+      href: '/dashboard/domains',
+      requiresPro: true,
+    },
+  ]
+
+  if (!session) return null
 
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
@@ -222,93 +280,106 @@ export default function DashboardClient({
         ))}
       </div>
 
-      {/* Header */}
-      <header className="bg-gray-900/50 backdrop-blur-sm border-b border-gray-800 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <a href="/" className="text-2xl font-bold text-white">
-            BuildFlow
-          </a>
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard/submissions" className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition text-sm font-medium">
-              Forms Submissions
-            </Link>
-            <Link href="/dashboard/analytics" className="px-4 py-2 text-gray-300 hover:text-white text-sm flex items-center gap-2">
-              📊 Analytics
-            </Link>
-            <Link href="/dashboard/domains" className="px-4 py-2 text-gray-300 hover:text-white text-sm flex items-center gap-2">
-              🌐 Custom Domains
-            </Link>
-            <Link href="/dashboard/database" className="px-4 py-2 text-gray-300 hover:text-white text-sm flex items-center gap-2">
-              🗄️ Database
-            </Link>
-            <button
-              onClick={() => setIsDarkMode(!isDarkMode)}
-              className="p-2 hover:bg-gray-800 rounded-lg transition"
-              aria-label="Toggle theme"
-            >
-              {isDarkMode ? <SunIcon /> : <MoonIcon />}
-            </button>
-            <button
-              className="p-2 hover:bg-gray-800 rounded-lg transition text-gray-300"
-              aria-label="Favorites"
-            >
-              <StarIcon />
-            </button>
-            <Link href="/pricing" className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition text-sm font-medium">
-              Upgrade
-            </Link>
-            <Link href="/contact" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm font-medium">
-              Contact Support
-            </Link>
-            <div className="relative">
+        {/* Header */}
+        <header className="bg-gray-900/50 backdrop-blur-sm border-b border-gray-800 sticky top-0 z-10">
+          <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+            {/* Logo - Always visible */}
+            <a href="/" className="text-2xl font-bold text-white">
+              BuildFlow
+            </a>
+
+            {/* Desktop Navigation - Hidden on mobile (< lg) */}
+            <div className="hidden lg:flex items-center gap-3">
+              <Link href="/dashboard/submissions" className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition text-sm font-medium">
+                Forms Submissions
+              </Link>
+              <Link href="/dashboard/analytics" className="px-4 py-2 text-gray-300 hover:text-white text-sm flex items-center gap-2">
+                📊 Analytics
+              </Link>
+              <Link href="/dashboard/domains" className="px-4 py-2 text-gray-300 hover:text-white text-sm flex items-center gap-2">
+                🌐 Custom Domains
+              </Link>
+              <Link href="/dashboard/database" className="px-4 py-2 text-gray-300 hover:text-white text-sm flex items-center gap-2">
+                🗄️ Database
+              </Link>
               <button
-                onClick={() => setShowAccountMenu(!showAccountMenu)}
-                className="flex items-center gap-2 px-3 py-2 hover:bg-gray-800 rounded-lg transition bg-green-900/30 border border-green-700"
+                onClick={() => setIsDarkMode(!isDarkMode)}
+                className="p-2 hover:bg-gray-800 rounded-lg transition"
+                aria-label="Toggle theme"
               >
-                <span className="text-green-400 text-sm">✓</span>
-                <span className="text-white text-sm font-medium">Welcome back!</span>
-                <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-bold">
-                    {userName?.charAt(0).toUpperCase() || 'U'}
-                  </span>
-                </div>
+                {isDarkMode ? <SunIcon /> : <MoonIcon />}
               </button>
-              {showAccountMenu && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setShowAccountMenu(false)} />
-                  <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20">
-                    <div className="p-3 border-b border-gray-700">
-                      <p className="text-white font-medium text-sm truncate">{userName || 'User'}</p>
-                      <p className="text-gray-400 text-xs truncate">{userEmail}</p>
-                    </div>
-                    <div className="py-1">
-                      <Link href="/settings" className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm">
-                        ⚙️ Settings
-                      </Link>
-                      <Link href="/billing" className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm">
-                        💳 Billing
-                      </Link>
-                      {isAdmin && (
-                        <Link href="/admin" className="flex items-center gap-2 px-4 py-2 text-yellow-400 hover:bg-gray-700 text-sm">
-                          👑 Admin Panel
-                        </Link>
-                      )}
-                    </div>
-                    <div className="border-t border-gray-700">
-                      <button
-                        onClick={() => signOut()}
-                        className="flex items-center gap-2 w-full px-4 py-2 text-red-400 hover:bg-gray-700 text-sm"
-                      >
-                        🚪 Sign Out
-                      </button>
-                    </div>
+              <button
+                className="p-2 hover:bg-gray-800 rounded-lg transition text-gray-300"
+                aria-label="Favorites"
+              >
+                <StarIcon />
+              </button>
+              <Link href="/pricing" className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition text-sm font-medium">
+                Upgrade
+              </Link>
+              <Link href="/contact" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm font-medium">
+                Contact Support
+              </Link>
+              {/* Desktop Account Menu */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowAccountMenu(!showAccountMenu)}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-800 rounded-lg transition bg-green-900/30 border border-green-700"
+                >
+                  <span className="text-green-400 text-sm">✓</span>
+                  <span className="text-white text-sm font-medium">Welcome back!</span>
+                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm font-bold">
+                      {userName?.charAt(0).toUpperCase() || 'U'}
+                    </span>
                   </div>
-                </>
-              )}
+                </button>
+                {showAccountMenu && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setShowAccountMenu(false)} />
+                    <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20">
+                      <div className="p-3 border-b border-gray-700">
+                        <p className="text-white font-medium text-sm truncate">{userName || 'User'}</p>
+                        <p className="text-gray-400 text-xs truncate">{userEmail}</p>
+                      </div>
+                      <div className="py-1">
+                        <Link href="/settings" className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm">
+                          ⚙️ Settings
+                        </Link>
+                        <Link href="/billing" className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm">
+                          💳 Billing
+                        </Link>
+                        {isAdmin && (
+                          <Link href="/admin" className="flex items-center gap-2 px-4 py-2 text-yellow-400 hover:bg-gray-700 text-sm">
+                            👑 Admin Panel
+                          </Link>
+                        )}
+                      </div>
+                      <div className="border-t border-gray-700">
+                        <button
+                          onClick={() => signOut()}
+                          className="flex items-center gap-2 w-full px-4 py-2 text-red-400 hover:bg-gray-700 text-sm"
+                        >
+                          🚪 Sign Out
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Mobile Navigation - Visible only on mobile */}
+            <div className="lg:hidden">
+              <UnifiedMobileNav
+                userName={userName || undefined}
+                userEmail={userEmail || undefined}
+                isAdmin={isAdmin}
+              />
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Builder Navigation */}

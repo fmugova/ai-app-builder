@@ -62,7 +62,7 @@ export default function AdminProjectsPage() {
       const res = await fetch('/api/admin/projects')
       if (res.ok) {
         const data = await res.json()
-        setProjects(data)
+        setProjects(Array.isArray(data) ? data : [])
       }
     } catch (error) {
       console.error('Failed to load projects:', error)

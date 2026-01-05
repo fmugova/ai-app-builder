@@ -1,122 +1,56 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { compose, withAuth, withRateLimit, withUsageCheck } from '@/lib/api-middleware'
+import { incrementUsage } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { NextResponse } from 'next/server'
+import { z } from 'zod'
+
+const createProjectSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+})
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
 
 // GET - Fetch all projects for user
-export async function GET() {
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+export const GET = compose(
+  withRateLimit(100),
+  withAuth
+)(async (req, context, session) => {
+  const projects = await prisma.project.findMany({
+    where: { userId: session.user.id },
+    orderBy: { createdAt: 'desc' },
+  })
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    const projects = await prisma.project.findMany({
-      where: { userId: user.id },
-      orderBy: { updatedAt: 'desc' },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        publishedAt: true,
-        createdAt: true,
-        updatedAt: true
-      }
-    })
-
-    // ✅ MAKE SURE IT RETURNS { projects: [...] }
-    return NextResponse.json({ 
-      projects,
-      count: projects.length 
-    })
-
-  } catch (error: any) {
-    console.error('Projects GET error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch projects' },
-      { status: 500 }
-    )
-  }
-}
+  return NextResponse.json({ projects })
+})
 
 // POST - Create new project
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+export const POST = compose(
+  withRateLimit(20),
+  withUsageCheck('create_project'),
+  withAuth
+)(async (req, context, session) => {
+  const body = await req.json()
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { _count: { select: { projects: true } } },
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    // Check project limit
-    const plan = user.subscriptionTier || 'free'
-
-    // Development: unlimited projects
-    // Production: enforce limits based on tier
-    const limit = process.env.NODE_ENV === 'development' 
-      ? 999
-      : (plan === 'free' ? 3 : plan === 'pro' ? 50 : 999)
-
-    if (user._count.projects >= limit) {
-      return NextResponse.json(
-        { error: 'Project limit reached. Please upgrade your plan.' },
-        { status: 429 }
-      )
-    }
-
-    const { name, description, type, code } = await request.json()
-
-    const project = await prisma.project.create({
-      data: {
-        name: name || 'Untitled Project',
-        description: description || '',
-        type: type || 'landing-page',
-        code: code || '',
-        userId: user.id,
-      },
-    })
-
-    // Log activity
-    await prisma.activity.create({
-      data: {
-        userId: user.id,
-        type: 'project',
-        action: 'created',
-        metadata: {
-          projectId: project.id,
-          projectName: project.name,
-          projectType: project.type
-        }
-      }
-    })
-
-    return NextResponse.json({ project }, { status: 201 })
-  } catch (error) {
-    console.error('Create project error:', error)
+  // Validate input
+  const result = createProjectSchema.safeParse(body)
+  if (!result.success) {
     return NextResponse.json(
-      { error: 'Failed to create project' },
-      { status: 500 }
+      { error: 'Invalid input', details: result.error },
+      { status: 400 }
     )
   }
-}
+
+  const project = await prisma.project.create({
+    data: {
+      ...result.data,
+      userId: session.user.id,
+    },
+  })
+
+  // Increment usage counter
+  await incrementUsage(session.user.id, 'project')
+
+  return NextResponse.json({ project }, { status: 201 })
+})

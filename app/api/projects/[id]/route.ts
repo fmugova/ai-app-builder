@@ -1,4 +1,5 @@
 import { authOptions } from '@/lib/auth';
+import { compose, withAuth, withResourceOwnership, withRateLimit } from '@/lib/api-middleware'
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { prisma } from '@/lib/prisma';
@@ -7,173 +8,46 @@ import { prisma } from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 
 // GET single project
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    const { id } = await params
-
-    // Admins can view any project, regular users only their own
-    const project = await prisma.project.findFirst({
-      where: {
-        id,
-        ...(user.role !== 'admin' && { userId: user.id }),
-      },
-    })
-
-    if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
-    }
-
-    return NextResponse.json(project)
-  } catch (error: any) {
-    console.error('Project fetch error:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to fetch project' },
-      { status: 500 }
-    )
-  }
-}
+export const GET = compose(
+  withResourceOwnership('project', (params) => params.id),
+  withAuth
+)(async (req, context, session) => {
+  const project = await prisma.project.findUnique({
+    where: { id: context.params.id },
+    include: {
+      pages: true,
+      customDomains: true,
+    },
+  })
+  
+  return NextResponse.json({ project })
+})
 
 // UPDATE project
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
-    
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { name, description, code, type } = await request.json()
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    // Admins can update any project, regular users only their own
-    const existingProject = await prisma.project.findFirst({
-      where: {
-        id,
-        ...(user.role !== 'admin' && { userId: user.id }),
-      },
-    })
-
-    if (!existingProject) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
-    }
-
-    // Update project
-    const project = await prisma.project.update({
-      where: { id },
-      data: {
-        name: name || existingProject.name,
-        description: description !== undefined ? description : existingProject.description,
-        code: code || existingProject.code,
-        type: type || existingProject.type,
-      },
-    })
-
-    // Log activity
-    await prisma.activity.create({
-      data: {
-        userId: user.id,
-        type: 'project',
-        action: 'updated',
-        metadata: {
-          projectId: project.id,
-          projectName: project.name
-        }
-      }
-    })
-
-    return NextResponse.json(project)
-  } catch (error: any) {
-    console.error('Project update error:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to update project' },
-      { status: 500 }
-    )
-  }
-}
+export const PUT = compose(
+  withRateLimit(30),
+  withResourceOwnership('project', (params) => params.id),
+  withAuth
+)(async (req, context, session) => {
+  const body = await req.json()
+  
+  const project = await prisma.project.update({
+    where: { id: context.params.id },
+    data: body,
+  })
+  
+  return NextResponse.json({ project })
+})
 
 // DELETE project
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
-    
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    // Admins can delete any project, regular users only their own
-    const project = await prisma.project.findFirst({
-      where: {
-        id,
-        ...(user.role !== 'admin' && { userId: user.id }),
-      },
-    })
-
-    if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
-    }
-
-    await prisma.project.delete({
-      where: { id },
-    })
-
-    // Log activity
-    await prisma.activity.create({
-      data: {
-        userId: user.id,
-        type: 'project',
-        action: 'deleted',
-        metadata: {
-          projectId: project.id,
-          projectName: project.name
-        }
-      }
-    })
-
-    return NextResponse.json({ message: 'Project deleted successfully' })
-  } catch (error: any) {
-    console.error('Project deletion error:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to delete project' },
-      { status: 500 }
-    )
-  }
-}
+export const DELETE = compose(
+  withResourceOwnership('project', (params) => params.id),
+  withAuth
+)(async (req, context, session) => {
+  // User ownership verified!
+  await prisma.project.delete({
+    where: { id: context.params.id },
+  })
+  
+  return NextResponse.json({ success: true })
+})

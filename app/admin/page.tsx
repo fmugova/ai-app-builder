@@ -142,9 +142,18 @@ export default function AdminDashboard() {
       ])
 
       if (statsRes.ok) setStats(await statsRes.json())
-      if (usersRes.ok) setUsers(await usersRes.json())
-      if (activitiesRes.ok) setActivities(await activitiesRes.json())
-      if (feedbackRes.ok) setFeedback(await feedbackRes.json())
+      if (usersRes.ok) {
+        const data = await usersRes.json()
+        setUsers(data.users || [])
+      }
+      if (activitiesRes.ok) {
+        const data = await activitiesRes.json()
+        setActivities(Array.isArray(data) ? data : [])
+      }
+      if (feedbackRes.ok) {
+        const data = await feedbackRes.json()
+        setFeedback(Array.isArray(data) ? data : [])
+      }
       if (healthRes.ok) setSystemHealth(await healthRes.json())
     } catch (err) {
       console.error('Failed to load admin data:', err)

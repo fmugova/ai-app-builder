@@ -1,9 +1,19 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { compose, withAuth, withSubscription, withUsageCheck, withRateLimit } from '@/lib/api-middleware'
+import { logSecurityEvent } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { testSupabaseConnection } from '@/lib/supabase-integration'
-import { encrypt, decrypt } from '@/lib/encryption'
+import { NextResponse } from 'next/server'
+import { z } from 'zod'
+
+const createConnectionSchema = z.object({
+  name: z.string().min(1).max(100),
+  type: z.enum(['postgres', 'mysql', 'mongodb', 'sqlite']),
+  host: z.string().min(1),
+  port: z.number().int().min(1).max(65535),
+  database: z.string().min(1),
+  username: z.string().min(1),
+  password: z.string().min(1),
+  ssl: z.boolean().optional().default(false),
+})
 
 export const dynamic = 'force-dynamic'
 

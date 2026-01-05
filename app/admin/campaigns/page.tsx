@@ -82,12 +82,12 @@ export default function CampaignsPage() {
 
       if (campaignsRes.ok) {
         const data = await campaignsRes.json()
-        setCampaigns(data)
+        setCampaigns(Array.isArray(data) ? data : [])
       }
 
       if (subscribersRes.ok) {
         const data = await subscribersRes.json()
-        setSubscribers(data)
+        setSubscribers(Array.isArray(data) ? data : [])
       }
     } catch (error) {
       console.error('Failed to load data:', error)

@@ -1,164 +1,128 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { compose, withAuth, withSubscription, withUsageCheck, withRateLimit } from '@/lib/api-middleware'
+import { logSecurityEvent } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { addDomainToVercel, generateVerificationRecord } from '@/lib/vercel-domains'
+import { NextResponse } from 'next/server'
+import { z } from 'zod'
+
+const createDomainSchema = z.object({
+  domain: z.string()
+    .min(3)
+    .max(253)
+    .regex(/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i, 'Invalid domain format'),
+  projectId: z.string().min(1),
+})
 
 export const dynamic = 'force-dynamic'
 
 // GET: List all domains for user's projects
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    const domains = await prisma.customDomain.findMany({
-      where: {
-        project: {
-          userId: user.id
-        }
+export const GET = compose(
+  withRateLimit(100),
+  withSubscription('pro'),
+  withAuth
+)(async (req, context, session) => {
+  const domains = await prisma.customDomain.findMany({
+    where: {
+      project: {
+        userId: session.user.id,
       },
-      include: {
-        project: {
-          select: {
-            id: true,
-            name: true
-          }
-        }
+    },
+    include: {
+      project: {
+        select: {
+          id: true,
+          name: true,
+        },
       },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    })
-
-    return NextResponse.json({ domains })
-
-  } catch (error: any) {
-    console.error('Domains GET error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch domains' },
-      { status: 500 }
-    )
-  }
-}
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+  
+  return NextResponse.json({ success: true, domains })
+})
 
 // POST: Add new custom domain
-export async function POST(request: NextRequest) {
+export const POST = compose(
+  withRateLimit(20),
+  withUsageCheck('add_domain'),
+  withSubscription('pro'),
+  withAuth
+)(async (req, context, session) => {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { projectId, domain } = await request.json()
-
-    if (!projectId || !domain) {
+    const body = await req.json()
+    
+    // Validate input
+    const result = createDomainSchema.safeParse(body)
+    if (!result.success) {
       return NextResponse.json(
-        { error: 'Missing projectId or domain' },
+        { error: 'Invalid input', details: result.error },
         { status: 400 }
       )
     }
-
-    // Validate domain format
-    const domainRegex = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/i
-    if (!domainRegex.test(domain)) {
-      return NextResponse.json(
-        { error: 'Invalid domain format' },
-        { status: 400 }
-      )
-    }
-
-    // Check if user owns the project
+    
+    const { domain, projectId } = result.data
+    
+    // Verify user owns the project
     const project = await prisma.project.findFirst({
       where: {
         id: projectId,
-        User: {
-          email: session.user.email
-        }
-      }
+        userId: session.user.id,
+      },
     })
-
+    
     if (!project) {
       return NextResponse.json(
-        { error: 'Project not found or unauthorized' },
+        { error: 'Project not found' },
         { status: 404 }
       )
     }
-
+    
     // Check if domain already exists
     const existingDomain = await prisma.customDomain.findUnique({
-      where: { domain }
+      where: { domain },
     })
-
+    
     if (existingDomain) {
       return NextResponse.json(
         { error: 'Domain already in use' },
         { status: 409 }
       )
     }
-
-    // Generate verification record
-    const verificationRecord = generateVerificationRecord(domain, projectId)
-
-    // Add domain to Vercel
-    try {
-      await addDomainToVercel(domain)
-    } catch (vercelError: any) {
-      console.error('Vercel API error:', vercelError)
-      // Continue anyway - we'll store it and user can verify later
-    }
-
-    // Create domain record in database
+    
+    // Create custom domain
     const customDomain = await prisma.customDomain.create({
       data: {
-        projectId,
         domain,
+        projectId,
+        verified: false,
         status: 'pending',
-        verificationKey: verificationRecord.value
       },
       include: {
         project: {
           select: {
             id: true,
-            name: true
-          }
-        }
-      }
-    })
-
-    return NextResponse.json({
-      domain: customDomain,
-      verificationRecord
-    })
-
-  } catch (error: any) {
-    console.error('=== DOMAIN ERROR DEBUG ===')
-    console.error('Error message:', error.message)
-    console.error('Error stack:', error.stack)
-    console.error('Vercel token exists:', !!process.env.VERCEL_API_TOKEN)
-    console.error('Vercel project ID:', process.env.VERCEL_PROJECT_ID)
-    console.error('=========================')
-
-    return NextResponse.json(
-      { 
-        error: 'Failed to add domain', 
-        message: error.message,
-        debug: {
-          hasToken: !!process.env.VERCEL_API_TOKEN,
-          hasProjectId: !!process.env.VERCEL_PROJECT_ID
-        }
+            name: true,
+          },
+        },
       },
+    })
+    
+    // Log security event
+    await logSecurityEvent(session.user.id, 'custom_domain_added', {
+      domainId: customDomain.id,
+      domain: customDomain.domain,
+      projectId,
+    })
+    
+    return NextResponse.json({ 
+      success: true, 
+      domain: customDomain 
+    }, { status: 201 })
+    
+  } catch (error) {
+    console.error('Failed to add custom domain:', error)
+    return NextResponse.json(
+      { error: 'Failed to add custom domain' },
       { status: 500 }
     )
   }
-}
+})
