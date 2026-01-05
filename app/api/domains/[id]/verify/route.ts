@@ -1,17 +1,26 @@
-import { compose, withAuth, withSubscription, withResourceOwnership, withRateLimit } from '@/lib/api-middleware'
+import { withAuth } from '@/lib/api-middleware'
 import { logSecurityEvent } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 
-export const POST = compose(
-  withRateLimit(10, 60000), // 10 verifications per minute
-  withResourceOwnership('domain', (params) => params.id),
-  withSubscription('pro'),
-  withAuth
-)(async (req: NextRequest, context: { params: any }, session: any) => {
+export const POST = withAuth(async (req, context, session) => {
   try {
-    const domain = await prisma.customDomain.findUnique({
-      where: { id: context.params.id },
+    // Check Pro subscription
+    if (!['pro', 'business', 'enterprise'].includes(session.user.subscriptionTier)) {
+      return NextResponse.json(
+        { error: 'Pro subscription required' },
+        { status: 403 }
+      )
+    }
+
+    // Check ownership
+    const domain = await prisma.customDomain.findFirst({
+      where: {
+        id: context.params.id,
+        project: {
+          userId: session.user.id
+        }
+      },
     })
     
     if (!domain) {
@@ -24,11 +33,10 @@ export const POST = compose(
     // Verify DNS records
     const verificationResult = await verifyDomainDNS(domain.domain)
     
-    // Update domain status
+    // Update domain status - removed 'verified' field, only using 'verifiedAt'
     await prisma.customDomain.update({
       where: { id: context.params.id },
       data: {
-        verified: verificationResult.verified,
         status: verificationResult.verified ? 'active' : 'pending',
         verifiedAt: verificationResult.verified ? new Date() : null,
       },
