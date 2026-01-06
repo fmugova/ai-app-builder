@@ -2,5 +2,11 @@
   "buildCommand": "prisma generate && next build",
   "env": {
     "SKIP_ENV_VALIDATION": "true"
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/drip-emails",
+      "schedule": "0 */6 * * *"
+    }
+  ]
 }
