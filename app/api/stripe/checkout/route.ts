@@ -38,8 +38,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { priceId, plan, promoCode } = body
 
-    // Create checkout session
-    const checkoutSession = await stripe.checkout.sessions.create({
+    // Build checkout session params
+    const sessionParams: any = {
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [
@@ -56,8 +56,16 @@ export async function POST(request: NextRequest) {
         plan: plan || 'pro',
         priceId: priceId,
       },
-      ...(promoCode && { discounts: [{ coupon: promoCode }] }),
-    })
+    }
+
+    // Apply promo code if provided
+    if (promoCode) {
+      sessionParams.discounts = [{ coupon: promoCode }]
+      sessionParams.metadata.promoCode = promoCode
+    }
+
+    // Create checkout session
+    const checkoutSession = await stripe.checkout.sessions.create(sessionParams)
 
     return NextResponse.json({ url: checkoutSession.url })
   } catch (error: any) {

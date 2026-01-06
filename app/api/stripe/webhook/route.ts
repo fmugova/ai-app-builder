@@ -73,8 +73,31 @@ export async function POST(request: NextRequest) {
         })
 
         // Update user
+        // Apply promo code if present
+        if (session.metadata?.promoCode) {
+          try {
+            const promo = await prisma.promoCodes.findFirst({
+              where: {
+                code: session.metadata.promoCode.toUpperCase(),
+                active: true,
+              },
+            })
+
+            if (promo) {
+              // Increment usage count
+              await prisma.promoCodes.update({
+                where: { id: promo.id },
+                data: { timesUsed: { increment: 1 } },
+              })
+              console.log(`✅ Promo code applied: ${promo.code}`)
+            }
+          } catch (promoError) {
+            console.error('Failed to apply promo code:', promoError)
+          }
+        }
+
         const updatedUser = await prisma.user.update({
-          where: { id: session.metadata.userId },
+          where: { email: session.customer_details?.email || undefined },
           data: {
             subscriptionTier: plan,
             subscriptionStatus: 'active',
@@ -83,6 +106,7 @@ export async function POST(request: NextRequest) {
             generationsLimit: planConfig.generationsLimit,
             projectsLimit: planConfig.projectsLimit,
             generationsUsed: 0,
+            ...(session.metadata?.promoCode && { promoCodeUsed: true }),
           },
         })
 

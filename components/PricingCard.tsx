@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Check, Loader2 } from 'lucide-react'
+import PromoCodeInput from './PromoCodeInput'
 
 interface PricingCardProps {
   name: string
@@ -21,6 +22,21 @@ export default function PricingCard({
   currentPlan = false 
 }: PricingCardProps) {
   const [loading, setLoading] = useState(false)
+  const [promoCode, setPromoCode] = useState<string | null>(null)
+  const [stripeCouponId, setStripeCouponId] = useState<string | null>(null)
+  const [discountMessage, setDiscountMessage] = useState<string | null>(null)
+
+  const handleValidPromo = (code: string, couponId: string, message: string) => {
+    setPromoCode(code)
+    setStripeCouponId(couponId)
+    setDiscountMessage(message)
+  }
+
+  const handleClearPromo = () => {
+    setPromoCode(null)
+    setStripeCouponId(null)
+    setDiscountMessage(null)
+  }
 
   const handleSubscribe = async () => {
     if (!priceId) return
@@ -31,7 +47,11 @@ export default function PricingCard({
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: name.toUpperCase() }),
+        body: JSON.stringify({ 
+          plan: name.toLowerCase(),
+          priceId,
+          promoCode: stripeCouponId,
+        }),
       })
 
       const data = await res.json()
@@ -79,10 +99,20 @@ export default function PricingCard({
         ))}
       </ul>
 
+      {!currentPlan && price > 0 && priceId && (
+        <PromoCodeInput
+          plan={name.toLowerCase()}
+          onValidCode={handleValidPromo}
+          onClearCode={handleClearPromo}
+        />
+      )}
+
       <button
         onClick={handleSubscribe}
         disabled={loading || currentPlan || !priceId}
         className={`w-full py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2 ${
+          !currentPlan && price > 0 && priceId ? 'mt-4' : 'mt-0'
+        } ${
           currentPlan
             ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
             : popular
