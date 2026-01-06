@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { checkRateLimit, rateLimits } from '@/lib/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,6 +12,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Apply rate limiting to prevent SSRF abuse
+    const rateLimitResult = checkRateLimit(`fetch-url:${session.user.email}`, { maxRequests: 30, windowMs: 60000 }) // 30 per minute
+    if (!rateLimitResult.allowed) {
+      const resetIn = Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000)
+      return NextResponse.json(
+        { 
+          error: 'Too many requests. Please try again later.',
+          resetIn 
+        },
+        { status: 429 }
+      )
+    }
+
     const { url } = await request.json()
 
     if (!url) {
@@ -18,10 +32,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate URL
+    let parsedUrl
     try {
-      new URL(url)
+      parsedUrl = new URL(url)
     } catch {
       return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
+    }
+
+    // Block private IP ranges to prevent SSRF attacks
+    const hostname = parsedUrl.hostname.toLowerCase()
+    const blockedHosts = ['localhost', '127.0.0.1', '0.0.0.0', '::1', '169.254.169.254']
+    const privateRanges = /^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)/
+    
+    if (blockedHosts.includes(hostname) || privateRanges.test(hostname)) {
+      return NextResponse.json({ error: 'Access to private/local URLs is not allowed' }, { status: 403 })
     }
 
     // Fetch the URL content

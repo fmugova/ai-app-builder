@@ -13,6 +13,28 @@ const anthropic = new Anthropic({
 
 export async function POST(request: NextRequest) {
   try {
+    // Check authentication
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please sign in' },
+        { status: 401 }
+      )
+    }
+
+    // Apply rate limiting
+    const rateLimitResult = checkRateLimit(`chat:${session.user.email}`, rateLimits.aiGeneration)
+    if (!rateLimitResult.allowed) {
+      const resetIn = Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000)
+      return NextResponse.json(
+        { 
+          error: 'Too many requests. Please try again later.',
+          resetIn 
+        },
+        { status: 429 }
+      )
+    }
+
     const formData = await request.formData();
     const message = formData.get('message') as string;
     const files = formData.getAll('files') as File[];

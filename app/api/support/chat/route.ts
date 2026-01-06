@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { checkRateLimit, rateLimits } from '@/lib/rateLimit';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
@@ -11,6 +12,21 @@ const anthropic = new Anthropic({
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
+
+    // Apply rate limiting (even for non-authenticated users to prevent abuse)
+    const identifier = session?.user?.email || request.headers.get('x-forwarded-for') || 'unknown'
+    const rateLimitResult = checkRateLimit(`support:${identifier}`, rateLimits.aiGeneration)
+    if (!rateLimitResult.allowed) {
+      const resetIn = Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000)
+      return NextResponse.json(
+        { 
+          error: 'Too many requests. Please try again later.',
+          resetIn 
+        },
+        { status: 429 }
+      )
+    }
+
     const { message } = await request.json();
 
     // Get user context

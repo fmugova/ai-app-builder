@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +35,19 @@ export async function POST(request: Request) {
         { error: 'Authentication required' },
         { status: 401 }
       );
+    }
+
+    // Apply rate limiting to prevent GitHub API abuse
+    const rateLimitResult = checkRateLimit(`github-export:${session.user.email}`, { maxRequests: 10, windowMs: 3600000 }) // 10 per hour
+    if (!rateLimitResult.allowed) {
+      const resetIn = Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000)
+      return NextResponse.json(
+        { 
+          error: 'Too many GitHub exports. Please try again later.',
+          resetIn 
+        },
+        { status: 429 }
+      )
     }
     
     const { projectId } = await request.json();

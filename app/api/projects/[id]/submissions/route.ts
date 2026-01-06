@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,15 +67,39 @@ export async function POST(
   }
 }
 
-// GET - Retrieve form submissions for a project (admin only)
+// GET - Retrieve form submissions for a project (requires ownership)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Check authentication
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please sign in' },
+        { status: 401 }
+      )
+    }
+
     const { id: projectId } = await params
 
-    // Get submissions
+    // Verify user owns this project
+    const project = await prisma.project.findFirst({
+      where: {
+        id: projectId,
+        userId: session.user.id
+      }
+    })
+
+    if (!project) {
+      return NextResponse.json(
+        { error: 'Project not found or access denied' },
+        { status: 404 }
+      )
+    }
+
+    // Get submissions for owned project
     const submissions = await prisma.formSubmission.findMany({
       where: { projectId },
       orderBy: { submittedAt: 'desc' },
