@@ -247,7 +247,7 @@ export default function SettingsClient({ user: initialUser }: SettingsClientProp
 
               <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
                 <Link
-                  href="/dashboard/billing"
+                  href="/billing"
                   className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition text-sm font-medium"
                 >
                   Manage Subscription →
