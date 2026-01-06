@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     await prisma.user.update({
       where: { email: session.user.email },
       data: { 
-        promoCodeUsed: true,
+        promoCodeUsed: code.toUpperCase(),
         discountRate: promo.discountType === 'percentage' ? promo.discountValue : 0,
       },
     })
