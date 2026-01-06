@@ -1,5 +1,5 @@
 {
-  "buildCommand": "prisma migrate deploy && prisma generate && next build",
+  "buildCommand": "prisma migrate resolve --rolled-back 20250106000000_baseline || true && prisma generate && next build",
   "env": {
     "SKIP_ENV_VALIDATION": "true"
   }
