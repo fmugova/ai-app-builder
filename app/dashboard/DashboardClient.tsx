@@ -629,6 +629,9 @@ export default function DashboardClient({
                       <Link href={`/dashboard/projects/${project.id}/seo`} className={`px-3 py-1.5 text-xs rounded-md ${isDarkMode ? 'bg-green-900/50 text-green-300 hover:bg-green-900/70' : 'bg-green-100 text-green-700 hover:bg-green-200'} transition`}>
                         🔍 SEO
                       </Link>
+                      <Link href={`/dashboard/projects/${project.id}/analytics`} className={`px-3 py-1.5 text-xs rounded-md ${isDarkMode ? 'bg-cyan-900/50 text-cyan-300 hover:bg-cyan-900/70' : 'bg-cyan-100 text-cyan-700 hover:bg-cyan-200'} transition`}>
+                        📊 Analytics
+                      </Link>
                     </div>
                   </div>
                 </div>

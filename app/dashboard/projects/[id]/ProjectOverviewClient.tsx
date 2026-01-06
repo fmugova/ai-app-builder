@@ -152,6 +152,15 @@ export default function ProjectOverviewClient({ project }: ProjectOverviewClient
           </Link>
 
           <Link
+            href={`/dashboard/projects/${project.id}/analytics`}
+            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 hover:shadow-lg transition"
+          >
+            <div className="text-3xl mb-3">📊</div>
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Analytics</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">View insights</p>
+          </Link>
+
+          <Link
             href={`/dashboard/projects/${project.id}/submissions`}
             className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 hover:shadow-lg transition"
           >

@@ -579,8 +579,8 @@ export default function AdminDashboard() {
             ))}
           </div>
 
-          {/* Quick Actions Grid - 5 cards */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+          {/* Quick Actions Grid - 6 cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8">
             {/* Users */}
             <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
               <div className="text-4xl mb-3">👥</div>
@@ -646,6 +646,21 @@ export default function AdminDashboard() {
               </button>
             </div>
 
+            {/* Subscription Analytics - NEW! */}
+            <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+              <div className="text-4xl mb-3">💰</div>
+              <h3 className="text-xl font-bold mb-2">Analytics</h3>
+              <p className="text-gray-400 text-sm mb-4">
+                Revenue & MRR
+              </p>
+              <button 
+                onClick={() => router.push('/admin/analytics')}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg transition text-sm"
+              >
+                View Details
+              </button>
+            </div>
+
             {/* Export Data */}
             <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
               <div className="text-4xl mb-3">📥</div>
@@ -660,19 +675,25 @@ export default function AdminDashboard() {
                 Export CSV
               </button>
             </div>
+          </div>
 
-            {/* Marketing Campaigns */}
-            <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
-              <div className="text-4xl mb-3">📧</div>
-              <h3 className="text-xl font-bold mb-2">Campaigns</h3>
-              <p className="text-gray-400 text-sm mb-4">
-                Email marketing
-              </p>
+          {/* Marketing Campaigns Card - Full Width */}
+          <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700 mb-8">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="text-4xl">📧</div>
+                <div>
+                  <h3 className="text-xl font-bold mb-1">Email Marketing Campaigns</h3>
+                  <p className="text-gray-400 text-sm">
+                    Create and manage drip campaigns for user segments
+                  </p>
+                </div>
+              </div>
               <button 
                 onClick={() => router.push('/admin/campaigns')}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg transition text-sm"
+                className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition font-medium"
               >
-                Manage
+                Manage Campaigns
               </button>
             </div>
           </div>
