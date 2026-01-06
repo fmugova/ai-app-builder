@@ -55,5 +55,12 @@ export const POST = compose(
   // Increment usage counter
   await incrementUsage(session.user.id, 'project')
 
+  // Check and send usage alerts (non-blocking)
+  import('@/lib/usage-alerts').then(({ checkUsageAlerts }) => {
+    checkUsageAlerts(session.user.id).catch(err => 
+      console.error('Usage alert check failed:', err)
+    )
+  })
+
   return NextResponse.json({ project }, { status: 201 })
 })

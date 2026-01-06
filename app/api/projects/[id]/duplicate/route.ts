@@ -70,6 +70,19 @@ export async function POST(
       },
     })
 
+    // Increment project counter
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { projectsThisMonth: { increment: 1 } }
+    })
+
+    // Check and send usage alerts (non-blocking)
+    import('@/lib/usage-alerts').then(({ checkUsageAlerts }) => {
+      checkUsageAlerts(user.id).catch(err => 
+        console.error('Usage alert check failed:', err)
+      )
+    })
+
     return NextResponse.json({
       success: true,
       project: duplicatedProject,

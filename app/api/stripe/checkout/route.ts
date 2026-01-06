@@ -4,10 +4,11 @@ export const runtime = 'nodejs'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { checkRateLimit } from '@/lib/rateLimit'
 import Stripe from 'stripe'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-11-17.clover',  // ✅ Updated
+  apiVersion: '2025-11-17.clover',
 })
 
 export async function POST(request: NextRequest) {
@@ -18,8 +19,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Rate limiting: 5 checkout attempts per hour per user
+    const rateLimitResult = await checkRateLimit(
+      `checkout:${session.user.id || session.user.email}`,
+      5,
+      60 * 60 * 1000
+    )
+
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Too many checkout attempts. Please try again later.' },
+        { status: 429 }
+      )
+    }
+
     const body = await request.json()
-    const { priceId, promoCode } = body
+    const { priceId, plan, promoCode } = body
 
     // Create checkout session
     const checkoutSession = await stripe.checkout.sessions.create({
@@ -36,6 +51,8 @@ export async function POST(request: NextRequest) {
       customer_email: session.user.email,
       metadata: {
         userId: session.user.id || session.user.email,
+        plan: plan || 'pro',
+        priceId: priceId,
       },
       ...(promoCode && { discounts: [{ coupon: promoCode }] }),
     })

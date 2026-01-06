@@ -23,6 +23,7 @@ export const PLANS = {
     price: 19,
     priceId: process.env.STRIPE_PRO_PRICE_ID,
     generationsLimit: 100,
+    projectsLimit: 50,
     features: [
       '100 AI generations per month',
       'Unlimited saved projects',
@@ -32,13 +33,14 @@ export const PLANS = {
       'Export to multiple formats'
     ]
   },
-  ENTERPRISE: {
-    name: 'Enterprise',
-    price: 99,
-    priceId: process.env.STRIPE_ENTERPRISE_PRICE_ID,
-    generationsLimit: -1,
+  BUSINESS: {
+    name: 'Business',
+    price: 49,
+    priceId: process.env.STRIPE_BUSINESS_PRICE_ID,
+    generationsLimit: 500,
+    projectsLimit: 200,
     features: [
-      'Unlimited AI generations',
+      '500 AI generations per month',
       'Unlimited saved projects',
       'All templates & features',
       'Advanced AI models',

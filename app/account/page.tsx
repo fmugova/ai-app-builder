@@ -1,38 +1,67 @@
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+'use client'
+
+import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
-import { prisma } from '@/lib/prisma'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import toast from 'react-hot-toast'
 
-export default async function AccountPage() {
-  const session = await getServerSession(authOptions)
-  
-  if (!session?.user?.email) {
-    redirect('/auth/signin')
-  }
+export default function AccountPage() {
+  const { data: session, status } = useSession()
+  const [user, setUser] = useState<any>(null)
+  const [projectCount, setProjectCount] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [managingSubscription, setManagingSubscription] = useState(false)
 
-  const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      image: true,
-      generationsUsed: true,
-      generationsLimit: true,
-      stripeCustomerId: true,
-      stripeSubscriptionId: true,
-      createdAt: true,
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      redirect('/auth/signin')
     }
-  })
+    
+    if (status === 'authenticated' && session?.user?.email) {
+      fetchUserData()
+    }
+  }, [status, session])
 
-  if (!user) {
-    redirect('/auth/signin')
+  const fetchUserData = async () => {
+    try {
+      const res = await fetch('/api/user/profile')
+      const data = await res.json()
+      setUser(data.user)
+      setProjectCount(data.projectCount)
+    } catch (error) {
+      console.error('Failed to fetch user data:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const projectCount = await prisma.project.count({
-    where: { userId: user.id }
-  })
+  const handleManageSubscription = async () => {
+    setManagingSubscription(true)
+    try {
+      const res = await fetch('/api/stripe/portal', { method: 'POST' })
+      
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || 'Failed to open billing portal')
+      }
+      
+      const { url } = await res.json()
+      window.location.href = url
+    } catch (error: any) {
+      console.error('Portal error:', error)
+      toast.error(error.message || 'Failed to open billing portal')
+      setManagingSubscription(false)
+    }
+  }
+
+  if (loading || !user) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    )
+  }
 
   const plan = user.stripeSubscriptionId ? 'Pro' : 'Free'
 
@@ -177,12 +206,23 @@ export default async function AccountPage() {
               )}
               
               <div className="pt-4 border-t border-gray-800">
-                <a 
-                  href="/api/billing/portal"
-                  className="inline-block px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+                <button
+                  onClick={handleManageSubscription}
+                  disabled={managingSubscription}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white rounded-lg transition"
                 >
-                  Manage Subscription
-                </a>
+                  {managingSubscription ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Opening...
+                    </>
+                  ) : (
+                    'Manage Subscription'
+                  )}
+                </button>
                 <p className="text-sm text-gray-400 mt-2">
                   Update payment method, view invoices, or cancel subscription
                 </p>

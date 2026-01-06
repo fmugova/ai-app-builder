@@ -44,17 +44,14 @@ export async function POST(request: NextRequest) {
           break
         }
 
-        // Determine plan from amount
-        const plan = 
-          session.amount_total === 1900 ? 'pro' : 
-          session.amount_total === 4900 ? 'business' : 
-          'free'
+        // Get plan from metadata (more reliable than amount)
+        const plan = session.metadata?.plan || 'pro'
 
         const planConfig = {
           pro: { generationsLimit: 100, projectsLimit: 50 },
           business: { generationsLimit: 500, projectsLimit: 200 },
           free: { generationsLimit: 3, projectsLimit: 3 },
-        }[plan]
+        }[plan] || { generationsLimit: 100, projectsLimit: 50 }
 
         // Update or create subscription
         await prisma.subscription.upsert({

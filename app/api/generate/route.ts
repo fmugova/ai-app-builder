@@ -613,6 +613,13 @@ Make it visually stunning, fully functional, and ready to deploy immediately.`
       data: { generationsUsed: { increment: 1 } },
     })
 
+    // Check and send usage alerts (non-blocking)
+    import('@/lib/usage-alerts').then(({ checkUsageAlerts }) => {
+      checkUsageAlerts(user.id).catch(err => 
+        console.error('Usage alert check failed:', err)
+      )
+    })
+
     // Log activity
     await prisma.activity.create({
       data: {
