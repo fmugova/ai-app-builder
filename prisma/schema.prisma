@@ -103,6 +103,7 @@ model User {
   sessions              Session[]
   subscriptions         Subscription?
   VercelConnection      VercelConnection?
+  workspaceMembers      WorkspaceMember[]
 
   @@schema("public")
 }
@@ -290,6 +291,85 @@ model Subscription {
   @@index([stripeSubscriptionId])
   @@index([userId])
   @@index([status])
+  @@schema("public")
+}
+
+model Workspace {
+  id                    String             @id @default(cuid())
+  name                  String
+  slug                  String             @unique
+  description           String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  subscriptionTier      String             @default("free")
+  subscriptionStatus    String             @default("active")
+  stripeCustomerId      String?            @unique
+  stripeSubscriptionId  String?            @unique
+  currentPeriodStart    DateTime?
+  currentPeriodEnd      DateTime?
+  generationsUsed       Int                @default(0)
+  generationsLimit      Int                @default(50)
+  projectsLimit         Int                @default(10)
+  membersLimit          Int                @default(5)
+  members               WorkspaceMember[]
+  projects              WorkspaceProject[]
+  invites               WorkspaceInvite[]
+
+  @@index([slug])
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+  @@schema("public")
+}
+
+model WorkspaceMember {
+  id          String    @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        String    @default("member")
+  joinedAt    DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([role])
+  @@schema("public")
+}
+
+model WorkspaceInvite {
+  id          String    @id @default(cuid())
+  workspaceId String
+  email       String
+  role        String    @default("member")
+  token       String    @unique
+  status      String    @default("pending")
+  invitedBy   String
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([email])
+  @@index([token])
+  @@index([status])
+  @@schema("public")
+}
+
+model WorkspaceProject {
+  id          String    @id @default(cuid())
+  workspaceId String
+  projectId   String
+  permission  String    @default("edit")
+  addedAt     DateTime  @default(now())
+  addedBy     String?
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, projectId])
+  @@index([workspaceId])
+  @@index([projectId])
   @@schema("public")
 }
 

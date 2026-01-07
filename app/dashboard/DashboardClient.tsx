@@ -7,7 +7,6 @@ import dynamic from 'next/dynamic'
 import { signOut } from 'next-auth/react'
 import ProjectCard from '@/components/ProjectCard'
 import type { Project } from '@/types/project'
-import UnifiedMobileNav from '@/components/UnifiedMobileNav'
 import { useSession } from 'next-auth/react'
 import { TIER_LIMITS } from '@/lib/auth'
 import { UsageDashboard } from '@/components/usage/UsageDashboard'
@@ -370,14 +369,6 @@ export default function DashboardClient({
               </div>
             </div>
 
-            {/* Mobile Navigation - Visible only on mobile */}
-            <div className="lg:hidden">
-              <UnifiedMobileNav
-                userName={userName || undefined}
-                userEmail={userEmail || undefined}
-                isAdmin={isAdmin}
-              />
-            </div>
           </div>
         </header>
 

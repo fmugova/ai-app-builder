@@ -15,7 +15,8 @@ import {
   Calendar,
   BarChart3,
   PieChart,
-  Activity
+  Activity,
+  ArrowLeft
 } from 'lucide-react'
 
 interface SubscriptionAnalytics {
@@ -154,6 +155,13 @@ export default function SubscriptionAnalyticsPage() {
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push('/admin')}
+                className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                title="Back to Admin"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-400" />
+              </button>
               <div className="bg-blue-600 p-2 rounded-lg">
                 <BarChart3 className="w-6 h-6" />
               </div>
