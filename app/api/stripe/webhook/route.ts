@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
             generationsLimit: planConfig.generationsLimit,
             projectsLimit: planConfig.projectsLimit,
             generationsUsed: 0,
-            ...(session.metadata?.promoCode && { promoCodeUsed: true }),
+            ...(session.metadata?.promoCode && { promoCodeUsed: session.metadata.promoCode }),
           },
         })
 
