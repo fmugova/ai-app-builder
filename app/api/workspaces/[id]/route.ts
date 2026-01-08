@@ -84,17 +84,7 @@ export async function GET(
             joinedAt: 'asc',
           },
         },
-        projects: {
-          include: {
-            project: true,
-          },
-        },
-        _count: {
-          select: {
-            members: true,
-            projects: true,
-          },
-        },
+        projects: true,
         _count: {
           select: {
             members: true,
