@@ -1,6 +1,3 @@
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
-
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -31,7 +28,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Find promo code
+    // Find promo code (model is PromoCodes plural)
     const promo = await prisma.promoCodes.findUnique({
       where: { code: code.toUpperCase() },
     })
@@ -59,7 +56,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Check expiry date
+    // Check expiry date (field is validUntil, not expiresAt)
     if (promo.validUntil && new Date(promo.validUntil) < new Date()) {
       return NextResponse.json(
         { error: 'This promo code has expired' },
@@ -81,11 +78,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Update user with promo code
+    // promoCodeUsed is String, discountRate is Float
     await prisma.user.update({
       where: { email: session.user.email },
       data: {
-        promoCodeUsed: promo.code, // ✅ Store the actual promo code used
-        discountRate: promo.discountType === 'percentage' ? promo.discountValue : 0,
+        promoCodeUsed: promo.code, // String - store the actual promo code
+        discountRate: promo.discountType === 'percentage' 
+          ? promo.discountValue 
+          : 0, // Float - store the discount rate
       },
     })
 
