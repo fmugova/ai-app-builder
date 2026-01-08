@@ -179,7 +179,11 @@ export default async function WorkspacePage({ params }: { params: { id: string }
           </div>
           <WorkspaceMembersList
             workspaceId={workspace.id}
-            members={workspace.members}
+            members={workspace.members.map(m => ({
+              ...m,
+              joinedAt: m.joinedAt.toISOString(),
+              updatedAt: m.updatedAt.toISOString(),
+            }))}
             currentUserRole={member.role}
             currentUserId={user.id}
           />
