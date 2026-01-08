@@ -86,11 +86,13 @@ export async function GET(
         },
         projects: {
           include: {
-            _count: {
-              select: {
-                members: true,
-              },
-            },
+            project: true,
+          },
+        },
+        _count: {
+          select: {
+            members: true,
+            projects: true,
           },
         },
         _count: {

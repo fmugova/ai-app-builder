@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
           gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000), // Last 30 days
         },
         subscriptionTier: 'free',
-        email: { not: null },
+        email: { not: null as any },
       },
       select: {
         id: true,
