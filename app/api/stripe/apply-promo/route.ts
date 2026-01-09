@@ -107,10 +107,11 @@ export async function POST(req: NextRequest) {
         value: promo.discountValue,
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Apply promo code error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json(
-      { error: 'Failed to apply promo code', details: error.message },
+      { error: 'Failed to apply promo code', details: errorMessage },
       { status: 500 }
     )
   }
