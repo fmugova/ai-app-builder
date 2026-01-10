@@ -3,36 +3,10 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import dynamic from 'next/dynamic'
 import { signOut } from 'next-auth/react'
 import ProjectCard from '@/components/ProjectCard'
 import type { Project } from '@/types/project'
 import { useSession } from 'next-auth/react'
-import { TIER_LIMITS } from '@/lib/auth'
-import { UsageDashboard } from '@/components/usage/UsageDashboard'
-import { ProjectLimitBanner } from '@/components/usage/ProjectLimitBanner'
-import { Button } from '@/components/ui/button'
-import {
-  FolderIcon,
-  DatabaseIcon,
-  GlobeIcon,
-  SparklesIcon,
-  ArrowUpIcon
-} from 'lucide-react'
-
-// Lazy load heavy components
-const SimpleExportButton = dynamic(() => import('@/components/SimpleExportButton'), {
-  loading: () => <div className="text-sm text-gray-400">Loading export...</div>,
-  ssr: false,
-})
-
-const OnboardingTutorial = dynamic(() => import('@/components/OnboardingTutorial'), {
-  ssr: false,
-})
-
-const QuickTips = dynamic(() => import('@/components/OnboardingTutorial').then(mod => ({ default: mod.QuickTips })), {
-  ssr: false,
-})
 
 // Icons
 const SunIcon = () => (
@@ -87,12 +61,14 @@ export default function DashboardClient({
   const searchParams = useSearchParams()
   const [projects, setProjects] = useState<Project[]>(initialProjects || [])
   const [searchQuery, setSearchQuery] = useState('')
-  const [isDarkMode, setIsDarkMode] = useState(true)
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
-  const [exportProject, setExportProject] = useState<Project | null>(null)
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('theme') === 'dark'
+    }
+    return true
+  })
   const [showAccountMenu, setShowAccountMenu] = useState(false)
   const [toasts, setToasts] = useState<Toast[]>([])
-  const [showTutorial, setShowTutorial] = useState(false)
 
   // Toast notification system
   // Reliable toast id counter
@@ -140,13 +116,6 @@ export default function DashboardClient({
 
   useEffect(() => {
     fetch('/api/analytics?type=dashboard').catch(() => {})
-  }, [])
-
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('theme')
-    if (savedTheme) {
-      setIsDarkMode(savedTheme === 'dark')
-    }
   }, [])
 
   useEffect(() => {
@@ -204,47 +173,16 @@ export default function DashboardClient({
   const generationsPercentage = getUsagePercentage(stats.generationsUsed, stats.generationsLimit)
 
   const { data: session } = useSession()
-  const tier = session?.user.subscriptionTier as keyof typeof TIER_LIMITS
-  const limits = TIER_LIMITS[tier] ?? TIER_LIMITS.free
-  const projectsUsed = session?.user.projectsThisMonth || 0
-  const generationsUsed = session?.user.generationsUsed || 0
 
-  const usageStats = [
-    {
-      label: 'Projects',
-      used: projectsUsed,
-      limit: limits.projectsPerMonth,
-      icon: FolderIcon,
-      color: 'blue',
-      href: '/dashboard/projects',
-    },
-    {
-      label: 'AI Generations',
-      used: generationsUsed,
-      limit: limits.generationsPerMonth,
-      icon: SparklesIcon,
-      color: 'purple',
-      href: '/dashboard/generate',
-    },
-    {
-      label: 'Databases',
-      used: 0, // TODO: Fetch actual count
-      limit: limits.databases,
-      icon: DatabaseIcon,
-      color: 'green',
-      href: '/dashboard/database',
-      requiresPro: true,
-    },
-    {
-      label: 'Custom Domains',
-      used: 0, // TODO: Fetch actual count
-      limit: limits.customDomains,
-      icon: GlobeIcon,
-      color: 'orange',
-      href: '/dashboard/domains',
-      requiresPro: true,
-    },
-  ]
+  // Usage stats removed - not used in current implementation
+  // const usageStats = [
+  //   {
+  //     label: 'Projects',
+  //     used: projectsUsed,
+  //     limit: limits.projectsPerMonth,
+  //     icon: FolderIcon,
+  //   },
+  // ]
 
   if (!session) return null
 
@@ -283,9 +221,9 @@ export default function DashboardClient({
         <header className="bg-gray-900/50 backdrop-blur-sm border-b border-gray-800 sticky top-0 z-10">
           <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
             {/* Logo - Always visible */}
-            <a href="/" className="text-2xl font-bold text-white">
+            <Link href="/" className="text-2xl font-bold text-white">
               BuildFlow
-            </a>
+            </Link>
 
             {/* Desktop Navigation - Hidden on mobile (< lg) */}
             <div className="hidden lg:flex items-center gap-3">
@@ -494,19 +432,6 @@ export default function DashboardClient({
           </button>
 
           <button 
-            onClick={() => setShowTutorial(true)}
-            className={`flex items-center gap-3 p-4 rounded-xl transition group ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-50'} border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}
-          >
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center group-hover:scale-110 transition ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
-              <span className="text-2xl">🎓</span>
-            </div>
-            <div className="text-left">
-              <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Tutorial</p>
-              <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Learn the basics</p>
-            </div>
-          </button>
-
-          <button 
             onClick={() => window.location.href = 'mailto:support@buildflow-ai.app'}
             className={`flex items-center gap-3 p-4 rounded-xl transition group ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-50'} border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}
           >
@@ -649,9 +574,6 @@ export default function DashboardClient({
           )}
         </div>
       </div>
-
-      <OnboardingTutorial />
-      <QuickTips />
 
       {/* Add CSS for toast animation */}
       <style jsx global>{`
