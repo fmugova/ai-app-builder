@@ -142,6 +142,7 @@ export function CreateWorkspaceDialog() {
               variant="outline"
               onClick={() => setOpen(false)}
               disabled={isLoading}
+              className="border-gray-600 hover:bg-gray-700 hover:text-white"
             >
               Cancel
             </Button>

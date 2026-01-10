@@ -5,7 +5,8 @@ import prisma from '@/lib/prisma';
 import { CreateWorkspaceDialog } from '@/components/CreateWorkspaceDialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, FolderKanban, Settings } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Users, FolderKanban, Settings, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 export default async function WorkspacesPage() {
@@ -51,6 +52,14 @@ export default async function WorkspacesPage() {
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-7xl">
+      <div className="mb-6">
+        <Link href="/dashboard">
+          <Button variant="ghost" size="sm" className="mb-4">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+        </Link>
+      </div>
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold">Workspaces</h1>
