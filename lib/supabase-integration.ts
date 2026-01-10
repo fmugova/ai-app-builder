@@ -19,7 +19,7 @@ interface TableSchema {
     primaryKey?: boolean
     nullable?: boolean
     unique?: boolean
-    defaultValue?: any
+    defaultValue?: string | number | boolean
     foreignKey?: {
       table: string
       column: string
@@ -74,12 +74,19 @@ export async function testSupabaseConnection(config: SupabaseConfig): Promise<bo
 }
 
 /**
- * Generate SQL for creating a table
+ * Generate SQL for creating a table with RLS policies
+ * Generates complete DDL including table creation, constraints, triggers, and RLS policies
  */
 export function generateTableSQL(schema: TableSchema): string {
   const { name, columns, timestamps, softDeletes } = schema
   
-  let sql = `CREATE TABLE IF NOT EXISTS "${name}" (\n`
+  // Validate table name
+  if (!name || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+    throw new Error('Invalid table name. Use only letters, numbers, and underscores.')
+  }
+  
+  let sql = `-- Table: ${name}\n`
+  sql += `CREATE TABLE IF NOT EXISTS "${name}" (\n`
   
   // Add columns
   const columnDefs = columns.map(col => {
@@ -87,9 +94,16 @@ export function generateTableSQL(schema: TableSchema): string {
     
     if (col.primaryKey) def += ' PRIMARY KEY'
     if (!col.nullable && !col.primaryKey) def += ' NOT NULL'
-    if (col.unique) def += ' UNIQUE'
+    if (col.unique && !col.primaryKey) def += ' UNIQUE'
     if (col.defaultValue !== undefined) {
-      def += ` DEFAULT ${typeof col.defaultValue === 'string' ? `'${col.defaultValue}'` : col.defaultValue}`
+      // Handle different default value types
+      if (col.defaultValue === 'gen_random_uuid()' || col.defaultValue === 'NOW()' || col.defaultValue === 'now()') {
+        def += ` DEFAULT ${col.defaultValue}`
+      } else if (typeof col.defaultValue === 'string') {
+        def += ` DEFAULT '${col.defaultValue}'`
+      } else {
+        def += ` DEFAULT ${col.defaultValue}`
+      }
     }
     
     return def
@@ -108,26 +122,52 @@ export function generateTableSQL(schema: TableSchema): string {
     sql += ',\n  "deleted_at" TIMESTAMPTZ'
   }
   
-  sql += '\n);'
+  sql += '\n);\n'
   
   // Add foreign keys
   const foreignKeys = columns.filter(col => col.foreignKey)
-  foreignKeys.forEach(col => {
-    sql += `\n\nALTER TABLE "${name}" ADD CONSTRAINT "fk_${name}_${col.name}" `
-    sql += `FOREIGN KEY ("${col.name}") REFERENCES "${col.foreignKey!.table}"("${col.foreignKey!.column}");`
-  })
+  if (foreignKeys.length > 0) {
+    sql += '\n-- Foreign Key Constraints\n'
+    foreignKeys.forEach(col => {
+      sql += `ALTER TABLE "${name}" ADD CONSTRAINT "fk_${name}_${col.name}" `
+      sql += `FOREIGN KEY ("${col.name}") REFERENCES "${col.foreignKey!.table}"("${col.foreignKey!.column}");\n`
+    })
+  }
+  
+  // Add RLS (Row Level Security)
+  sql += `\n-- Enable Row Level Security\n`
+  sql += `ALTER TABLE "${name}" ENABLE ROW LEVEL SECURITY;\n`
+  
+  // Add RLS policies
+  sql += `\n-- RLS Policies\n`
+  sql += `CREATE POLICY "Enable read access for authenticated users"\n`
+  sql += `  ON "${name}" FOR SELECT\n`
+  sql += `  USING (auth.role() = 'authenticated');\n\n`
+  
+  sql += `CREATE POLICY "Enable insert access for authenticated users"\n`
+  sql += `  ON "${name}" FOR INSERT\n`
+  sql += `  WITH CHECK (auth.role() = 'authenticated');\n\n`
+  
+  sql += `CREATE POLICY "Enable update access for authenticated users"\n`
+  sql += `  ON "${name}" FOR UPDATE\n`
+  sql += `  USING (auth.role() = 'authenticated');\n\n`
+  
+  sql += `CREATE POLICY "Enable delete access for authenticated users"\n`
+  sql += `  ON "${name}" FOR DELETE\n`
+  sql += `  USING (auth.role() = 'authenticated');\n`
   
   // Add updated_at trigger
   if (timestamps) {
-    sql += `\n\nCREATE OR REPLACE FUNCTION update_updated_at_column()
+    sql += `\n-- Updated At Trigger\n`
+    sql += `CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;\n\n`
 
-CREATE TRIGGER update_${name}_updated_at
+    sql += `CREATE TRIGGER update_${name}_updated_at
 BEFORE UPDATE ON "${name}"
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();`
@@ -161,7 +201,7 @@ export async function getSupabaseTables(config: SupabaseConfig): Promise<string[
   
   if (error) throw error
   
-  return data.map((t: any) => t.table_name)
+  return data.map((t: { table_name: string }) => t.table_name)
 }
 
 /**

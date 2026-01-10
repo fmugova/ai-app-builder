@@ -38,10 +38,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ tables })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     console.error('Database tables GET error:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch tables' },
+      { error: 'Failed to fetch tables', message: errorMessage },
       { status: 500 }
     )
   }
@@ -49,14 +50,32 @@ export async function GET(request: NextRequest) {
 
 // POST: Create new table
 export async function POST(request: NextRequest) {
+  let requestBody: { 
+    connectionId?: string
+    name?: string
+    schema?: {
+      name: string
+      columns: Array<{
+        name: string
+        type: string
+        primaryKey?: boolean
+        nullable?: boolean
+        unique?: boolean
+        defaultValue?: string | number | boolean
+      }>
+      timestamps?: boolean
+      softDeletes?: boolean
+    }
+  } = {}
+  
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { connectionId, name, schema } = body
+    requestBody = await request.json()
+    const { connectionId, name, schema } = requestBody
 
     if (!connectionId || !name || !schema) {
       return NextResponse.json(
@@ -82,6 +101,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Get user for activity logging
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    })
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
+
     // Generate SQL
     const sql = generateTableSQL(schema)
 
@@ -94,15 +125,48 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    return NextResponse.json({
-      table,
-      sql
+    // Log activity for table creation
+    await prisma.activity.create({
+      data: {
+        userId: user.id,
+        type: 'database',
+        action: 'table_created',
+        metadata: {
+          connectionId,
+          tableName: name,
+          columnCount: schema.columns?.length || 0,
+          hasTimestamps: schema.timestamps || false,
+          hasSoftDeletes: schema.softDeletes || false
+        }
+      }
     })
 
-  } catch (error: any) {
+    return NextResponse.json({
+      table,
+      sql,
+      success: true
+    })
+
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     console.error('Database table POST error:', error)
+    
+    // Provide SQL in error response for manual execution fallback
+    let fallbackSQL = null
+    try {
+      if (requestBody?.schema) {
+        fallbackSQL = generateTableSQL(requestBody.schema)
+      }
+    } catch {
+      // Ignore SQL generation errors in error handler
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to create table', message: error.message },
+      { 
+        error: 'Failed to create table', 
+        message: errorMessage,
+        sql: fallbackSQL
+      },
       { status: 500 }
     )
   }

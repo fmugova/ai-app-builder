@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { toast, Toaster } from 'react-hot-toast'
 
 interface Column {
   name: string
@@ -205,9 +206,22 @@ export default function DatabaseTablesPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to create table')
+        // If API fails, show SQL for manual execution
+        if (data.sql) {
+          setGeneratedSQL(data.sql)
+          setError(`${data.error || 'Failed to create table'}. Copy the SQL below and execute it manually in Supabase SQL Editor.`)
+        } else {
+          throw new Error(data.error || 'Failed to create table')
+        }
+        return
       }
 
+      // Success - show confirmation and reset form
+      toast.success(`Table "${currentTable.name}" created successfully! 🎉`, {
+        duration: 4000,
+        position: 'top-center',
+      })
+      
       setShowTableBuilder(false)
       setCurrentTable({
         name: '',
@@ -220,8 +234,9 @@ export default function DatabaseTablesPage() {
       setGeneratedSQL('')
       fetchTables()
 
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred'
+      setError(errorMessage)
     } finally {
       setCreating(false)
     }
@@ -229,7 +244,10 @@ export default function DatabaseTablesPage() {
 
   const copySQL = () => {
     navigator.clipboard.writeText(generatedSQL)
-    alert('✅ SQL copied to clipboard!')
+    toast.success('SQL copied to clipboard! 📋', {
+      duration: 2000,
+      position: 'top-center',
+    })
   }
 
   if (status === 'loading' || loading) {
@@ -242,6 +260,7 @@ export default function DatabaseTablesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Toaster />
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
