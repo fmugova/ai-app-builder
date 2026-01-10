@@ -289,6 +289,9 @@ export default function DashboardClient({
 
             {/* Desktop Navigation - Hidden on mobile (< lg) */}
             <div className="hidden lg:flex items-center gap-3">
+              <Link href="/workspaces" className="px-4 py-2 text-gray-300 hover:text-white text-sm flex items-center gap-2">
+                👥 Workspaces
+              </Link>
               <Link href="/dashboard/submissions" className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition text-sm font-medium">
                 Forms Submissions
               </Link>
