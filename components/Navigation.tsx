@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { 
   Menu, X, Home, FolderOpen, User, Mail, LogOut, 
-  CreditCard, Shield, Sun, Moon
+  CreditCard, Shield, Sun, Moon, Users
 } from 'lucide-react'
 
 interface NavigationProps {
@@ -220,6 +220,16 @@ export function Navigation({ variant = 'dashboard' }: NavigationProps) {
           Projects
         </Link>
         <Link 
+          href="/workspaces"
+          className={`px-4 py-2 rounded-lg transition ${
+            isActive('/workspaces') 
+              ? 'bg-gray-800 text-white' 
+              : 'text-gray-300 hover:text-white hover:bg-gray-800'
+          }`}
+        >
+          Workspaces
+        </Link>
+        <Link 
           href="/account"
           className={`px-4 py-2 rounded-lg transition ${
             isActive('/account') 
@@ -314,6 +324,14 @@ export function Navigation({ variant = 'dashboard' }: NavigationProps) {
               >
                 <FolderOpen className="w-5 h-5" />
                 <span>My Projects</span>
+              </Link>
+              <Link 
+                href="/workspaces"
+                onClick={closeMenu}
+                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition text-white"
+              >
+                <Users className="w-5 h-5" />
+                <span>Workspaces</span>
               </Link>
               <Link 
                 href="/account"

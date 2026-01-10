@@ -45,6 +45,7 @@ export default function UnifiedMobileNav({
   // Main menu items (when NOT in project)
   const mainMenuItems = [
     { href: '/dashboard', label: 'Dashboard', icon: '📊', active: pathname === '/dashboard' },
+    { href: '/workspaces', label: 'Workspaces', icon: '👥', active: pathname.startsWith('/workspaces') },
     { href: '/dashboard/submissions', label: 'Form Submissions', icon: '📬', active: pathname === '/dashboard/submissions' },
     { href: '/dashboard/analytics', label: 'Analytics', icon: '📈', active: pathname === '/dashboard/analytics' },
     { href: '/dashboard/database', label: 'Database', icon: '🗄️', active: pathname === '/dashboard/database' },
