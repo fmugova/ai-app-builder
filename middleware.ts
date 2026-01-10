@@ -32,6 +32,23 @@ const CUSTOM_PROTECTED_ROUTES = [
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+  const hostname = request.headers.get('host') || ''
+  
+  // Handle custom domain routing
+  const isCustomDomain = !hostname.includes('localhost') && 
+                         !hostname.includes('vercel.app') && 
+                         !hostname.includes('buildflow') &&
+                         !hostname.startsWith('192.168.') &&
+                         !hostname.startsWith('127.0.')
+  
+  if (isCustomDomain && !pathname.startsWith('/api') && !pathname.startsWith('/_next')) {
+    // Rewrite custom domain requests to project render endpoint
+    const url = request.nextUrl.clone()
+    url.pathname = `/api/projects/render`
+    url.searchParams.set('domain', hostname)
+    url.searchParams.set('path', pathname)
+    return NextResponse.rewrite(url)
+  }
   
   // Allow public routes
   if (PUBLIC_ROUTES.some(route => pathname.startsWith(route))) {
