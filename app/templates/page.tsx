@@ -3,10 +3,10 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { templates, getTemplatesByCategory } from '@/lib/templates'
+import { templates } from '@/lib/templates'
 import { Toaster, toast } from 'react-hot-toast'
 import { analytics } from '@/lib/analytics'
-import { ArrowLeft, DollarSign, Star, Download, Crown, Lock } from 'lucide-react'
+import { DollarSign, Star, Download, Crown, Lock } from 'lucide-react'
 
 export default function TemplatesPage() {
   const router = useRouter()
@@ -361,7 +361,7 @@ export default function TemplatesPage() {
           <div className="mt-16 text-center">
             <div className="bg-gradient-to-r from-gray-800 to-gray-900 rounded-3xl p-8 sm:p-12 text-white">
               <h2 className="text-2xl sm:text-3xl font-bold mb-4">
-                Can't find what you're looking for?
+                Can&apos;t find what you&apos;re looking for?
               </h2>
               <p className="text-lg text-gray-300 mb-8 max-w-xl mx-auto">
                 Start from scratch and let AI help you build exactly what you need

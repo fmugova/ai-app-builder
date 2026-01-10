@@ -5,20 +5,33 @@ import Link from 'next/link';
 import { ArrowLeft, Search, Star, Download, DollarSign, Crown, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+interface Template {
+  id: string;
+  name: string;
+  description: string;
+  tier: string;
+  price: number;
+  thumbnail?: string;
+  category: string;
+  downloads: number;
+  rating: number;
+  reviewCount: number;
+}
+
 interface TemplateMarketplaceProps {
-  templates: any[];
-  userPurchases: any[];
+  templates: Template[];
+  userPurchases: { templateId: string }[];
   userId: string;
   userName: string;
   userEmail: string;
 }
 
 export default function TemplateMarketplace({
-  templates,
-  userPurchases,
-  userId,
-  userName,
-  userEmail,
+  // templates,
+  // userPurchases,
+  // userId,
+  // userName,
+  // userEmail,
 }: TemplateMarketplaceProps) {
   const [filter, setFilter] = useState<'all' | 'free' | 'pro' | 'collection'>('all');
   const [searchQuery, setSearchQuery] = useState('');
