@@ -1,11 +1,19 @@
 -- CreateEnum for template pricing tiers
-CREATE TYPE "public"."TemplateTier" AS ENUM ('FREE', 'PRO', 'COLLECTION');
+DO $$ BEGIN
+ CREATE TYPE "public"."TemplateTier" AS ENUM ('FREE', 'PRO', 'COLLECTION');
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
 
 -- CreateEnum for template status
-CREATE TYPE "public"."TemplateStatus" AS ENUM ('DRAFT', 'PUBLISHED', 'ARCHIVED');
+DO $$ BEGIN
+ CREATE TYPE "public"."TemplateStatus" AS ENUM ('DRAFT', 'PUBLISHED', 'ARCHIVED');
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
 
 -- Template marketplace table
-CREATE TABLE "public"."Template" (
+CREATE TABLE IF NOT EXISTS "public"."Template" (
     "id" TEXT NOT NULL,
     "creatorId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -30,7 +38,7 @@ CREATE TABLE "public"."Template" (
 );
 
 -- Template purchases table
-CREATE TABLE "public"."TemplatePurchase" (
+CREATE TABLE IF NOT EXISTS "public"."TemplatePurchase" (
     "id" TEXT NOT NULL,
     "templateId" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -41,7 +49,7 @@ CREATE TABLE "public"."TemplatePurchase" (
 );
 
 -- Template revenue share for user-created templates
-CREATE TABLE "public"."TemplateRevenue" (
+CREATE TABLE IF NOT EXISTS "public"."TemplateRevenue" (
     "id" TEXT NOT NULL,
     "templateId" TEXT NOT NULL,
     "creatorId" TEXT NOT NULL,
@@ -57,7 +65,7 @@ CREATE TABLE "public"."TemplateRevenue" (
 );
 
 -- Template reviews
-CREATE TABLE "public"."TemplateReview" (
+CREATE TABLE IF NOT EXISTS "public"."TemplateReview" (
     "id" TEXT NOT NULL,
     "templateId" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -70,27 +78,61 @@ CREATE TABLE "public"."TemplateReview" (
 );
 
 -- Indexes
-CREATE INDEX "Template_creatorId_idx" ON "public"."Template"("creatorId");
-CREATE INDEX "Template_status_idx" ON "public"."Template"("status");
-CREATE INDEX "Template_tier_idx" ON "public"."Template"("tier");
-CREATE INDEX "Template_category_idx" ON "public"."Template"("category");
-CREATE INDEX "TemplatePurchase_userId_idx" ON "public"."TemplatePurchase"("userId");
-CREATE INDEX "TemplatePurchase_templateId_idx" ON "public"."TemplatePurchase"("templateId");
-CREATE INDEX "TemplateRevenue_creatorId_idx" ON "public"."TemplateRevenue"("creatorId");
-CREATE INDEX "TemplateRevenue_templateId_idx" ON "public"."TemplateRevenue"("templateId");
-CREATE INDEX "TemplateRevenue_paidOut_idx" ON "public"."TemplateRevenue"("paidOut");
-CREATE INDEX "TemplateReview_templateId_idx" ON "public"."TemplateReview"("templateId");
-CREATE INDEX "TemplateReview_userId_idx" ON "public"."TemplateReview"("userId");
+CREATE INDEX IF NOT EXISTS "Template_creatorId_idx" ON "public"."Template"("creatorId");
+CREATE INDEX IF NOT EXISTS "Template_status_idx" ON "public"."Template"("status");
+CREATE INDEX IF NOT EXISTS "Template_tier_idx" ON "public"."Template"("tier");
+CREATE INDEX IF NOT EXISTS "Template_category_idx" ON "public"."Template"("category");
+CREATE INDEX IF NOT EXISTS "TemplatePurchase_userId_idx" ON "public"."TemplatePurchase"("userId");
+CREATE INDEX IF NOT EXISTS "TemplatePurchase_templateId_idx" ON "public"."TemplatePurchase"("templateId");
+CREATE INDEX IF NOT EXISTS "TemplateRevenue_creatorId_idx" ON "public"."TemplateRevenue"("creatorId");
+CREATE INDEX IF NOT EXISTS "TemplateRevenue_templateId_idx" ON "public"."TemplateRevenue"("templateId");
+CREATE INDEX IF NOT EXISTS "TemplateRevenue_paidOut_idx" ON "public"."TemplateRevenue"("paidOut");
+CREATE INDEX IF NOT EXISTS "TemplateReview_templateId_idx" ON "public"."TemplateReview"("templateId");
+CREATE INDEX IF NOT EXISTS "TemplateReview_userId_idx" ON "public"."TemplateReview"("userId");
 
 -- Foreign keys
-ALTER TABLE "public"."Template" ADD CONSTRAINT "Template_creatorId_fkey" FOREIGN KEY ("creatorId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "public"."TemplatePurchase" ADD CONSTRAINT "TemplatePurchase_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "public"."Template"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "public"."TemplatePurchase" ADD CONSTRAINT "TemplatePurchase_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "public"."TemplateRevenue" ADD CONSTRAINT "TemplateRevenue_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "public"."Template"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "public"."TemplateRevenue" ADD CONSTRAINT "TemplateRevenue_creatorId_fkey" FOREIGN KEY ("creatorId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "public"."TemplateReview" ADD CONSTRAINT "TemplateReview_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "public"."Template"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "public"."TemplateReview" ADD CONSTRAINT "TemplateReview_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+ ALTER TABLE "public"."Template" ADD CONSTRAINT "Template_creatorId_fkey" FOREIGN KEY ("creatorId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+ ALTER TABLE "public"."TemplatePurchase" ADD CONSTRAINT "TemplatePurchase_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "public"."Template"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+ ALTER TABLE "public"."TemplatePurchase" ADD CONSTRAINT "TemplatePurchase_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+ ALTER TABLE "public"."TemplateRevenue" ADD CONSTRAINT "TemplateRevenue_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "public"."Template"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+ ALTER TABLE "public"."TemplateRevenue" ADD CONSTRAINT "TemplateRevenue_creatorId_fkey" FOREIGN KEY ("creatorId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+ ALTER TABLE "public"."TemplateReview" ADD CONSTRAINT "TemplateReview_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "public"."Template"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+ ALTER TABLE "public"."TemplateReview" ADD CONSTRAINT "TemplateReview_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
 
 -- Unique constraints
-CREATE UNIQUE INDEX "TemplatePurchase_templateId_userId_key" ON "public"."TemplatePurchase"("templateId", "userId");
-CREATE UNIQUE INDEX "TemplateReview_templateId_userId_key" ON "public"."TemplateReview"("templateId", "userId");
+CREATE UNIQUE INDEX IF NOT EXISTS "TemplatePurchase_templateId_userId_key" ON "public"."TemplatePurchase"("templateId", "userId");
+CREATE UNIQUE INDEX IF NOT EXISTS "TemplateReview_templateId_userId_key" ON "public"."TemplateReview"("templateId", "userId");
