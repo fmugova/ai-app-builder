@@ -104,6 +104,10 @@ model User {
   subscriptions         Subscription?
   VercelConnection      VercelConnection?
   workspaceMembers      WorkspaceMember[]
+  createdTemplates      Template[]             @relation("TemplateCreator")
+  templatePurchases     TemplatePurchase[]
+  templateReviews       TemplateReview[]
+  templateRevenue       TemplateRevenue[]
 
   @@schema("public")
 }
@@ -1039,6 +1043,107 @@ model users {
   @@index([instance_id])
   @@index([is_anonymous])
   @@schema("auth")
+}
+
+// Template Marketplace Models
+enum TemplateTier {
+  FREE
+  PRO
+  COLLECTION
+
+  @@schema("public")
+}
+
+enum TemplateStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+
+  @@schema("public")
+}
+
+model Template {
+  id          String           @id @default(cuid())
+  creatorId   String
+  name        String
+  description String
+  category    String
+  tier        TemplateTier     @default(FREE)
+  price       Float            @default(0)
+  thumbnail   String?
+  htmlCode    String
+  cssCode     String?
+  jsCode      String?
+  status      TemplateStatus   @default(DRAFT)
+  downloads   Int              @default(0)
+  views       Int              @default(0)
+  rating      Float            @default(0)
+  reviewCount Int              @default(0)
+  tags        String[]         @default([])
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  creator     User             @relation("TemplateCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  purchases   TemplatePurchase[]
+  reviews     TemplateReview[]
+  revenue     TemplateRevenue[]
+
+  @@index([creatorId])
+  @@index([status])
+  @@index([tier])
+  @@index([category])
+  @@schema("public")
+}
+
+model TemplatePurchase {
+  id         String   @id @default(cuid())
+  templateId String
+  userId     String
+  price      Float
+  purchasedAt DateTime @default(now())
+  template   Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, userId])
+  @@index([userId])
+  @@index([templateId])
+  @@schema("public")
+}
+
+model TemplateRevenue {
+  id              String   @id @default(cuid())
+  templateId      String
+  creatorId       String
+  amount          Float
+  platformShare   Float
+  creatorShare    Float
+  stripePaymentId String?
+  createdAt       DateTime @default(now())
+  paidOut         Boolean  @default(false)
+  paidOutAt       DateTime?
+  template        Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  creator         User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@index([creatorId])
+  @@index([templateId])
+  @@index([paidOut])
+  @@schema("public")
+}
+
+model TemplateReview {
+  id         String   @id @default(cuid())
+  templateId String
+  userId     String
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  template   Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, userId])
+  @@index([templateId])
+  @@index([userId])
+  @@schema("public")
 }
 
 enum aal_level {
