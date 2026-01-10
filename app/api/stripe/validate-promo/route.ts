@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
     try {
       // Try to retrieve existing coupon
       stripeCoupon = await stripe.coupons.retrieve(code.toUpperCase())
-    } catch (error) {
+    } catch {
       // Coupon doesn't exist in Stripe, create it
       const couponData: Stripe.CouponCreateParams = {
         id: code.toUpperCase(),
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
         : `$${promo.discountValue} discount applied!`
     })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Promo validation error:', error)
     return NextResponse.json(
       { valid: false, error: 'Failed to validate promo code' },

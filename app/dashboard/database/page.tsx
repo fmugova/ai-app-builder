@@ -23,7 +23,7 @@ interface DatabaseConnection {
 
 export default function DatabasePage() {
   const router = useRouter()
-  const { data: session, status } = useSession()
+  const { status } = useSession()
   
   const [connections, setConnections] = useState<DatabaseConnection[]>([])
   const [loading, setLoading] = useState(true)
@@ -105,8 +105,8 @@ export default function DatabasePage() {
       })
       fetchConnections()
 
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
       setAdding(false)
     }
@@ -327,8 +327,8 @@ export default function DatabasePage() {
               <ol className="list-decimal list-inside space-y-1 text-xs">
                 <li>Go to supabase.com and create a project</li>
                 <li>Settings → API</li>
-                <li>Copy "Project URL" and "anon public" key</li>
-                <li>Copy "service_role" key for admin access</li>
+                <li>Copy &quot;Project URL&quot; and &quot;anon public&quot; key</li>
+                <li>Copy &quot;service_role&quot; key for admin access</li>
               </ol>
             </div>
           </div>
