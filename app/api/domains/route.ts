@@ -3,6 +3,7 @@ import { logSecurityEvent } from '@/lib/security'
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { Session } from 'next-auth'
 
 const createDomainSchema = z.object({
   domain: z.string()
@@ -19,7 +20,7 @@ export const GET = compose(
   withRateLimit(100),
   withSubscription('pro'),
   withAuth
-)(async (req: NextRequest, context: { params: any }, session: any) => {
+)(async (req: NextRequest, context: { params: Record<string, string> }, session: Session) => {
   const domains = await prisma.customDomain.findMany({
     where: {
       project: {
@@ -46,7 +47,7 @@ export const POST = compose(
   withUsageCheck('add_domain'),
   withSubscription('pro'),
   withAuth
-)(async (req: NextRequest, context: { params: any }, session: any) => {
+)(async (req: NextRequest, context: { params: Record<string, string> }, session: Session) => {
   try {
     const body = await req.json()
     
