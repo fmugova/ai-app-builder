@@ -1,5 +1,6 @@
 import { NextAuthOptions } from 'next-auth'
 import { PrismaAdapter } from '@auth/prisma-adapter'
+import { Adapter } from 'next-auth/adapters'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
 import { prisma } from './prisma'
@@ -56,7 +57,7 @@ export const TIER_LIMITS = {
 }
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma) as any,
+  adapter: PrismaAdapter(prisma) as Adapter,
   session: {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days
@@ -417,18 +418,28 @@ export async function verifyEmailOwnership(
 export async function logSecurityEvent(
   userId: string,
   event: string,
-  details?: Record<string, any>
+  details?: Record<string, unknown>
 ): Promise<void> {
-  // In production, send to logging service
-  console.log('[Security Event]', {
-    userId,
-    event,
-    details,
-    timestamp: new Date().toISOString(),
-  })
-  
-  // Optionally store in database
-  // await prisma.auditLog.create({
-  //   data: { userId, event, details, timestamp: new Date() }
-  // })
+  try {
+    // Store security event in database
+    await prisma.securityEvent.create({
+      data: {
+        userId,
+        type: event,
+        ipAddress: details?.ipAddress as string | undefined,
+        userAgent: details?.userAgent as string | undefined,
+        metadata: details ? JSON.parse(JSON.stringify(details)) : null,
+        severity: (details?.severity as string) || 'info',
+      },
+    })
+  } catch (error) {
+    // Fallback to console logging if database write fails
+    console.error('[Security Event Log Failed]', {
+      userId,
+      event,
+      details,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString(),
+    })
+  }
 }

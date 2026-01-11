@@ -108,6 +108,7 @@ model User {
   templatePurchases     TemplatePurchase[]
   templateReviews       TemplateReview[]
   templateRevenue       TemplateRevenue[]
+  securityEvents        SecurityEvent[]
 
   @@schema("public")
 }
@@ -1197,6 +1198,24 @@ enum oauth_registration_type {
   manual
 
   @@schema("auth")
+}
+
+model SecurityEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  type      String   // login, logout, password_change, 2fa_enabled, etc.
+  ipAddress String?
+  userAgent String?
+  metadata  Json?
+  severity  String   // info, warning, critical
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+  @@index([severity, createdAt])
+  @@schema("public")
 }
 
 enum oauth_response_type {
