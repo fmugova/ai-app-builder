@@ -40,7 +40,7 @@ export default function ProjectOverviewClient({ project }: ProjectOverviewClient
         const error = await res.json()
         alert(`❌ Failed to publish: ${error.error}`)
       }
-    } catch (error) {
+    } catch {
       alert('❌ Failed to publish project')
     } finally {
       setIsPublishing(false)
@@ -65,7 +65,7 @@ export default function ProjectOverviewClient({ project }: ProjectOverviewClient
         const error = await res.json()
         alert(`❌ Failed to delete: ${error.error}`)
       }
-    } catch (error) {
+    } catch {
       alert('❌ Failed to delete project')
     } finally {
       setIsDeleting(false)
@@ -176,6 +176,15 @@ export default function ProjectOverviewClient({ project }: ProjectOverviewClient
             <div className="text-3xl mb-3">🌐</div>
             <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Custom Domains</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">Add domains</p>
+          </Link>
+
+          <Link
+            href={`/dashboard/projects/${project.id}/env-vars`}
+            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 hover:shadow-lg transition"
+          >
+            <div className="text-3xl mb-3">🔐</div>
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Environment Variables</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Secure config</p>
           </Link>
 
           <button
