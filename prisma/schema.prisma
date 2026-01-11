@@ -88,6 +88,11 @@ model User {
   githubUsername        String?
   twoFactorEnabled      Boolean                @default(false)
   twoFactorSecret       String?
+  twoFactorBackupCodes  String[]               @default([])
+  lastLoginAt           DateTime?
+  lastLoginIp           String?
+  failedLoginAttempts   Int                    @default(0)
+  accountLockedUntil    DateTime?
   resetToken            String?                @unique
   resetTokenExpiry      DateTime?
   vercelToken           String?
@@ -116,6 +121,8 @@ model User {
   templateReviews       TemplateReview[]
   templateRevenue       TemplateRevenue[]
   securityEvents        SecurityEvent[]
+  activeSessions        ActiveSession[]
+  passwordHistory       PasswordHistory[]
 
   @@schema("public")
 }
@@ -1211,8 +1218,10 @@ model SecurityEvent {
   id        String   @id @default(cuid())
   userId    String?
   type      String   // login, logout, password_change, 2fa_enabled, etc.
+  action    String   @default("success") // success, failure, attempt
   ipAddress String?
   userAgent String?
+  location  String?  // City, Country from IP geolocation
   metadata  Json?
   severity  String   // info, warning, critical
   createdAt DateTime @default(now())
@@ -1222,6 +1231,7 @@ model SecurityEvent {
   @@index([userId, createdAt])
   @@index([type, createdAt])
   @@index([severity, createdAt])
+  @@index([action])
   @@schema("public")
 }
 
@@ -1229,7 +1239,9 @@ model FailedLoginAttempt {
   id          String    @id @default(cuid())
   email       String
   ipAddress   String
+  userAgent   String?
   attempts    Int       @default(1)
+  lastAttempt DateTime  @default(now())
   lockedUntil DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -1238,6 +1250,40 @@ model FailedLoginAttempt {
   @@index([email])
   @@index([ipAddress])
   @@index([lockedUntil])
+  @@schema("public")
+}
+
+model ActiveSession {
+  id           String   @id @default(cuid())
+  userId       String
+  sessionToken String   @unique
+  ipAddress    String?
+  userAgent    String?
+  deviceType   String?  // mobile, tablet, desktop
+  deviceName   String?  // Chrome Browser, iPhone, etc.
+  location     String?  // City, Country from IP
+  lastActive   DateTime @default(now())
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionToken])
+  @@index([userId, lastActive])
+  @@index([expiresAt])
+  @@schema("public")
+}
+
+model PasswordHistory {
+  id             String   @id @default(cuid())
+  userId         String
+  hashedPassword String
+  createdAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
   @@schema("public")
 }
 

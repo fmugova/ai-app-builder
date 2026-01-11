@@ -6,6 +6,13 @@ import GoogleProvider from 'next-auth/providers/google'
 import { prisma } from './prisma'
 import bcrypt from 'bcryptjs'
 import { sendSecurityAlert } from './security-emails'
+import {
+  logSecurityEvent,
+  checkAccountLockout,
+  trackFailedLoginAttempt,
+  resetFailedLoginAttempts,
+  detectSuspiciousActivity
+} from './security'
 
 // Define user roles
 export enum UserRole {
@@ -89,19 +96,13 @@ export const authOptions: NextAuthOptions = {
         // Check for account lockout (IP-based rate limiting)
         // Note: In production, pass IP from request context
         const ipAddress = 'unknown' // Should be passed from API route context
+        const userAgent = 'unknown' // Should be passed from API route context
         
-        const failedAttempts = await prisma.failedLoginAttempt.findUnique({
-          where: { 
-            email_ipAddress: { 
-              email: credentials.email, 
-              ipAddress 
-            } 
-          }
-        })
-
-        // Check if account is locked
-        if (failedAttempts?.lockedUntil && failedAttempts.lockedUntil > new Date()) {
-          const minutesLeft = Math.ceil((failedAttempts.lockedUntil.getTime() - Date.now()) / 60000)
+        // Use comprehensive lockout check from lib/security.ts
+        const lockoutCheck = await checkAccountLockout(credentials.email, ipAddress)
+        
+        if (lockoutCheck.isLocked) {
+          const minutesLeft = Math.ceil(((lockoutCheck.lockedUntil?.getTime() || 0) - Date.now()) / 60000)
           throw new Error(`Account temporarily locked. Try again in ${minutesLeft} minutes.`)
         }
 
@@ -113,8 +114,8 @@ export const authOptions: NextAuthOptions = {
         })
 
         if (!user || !user.password) {
-          // Track failed login attempt
-          await trackFailedLogin(credentials.email, ipAddress)
+          // Track failed login attempt using comprehensive function
+          await trackFailedLoginAttempt(credentials.email, ipAddress, userAgent)
           throw new Error('Invalid credentials')
         }
 
@@ -124,8 +125,8 @@ export const authOptions: NextAuthOptions = {
         )
 
         if (!isPasswordValid) {
-          // Track failed login attempt
-          await trackFailedLogin(credentials.email, ipAddress)
+          // Track failed login attempt using comprehensive function
+          await trackFailedLoginAttempt(credentials.email, ipAddress, userAgent)
           throw new Error('Invalid credentials')
         }
 
@@ -135,12 +136,42 @@ export const authOptions: NextAuthOptions = {
         }
 
         // Reset failed attempts on successful login
-        await resetFailedAttempts(credentials.email, ipAddress)
+        await resetFailedLoginAttempts(credentials.email, ipAddress)
 
-        // Log successful login (IP tracking handled at API route level)
-        await logSecurityEvent(user.id, 'login_credentials', {
+        // Check for suspicious activity
+        const suspiciousCheck = await detectSuspiciousActivity(
+          user.id,
+          ipAddress,
+          userAgent
+        )
+
+        if (suspiciousCheck.isSuspicious) {
+          // Send email notification for new location login
+          await sendSecurityAlert(user.id, 'new_login_location', {
+            ipAddress,
+            device: userAgent,
+            location: ipAddress, // Could be enhanced with IP geolocation
+          })
+        }
+
+        // Update user login tracking
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            lastLoginAt: new Date(),
+            lastLoginIp: ipAddress,
+            failedLoginAttempts: 0,
+          },
+        })
+
+        // Log successful login using comprehensive function
+        await logSecurityEvent({
+          userId: user.id,
+          type: 'login_credentials',
+          action: 'success',
+          ipAddress,
+          userAgent,
           severity: 'info',
-          email: credentials.email,
         })
 
         return {
@@ -159,10 +190,15 @@ export const authOptions: NextAuthOptions = {
       if (trigger === 'signIn' && user) {
         // Note: IP and User Agent should be captured at middleware/API route level
         // and passed through session context if needed
-        await logSecurityEvent(user.id, 'login', {
+        await logSecurityEvent({
+          userId: user.id,
+          type: 'login',
+          action: 'success',
+          metadata: {
+            provider: account?.provider || 'credentials',
+            timestamp: new Date().toISOString(),
+          },
           severity: 'info',
-          provider: account?.provider || 'credentials',
-          timestamp: new Date().toISOString(),
         })
       }
 
@@ -220,10 +256,15 @@ export const authOptions: NextAuthOptions = {
   events: {
     async signIn({ user, isNewUser, account }) {
       // Log security event for all sign-ins
-      await logSecurityEvent(user.id, isNewUser ? 'signup' : 'login', {
+      await logSecurityEvent({
+        userId: user.id,
+        type: isNewUser ? 'signup' : 'login',
+        action: 'success',
+        metadata: {
+          provider: account?.provider || 'credentials',
+          isNewUser,
+        },
         severity: 'info',
-        provider: account?.provider || 'credentials',
-        isNewUser,
       })
 
       if (isNewUser) {
@@ -235,7 +276,10 @@ export const authOptions: NextAuthOptions = {
     },
     async signOut({ token }) {
       if (token.id) {
-        await logSecurityEvent(token.id as string, 'logout', {
+        await logSecurityEvent({
+          userId: token.id as string,
+          type: 'logout',
+          action: 'success',
           severity: 'info',
         })
       }
@@ -243,96 +287,6 @@ export const authOptions: NextAuthOptions = {
     },
   },
   debug: process.env.NODE_ENV === 'development',
-}
-
-/**
- * Track failed login attempts and implement account lockout
- */
-async function trackFailedLogin(email: string, ipAddress: string): Promise<void> {
-  try {
-    const existing = await prisma.failedLoginAttempt.findUnique({
-      where: { email_ipAddress: { email, ipAddress } }
-    })
-
-    if (existing) {
-      const newAttempts = existing.attempts + 1
-      
-      // Lock account after 5 failed attempts
-      if (newAttempts >= 5) {
-        await prisma.failedLoginAttempt.update({
-          where: { email_ipAddress: { email, ipAddress } },
-          data: {
-            attempts: newAttempts,
-            lockedUntil: new Date(Date.now() + 30 * 60 * 1000) // 30 minutes
-          }
-        })
-        
-        // Log security event
-        await logSecurityEvent(email, 'account_locked', {
-          severity: 'critical',
-          ipAddress,
-          attempts: newAttempts,
-        })
-        
-        // Send email notification
-        const user = await prisma.user.findUnique({ where: { email } })
-        if (user) {
-          await sendSecurityAlert(user.id, 'account_locked', {
-            ipAddress,
-            attempts: newAttempts,
-          })
-        }
-      } else {
-        await prisma.failedLoginAttempt.update({
-          where: { email_ipAddress: { email, ipAddress } },
-          data: { attempts: newAttempts }
-        })
-      }
-    } else {
-      await prisma.failedLoginAttempt.create({
-        data: {
-          email,
-          ipAddress,
-          attempts: 1
-        }
-      })
-    }
-
-    // Log failed login attempt
-    await logSecurityEvent(email, 'failed_login', {
-      severity: 'warning',
-      ipAddress,
-    })
-    
-    // Send email notification after 3 failed attempts
-    if (existing && existing.attempts >= 2) {
-      const user = await prisma.user.findUnique({ where: { email } })
-      if (user) {
-        await sendSecurityAlert(user.id, 'failed_login', {
-          ipAddress,
-          attempts: existing.attempts + 1,
-        })
-      }
-    }
-  } catch (error) {
-    console.error('Failed to track login attempt:', error)
-  }
-}
-
-/**
- * Reset failed login attempts on successful login
- */
-async function resetFailedAttempts(email: string, ipAddress: string): Promise<void> {
-  try {
-    await prisma.failedLoginAttempt.deleteMany({
-      where: {
-        email,
-        ipAddress
-      }
-    })
-  } catch (error) {
-    console.error('Failed to reset login attempts:', error)
-  }
 }
 
 // Helper function to check if user has permission
@@ -558,34 +512,4 @@ export async function verifyEmailOwnership(
   })
   
   return user?.email === email
-}
-
-// Security audit log helper
-export async function logSecurityEvent(
-  userId: string,
-  event: string,
-  details?: Record<string, unknown>
-): Promise<void> {
-  try {
-    // Store security event in database
-    await prisma.securityEvent.create({
-      data: {
-        userId,
-        type: event,
-        ipAddress: details?.ipAddress as string | undefined,
-        userAgent: details?.userAgent as string | undefined,
-        metadata: details ? JSON.parse(JSON.stringify(details)) : null,
-        severity: (details?.severity as string) || 'info',
-      },
-    })
-  } catch (error) {
-    // Fallback to console logging if database write fails
-    console.error('[Security Event Log Failed]', {
-      userId,
-      event,
-      details,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString(),
-    })
-  }
 }

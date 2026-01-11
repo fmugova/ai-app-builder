@@ -252,6 +252,86 @@ If this wasn't you, secure your account at ${baseUrl}/account/security
         `
       }
 
+    case 'two_factor_disabled':
+      return {
+        subject: '⚠️ Two-Factor Authentication Disabled',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #f59e0b;">⚠️ 2FA Disabled</h2>
+            <p>Hi ${userName},</p>
+            <p>Two-factor authentication has been <strong>disabled</strong> on your BuildFlow account.</p>
+            <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin: 20px 0;">
+              <p style="margin: 0;"><strong>Details:</strong></p>
+              <ul style="margin: 8px 0;">
+                <li>Time: ${new Date().toLocaleString()}</li>
+                <li>IP Address: ${details?.ipAddress || 'Unknown'}</li>
+              </ul>
+            </div>
+            <p style="color: #dc2626; font-weight: bold;">Warning: Your account is now less secure.</p>
+            <p>We strongly recommend enabling 2FA again to protect your account.</p>
+            <a href="${baseUrl}/profile/security" style="display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 16px 0;">
+              Enable 2FA
+            </a>
+          </div>
+        `,
+        text: `
+Two-Factor Authentication Disabled
+
+Hi ${userName},
+
+Two-factor authentication has been disabled on your BuildFlow account.
+
+Time: ${new Date().toLocaleString()}
+IP Address: ${details?.ipAddress || 'Unknown'}
+
+We recommend enabling 2FA again at ${baseUrl}/profile/security
+        `
+      }
+
+    case 'suspicious_activity':
+      return {
+        subject: '⚠️ Suspicious Activity Detected',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #dc2626;">⚠️ Suspicious Activity Detected</h2>
+            <p>Hi ${userName},</p>
+            <p>We detected <strong>suspicious activity</strong> on your BuildFlow account.</p>
+            <div style="background: #fee2e2; border-left: 4px solid #dc2626; padding: 16px; margin: 20px 0;">
+              <p style="margin: 0;"><strong>Details:</strong></p>
+              <ul style="margin: 8px 0;">
+                <li>Activity: ${details?.reason || 'Unusual login pattern detected'}</li>
+                <li>IP Address: ${details?.ipAddress || 'Unknown'}</li>
+                <li>Time: ${new Date().toLocaleString()}</li>
+              </ul>
+            </div>
+            <p style="color: #dc2626; font-weight: bold;">Immediate action recommended:</p>
+            <div style="margin: 20px 0;">
+              <a href="${baseUrl}/auth/reset-password" style="display: inline-block; background: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 5px;">
+                Change Password
+              </a>
+              <a href="${baseUrl}/profile/security" style="display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 5px;">
+                Enable 2FA
+              </a>
+            </div>
+          </div>
+        `,
+        text: `
+Suspicious Activity Detected
+
+Hi ${userName},
+
+We detected suspicious activity on your BuildFlow account.
+
+Activity: ${details?.reason || 'Unusual login pattern'}
+IP Address: ${details?.ipAddress || 'Unknown'}
+Time: ${new Date().toLocaleString()}
+
+Secure your account immediately:
+- Change password: ${baseUrl}/auth/reset-password
+- Enable 2FA: ${baseUrl}/profile/security
+        `
+      }
+
     default:
       return {
         subject: `🔔 Security Alert: ${eventType}`,
