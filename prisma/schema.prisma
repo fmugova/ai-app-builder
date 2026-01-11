@@ -35,8 +35,15 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
+  ipAddress    String?
+  userAgent    String?
+  lastActive   DateTime @default(now())
+  createdAt    DateTime @default(now())
   User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+  @@index([sessionToken])
+  @@index([userId, lastActive])
   @@schema("public")
 }
 
