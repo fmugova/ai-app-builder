@@ -74,7 +74,7 @@ export async function logSecurityEvent({
         ipAddress,
         userAgent,
         location,
-        metadata,
+        metadata: metadata ? JSON.parse(JSON.stringify(metadata)) : null,
         severity
       }
     })

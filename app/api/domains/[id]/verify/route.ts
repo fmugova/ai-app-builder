@@ -1,5 +1,5 @@
 import { withAuth } from '@/lib/api-middleware'
-import { logSecurityEvent } from '@/lib/auth'
+import { logSecurityEvent } from '@/lib/security'
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -43,10 +43,16 @@ export const POST = withAuth(async (req, context, session) => {
     })
     
     // Log security event
-    await logSecurityEvent(session.user.id, 'domain_verification_attempted', {
-      domainId: context.params.id,
-      domain: domain.domain,
-      success: verificationResult.verified,
+    await logSecurityEvent({
+      userId: session.user.id,
+      type: 'domain_verification_attempted',
+      action: verificationResult.verified ? 'success' : 'failure',
+      metadata: {
+        domainId: context.params.id,
+        domain: domain.domain,
+        success: verificationResult.verified,
+      },
+      severity: 'info',
     })
     
     return NextResponse.json({

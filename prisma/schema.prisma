@@ -1,7 +1,6 @@
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["multiSchema"]
-  binaryTargets   = ["native", "rhel-openssl-3.0.x"]
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
@@ -314,25 +313,25 @@ model Subscription {
 }
 
 model Workspace {
-  id                    String             @id @default(cuid())
-  name                  String
-  slug                  String             @unique
-  description           String?
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
-  subscriptionTier      String             @default("free")
-  subscriptionStatus    String             @default("active")
-  stripeCustomerId      String?            @unique
-  stripeSubscriptionId  String?            @unique
-  currentPeriodStart    DateTime?
-  currentPeriodEnd      DateTime?
-  generationsUsed       Int                @default(0)
-  generationsLimit      Int                @default(50)
-  projectsLimit         Int                @default(10)
-  membersLimit          Int                @default(5)
-  members               WorkspaceMember[]
-  projects              WorkspaceProject[]
-  invites               WorkspaceInvite[]
+  id                   String             @id @default(cuid())
+  name                 String
+  slug                 String             @unique
+  description          String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  subscriptionTier     String             @default("free")
+  subscriptionStatus   String             @default("active")
+  stripeCustomerId     String?            @unique
+  stripeSubscriptionId String?            @unique
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  generationsUsed      Int                @default(0)
+  generationsLimit     Int                @default(50)
+  projectsLimit        Int                @default(10)
+  membersLimit         Int                @default(5)
+  members              WorkspaceMember[]
+  projects             WorkspaceProject[]
+  invites              WorkspaceInvite[]
 
   @@index([slug])
   @@index([stripeCustomerId])
@@ -1078,26 +1077,26 @@ enum TemplateStatus {
 }
 
 model Template {
-  id          String           @id @default(cuid())
+  id          String             @id @default(cuid())
   creatorId   String
   name        String
   description String
   category    String
-  tier        TemplateTier     @default(FREE)
-  price       Float            @default(0)
+  tier        TemplateTier       @default(FREE)
+  price       Float              @default(0)
   thumbnail   String?
   htmlCode    String
   cssCode     String?
   jsCode      String?
-  status      TemplateStatus   @default(DRAFT)
-  downloads   Int              @default(0)
-  views       Int              @default(0)
-  rating      Float            @default(0)
-  reviewCount Int              @default(0)
-  tags        String[]         @default([])
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  creator     User             @relation("TemplateCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  status      TemplateStatus     @default(DRAFT)
+  downloads   Int                @default(0)
+  views       Int                @default(0)
+  rating      Float              @default(0)
+  reviewCount Int                @default(0)
+  tags        String[]           @default([])
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  creator     User               @relation("TemplateCreator", fields: [creatorId], references: [id], onDelete: Cascade)
   purchases   TemplatePurchase[]
   reviews     TemplateReview[]
   revenue     TemplateRevenue[]
@@ -1110,13 +1109,13 @@ model Template {
 }
 
 model TemplatePurchase {
-  id         String   @id @default(cuid())
-  templateId String
-  userId     String
-  price      Float
+  id          String   @id @default(cuid())
+  templateId  String
+  userId      String
+  price       Float
   purchasedAt DateTime @default(now())
-  template   Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template    Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([templateId, userId])
   @@index([userId])
@@ -1125,18 +1124,18 @@ model TemplatePurchase {
 }
 
 model TemplateRevenue {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   templateId      String
   creatorId       String
   amount          Float
   platformShare   Float
   creatorShare    Float
   stripePaymentId String?
-  createdAt       DateTime @default(now())
-  paidOut         Boolean  @default(false)
+  createdAt       DateTime  @default(now())
+  paidOut         Boolean   @default(false)
   paidOutAt       DateTime?
-  template        Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  creator         User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  template        Template  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  creator         User      @relation(fields: [creatorId], references: [id], onDelete: Cascade)
 
   @@index([creatorId])
   @@index([templateId])
@@ -1217,13 +1216,13 @@ enum oauth_registration_type {
 model SecurityEvent {
   id        String   @id @default(cuid())
   userId    String?
-  type      String   // login, logout, password_change, 2fa_enabled, etc.
+  type      String // login, logout, password_change, 2fa_enabled, etc.
   action    String   @default("success") // success, failure, attempt
   ipAddress String?
   userAgent String?
-  location  String?  // City, Country from IP geolocation
+  location  String? // City, Country from IP geolocation
   metadata  Json?
-  severity  String   // info, warning, critical
+  severity  String // info, warning, critical
   createdAt DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1259,9 +1258,9 @@ model ActiveSession {
   sessionToken String   @unique
   ipAddress    String?
   userAgent    String?
-  deviceType   String?  // mobile, tablet, desktop
-  deviceName   String?  // Chrome Browser, iPhone, etc.
-  location     String?  // City, Country from IP
+  deviceType   String? // mobile, tablet, desktop
+  deviceName   String? // Chrome Browser, iPhone, etc.
+  location     String? // City, Country from IP
   lastActive   DateTime @default(now())
   expiresAt    DateTime
   createdAt    DateTime @default(now())

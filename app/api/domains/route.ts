@@ -1,5 +1,5 @@
 import { compose, withAuth, withSubscription, withUsageCheck, withRateLimit } from '@/lib/api-middleware'
-import { logSecurityEvent } from '@/lib/auth'
+import { logSecurityEvent } from '@/lib/security'
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -106,10 +106,16 @@ export const POST = compose(
     })
     
     // Log security event
-    await logSecurityEvent(session.user.id, 'custom_domain_added', {
-      domainId: customDomain.id,
-      domain: customDomain.domain,
-      projectId,
+    await logSecurityEvent({
+      userId: session.user.id,
+      type: 'custom_domain_added',
+      action: 'success',
+      metadata: {
+        domainId: customDomain.id,
+        domain: customDomain.domain,
+        projectId,
+      },
+      severity: 'info',
     })
     
     return NextResponse.json({ 

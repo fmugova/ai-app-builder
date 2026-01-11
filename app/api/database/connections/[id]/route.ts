@@ -1,5 +1,5 @@
 import { withAuth } from '@/lib/api-middleware'
-import { logSecurityEvent } from '@/lib/auth'
+import { logSecurityEvent } from '@/lib/security'
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -119,9 +119,15 @@ export const PUT = withAuth(async (req, context, session) => {
     })
     
     // Log security event
-    await logSecurityEvent(session.user.id, 'database_connection_updated', {
-      connectionId: connection.id,
-      fields: Object.keys(result.data),
+    await logSecurityEvent({
+      userId: session.user.id,
+      type: 'database_connection_updated',
+      action: 'success',
+      metadata: {
+        connectionId: connection.id,
+        fields: Object.keys(result.data),
+      },
+      severity: 'info',
     })
     
     return NextResponse.json({ success: true, connection })
@@ -165,8 +171,14 @@ export const DELETE = withAuth(async (req, context, session) => {
     })
     
     // Log security event
-    await logSecurityEvent(session.user.id, 'database_connection_deleted', {
-      connectionId: context.params.id,
+    await logSecurityEvent({
+      userId: session.user.id,
+      type: 'database_connection_deleted',
+      action: 'success',
+      metadata: {
+        connectionId: context.params.id,
+      },
+      severity: 'info',
     })
     
     return NextResponse.json({ success: true })

@@ -1,5 +1,5 @@
 import { prisma } from './prisma'
-import { logSecurityEvent } from './auth'
+import { logSecurityEvent } from './security'
 
 /**
  * Session Management Utilities
@@ -69,8 +69,13 @@ export async function revokeSession(
       },
     })
 
-    await logSecurityEvent(userId, 'session_revoked', {
-      sessionToken: sessionToken.substring(0, 10) + '...', // Partial for security
+    await logSecurityEvent({
+      userId,
+      type: 'session_revoked',
+      action: 'success',
+      metadata: {
+        sessionToken: sessionToken.substring(0, 10) + '...', // Partial for security
+      },
       severity: 'info',
     })
 
@@ -96,8 +101,13 @@ export async function revokeAllOtherSessions(
       },
     })
 
-    await logSecurityEvent(userId, 'all_sessions_revoked', {
-      count: result.count,
+    await logSecurityEvent({
+      userId,
+      type: 'all_sessions_revoked',
+      action: 'success',
+      metadata: {
+        count: result.count,
+      },
       severity: 'warning',
     })
 
