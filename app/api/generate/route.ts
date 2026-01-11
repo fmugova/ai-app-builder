@@ -5,8 +5,33 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { checkRateLimit, rateLimits } from '@/lib/rateLimit'
 import { getAnalyticsScript } from '@/lib/analytics-script'
+import { AUTH_TEMPLATES } from '@/lib/auth-templates'
+import { AUTH_PAGES } from '@/lib/auth-pages'
+import { PROTECTED_COMPONENTS } from '@/lib/protected-components'
 
 export const dynamic = 'force-dynamic'
+
+// Detect if authentication is needed
+function needsAuthentication(prompt: string): boolean {
+  const authKeywords = [
+    'login', 'signup', 'sign up', 'sign in', 'authentication', 'auth',
+    'user accounts', 'register', 'registration', 'protected', 'private', 
+    'members only', 'dashboard', 'profile', 'saas', 'admin', 'booking',
+    'social network', 'user management', 'customer portal', 'subscription',
+    'member site', 'e-learning', 'marketplace', 'community', 'forum'
+  ]
+  
+  const lowerPrompt = prompt.toLowerCase()
+  return authKeywords.some(keyword => lowerPrompt.includes(keyword))
+}
+
+// Select auth provider based on prompt
+function selectAuthProvider(prompt: string): 'nextauth' | 'supabase' | 'jwt' {
+  const lowerPrompt = prompt.toLowerCase()
+  if (lowerPrompt.includes('supabase') && !lowerPrompt.includes('nextauth')) return 'supabase'
+  if (lowerPrompt.includes('jwt') || lowerPrompt.includes('custom auth')) return 'jwt'
+  return 'nextauth' // Default - most popular and flexible
+}
 
 async function callClaudeWithRetry(anthropic: Anthropic, messages: any[], maxRetries = 3) {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -514,6 +539,10 @@ export async function POST(request: NextRequest) {
 
     const { prompt, type, projectId } = await request.json()
 
+    // Detect authentication requirement
+    const requiresAuth = needsAuthentication(prompt)
+    const authProvider = requiresAuth ? selectAuthProvider(prompt) : null
+
     // Get user's database connection if they have one
     let databaseConfig = null
     if (projectId) {
@@ -535,7 +564,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Update system prompt with database config
+    // Update system prompt with database config and auth requirements
     let enhancedPrompt = `${GENERATION_SYSTEM_PROMPT}\n\n`
     
     if (databaseConfig) {
@@ -546,6 +575,37 @@ const SUPABASE_URL = '${databaseConfig.url}';
 const SUPABASE_ANON_KEY = '${databaseConfig.anonKey}';
 
 DO NOT ask user to enter credentials. The app should work immediately.
+`
+    }
+
+    // Add authentication instructions if needed
+    if (requiresAuth && authProvider) {
+      const authTemplate = AUTH_TEMPLATES[authProvider]
+      enhancedPrompt += `
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+AUTHENTICATION REQUIRED - ${authTemplate.name}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This application requires user authentication! Include:
+
+1. **Login/Signup Pages** with beautiful UI
+2. **Protected Routes** - only authenticated users can access certain content
+3. **Session Management** - track logged-in users
+4. **Supabase Auth Integration** - for authentication
+
+IMPLEMENTATION:
+- Use Supabase Auth (already included in CDN)
+- Create login/signup forms with email/password
+- Implement session checking
+- Protect dashboard/profile routes
+- Include sign out functionality
+- Show user email when logged in
+
+EXAMPLE AUTH STRUCTURE:
+${AUTH_PAGES.login.content.substring(0, 500)}... (simplified for single-file HTML with React CDN)
+
+Make authentication seamless and production-ready!
 `
     }
     
@@ -594,7 +654,11 @@ Make it visually stunning, fully functional, and ready to deploy immediately.`
         description: `Generated: ${new Date().toLocaleDateString()}`,
         code: codeWithAnalytics,
         type: type || 'landing-page',
-        publishedAt: null
+        publishedAt: null,
+        metadata: requiresAuth ? {
+          requiresAuth: true,
+          authProvider: authProvider
+        } : undefined
       }
     })
 
@@ -638,7 +702,12 @@ Make it visually stunning, fully functional, and ready to deploy immediately.`
     
     return NextResponse.json({ 
       code: finalCode,
-      projectId: project.id
+      projectId: project.id,
+      requiresAuth,
+      authProvider,
+      message: requiresAuth 
+        ? `Authentication system included using ${authProvider}. Users can log in and access protected content.`
+        : undefined
     })
 
   } catch (error: any) {

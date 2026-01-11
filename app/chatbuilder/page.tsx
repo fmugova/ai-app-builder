@@ -55,6 +55,8 @@ export default function ChatBuilderPage() {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [showTemplates, setShowTemplates] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [includeAuth, setIncludeAuth] = useState(false)
+  const [authProvider, setAuthProvider] = useState<'nextauth' | 'supabase' | 'jwt'>('nextauth')
 
   // Load project or page from URL parameter
   useEffect(() => {
@@ -220,22 +222,34 @@ export default function ChatBuilderPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             prompt: enhancedInput,
-            type: 'landing-page'
+            type: 'landing-page',
+            includeAuth,
+            authProvider
           })
         })
 
         const data = await response.json()
 
         if (response.ok) {
+          let messageContent = "Great! I've created your site. You can see it in the preview. Want me to make any changes?"
+          
+          // Add auth success message
+          if (data.message && includeAuth) {
+            messageContent = `✅ ${data.message}\n\n${messageContent}`
+          }
+          
           const assistantMessage: Message = {
             id: Date.now().toString(),
             role: 'assistant',
-            content: "Great! I've created your site. You can see it in the preview. Want me to make any changes?",
+            content: messageContent,
             timestamp: new Date()
           }
 
           setMessages(prev => [...prev, assistantMessage])
           setCurrentCode(data.code)
+          
+          // Reset auth checkbox after generation
+          setIncludeAuth(false)
           
           // Set default project name from prompt
           if (!projectName) {
@@ -493,13 +507,96 @@ export default function ChatBuilderPage() {
   const handleDownload = () => {
     if (!currentCode) return
     
-    const blob = new Blob([currentCode], { type: 'text/html' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${projectName || 'website'}.html`
-    a.click()
-    URL.revokeObjectURL(url)
+    // Check if code includes Supabase auth (has supabase auth keywords)
+    const hasAuth = currentCode.includes('supabase.auth') || 
+                    currentCode.includes('signIn') || 
+                    currentCode.includes('signUp')
+    
+    if (hasAuth) {
+      // Create README with setup instructions
+      const readme = `# ${projectName || 'Your Website'}
+
+## 🎉 Your site includes user authentication!
+
+### Quick Setup:
+
+1. **Create a Supabase Account** (Free)
+   - Go to https://supabase.com
+   - Create a new project
+   - Wait for setup to complete (~2 minutes)
+
+2. **Get Your Credentials**
+   - Go to Project Settings → API
+   - Copy your Project URL and anon/public key
+   - Replace these values in the HTML file:
+     \`\`\`javascript
+     const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+     const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+     \`\`\`
+
+3. **Enable Email Authentication**
+   - In Supabase Dashboard: Authentication → Providers
+   - Enable "Email" provider
+   - Configure email templates (optional)
+
+4. **Test Your Site**
+   - Open the HTML file in your browser
+   - Try signing up with an email/password
+   - Check Supabase Dashboard → Authentication → Users
+
+### Features Included:
+✅ User signup/login
+✅ Protected content
+✅ Session management
+✅ Secure authentication
+
+### Deploy:
+Upload your HTML file to:
+- Vercel (https://vercel.com)
+- Netlify (https://netlify.com)
+- GitHub Pages
+
+Need help? Check Supabase docs: https://supabase.com/docs
+
+---
+Built with BuildFlow AI 🚀
+`
+      
+      // Download both files
+      const htmlBlob = new Blob([currentCode], { type: 'text/html' })
+      const readmeBlob = new Blob([readme], { type: 'text/markdown' })
+      
+      const htmlUrl = URL.createObjectURL(htmlBlob)
+      const readmeUrl = URL.createObjectURL(readmeBlob)
+      
+      const htmlLink = document.createElement('a')
+      htmlLink.href = htmlUrl
+      htmlLink.download = `${projectName || 'website'}.html`
+      htmlLink.click()
+      
+      setTimeout(() => {
+        const readmeLink = document.createElement('a')
+        readmeLink.href = readmeUrl
+        readmeLink.download = 'README.md'
+        readmeLink.click()
+        URL.revokeObjectURL(htmlUrl)
+        URL.revokeObjectURL(readmeUrl)
+      }, 100)
+      
+      toast({
+        title: '📦 Downloaded!',
+        description: 'HTML file + README with setup instructions',
+      })
+    } else {
+      // Regular download without auth
+      const blob = new Blob([currentCode], { type: 'text/html' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${projectName || 'website'}.html`
+      a.click()
+      URL.revokeObjectURL(url)
+    }
   }
 
   const handleExportToGitHub = async () => {
@@ -756,6 +853,69 @@ export default function ChatBuilderPage() {
               ))}
             </div>
           )}
+
+          {/* Authentication Options */}
+          <div className="mb-3 border-t border-gray-200 pt-3">
+            <label className="flex items-center gap-2 mb-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={includeAuth}
+                onChange={(e) => setIncludeAuth(e.target.checked)}
+                className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+              />
+              <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                Include User Authentication
+              </span>
+            </label>
+            
+            {includeAuth && (
+              <div className="ml-6 space-y-2 animate-fadeIn">
+                <p className="text-xs text-gray-500 mb-2">Choose authentication method:</p>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    value="supabase"
+                    checked={authProvider === 'supabase'}
+                    onChange={(e) => setAuthProvider(e.target.value as any)}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <span className="text-sm">
+                    <strong>Supabase Auth</strong> - Login, signup, protected content (Recommended for single-file HTML)
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    value="nextauth"
+                    checked={authProvider === 'nextauth'}
+                    onChange={(e) => setAuthProvider(e.target.value as any)}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <span className="text-sm">
+                    <strong>NextAuth.js</strong> - Full auth system with Google/GitHub OAuth (Better for multi-page apps)
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    value="jwt"
+                    checked={authProvider === 'jwt'}
+                    onChange={(e) => setAuthProvider(e.target.value as any)}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <span className="text-sm">
+                    <strong>Custom JWT</strong> - Maximum control, custom implementation
+                  </span>
+                </label>
+                <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
+                  ✨ Authentication will include login/signup pages, protected routes, and session management
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Larger Textarea Input */}
           <div className="flex gap-2 items-end">
