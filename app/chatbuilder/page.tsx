@@ -1,12 +1,17 @@
 'use client'
 
-import PromptGuide from '@/components/PromptGuide'
-
 import { useState, useRef, useEffect } from 'react'
 import { useToast } from '@/hooks/use-toast'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { templates, getTemplatesByCategory } from '@/lib/templates'
+import dynamic from 'next/dynamic'
+
+// Lazy load heavy components
+const PromptGuide = dynamic(() => import('@/components/PromptGuide'), {
+  loading: () => null,
+  ssr: false
+})
 
 interface Message {
   id: string

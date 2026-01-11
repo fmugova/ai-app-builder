@@ -3,13 +3,59 @@ import { authOptions } from '@/lib/auth';
 import { redirect, notFound } from 'next/navigation';
 import prisma from '@/lib/prisma';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { InviteMemberDialog } from '@/components/InviteMemberDialog';
-import { WorkspaceMembersList } from '@/components/WorkspaceMembersList';
 import { Badge } from '@/components/ui/badge';
-import { Users, FolderKanban, Settings, ArrowLeft } from 'lucide-react';
+import { Settings, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import dynamic from 'next/dynamic';
+
+// Lazy load each tab component - only loads when user clicks the tab!
+const Overview = dynamic(() => import('./overview'), {
+  loading: () => (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {[1, 2, 3].map(i => (
+        <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 animate-pulse">
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4"></div>
+          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+        </div>
+      ))}
+    </div>
+  ),
+});
+
+const Members = dynamic(() => import('./members'), {
+  loading: () => (
+    <div className="space-y-3 animate-pulse">
+      {[1, 2, 3].map(i => (
+        <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-3"></div>
+          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+        </div>
+      ))}
+    </div>
+  ),
+});
+
+const Projects = dynamic(() => import('./projects'), {
+  loading: () => (
+    <div className="space-y-3 animate-pulse">
+      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-3"></div>
+        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+      </div>
+    </div>
+  ),
+});
+
+const Invites = dynamic(() => import('./invites'), {
+  loading: () => (
+    <div className="space-y-3 animate-pulse">
+      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+      </div>
+    </div>
+  ),
+});
 
 export default async function WorkspacePage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -116,69 +162,22 @@ export default async function WorkspacePage({ params }: { params: { id: string }
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Members</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-muted-foreground" />
-              <span className="text-2xl font-bold">{workspace._count.members}</span>
-              <span className="text-sm text-muted-foreground">/ {workspace.membersLimit}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Projects</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <FolderKanban className="h-5 w-5 text-muted-foreground" />
-              <span className="text-2xl font-bold">{workspace._count.projects}</span>
-              <span className="text-sm text-muted-foreground">/ {workspace.projectsLimit}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Plan</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <Badge variant="secondary" className="text-sm capitalize">
-                {workspace.subscriptionTier}
-              </Badge>
-              <span className="text-xs text-muted-foreground">{workspace.subscriptionStatus}</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs defaultValue="members" className="space-y-6">
+      <Tabs defaultValue="overview" className="space-y-6">
         <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="members">Team Members</TabsTrigger>
           <TabsTrigger value="projects">Projects</TabsTrigger>
           <TabsTrigger value="invites">Pending Invites</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="members" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-xl font-semibold">Team Members</h2>
-              <p className="text-sm text-muted-foreground">
-                Manage who has access to this workspace
-              </p>
-            </div>
-            {canManageMembers && (
-              <InviteMemberDialog workspaceId={workspace.id} workspaceName={workspace.name} />
-            )}
-          </div>
-          <WorkspaceMembersList
+        <TabsContent value="overview">
+          <Overview workspace={workspace} />
+        </TabsContent>
+
+        <TabsContent value="members">
+          <Members
             workspaceId={workspace.id}
+            workspaceName={workspace.name}
             members={workspace.members.map(m => ({
               ...m,
               joinedAt: m.joinedAt.toISOString(),
@@ -186,82 +185,16 @@ export default async function WorkspacePage({ params }: { params: { id: string }
             }))}
             currentUserRole={member.role}
             currentUserId={user.id}
+            canManageMembers={canManageMembers}
           />
         </TabsContent>
 
-        <TabsContent value="projects" className="space-y-4">
-          <div>
-            <h2 className="text-xl font-semibold">Workspace Projects</h2>
-            <p className="text-sm text-muted-foreground">
-              Projects shared with this workspace
-            </p>
-          </div>
-          {workspace.projects.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <FolderKanban className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No projects yet</h3>
-                <p className="text-muted-foreground text-center">
-                  Add projects to share them with your team.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {workspace.projects.map((project) => (
-                <Card key={project.id}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle>Project {project.projectId}</CardTitle>
-                        <CardDescription>
-                          Permission: {project.permission}
-                        </CardDescription>
-                      </div>
-                      <Badge variant="outline">
-                        {new Date(project.addedAt).toLocaleDateString()}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                </Card>
-              ))}
-            </div>
-          )}
+        <TabsContent value="projects">
+          <Projects projects={workspace.projects} />
         </TabsContent>
 
-        <TabsContent value="invites" className="space-y-4">
-          <div>
-            <h2 className="text-xl font-semibold">Pending Invitations</h2>
-            <p className="text-sm text-muted-foreground">
-              Invitations that haven't been accepted yet
-            </p>
-          </div>
-          {workspace.invites.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <p className="text-muted-foreground">No pending invitations</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {workspace.invites.map((invite) => (
-                <Card key={invite.id}>
-                  <CardContent className="py-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{invite.email}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Invited as {invite.role} • Expires{' '}
-                          {new Date(invite.expiresAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <Badge variant="outline">Pending</Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+        <TabsContent value="invites">
+          <Invites invites={workspace.invites} />
         </TabsContent>
       </Tabs>
     </div>

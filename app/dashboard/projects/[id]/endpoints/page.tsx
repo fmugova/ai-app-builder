@@ -1,10 +1,12 @@
+import { Suspense } from 'react'
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import ApiEndpointsPage from '@/components/ApiEndpointsPage'
+import { ApiEndpointsSkeleton } from '@/components/LoadingSkeleton'
 
-export default async function EndpointsPage({ params }: { params: { id: string } }) {
+async function EndpointsContent({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
 
@@ -22,5 +24,13 @@ export default async function EndpointsPage({ params }: { params: { id: string }
       projectId={project.id}
       projectName={project.name}
     />
+  )
+}
+
+export default function EndpointsPage({ params }: { params: { id: string } }) {
+  return (
+    <Suspense fallback={<ApiEndpointsSkeleton />}>
+      <EndpointsContent params={params} />
+    </Suspense>
   )
 }

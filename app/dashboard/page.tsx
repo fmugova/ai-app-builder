@@ -1,12 +1,14 @@
+import { Suspense } from 'react'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
-import DashboardClient from './DashboardClient'
+import DashboardClientOptimized from './DashboardClientOptimized'
+import { DashboardSkeleton } from '@/components/LoadingSkeleton'
 
 export const dynamic = 'force-dynamic'
 
-export default async function DashboardPage() {
+async function DashboardContent() {
   // Get session
   const session = await getServerSession(authOptions)
   
@@ -47,12 +49,20 @@ export default async function DashboardPage() {
   }
 
   return (
-    <DashboardClient
+    <DashboardClientOptimized
       initialProjects={projects}
       stats={stats}
       userName={user.name}
       userEmail={user.email}
       isAdmin={user.role === 'admin'}
     />
+  )
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<DashboardSkeleton />}>
+      <DashboardContent />
+    </Suspense>
   )
 }

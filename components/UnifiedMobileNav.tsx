@@ -76,6 +76,7 @@ export default function UnifiedMobileNav({
     { href: `/dashboard/projects/${currentProjectId}/submissions`, label: 'Submissions', icon: '📬', active: pathname.includes('/submissions') },
     { href: `/dashboard/projects/${currentProjectId}/domains`, label: 'Custom Domains', icon: '🌐', active: pathname.includes('/domains') },
     { href: `/dashboard/projects/${currentProjectId}/env-vars`, label: 'Environment Variables', icon: '🔐', active: pathname.includes('/env-vars') },
+    { href: `/dashboard/projects/${currentProjectId}/endpoints`, label: 'API Endpoints', icon: '⚡', active: pathname.includes('/endpoints') },
   ] : []
 
   return (

@@ -3,14 +3,44 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast, Toaster } from 'react-hot-toast'
+import dynamic from 'next/dynamic'
 
 import { templates } from '@/lib/templates'
 import { analytics } from '@/lib/analytics'
 import { Loader2 } from 'lucide-react'
-import { EnhancedPromptInput } from '@/components/EnhancedPromptInput'
-
 import { sanitizeForPreview } from '@/lib/sanitizeForPreview'
-import PromptGuide from '@/components/PromptGuide'
+
+// Lazy load heavy components
+const EnhancedPromptInput = dynamic(
+  () => import('@/components/EnhancedPromptInput').then(mod => ({ default: mod.EnhancedPromptInput })),
+  {
+    loading: () => (
+      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 animate-pulse">
+        <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+      </div>
+    ),
+    ssr: false
+  }
+);
+
+const PromptGuide = dynamic(() => import('@/components/PromptGuide'), {
+  loading: () => null,
+  ssr: false
+});
+
+const CodePreview = dynamic(() => import('./code-preview'), {
+  loading: () => (
+    <div className="bg-white rounded-xl shadow-sm border p-6 animate-pulse">
+      <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-4"></div>
+      <div className="bg-gray-100 rounded-lg" style={{ height: '500px' }}>
+        <div className="w-full h-full flex items-center justify-center">
+          <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+        </div>
+      </div>
+    </div>
+  ),
+  ssr: false
+});
 
 
 function BuilderContent() {
@@ -539,91 +569,15 @@ function BuilderContent() {
           </div>
 
           <div className="space-y-6">
-            {isLoadedProject ? (
-              <div className="bg-white rounded-xl shadow-sm border p-6">
-                <h3 className="text-xl font-semibold mb-4">Preview</h3>
-                <div className="bg-gray-50 rounded-lg p-12 text-center border-2 border-dashed border-gray-300">
-                  <div className="text-6xl mb-4">👁️</div>
-                  <h4 className="text-lg font-semibold mb-2">Project Loaded</h4>
-                  <p className="text-gray-600 mb-6">Click below to open preview in new tab</p>
-                  <button
-                    onClick={() => window.open(`/preview/${currentProjectId}`, '_blank', 'noopener,noreferrer')}
-                    className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 inline-flex items-center gap-2 font-semibold"
-                  >
-                    <span>👁️ Open Preview</span>
-                    <span>→</span>
-                  </button>
-                  <div className="mt-6 pt-6 border-t">
-                    <p className="text-sm text-gray-500 mb-3">Want to make changes?</p>
-                    <button
-                      onClick={() => setIsLoadedProject(false)}
-                      className="text-purple-600 hover:text-purple-700 font-medium"
-                    >
-                      Generate New Version →
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : generatedCode ? (
-              <div className="bg-white rounded-xl shadow-sm border p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-semibold">Live Preview</h3>
-                  {currentProjectId && (
-                    <button
-                      onClick={() => window.open(`/preview/${currentProjectId}`, '_blank', 'noopener,noreferrer')}
-                      className="text-sm bg-blue-100 text-blue-700 hover:bg-blue-200 px-4 py-2 rounded-lg flex items-center gap-2"
-                    >
-                      🔗 Open Full Preview
-                    </button>
-                  )}
-                </div>
-                <div className="bg-gray-100 rounded-lg overflow-hidden border" style={{ height: '500px' }}>
-                  <iframe
-                    srcDoc={sanitizeForPreview(generatedCode)}
-                    className="w-full h-full border-0"
-                    sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
-                    title="Live Preview"
-                  />
-                </div>
-                
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(generatedCode)
-                      toast.success('Code copied!', {
-                        duration: 2000,
-                        id: 'code-copied-2',
-                      })
-                    }}
-                    className="flex-1 min-w-[120px] px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium flex items-center justify-center gap-2"
-                  >
-                    📋 Copy Code
-                  </button>
-                  <button
-                    onClick={downloadCode}
-                    className="flex-1 min-w-[120px] px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium flex items-center justify-center gap-2"
-                  >
-                    💾 Download
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="flex-1 min-w-[120px] px-4 py-3 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    {saving ? '⏳ Saving...' : '✅ Save Project'}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-white rounded-xl shadow-sm border p-6">
-                <h3 className="text-xl font-semibold mb-4">Preview</h3>
-                <div className="bg-gray-50 rounded-lg p-12 text-center border-2 border-dashed">
-                  <div className="text-6xl mb-4">🚀</div>
-                  <h4 className="text-lg font-semibold mb-2">No Preview Yet</h4>
-                  <p className="text-gray-600">Generate code to see a live preview</p>
-                </div>
-              </div>
-            )}
+            <CodePreview
+              code={generatedCode}
+              projectId={currentProjectId}
+              isLoadedProject={isLoadedProject}
+              onRegenerate={() => setIsLoadedProject(false)}
+              onSave={handleSave}
+              onDownload={downloadCode}
+              saving={saving}
+            />
 
             {generatedCode && (
               <div className="bg-white rounded-xl shadow-sm border p-6">

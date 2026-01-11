@@ -2,7 +2,7 @@ import './globals.css'
 import UnifiedMobileNav from '@/components/UnifiedMobileNav'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { checkIfAdmin } from '@/lib/admin-check'
 import { Inter } from 'next/font/google'
 import Providers from './providers'
 import { Analytics } from '@vercel/analytics/next'
@@ -14,7 +14,14 @@ import FeedbackWidget from '@/components/FeedbackWidget'
 import Script from 'next/script'
 import type { Metadata, Viewport } from 'next'
 
-const inter = Inter({ subsets: ['latin'] })
+// Optimize Inter font loading
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap', // Show fallback font immediately, swap when loaded
+  preload: true, // Preload font for faster rendering
+  variable: '--font-inter', // CSS variable for the font
+  weight: ['300', '400', '500', '600', '700'], // Only load weights we use
+})
 
 // Safe URL resolution
 const getBaseUrl = () => {
@@ -170,7 +177,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           strategy="afterInteractive"
         />
       </head>
-      <body className={inter.className}>
+      <body className={`${inter.variable} font-sans`}>
         {session && (
           <UnifiedMobileNav
             userName={session.user?.name || undefined}
@@ -190,13 +197,4 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </body>
     </html>
   )
-}
-
-// Helper function
-async function checkIfAdmin(email: string) {
-  const user = await prisma.user.findUnique({
-    where: { email },
-    select: { role: true }
-  })
-  return user?.role === 'admin'
 }

@@ -187,6 +187,15 @@ export default function ProjectOverviewClient({ project }: ProjectOverviewClient
             <p className="text-sm text-gray-600 dark:text-gray-400">Secure config</p>
           </Link>
 
+          <Link
+            href={`/dashboard/projects/${project.id}/endpoints`}
+            className="bg-gradient-to-br from-purple-500 to-blue-600 text-white rounded-xl p-6 hover:shadow-lg transition"
+          >
+            <div className="text-3xl mb-3">⚡</div>
+            <h3 className="font-semibold mb-1">API Endpoints</h3>
+            <p className="text-sm text-purple-100">Backend logic</p>
+          </Link>
+
           <button
             onClick={handlePublish}
             disabled={isPublishing}
