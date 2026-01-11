@@ -1,10 +1,12 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Footer from '../components/Footer'
-import { Mail, MessageSquare, Send } from 'lucide-react'
+import { Mail, MessageSquare, Send, ArrowLeft } from 'lucide-react'
 
 export default function ContactPage() {
+  const router = useRouter()
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -22,6 +24,16 @@ export default function ContactPage() {
     <>
       <div className="min-h-screen bg-gray-950">
         <div className="max-w-4xl mx-auto px-4 py-16">
+          <div className="mb-8">
+            <button
+              onClick={() => router.back()}
+              className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              <span>Back</span>
+            </button>
+          </div>
+          
           <div className="text-center mb-12">
             <h1 className="text-5xl font-bold text-white mb-4">Get in Touch</h1>
             <p className="text-xl text-gray-300">
