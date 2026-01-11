@@ -157,6 +157,7 @@ model Project {
   ProjectShare         ProjectShare[]
   ProjectVersion       ProjectVersion[]
   environmentVariables EnvironmentVariable[]
+  apiEndpoints         ApiEndpoint[]
 
   @@index([isPublic])
   @@index([isPublished])
@@ -1302,6 +1303,70 @@ model EnvironmentVariable {
   @@unique([projectId, key, environment])
   @@index([projectId])
   @@index([key])
+  @@schema("public")
+}
+
+model ApiEndpoint {
+  id          String   @id @default(cuid())
+  projectId   String
+  name        String
+  path        String
+  method      String
+  description String?
+  code        String   @db.Text
+
+  requiresAuth  Boolean  @default(false)
+  rateLimit     Int?
+  responseType  String   @default("json")
+  statusCode    Int      @default(200)
+  usesDatabase  Boolean  @default(false)
+  databaseTable String?
+
+  requestSchema  Json?
+  responseSchema Json?
+
+  tags        String[]  @default([])
+  isActive    Boolean   @default(true)
+  testsPassed Boolean   @default(false)
+  lastTested  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, path, method])
+  @@index([projectId])
+  @@index([method])
+  @@index([tags])
+  @@schema("public")
+}
+
+model ApiTemplate {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  displayName String
+  description String
+  category    String
+  icon        String
+  tags        String[] @default([])
+
+  template String @db.Text
+
+  requiresAuth   Boolean @default(false)
+  usesDatabase   Boolean @default(false)
+  usesSendEmail  Boolean @default(false)
+  usesFileUpload Boolean @default(false)
+
+  configSchema Json?
+
+  isActive   Boolean  @default(true)
+  usageCount Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([category])
+  @@index([isActive])
   @@schema("public")
 }
 
