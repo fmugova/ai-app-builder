@@ -5,6 +5,7 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
 import { prisma } from './prisma'
 import bcrypt from 'bcryptjs'
+import { sendSecurityAlert } from './security-emails'
 
 // Define user roles
 export enum UserRole {
@@ -272,6 +273,15 @@ async function trackFailedLogin(email: string, ipAddress: string): Promise<void>
           ipAddress,
           attempts: newAttempts,
         })
+        
+        // Send email notification
+        const user = await prisma.user.findUnique({ where: { email } })
+        if (user) {
+          await sendSecurityAlert(user.id, 'account_locked', {
+            ipAddress,
+            attempts: newAttempts,
+          })
+        }
       } else {
         await prisma.failedLoginAttempt.update({
           where: { email_ipAddress: { email, ipAddress } },
@@ -293,6 +303,17 @@ async function trackFailedLogin(email: string, ipAddress: string): Promise<void>
       severity: 'warning',
       ipAddress,
     })
+    
+    // Send email notification after 3 failed attempts
+    if (existing && existing.attempts >= 2) {
+      const user = await prisma.user.findUnique({ where: { email } })
+      if (user) {
+        await sendSecurityAlert(user.id, 'failed_login', {
+          ipAddress,
+          attempts: existing.attempts + 1,
+        })
+      }
+    }
   } catch (error) {
     console.error('Failed to track login attempt:', error)
   }
