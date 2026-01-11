@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { sendEmail, getWelcomeEmailHTML } from '@/lib/email'
 import { checkRateLimit, rateLimits } from '@/lib/rateLimit'
-import { validatePassword } from '@/lib/validation'
+import { signupSchema, validateSchema } from '@/lib/schemas'
 
 // Server-side analytics logging (GA tracking happens client-side)
 const logAnalyticsEvent = (event: string, properties?: Record<string, any>) => {
@@ -30,24 +30,17 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, email, password } = body
-
-    // Validation
-    if (!name || !email || !password) {
+    
+    // Validate input with Zod
+    const validation = validateSchema(signupSchema, body)
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'All fields are required' },
+        { error: validation.error },
         { status: 400 }
       )
     }
 
-    // Strong password validation
-    const passwordValidation = validatePassword(password)
-    if (!passwordValidation.valid) {
-      return NextResponse.json(
-        { error: passwordValidation.errors.join(' ') },
-        { status: 400 }
-      )
-    }
+    const { name, email, password } = validation.data
 
     // Check if user exists
     const existingUser = await prisma.user.findUnique({
