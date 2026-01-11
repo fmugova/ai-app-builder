@@ -90,10 +90,10 @@ export async function POST(
       needsConfiguration: !isVerified
     })
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Verify domain error:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to verify domain' },
+      { error: error instanceof Error ? error.message : 'Failed to verify domain' },
       { status: 500 }
     )
   }
@@ -179,10 +179,10 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Delete domain error:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to delete domain' },
+      { error: error instanceof Error ? error.message : 'Failed to delete domain' },
       { status: 500 }
     )
   }
@@ -242,10 +242,10 @@ export async function GET(
       }
     })
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Get domain error:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to get domain' },
+      { error: error instanceof Error ? error.message : 'Failed to get domain' },
       { status: 500 }
     )
   }

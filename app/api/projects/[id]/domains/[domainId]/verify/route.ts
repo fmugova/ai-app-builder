@@ -15,13 +15,22 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { id: true }
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
     // Get domain
     const domain = await prisma.customDomain.findFirst({
       where: {
         id: params.domainId,
         project: {
           id: params.id,
-          user: { email: session.user.email }
+          userId: user.id
         }
       }
     })
@@ -62,26 +71,18 @@ export async function POST(
     })
 
     // Log activity
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true }
+    await prisma.activity.create({
+      data: {
+        type: 'domain',
+        action: 'verified',
+        metadata: {
+          projectId: params.id,
+          domain: domain.domain,
+          sslConfigured: vercelCheck.sslConfigured
+        },
+        userId: user.id
+      }
     })
-
-    if (user) {
-      await prisma.activity.create({
-        data: {
-          type: 'domain',
-          action: 'verified',
-          description: `Verified domain: ${domain.domain}`,
-          metadata: {
-            projectId: params.id,
-            domain: domain.domain,
-            sslConfigured: vercelCheck.sslConfigured
-          },
-          userId: user.id
-        }
-      })
-    }
 
     return NextResponse.json({
       verified: true,
@@ -91,10 +92,10 @@ export async function POST(
       checks: dnsCheck.checks
     })
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Verify domain error:', error)
     return NextResponse.json(
-      { error: 'Failed to verify domain', details: error.message },
+      { error: 'Failed to verify domain', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     )
   }
@@ -129,7 +130,7 @@ async function verifyDNSConfiguration(
         record.includes('cname.vercel-dns.com')
       )
       checks.cname = hasVercelCname
-    } catch (error) {
+    } catch {
       // CNAME might not exist, try A record
       try {
         const aRecords = await dns.resolve4(domain)
@@ -171,10 +172,10 @@ async function verifyDNSConfiguration(
       checks
     }
 
-  } catch (error: any) {
+  } catch (error) {
     return {
       verified: false,
-      message: `DNS verification failed: ${error.message}`,
+      message: `DNS verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       checks
     }
   }
@@ -223,11 +224,11 @@ async function checkVercelDomainStatus(domain: string): Promise<{
       error: data.misconfigured ? 'Domain misconfigured' : undefined
     }
 
-  } catch (error: any) {
+  } catch (error) {
     return {
       configured: false,
       sslConfigured: false,
-      error: error.message
+      error: error instanceof Error ? error.message : 'Unknown error'
     }
   }
 }

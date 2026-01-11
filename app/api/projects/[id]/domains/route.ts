@@ -131,10 +131,10 @@ export async function POST(
       }
     })
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Add domain error:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to add domain' },
+      { error: error instanceof Error ? error.message : 'Failed to add domain' },
       { status: 500 }
     )
   }
@@ -181,10 +181,10 @@ export async function GET(
 
     return NextResponse.json({ domains })
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Get domains error:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to get domains' },
+      { error: 'Failed to get domains' },
       { status: 500 }
     )
   }

@@ -77,8 +77,8 @@ export default function CustomDomainsClient({
 
       alert('✅ Domain added! Please configure DNS settings.')
 
-    } catch (error: any) {
-      alert(`Failed to add domain: ${error.message}`)
+    } catch (error) {
+      alert(`Failed to add domain: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setIsAdding(false)
     }
@@ -109,8 +109,8 @@ export default function CustomDomainsClient({
         alert(`❌ ${data.message}\n\nPlease check your DNS settings and try again.`)
       }
 
-    } catch (error: any) {
-      alert(`Verification failed: ${error.message}`)
+    } catch (error) {
+      alert(`Verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setVerifyingDomains(prev => {
         const next = new Set(prev)
@@ -141,8 +141,8 @@ export default function CustomDomainsClient({
       setDomains(domains.filter(d => d.id !== domainId))
       alert('✅ Domain removed successfully')
 
-    } catch (error: any) {
-      alert(`Failed to remove domain: ${error.message}`)
+    } catch (error) {
+      alert(`Failed to remove domain: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setRemovingDomains(prev => {
         const next = new Set(prev)
