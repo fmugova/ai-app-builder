@@ -64,7 +64,7 @@ export async function POST(
       method: result.method,
       validation
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Generate endpoint error:', error)
     return NextResponse.json(
       { error: 'Failed to generate endpoint' },

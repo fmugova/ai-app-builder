@@ -51,6 +51,7 @@ export default function ApiEndpointsPage({ projectId, projectName }: Props) {
 
   useEffect(() => {
     fetchEndpoints()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const fetchEndpoints = async () => {
@@ -58,8 +59,8 @@ export default function ApiEndpointsPage({ projectId, projectName }: Props) {
       const response = await fetch(`/api/projects/${projectId}/endpoints`)
       const data = await response.json()
       setEndpoints(data.endpoints || [])
-    } catch (error) {
-      console.error('Failed to fetch endpoints:', error)
+    } catch {
+      console.error('Failed to fetch endpoints')
     } finally {
       setIsLoading(false)
     }
@@ -78,7 +79,7 @@ export default function ApiEndpointsPage({ projectId, projectName }: Props) {
       if (response.ok) {
         fetchEndpoints()
       }
-    } catch (error) {
+    } catch {
       alert('Failed to delete endpoint')
     }
   }
@@ -102,7 +103,7 @@ export default function ApiEndpointsPage({ projectId, projectName }: Props) {
       } else {
         alert('Test failed! ❌')
       }
-    } catch (error) {
+    } catch {
       alert('Failed to test endpoint')
     }
   }

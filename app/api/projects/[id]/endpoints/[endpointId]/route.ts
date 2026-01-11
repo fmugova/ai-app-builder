@@ -37,7 +37,7 @@ export async function DELETE(
     })
 
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Delete endpoint error:', error)
     return NextResponse.json(
       { error: 'Failed to delete endpoint' },

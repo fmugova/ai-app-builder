@@ -6,6 +6,14 @@
 import { useState } from 'react'
 import { X, Sparkles, Loader2, AlertCircle, CheckCircle2, Code } from 'lucide-react'
 
+// Validation result interface
+interface ValidationResult {
+  valid: boolean
+  errors: string[]
+  warnings: string[]
+  suggestions: string[]
+}
+
 // ============================================================================
 // CREATE ENDPOINT MODAL
 // ============================================================================
@@ -36,7 +44,7 @@ export function CreateEndpointModal({
 
   // Generated code
   const [generatedCode, setGeneratedCode] = useState('')
-  const [validation, setValidation] = useState<any>(null)
+  const [validation, setValidation] = useState<ValidationResult | null>(null)
 
   const handleGenerate = async () => {
     setError('')
@@ -65,8 +73,8 @@ export function CreateEndpointModal({
       setGeneratedCode(data.code)
       setValidation(data.validation)
       setStep(3)
-    } catch (error: any) {
-      setError(error.message)
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'Failed to generate')
     } finally {
       setIsGenerating(false)
     }
@@ -99,8 +107,8 @@ export function CreateEndpointModal({
       }
 
       onSuccess()
-    } catch (error: any) {
-      setError(error.message)
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'Failed to create')
       setIsGenerating(false)
     }
   }
@@ -411,8 +419,17 @@ export function CreateEndpointModal({
 // CODE VIEW MODAL
 // ============================================================================
 
+interface EndpointData {
+  id: string
+  name: string
+  method: string
+  path: string
+  code: string
+  description?: string
+}
+
 interface CodeViewModalProps {
-  endpoint: any
+  endpoint: EndpointData
   onClose: () => void
 }
 

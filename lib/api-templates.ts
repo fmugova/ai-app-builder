@@ -13,7 +13,7 @@ export interface ApiTemplate {
   requiresAuth: boolean
   usesDatabase: boolean
   code: string
-  configSchema?: any
+  configSchema?: Record<string, { type: string; required: boolean; placeholder?: string }>
 }
 
 // ============================================================================

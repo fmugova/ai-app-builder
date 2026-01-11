@@ -117,7 +117,7 @@ export async function generateApiEndpoint(
       path,
       method
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('AI generation error:', error)
     throw new Error('Failed to generate API endpoint')
   }
@@ -131,8 +131,8 @@ export function generateFromTemplate(
   templateId: string,
   variables: Record<string, string>
 ): string {
-  // Import template
-  const template = getTemplateById(templateId)
+  // TODO: Import template from api-templates.ts using templateId
+  const template = getTemplateById()
   if (!template) {
     throw new Error(`Template not found: ${templateId}`)
   }
@@ -147,7 +147,7 @@ export function generateFromTemplate(
   return code
 }
 
-function getTemplateById(id: string) {
+function getTemplateById(): { code: string } | null {
   // This would import from api-templates.ts
   // For now, return null (implement when integrating)
   return null
@@ -210,13 +210,13 @@ export interface ApiDocumentation {
   authentication: boolean
   requestBody?: {
     type: string
-    properties: Record<string, any>
+    properties: Record<string, unknown>
   }
   responses: Record<
     string,
     {
       description: string
-      example?: any
+      example?: unknown
     }
   >
   examples?: {
@@ -278,12 +278,12 @@ function getStatusDescription(status: number): string {
 export async function testEndpoint(
   url: string,
   method: string,
-  body?: any,
+  body?: unknown,
   headers?: Record<string, string>
 ): Promise<{
   success: boolean
   status: number
-  data?: any
+  data?: unknown
   error?: string
   duration: number
 }> {
@@ -296,7 +296,7 @@ export async function testEndpoint(
         'Content-Type': 'application/json',
         ...headers
       },
-      ...(body && { body: JSON.stringify(body) })
+      body: body ? JSON.stringify(body) : undefined
     })
 
     const duration = Date.now() - startTime
@@ -308,12 +308,12 @@ export async function testEndpoint(
       data,
       duration
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     const duration = Date.now() - startTime
     return {
       success: false,
       status: 0,
-      error: error.message,
+      error: error instanceof Error ? error.message : 'Unknown error',
       duration
     }
   }

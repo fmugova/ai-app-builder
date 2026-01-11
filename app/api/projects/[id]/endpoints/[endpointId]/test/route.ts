@@ -16,8 +16,6 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { testData } = await req.json()
-
     // Get endpoint
     const endpoint = await prisma.apiEndpoint.findFirst({
       where: {
@@ -54,7 +52,7 @@ export async function POST(
     })
 
     return NextResponse.json({ testResult })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Test endpoint error:', error)
     return NextResponse.json(
       { error: 'Failed to test endpoint' },

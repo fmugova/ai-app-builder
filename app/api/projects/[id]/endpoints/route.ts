@@ -36,7 +36,7 @@ export async function GET(
     }
 
     return NextResponse.json({ endpoints: project.apiEndpoints })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Get endpoints error:', error)
     return NextResponse.json(
       { error: 'Failed to fetch endpoints' },
@@ -120,7 +120,7 @@ export async function POST(
           databaseTable
         })
         code = result.code
-      } catch (error) {
+      } catch {
         return NextResponse.json(
           { error: 'Failed to generate endpoint with AI' },
           { status: 500 }
@@ -173,7 +173,7 @@ export async function POST(
       endpoint,
       validation
     }, { status: 201 })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Create endpoint error:', error)
     return NextResponse.json(
       { error: 'Failed to create endpoint' },
@@ -244,7 +244,7 @@ export async function PUT(
     })
 
     return NextResponse.json({ endpoint: updated, validation })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Update endpoint error:', error)
     return NextResponse.json(
       { error: 'Failed to update endpoint' },
