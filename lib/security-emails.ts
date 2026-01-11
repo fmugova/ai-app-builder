@@ -1,9 +1,12 @@
 import { prisma } from './prisma'
+import { Resend } from 'resend'
 
 /**
  * Security Email Notifications
  * Send alerts for important security events
  */
+
+const resend = new Resend(process.env.RESEND_API_KEY)
 
 interface EmailOptions {
   to: string
@@ -13,23 +16,25 @@ interface EmailOptions {
 }
 
 /**
- * Send email (placeholder - integrate with your email service)
- * Replace with actual email service: SendGrid, AWS SES, Resend, etc.
+ * Send email using Resend
  */
 async function sendEmail(options: EmailOptions): Promise<void> {
-  // TODO: Integrate with actual email service
-  // Example integrations:
-  // - SendGrid: await sgMail.send(options)
-  // - Resend: await resend.emails.send(options)
-  // - AWS SES: await ses.sendEmail(...)
-  
-  console.log('[Email] Would send:', {
-    to: options.to,
-    subject: options.subject,
-  })
-  
-  // For now, just log to console
-  // In production, replace with actual email service call
+  try {
+    await resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL || 'BuildFlow <noreply@buildflow.ai>',
+      to: options.to,
+      subject: options.subject,
+      html: options.html,
+      text: options.text,
+    })
+  } catch (error) {
+    console.error('[Email Send Failed]', {
+      to: options.to,
+      subject: options.subject,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })
+    throw error
+  }
 }
 
 /**
