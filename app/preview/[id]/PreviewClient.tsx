@@ -31,10 +31,17 @@ export default function PreviewClient({ project }: PreviewClientProps) {
   const [showCode, setShowCode] = useState(false)
   const [deployingVercel, setDeployingVercel] = useState(false)
   const [publishing, setPublishing] = useState(false)
+  const [iframeError, setIframeError] = useState(false)
   const router = useRouter()
 
   // Use sanitizeForPreview to wrap React/JSX code
-  const sanitizedCode = sanitizeForPreview(project.code)
+  let sanitizedCode = ''
+  try {
+    sanitizedCode = sanitizeForPreview(project.code)
+  } catch (error) {
+    console.error('Code sanitization error:', error)
+    setIframeError(true)
+  }
 
   // Publish to BuildFlow
   const handlePublish = async () => {
@@ -304,12 +311,39 @@ export default function PreviewClient({ project }: PreviewClientProps) {
           </div>
         ) : (
           /* Preview View - FULL HEIGHT */
-          <iframe
-            srcDoc={sanitizedCode}
-            className="absolute inset-0 w-full h-full border-0"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-            title={project.name}
-          />
+          iframeError ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+              <div className="text-center max-w-md p-8">
+                <div className="text-6xl mb-4">⚠️</div>
+                <h2 className="text-2xl font-bold text-white mb-4">Preview Error</h2>
+                <p className="text-gray-400 mb-6">
+                  There was an error rendering this project. The code may have syntax errors.
+                </p>
+                <div className="flex gap-3 justify-center">
+                  <button
+                    onClick={() => setShowCode(true)}
+                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg"
+                  >
+                    View Code
+                  </button>
+                  <a
+                    href={`/chatbuilder?project=${project.id}`}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
+                  >
+                    Fix in Chat Builder
+                  </a>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <iframe
+              srcDoc={sanitizedCode}
+              className="absolute inset-0 w-full h-full border-0"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              title={project.name}
+              onError={() => setIframeError(true)}
+            />
+          )
         )}
       </div>
 
