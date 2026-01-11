@@ -71,7 +71,7 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      allowDangerousEmailAccountLinking: true,
+      allowDangerousEmailAccountLinking: false, // CRITICAL: Prevent account takeover via OAuth
     }),
     CredentialsProvider({
       name: 'credentials',
@@ -104,10 +104,10 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Invalid credentials')
         }
 
-        // Check if email is verified (optional)
-        // if (!user.emailVerified) {
-        //   throw new Error('Please verify your email first')
-        // }
+        // Check if email is verified
+        if (!user.emailVerified) {
+          throw new Error('Please verify your email before signing in')
+        }
 
         return {
           id: user.id,
