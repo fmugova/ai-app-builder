@@ -110,6 +110,12 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Please verify your email before signing in')
         }
 
+        // Log successful login (IP tracking handled at API route level)
+        await logSecurityEvent(user.id, 'login_credentials', {
+          severity: 'info',
+          email: credentials.email,
+        })
+
         return {
           id: user.id,
           email: user.email,
@@ -121,7 +127,18 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user, trigger, session }) {
+    async jwt({ token, user, trigger, session, account }) {
+      // Log security event on sign in
+      if (trigger === 'signIn' && user) {
+        // Note: IP and User Agent should be captured at middleware/API route level
+        // and passed through session context if needed
+        await logSecurityEvent(user.id, 'login', {
+          severity: 'info',
+          provider: account?.provider || 'credentials',
+          timestamp: new Date().toISOString(),
+        })
+      }
+
       // Initial sign in
       if (user) {
         token.id = user.id
@@ -174,7 +191,14 @@ export const authOptions: NextAuthOptions = {
     },
   },
   events: {
-    async signIn({ user, isNewUser }) {
+    async signIn({ user, isNewUser, account }) {
+      // Log security event for all sign-ins
+      await logSecurityEvent(user.id, isNewUser ? 'signup' : 'login', {
+        severity: 'info',
+        provider: account?.provider || 'credentials',
+        isNewUser,
+      })
+
       if (isNewUser) {
         console.log(`New user signed up: ${user.email}`)
         
@@ -183,6 +207,11 @@ export const authOptions: NextAuthOptions = {
       }
     },
     async signOut({ token }) {
+      if (token.id) {
+        await logSecurityEvent(token.id as string, 'logout', {
+          severity: 'info',
+        })
+      }
       console.log(`User signed out: ${token.email}`)
     },
   },
