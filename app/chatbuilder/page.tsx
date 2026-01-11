@@ -4,7 +4,7 @@ import PromptGuide from '@/components/PromptGuide'
 
 import { useState, useRef, useEffect } from 'react'
 import { useToast } from '@/hooks/use-toast'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { templates, getTemplatesByCategory } from '@/lib/templates'
 
@@ -16,8 +16,8 @@ interface Message {
 }
 
 export default function ChatBuilderPage() {
-  const toast = useToast()
-  const { data: session } = useSession()
+  const { toast } = useToast()
+  useSession()
   const router = useRouter()
   const searchParams = typeof window !== 'undefined'
     ? new URLSearchParams(window.location.search)
@@ -259,7 +259,7 @@ export default function ChatBuilderPage() {
           throw new Error(data.error || 'Failed to generate')
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       const errorMessage: Message = {
         id: Date.now().toString(),
         role: 'assistant',
@@ -879,7 +879,7 @@ Built with BuildFlow AI 🚀
                     type="radio"
                     value="supabase"
                     checked={authProvider === 'supabase'}
-                    onChange={(e) => setAuthProvider(e.target.value as any)}
+                    onChange={(e) => setAuthProvider(e.target.value as 'nextauth' | 'supabase' | 'jwt')}
                     className="w-4 h-4 text-blue-600"
                   />
                   <span className="text-sm">
@@ -891,7 +891,7 @@ Built with BuildFlow AI 🚀
                     type="radio"
                     value="nextauth"
                     checked={authProvider === 'nextauth'}
-                    onChange={(e) => setAuthProvider(e.target.value as any)}
+                    onChange={(e) => setAuthProvider(e.target.value as 'nextauth' | 'supabase' | 'jwt')}
                     className="w-4 h-4 text-blue-600"
                   />
                   <span className="text-sm">
@@ -903,7 +903,7 @@ Built with BuildFlow AI 🚀
                     type="radio"
                     value="jwt"
                     checked={authProvider === 'jwt'}
-                    onChange={(e) => setAuthProvider(e.target.value as any)}
+                    onChange={(e) => setAuthProvider(e.target.value as 'nextauth' | 'supabase' | 'jwt')}
                     className="w-4 h-4 text-blue-600"
                   />
                   <span className="text-sm">

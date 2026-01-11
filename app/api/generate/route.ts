@@ -6,8 +6,6 @@ import { prisma } from '@/lib/prisma'
 import { checkRateLimit, rateLimits } from '@/lib/rateLimit'
 import { getAnalyticsScript } from '@/lib/analytics-script'
 import { AUTH_TEMPLATES } from '@/lib/auth-templates'
-import { AUTH_PAGES } from '@/lib/auth-pages'
-import { PROTECTED_COMPONENTS } from '@/lib/protected-components'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,7 +31,7 @@ function selectAuthProvider(prompt: string): 'nextauth' | 'supabase' | 'jwt' {
   return 'nextauth' // Default - most popular and flexible
 }
 
-async function callClaudeWithRetry(anthropic: Anthropic, messages: any[], maxRetries = 3) {
+async function callClaudeWithRetry(anthropic: Anthropic, messages: Anthropic.MessageParam[], maxRetries = 3) {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const response = await anthropic.messages.create({
@@ -42,7 +40,7 @@ async function callClaudeWithRetry(anthropic: Anthropic, messages: any[], maxRet
         messages: messages
       });
       return response;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const isOverloaded = error?.error?.type === 'overloaded_error';
       const isLastAttempt = attempt === maxRetries - 1;
 
@@ -647,20 +645,23 @@ Make it visually stunning, fully functional, and ready to deploy immediately.`
     const codeWithAnalytics = injectAnalytics(code, 'SITE_ID_PLACEHOLDER')
 
     // Auto-create project
-    const project = await prisma.project.create({
-      data: {
-        userId: user.id,
-        name: prompt.substring(0, 100) || 'Generated Project',
-        description: `Generated: ${new Date().toLocaleDateString()}`,
-        code: codeWithAnalytics,
-        type: type || 'landing-page',
-        publishedAt: null,
-        metadata: requiresAuth ? {
-          requiresAuth: true,
-          authProvider: authProvider
-        } : undefined
+    const projectData: any = {
+      userId: user.id,
+      name: prompt.substring(0, 100) || 'Generated Project',
+      description: `Generated: ${new Date().toLocaleDateString()}`,
+      code: codeWithAnalytics,
+      type: type || 'landing-page',
+      publishedAt: null
+    }
+    
+    if (requiresAuth) {
+      projectData.metadata = {
+        requiresAuth: true,
+        authProvider: authProvider
       }
-    })
+    }
+    
+    const project = await prisma.project.create({ data: projectData })
 
     // Replace placeholder with actual project ID
     const finalCode = codeWithAnalytics.replace(/SITE_ID_PLACEHOLDER/g, project.id)
@@ -710,23 +711,24 @@ Make it visually stunning, fully functional, and ready to deploy immediately.`
         : undefined
     })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Generate error:', error)
+    const errorObj = error as { message?: string; error?: { type?: string }; status?: number; stack?: string }
     console.error('Error details:', {
-      message: error.message,
-      type: error?.error?.type,
-      status: error?.status,
-      stack: error.stack
+      message: errorObj.message,
+      type: errorObj?.error?.type,
+      status: errorObj?.status,
+      stack: errorObj.stack
     })
 
-    if (error?.error?.type === 'overloaded_error') {
+    if (errorObj?.error?.type === 'overloaded_error') {
       return NextResponse.json(
         { error: 'Claude is experiencing high demand. Please try again in a moment.', retryable: true },
         { status: 503 }
       );
     }
 
-    if (error?.status === 401) {
+    if (errorObj?.status === 401) {
       return NextResponse.json(
         { error: 'AI service configuration error. Please contact support.' },
         { status: 500 }
@@ -734,7 +736,7 @@ Make it visually stunning, fully functional, and ready to deploy immediately.`
     }
 
     return NextResponse.json(
-      { error: 'Failed to generate code', details: error.message },
+      { error: 'Failed to generate code', details: errorObj.message || 'Unknown error' },
       { status: 500 }
     );
   }
