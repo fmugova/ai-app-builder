@@ -143,7 +143,7 @@ export default function ChatBuilderPage() {
   // Helper: Detect and fetch URLs from input
   async function detectAndFetchUrls(text: string): Promise<string> {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const urls = text.match(urlRegex);
+    text.match(urlRegex); // Reserved for future URL processing
     // You can add logic here to fetch and process URLs if needed
     // For now, just return the original text
     return text;
@@ -263,7 +263,7 @@ export default function ChatBuilderPage() {
       const errorMessage: Message = {
         id: Date.now().toString(),
         role: 'assistant',
-        content: `Sorry, something went wrong: ${error.message}. Please try again.`,
+        content: `Sorry, something went wrong: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
         timestamp: new Date()
       }
       setMessages(prev => [...prev, errorMessage])
@@ -308,7 +308,7 @@ export default function ChatBuilderPage() {
 
   const handleSave = async () => {
     if (!currentCode) {
-      toast.toast({
+      toast({
         variant: 'destructive',
         description: 'No code to save. Generate a site first!'
       })
@@ -328,14 +328,14 @@ export default function ChatBuilderPage() {
           })
         })
         if (res.ok) {
-          toast.toast({
+          toast({
             variant: 'default',
             description: 'Page updated!'
           })
         } else {
           const error = await res.text()
           console.error('Save failed:', error)
-          toast.toast({
+          toast({
             variant: 'destructive',
             description: 'Failed to save'
           })
@@ -351,14 +351,14 @@ export default function ChatBuilderPage() {
           })
         })
         if (res.ok) {
-          toast.toast({
+          toast({
             variant: 'default',
             description: 'Project updated!'
           })
         } else {
           const error = await res.text()
           console.error('Save failed:', error)
-          toast.toast({
+          toast({
             variant: 'destructive',
             description: 'Failed to save'
           })
@@ -378,14 +378,14 @@ export default function ChatBuilderPage() {
           const data = await res.json()
           window.history.pushState({}, '', `/chatbuilder?project=${data.id}`)
           setProjectId(data.id)
-          toast.toast({
+          toast({
             variant: 'default',
             description: 'Project created!'
           })
         } else {
           const error = await res.text()
           console.error('Save failed:', error)
-          toast.toast({
+          toast({
             variant: 'destructive',
             description: 'Failed to save'
           })
@@ -393,7 +393,7 @@ export default function ChatBuilderPage() {
       }
     } catch (error) {
       console.error('Save error:', error)
-      toast.toast({
+      toast({
         variant: 'destructive',
         description: 'Error saving project'
       })
@@ -404,7 +404,7 @@ export default function ChatBuilderPage() {
 
   const handlePublish = async () => {
     if (!currentCode) {
-      toast.toast({
+      toast({
         variant: 'destructive',
         description: 'No code to publish. Generate a site first!'
       })
@@ -425,7 +425,7 @@ export default function ChatBuilderPage() {
           })
         })
         if (res.ok) {
-          toast.toast({
+          toast({
             variant: 'default',
             description: 'Page published!'
           })
@@ -433,7 +433,7 @@ export default function ChatBuilderPage() {
         } else {
           const error = await res.text()
           console.error('Publish failed:', error)
-          toast.toast({
+          toast({
             variant: 'destructive',
             description: 'Failed to publish'
           })
@@ -454,7 +454,7 @@ export default function ChatBuilderPage() {
           const data = await res.json()
           window.history.pushState({}, '', `/chatbuilder?project=${data.id}`)
           setProjectId(data.id)
-          toast.toast({
+          toast({
             variant: 'default',
             description: 'Project published!'
           })
@@ -462,7 +462,7 @@ export default function ChatBuilderPage() {
         } else {
           const error = await res.text()
           console.error('Publish failed:', error)
-          toast.toast({
+          toast({
             variant: 'destructive',
             description: 'Failed to publish'
           })
@@ -479,7 +479,7 @@ export default function ChatBuilderPage() {
           })
         })
         if (res.ok) {
-          toast.toast({
+          toast({
             variant: 'default',
             description: 'Project published!'
           })
@@ -487,7 +487,7 @@ export default function ChatBuilderPage() {
         } else {
           const error = await res.text()
           console.error('Publish failed:', error)
-          toast.toast({
+          toast({
             variant: 'destructive',
             description: 'Failed to publish'
           })
@@ -495,7 +495,7 @@ export default function ChatBuilderPage() {
       }
     } catch (error) {
       console.error('Publish error:', error)
-      toast.toast({
+      toast({
         variant: 'destructive',
         description: 'Error publishing project'
       })
@@ -599,6 +599,7 @@ Built with BuildFlow AI 🚀
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleExportToGitHub = async () => {
     if (!projectId) {
       alert('Please save your project first!')
@@ -624,6 +625,7 @@ Built with BuildFlow AI 🚀
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleDeployToVercel = async () => {
     if (!projectId) {
       alert('Please save your project first!')
@@ -1019,8 +1021,8 @@ Built with BuildFlow AI 🚀
                 <p className="text-sm mt-2">Start by telling me what you want to build</p>
                 <div className="mt-6 text-left max-w-md mx-auto space-y-2 text-sm">
                   <p className="font-semibold text-gray-600">Examples:</p>
-                  <p className="text-gray-500">• "Create a coffee shop website"</p>
-                  <p className="text-gray-500">• "Build a gym landing page"</p>
+                  <p className="text-gray-500">• &ldquo;Create a coffee shop website&rdquo;</p>
+                  <p className="text-gray-500">• &ldquo;Build a gym landing page&rdquo;</p>
                   <p className="text-gray-500">• Upload broken Replit code to fix</p>
                   <p className="text-gray-500">• Paste website URL to analyze</p>
                 </div>

@@ -41,7 +41,8 @@ async function callClaudeWithRetry(anthropic: Anthropic, messages: Anthropic.Mes
       });
       return response;
     } catch (error: unknown) {
-      const isOverloaded = error?.error?.type === 'overloaded_error';
+      const errorObj = error as { error?: { type?: string } }
+      const isOverloaded = errorObj?.error?.type === 'overloaded_error';
       const isLastAttempt = attempt === maxRetries - 1;
 
       if (isOverloaded && !isLastAttempt) {
@@ -595,13 +596,11 @@ This application requires user authentication! Include:
 IMPLEMENTATION:
 - Use Supabase Auth (already included in CDN)
 - Create login/signup forms with email/password
-- Implement session checking
+- Implement session checking with useEffect
 - Protect dashboard/profile routes
 - Include sign out functionality
 - Show user email when logged in
-
-EXAMPLE AUTH STRUCTURE:
-${AUTH_PAGES.login.content.substring(0, 500)}... (simplified for single-file HTML with React CDN)
+- Add loading states during auth checks
 
 Make authentication seamless and production-ready!
 `
@@ -645,20 +644,15 @@ Make it visually stunning, fully functional, and ready to deploy immediately.`
     const codeWithAnalytics = injectAnalytics(code, 'SITE_ID_PLACEHOLDER')
 
     // Auto-create project
-    const projectData: any = {
+    const projectData = {
       userId: user.id,
       name: prompt.substring(0, 100) || 'Generated Project',
-      description: `Generated: ${new Date().toLocaleDateString()}`,
+      description: requiresAuth 
+        ? `Auth-enabled (${authProvider}): ${new Date().toLocaleDateString()}`
+        : `Generated: ${new Date().toLocaleDateString()}`,
       code: codeWithAnalytics,
       type: type || 'landing-page',
       publishedAt: null
-    }
-    
-    if (requiresAuth) {
-      projectData.metadata = {
-        requiresAuth: true,
-        authProvider: authProvider
-      }
     }
     
     const project = await prisma.project.create({ data: projectData })
