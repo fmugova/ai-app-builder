@@ -85,6 +85,25 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Email and password required')
         }
 
+        // Check for account lockout (IP-based rate limiting)
+        // Note: In production, pass IP from request context
+        const ipAddress = 'unknown' // Should be passed from API route context
+        
+        const failedAttempts = await prisma.failedLoginAttempt.findUnique({
+          where: { 
+            email_ipAddress: { 
+              email: credentials.email, 
+              ipAddress 
+            } 
+          }
+        })
+
+        // Check if account is locked
+        if (failedAttempts?.lockedUntil && failedAttempts.lockedUntil > new Date()) {
+          const minutesLeft = Math.ceil((failedAttempts.lockedUntil.getTime() - Date.now()) / 60000)
+          throw new Error(`Account temporarily locked. Try again in ${minutesLeft} minutes.`)
+        }
+
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
           include: {
@@ -93,6 +112,8 @@ export const authOptions: NextAuthOptions = {
         })
 
         if (!user || !user.password) {
+          // Track failed login attempt
+          await trackFailedLogin(credentials.email, ipAddress)
           throw new Error('Invalid credentials')
         }
 
@@ -102,6 +123,8 @@ export const authOptions: NextAuthOptions = {
         )
 
         if (!isPasswordValid) {
+          // Track failed login attempt
+          await trackFailedLogin(credentials.email, ipAddress)
           throw new Error('Invalid credentials')
         }
 
@@ -109,6 +132,9 @@ export const authOptions: NextAuthOptions = {
         if (!user.emailVerified) {
           throw new Error('Please verify your email before signing in')
         }
+
+        // Reset failed attempts on successful login
+        await resetFailedAttempts(credentials.email, ipAddress)
 
         // Log successful login (IP tracking handled at API route level)
         await logSecurityEvent(user.id, 'login_credentials', {
@@ -216,6 +242,76 @@ export const authOptions: NextAuthOptions = {
     },
   },
   debug: process.env.NODE_ENV === 'development',
+}
+
+/**
+ * Track failed login attempts and implement account lockout
+ */
+async function trackFailedLogin(email: string, ipAddress: string): Promise<void> {
+  try {
+    const existing = await prisma.failedLoginAttempt.findUnique({
+      where: { email_ipAddress: { email, ipAddress } }
+    })
+
+    if (existing) {
+      const newAttempts = existing.attempts + 1
+      
+      // Lock account after 5 failed attempts
+      if (newAttempts >= 5) {
+        await prisma.failedLoginAttempt.update({
+          where: { email_ipAddress: { email, ipAddress } },
+          data: {
+            attempts: newAttempts,
+            lockedUntil: new Date(Date.now() + 30 * 60 * 1000) // 30 minutes
+          }
+        })
+        
+        // Log security event
+        await logSecurityEvent(email, 'account_locked', {
+          severity: 'critical',
+          ipAddress,
+          attempts: newAttempts,
+        })
+      } else {
+        await prisma.failedLoginAttempt.update({
+          where: { email_ipAddress: { email, ipAddress } },
+          data: { attempts: newAttempts }
+        })
+      }
+    } else {
+      await prisma.failedLoginAttempt.create({
+        data: {
+          email,
+          ipAddress,
+          attempts: 1
+        }
+      })
+    }
+
+    // Log failed login attempt
+    await logSecurityEvent(email, 'failed_login', {
+      severity: 'warning',
+      ipAddress,
+    })
+  } catch (error) {
+    console.error('Failed to track login attempt:', error)
+  }
+}
+
+/**
+ * Reset failed login attempts on successful login
+ */
+async function resetFailedAttempts(email: string, ipAddress: string): Promise<void> {
+  try {
+    await prisma.failedLoginAttempt.deleteMany({
+      where: {
+        email,
+        ipAddress
+      }
+    })
+  } catch (error) {
+    console.error('Failed to reset login attempts:', error)
+  }
 }
 
 // Helper function to check if user has permission

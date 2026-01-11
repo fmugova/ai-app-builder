@@ -1225,6 +1225,22 @@ model SecurityEvent {
   @@schema("public")
 }
 
+model FailedLoginAttempt {
+  id          String    @id @default(cuid())
+  email       String
+  ipAddress   String
+  attempts    Int       @default(1)
+  lockedUntil DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([email, ipAddress])
+  @@index([email])
+  @@index([ipAddress])
+  @@index([lockedUntil])
+  @@schema("public")
+}
+
 enum oauth_response_type {
   code
 
