@@ -190,8 +190,9 @@ function BuilderContent() {
         ])
         toast.error(errorMsg)
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('❌ Chat error:', err)
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
       setChatHistory([
         ...newHistory,
         { 
@@ -199,7 +200,7 @@ function BuilderContent() {
           content: '❌ Failed to connect to AI assistant. Please check your connection and try again.'
         }
       ])
-      toast.error('Connection failed: ' + err.message)
+      toast.error('Connection failed: ' + errorMessage)
     } finally {
       setChatLoading(false)
     }
@@ -230,8 +231,8 @@ function BuilderContent() {
         // The sanitizeForPreview function already handles React code properly!
         // No need to warn - just render it!
       }
-    } catch (err) {
-      console.error('Failed to load:', err)
+    } catch (error) {
+      console.error('Failed to load:', error)
     }
   }
 
@@ -283,7 +284,7 @@ function BuilderContent() {
           toast.error(data.error || 'Failed to generate')
         }
         break
-      } catch (err) {
+      } catch {
         analytics.aiGeneration(false, projectType)
         if (i === maxClientRetries - 1) {
           toast.error('Generation failed. Please try again.')
@@ -332,7 +333,7 @@ function BuilderContent() {
       } else {
         toast.error('Save failed')
       }
-    } catch (err) {
+    } catch {
       toast.error('Save failed')
     } finally {
       setSaving(false)
@@ -642,7 +643,7 @@ function BuilderContent() {
               <div className="text-center text-gray-500 py-8">
                 <div className="text-4xl mb-2">👋</div>
                 <p className="text-sm">Start a conversation!</p>
-                <p className="text-xs mt-2">Try: "Add a navigation bar" or upload a website for inspiration</p>
+                <p className="text-xs mt-2">Try: &quot;Add a navigation bar&quot; or upload a website for inspiration</p>
               </div>
             ) : (
               chatHistory.map((msg, i) => (

@@ -1,21 +1,20 @@
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import speakeasy from 'speakeasy'
+import * as speakeasy from 'speakeasy'
 
-export async function POST(request: NextRequest) {
+export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions)
-    
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { token } = await request.json()
+    const { token } = await req.json()
 
     if (!token) {
       return NextResponse.json(
@@ -30,16 +29,16 @@ export async function POST(request: NextRequest) {
 
     if (!user || !user.twoFactorSecret) {
       return NextResponse.json(
-        { error: 'Two-factor authentication not set up' },
+        { error: 'No 2FA setup found' },
         { status: 400 }
       )
     }
 
-    // Verify token
+    // Verify TOTP token
     const verified = speakeasy.totp.verify({
       secret: user.twoFactorSecret,
       encoding: 'base32',
-      token,
+      token: token,
       window: 2 // Allow 2 time steps before/after
     })
 
@@ -50,9 +49,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Enable 2FA for user
+    // Enable 2FA
     await prisma.user.update({
-      where: { email: session.user.email },
+      where: { id: user.id },
       data: {
         twoFactorEnabled: true
       }
@@ -60,13 +59,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Two-factor authentication enabled'
+      message: '2FA enabled successfully'
     })
-
   } catch (error) {
-    console.error('2FA verification error:', error)
+    console.error('2FA verify error:', error)
     return NextResponse.json(
-      { error: 'Failed to verify token' },
+      { error: 'Failed to verify 2FA' },
       { status: 500 }
     )
   }

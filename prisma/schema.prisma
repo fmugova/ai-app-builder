@@ -34,10 +34,10 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-  ipAddress    String?
-  userAgent    String?
-  lastActive   DateTime @default(now())
   createdAt    DateTime @default(now())
+  ipAddress    String?
+  lastActive   DateTime @default(now())
+  userAgent    String?
   User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -87,17 +87,18 @@ model User {
   githubUsername        String?
   twoFactorEnabled      Boolean                @default(false)
   twoFactorSecret       String?
-  twoFactorBackupCodes  String[]               @default([])
-  lastLoginAt           DateTime?
-  lastLoginIp           String?
-  failedLoginAttempts   Int                    @default(0)
-  accountLockedUntil    DateTime?
   resetToken            String?                @unique
   resetTokenExpiry      DateTime?
   vercelToken           String?
   vercelProjectName     String?
   vercelTeamId          String?
+  accountLockedUntil    DateTime?
+  failedLoginAttempts   Int                    @default(0)
+  lastLoginAt           DateTime?
+  lastLoginIp           String?
+  twoFactorBackupCodes  String[]               @default([])
   accounts              Account[]
+  activeSessions        ActiveSession[]
   activities            Activity[]
   DatabaseConnections   DatabaseConnection[]
   Deployment            Deployment[]
@@ -108,20 +109,19 @@ model User {
   generations           Generation[]
   generationHistory     GenerationHistory[]
   NewsletterSubscriber  NewsletterSubscriber[]
+  passwordHistory       PasswordHistory[]
   projects              Project[]
   projectSharesReceived ProjectShare[]         @relation("UserProjectShares")
   projectVersions       ProjectVersion[]
+  securityEvents        SecurityEvent[]
   sessions              Session[]
   subscriptions         Subscription?
-  VercelConnection      VercelConnection?
-  workspaceMembers      WorkspaceMember[]
   createdTemplates      Template[]             @relation("TemplateCreator")
   templatePurchases     TemplatePurchase[]
-  templateReviews       TemplateReview[]
   templateRevenue       TemplateRevenue[]
-  securityEvents        SecurityEvent[]
-  activeSessions        ActiveSession[]
-  passwordHistory       PasswordHistory[]
+  templateReviews       TemplateReview[]
+  VercelConnection      VercelConnection?
+  workspaceMembers      WorkspaceMember[]
 
   @@schema("public")
 }
@@ -148,16 +148,16 @@ model Project {
   tags                 String[]              @default([])
   views                Int                   @default(0)
   multiPage            Boolean               @default(false)
+  apiEndpoints         ApiEndpoint[]
   customDomains        CustomDomain[]
   DatabaseConnection   DatabaseConnection?
   Deployment           Deployment[]
+  environmentVariables EnvironmentVariable[]
   formSubmissions      FormSubmission[]
   pages                Page[]
   User                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   ProjectShare         ProjectShare[]
   ProjectVersion       ProjectVersion[]
-  environmentVariables EnvironmentVariable[]
-  apiEndpoints         ApiEndpoint[]
 
   @@index([isPublic])
   @@index([isPublished])
@@ -211,13 +211,13 @@ model ProjectVersion {
 model Generation {
   id         String   @id @default(cuid())
   userId     String
-  projectId  String?
-  prompt     String
-  code       String
-  type       String
-  tokensUsed Int      @default(0)
-  success    Boolean  @default(true)
   createdAt  DateTime @default(now())
+  code       String
+  prompt     String
+  type       String
+  projectId  String?
+  success    Boolean  @default(true)
+  tokensUsed Int      @default(0)
   User       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([createdAt])
@@ -331,9 +331,9 @@ model Workspace {
   generationsLimit     Int                @default(50)
   projectsLimit        Int                @default(10)
   membersLimit         Int                @default(5)
+  invites              WorkspaceInvite[]
   members              WorkspaceMember[]
   projects             WorkspaceProject[]
-  invites              WorkspaceInvite[]
 
   @@index([slug])
   @@index([stripeCustomerId])
@@ -348,8 +348,8 @@ model WorkspaceMember {
   role        String    @default("member")
   joinedAt    DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, userId])
   @@index([workspaceId])
@@ -648,7 +648,7 @@ model GenerationHistory {
   id         String   @id @default(cuid())
   userId     String
   projectId  String?
-  prompt     String   @db.Text
+  prompt     String
   tokensUsed Int      @default(0)
   success    Boolean  @default(true)
   createdAt  DateTime @default(now())
@@ -1061,47 +1061,30 @@ model users {
   @@schema("auth")
 }
 
-// Template Marketplace Models
-enum TemplateTier {
-  FREE
-  PRO
-  COLLECTION
-
-  @@schema("public")
-}
-
-enum TemplateStatus {
-  DRAFT
-  PUBLISHED
-  ARCHIVED
-
-  @@schema("public")
-}
-
 model Template {
   id          String             @id @default(cuid())
-  creatorId   String
   name        String
   description String
-  category    String
   tier        TemplateTier       @default(FREE)
   price       Float              @default(0)
-  thumbnail   String?
-  htmlCode    String
-  cssCode     String?
-  jsCode      String?
   status      TemplateStatus     @default(DRAFT)
+  thumbnail   String?
+  category    String
+  tags        String[]           @default([])
   downloads   Int                @default(0)
   views       Int                @default(0)
   rating      Float              @default(0)
   reviewCount Int                @default(0)
-  tags        String[]           @default([])
+  creatorId   String
   createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  updatedAt   DateTime           @default(now()) @updatedAt
+  cssCode     String?
+  htmlCode    String
+  jsCode      String?
   creator     User               @relation("TemplateCreator", fields: [creatorId], references: [id], onDelete: Cascade)
   purchases   TemplatePurchase[]
-  reviews     TemplateReview[]
   revenue     TemplateRevenue[]
+  reviews     TemplateReview[]
 
   @@index([creatorId])
   @@index([status])
@@ -1129,15 +1112,15 @@ model TemplateRevenue {
   id              String    @id @default(cuid())
   templateId      String
   creatorId       String
-  amount          Float
-  platformShare   Float
   creatorShare    Float
-  stripePaymentId String?
+  platformShare   Float
+  amount          Float
   createdAt       DateTime  @default(now())
   paidOut         Boolean   @default(false)
   paidOutAt       DateTime?
-  template        Template  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  stripePaymentId String?
   creator         User      @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  template        Template  @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   @@index([creatorId])
   @@index([templateId])
@@ -1159,6 +1142,164 @@ model TemplateReview {
   @@unique([templateId, userId])
   @@index([templateId])
   @@index([userId])
+  @@schema("public")
+}
+
+model SecurityEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  type      String
+  ipAddress String?
+  userAgent String?
+  metadata  Json?
+  severity  String
+  createdAt DateTime @default(now())
+  action    String   @default("success")
+  location  String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+  @@index([severity, createdAt])
+  @@index([action])
+  @@schema("public")
+}
+
+model FailedLoginAttempt {
+  id          String    @id @default(cuid())
+  email       String
+  ipAddress   String
+  attempts    Int       @default(1)
+  lockedUntil DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  lastAttempt DateTime  @default(now())
+  userAgent   String?
+
+  @@unique([email, ipAddress])
+  @@index([email])
+  @@index([ipAddress])
+  @@index([lockedUntil])
+  @@schema("public")
+}
+
+model ActiveSession {
+  id           String   @id @default(cuid())
+  userId       String
+  sessionToken String   @unique
+  ipAddress    String?
+  userAgent    String?
+  deviceType   String?
+  deviceName   String?
+  location     String?
+  lastActive   DateTime @default(now())
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionToken])
+  @@index([userId, lastActive])
+  @@index([expiresAt])
+  @@schema("public")
+}
+
+model PasswordHistory {
+  id             String   @id @default(cuid())
+  userId         String
+  hashedPassword String
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@schema("public")
+}
+
+model EnvironmentVariable {
+  id          String   @id @default(cuid())
+  projectId   String
+  key         String
+  value       String
+  description String?
+  environment String   @default("all")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, key, environment])
+  @@index([projectId])
+  @@index([key])
+  @@schema("public")
+}
+
+model ApiEndpoint {
+  id             String    @id @default(cuid())
+  projectId      String
+  name           String
+  path           String
+  method         String
+  description    String?
+  code           String
+  requiresAuth   Boolean   @default(false)
+  rateLimit      Int?
+  responseType   String    @default("json")
+  statusCode     Int       @default(200)
+  usesDatabase   Boolean   @default(false)
+  databaseTable  String?
+  requestSchema  Json?
+  responseSchema Json?
+  tags           String[]  @default([])
+  isActive       Boolean   @default(true)
+  testsPassed    Boolean   @default(false)
+  lastTested     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, path, method])
+  @@index([projectId])
+  @@index([method])
+  @@index([tags])
+  @@schema("public")
+}
+
+model ApiTemplate {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  displayName    String
+  description    String
+  category       String
+  icon           String
+  tags           String[] @default([])
+  template       String
+  requiresAuth   Boolean  @default(false)
+  usesDatabase   Boolean  @default(false)
+  usesSendEmail  Boolean  @default(false)
+  usesFileUpload Boolean  @default(false)
+  configSchema   Json?
+  isActive       Boolean  @default(true)
+  usageCount     Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@index([category])
+  @@index([isActive])
+  @@schema("public")
+}
+
+enum TemplateTier {
+  FREE
+  PRO
+  COLLECTION
+
+  @@schema("public")
+}
+
+enum TemplateStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+
   @@schema("public")
 }
 
@@ -1213,161 +1354,6 @@ enum oauth_registration_type {
   manual
 
   @@schema("auth")
-}
-
-model SecurityEvent {
-  id        String   @id @default(cuid())
-  userId    String?
-  type      String // login, logout, password_change, 2fa_enabled, etc.
-  action    String   @default("success") // success, failure, attempt
-  ipAddress String?
-  userAgent String?
-  location  String? // City, Country from IP geolocation
-  metadata  Json?
-  severity  String // info, warning, critical
-  createdAt DateTime @default(now())
-
-  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-  @@index([type, createdAt])
-  @@index([severity, createdAt])
-  @@index([action])
-  @@schema("public")
-}
-
-model FailedLoginAttempt {
-  id          String    @id @default(cuid())
-  email       String
-  ipAddress   String
-  userAgent   String?
-  attempts    Int       @default(1)
-  lastAttempt DateTime  @default(now())
-  lockedUntil DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@unique([email, ipAddress])
-  @@index([email])
-  @@index([ipAddress])
-  @@index([lockedUntil])
-  @@schema("public")
-}
-
-model ActiveSession {
-  id           String   @id @default(cuid())
-  userId       String
-  sessionToken String   @unique
-  ipAddress    String?
-  userAgent    String?
-  deviceType   String? // mobile, tablet, desktop
-  deviceName   String? // Chrome Browser, iPhone, etc.
-  location     String? // City, Country from IP
-  lastActive   DateTime @default(now())
-  expiresAt    DateTime
-  createdAt    DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([sessionToken])
-  @@index([userId, lastActive])
-  @@index([expiresAt])
-  @@schema("public")
-}
-
-model PasswordHistory {
-  id             String   @id @default(cuid())
-  userId         String
-  hashedPassword String
-  createdAt      DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-  @@schema("public")
-}
-
-model EnvironmentVariable {
-  id          String   @id @default(cuid())
-  projectId   String
-  key         String
-  value       String   @db.Text
-  description String?
-  environment String   @default("all")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@unique([projectId, key, environment])
-  @@index([projectId])
-  @@index([key])
-  @@schema("public")
-}
-
-model ApiEndpoint {
-  id          String   @id @default(cuid())
-  projectId   String
-  name        String
-  path        String
-  method      String
-  description String?
-  code        String   @db.Text
-
-  requiresAuth  Boolean  @default(false)
-  rateLimit     Int?
-  responseType  String   @default("json")
-  statusCode    Int      @default(200)
-  usesDatabase  Boolean  @default(false)
-  databaseTable String?
-
-  requestSchema  Json?
-  responseSchema Json?
-
-  tags        String[]  @default([])
-  isActive    Boolean   @default(true)
-  testsPassed Boolean   @default(false)
-  lastTested  DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@unique([projectId, path, method])
-  @@index([projectId])
-  @@index([method])
-  @@index([tags])
-  @@schema("public")
-}
-
-model ApiTemplate {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  displayName String
-  description String
-  category    String
-  icon        String
-  tags        String[] @default([])
-
-  template String @db.Text
-
-  requiresAuth   Boolean @default(false)
-  usesDatabase   Boolean @default(false)
-  usesSendEmail  Boolean @default(false)
-  usesFileUpload Boolean @default(false)
-
-  configSchema Json?
-
-  isActive   Boolean  @default(true)
-  usageCount Int      @default(0)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@index([category])
-  @@index([isActive])
-  @@schema("public")
 }
 
 enum oauth_response_type {

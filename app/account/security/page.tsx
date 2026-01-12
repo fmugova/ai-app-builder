@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Smartphone, Monitor, Tablet, MapPin, Clock, Loader2 } from 'lucide-react'
+import { Smartphone, Monitor, Tablet, MapPin, Clock, Loader2, Shield } from 'lucide-react'
+import Link from 'next/link'
 
 interface ActiveSession {
   id: string
@@ -176,14 +177,37 @@ export default function SecurityPage() {
         </div>
       )}
 
-      <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-        <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
-          Security Tip
-        </h3>
-        <p className="text-sm text-blue-800 dark:text-blue-200">
-          If you see a session you don&apos;t recognize, revoke it immediately and change your password.
-          Consider enabling two-factor authentication for additional security.
-        </p>
+      <div className="mt-8 space-y-4">
+        <Link
+          href="/account/security/2fa"
+          className="block p-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-lg hover:shadow-md transition-shadow"
+        >
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-blue-600 text-white rounded-lg">
+              <Shield className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                Two-Factor Authentication
+              </h3>
+              <p className="text-sm text-blue-800 dark:text-blue-200 mb-3">
+                Add an extra layer of security to your account by requiring a verification code in addition to your password.
+              </p>
+              <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                Configure 2FA →
+              </span>
+            </div>
+          </div>
+        </Link>
+
+        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
+            Security Tip
+          </h3>
+          <p className="text-sm text-blue-800 dark:text-blue-200">
+            If you see a session you don&apos;t recognize, revoke it immediately and change your password.
+          </p>
+        </div>
       </div>
     </div>
   )

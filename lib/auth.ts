@@ -76,6 +76,8 @@ export const authOptions: NextAuthOptions = {
     error: '/auth/error',
     verifyRequest: '/auth/verify-request',
   },
+  // Add custom error pages configuration
+  useSecureCookies: process.env.NODE_ENV === 'production',
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -87,99 +89,156 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
+        twoFactorToken: { label: '2FA Token', type: 'text', optional: true },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error('Email and password required')
-        }
+        try {
+          if (!credentials?.email || !credentials?.password) {
+            throw new Error('Email and password required')
+          }
 
-        // Check for account lockout (IP-based rate limiting)
-        // Note: In production, pass IP from request context
-        const ipAddress = 'unknown' // Should be passed from API route context
-        const userAgent = 'unknown' // Should be passed from API route context
-        
-        // Use comprehensive lockout check from lib/security.ts
-        const lockoutCheck = await checkAccountLockout(credentials.email, ipAddress)
-        
-        if (lockoutCheck.isLocked) {
-          const minutesLeft = Math.ceil(((lockoutCheck.lockedUntil?.getTime() || 0) - Date.now()) / 60000)
-          throw new Error(`Account temporarily locked. Try again in ${minutesLeft} minutes.`)
-        }
+          // Check for account lockout (IP-based rate limiting)
+          // Note: In production, pass IP from request context
+          const ipAddress = 'unknown' // Should be passed from API route context
+          const userAgent = 'unknown' // Should be passed from API route context
+          
+          // Use comprehensive lockout check from lib/security.ts
+          const lockoutCheck = await checkAccountLockout(credentials.email, ipAddress)
+          
+          if (lockoutCheck.isLocked) {
+            const minutesLeft = Math.ceil(((lockoutCheck.lockedUntil?.getTime() || 0) - Date.now()) / 60000)
+            throw new Error(`Account temporarily locked. Try again in ${minutesLeft} minutes.`)
+          }
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-          include: {
-            subscriptions: true,
-          },
-        })
-
-        if (!user || !user.password) {
-          // Track failed login attempt using comprehensive function
-          await trackFailedLoginAttempt(credentials.email, ipAddress, userAgent)
-          throw new Error('Invalid credentials')
-        }
-
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password,
-          user.password
-        )
-
-        if (!isPasswordValid) {
-          // Track failed login attempt using comprehensive function
-          await trackFailedLoginAttempt(credentials.email, ipAddress, userAgent)
-          throw new Error('Invalid credentials')
-        }
-
-        // Check if email is verified
-        if (!user.emailVerified) {
-          throw new Error('Please verify your email before signing in')
-        }
-
-        // Reset failed attempts on successful login
-        await resetFailedLoginAttempts(credentials.email, ipAddress)
-
-        // Check for suspicious activity
-        const suspiciousCheck = await detectSuspiciousActivity(
-          user.id,
-          ipAddress,
-          userAgent
-        )
-
-        if (suspiciousCheck.isSuspicious) {
-          // Send email notification for new location login
-          await sendSecurityAlert(user.id, 'new_login_location', {
-            ipAddress,
-            device: userAgent,
-            location: ipAddress, // Could be enhanced with IP geolocation
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email },
+            include: {
+              subscriptions: true,
+            },
           })
-        }
 
-        // Update user login tracking
-        await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            lastLoginAt: new Date(),
-            lastLoginIp: ipAddress,
-            failedLoginAttempts: 0,
-          },
-        })
+          if (!user || !user.password) {
+            // Track failed login attempt using comprehensive function
+            await trackFailedLoginAttempt(credentials.email, ipAddress, userAgent)
+            throw new Error('Invalid credentials')
+          }
 
-        // Log successful login using comprehensive function
-        await logSecurityEvent({
-          userId: user.id,
-          type: 'login_credentials',
-          action: 'success',
-          ipAddress,
-          userAgent,
-          severity: 'info',
-        })
+          const isPasswordValid = await bcrypt.compare(
+            credentials.password,
+            user.password
+          )
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          image: user.image,
+          if (!isPasswordValid) {
+            // Track failed login attempt using comprehensive function
+            await trackFailedLoginAttempt(credentials.email, ipAddress, userAgent)
+            throw new Error('Invalid credentials')
+          }
+
+          // Check if email is verified
+          if (!user.emailVerified) {
+            throw new Error('Please verify your email before signing in')
+          }
+
+          // Check if 2FA is enabled and validate token if provided
+          if (user.twoFactorEnabled && user.twoFactorSecret) {
+            const twoFactorToken = (credentials as Record<string, string>).twoFactorToken
+            
+            if (!twoFactorToken) {
+              // Return null but throw a specific error that can be caught
+              // We'll use a custom error that the client can detect
+              const error = new Error('2FA_REQUIRED')
+              error.name = '2FA_REQUIRED'
+              throw error
+            }
+
+            // Verify 2FA token
+            const speakeasy = await import('speakeasy')
+            const verified = speakeasy.totp.verify({
+              secret: user.twoFactorSecret,
+              encoding: 'base32',
+              token: twoFactorToken,
+              window: 2
+            })
+
+            if (!verified) {
+              // Check if it's a backup code
+              const backupCodeIndex = user.twoFactorBackupCodes?.indexOf(twoFactorToken) ?? -1
+              
+              if (backupCodeIndex === -1) {
+                await trackFailedLoginAttempt(credentials.email, ipAddress, userAgent)
+                throw new Error('Invalid 2FA code')
+              }
+
+              // Remove used backup code
+              const updatedBackupCodes = [...(user.twoFactorBackupCodes || [])]
+              updatedBackupCodes.splice(backupCodeIndex, 1)
+              
+              await prisma.user.update({
+                where: { id: user.id },
+                data: { twoFactorBackupCodes: updatedBackupCodes }
+              })
+
+              await logSecurityEvent({
+                userId: user.id,
+                type: 'login_2fa_backup',
+                action: 'success',
+                ipAddress,
+                userAgent,
+                severity: 'warning',
+                metadata: { backupCodesRemaining: updatedBackupCodes.length }
+              })
+            }
+          }
+
+          // Reset failed attempts on successful login
+          await resetFailedLoginAttempts(credentials.email, ipAddress)
+
+          // Check for suspicious activity
+          const suspiciousCheck = await detectSuspiciousActivity(
+            user.id,
+            ipAddress,
+            userAgent
+          )
+
+          if (suspiciousCheck.isSuspicious) {
+            // Send email notification for new location login
+            await sendSecurityAlert(user.id, 'new_login_location', {
+              ipAddress,
+              device: userAgent,
+              location: ipAddress, // Could be enhanced with IP geolocation
+            })
+          }
+
+          // Update user login tracking
+          await prisma.user.update({
+            where: { id: user.id },
+            data: {
+              lastLoginAt: new Date(),
+              lastLoginIp: ipAddress,
+              failedLoginAttempts: 0,
+            },
+          })
+
+          // Log successful login using comprehensive function
+          await logSecurityEvent({
+            userId: user.id,
+            type: 'login_credentials',
+            action: 'success',
+            ipAddress,
+            userAgent,
+            severity: 'info',
+          })
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            image: user.image,
+          }
+        } catch (error) {
+          console.error('[AUTH ERROR]', error)
+          throw error
         }
       },
     }),

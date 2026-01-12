@@ -1,17 +1,17 @@
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import speakeasy from 'speakeasy'
-import qrcode from 'qrcode'
+import * as speakeasy from 'speakeasy'
+import * as QRCode from 'qrcode'
+import { randomBytes } from 'crypto'
 
-export async function POST(request: NextRequest) {
+export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions)
-    
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -24,28 +24,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Generate 2FA secret
+    // Generate TOTP secret
     const secret = speakeasy.generateSecret({
-      name: `BuildFlow (${user.email})`,
-      issuer: 'BuildFlow'
-    })
-
-    // Save secret to database
-    await prisma.user.update({
-      where: { email: session.user.email },
-      data: {
-        twoFactorSecret: secret.base32
-      }
+      name: `BuildFlow AI (${user.email})`,
+      issuer: 'BuildFlow AI'
     })
 
     // Generate QR code
-    const qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url!)
+    const qrCode = await QRCode.toDataURL(secret.otpauth_url!)
+
+    // Generate 10 backup codes
+    const backupCodes = Array.from({ length: 10 }, () => {
+      return randomBytes(4).toString('hex').toUpperCase()
+    })
+
+    // Store secret temporarily (not enabled yet)
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        twoFactorSecret: secret.base32,
+        twoFactorBackupCodes: backupCodes, // In production, encrypt these!
+        twoFactorEnabled: false // Not enabled until verified
+      }
+    })
 
     return NextResponse.json({
       secret: secret.base32,
-      qrCode: qrCodeUrl
+      qrCode,
+      backupCodes,
+      message: 'Scan the QR code with your authenticator app'
     })
-
   } catch (error) {
     console.error('2FA setup error:', error)
     return NextResponse.json(
