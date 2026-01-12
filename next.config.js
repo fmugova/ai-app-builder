@@ -90,11 +90,11 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://*.vercel.app https://vercel.live",
               "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com",
               "img-src 'self' data: https: blob:",
               "font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com",
-              "connect-src 'self' https://api.anthropic.com https://api.openai.com https://api.github.com https://api.vercel.com",
+              "connect-src 'self' https://api.anthropic.com https://api.openai.com https://api.github.com https://api.vercel.com https://*.vercel.app",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'"
