@@ -94,6 +94,7 @@ export const POST = compose(
       data: {
         domain,
         projectId,
+        userId: session.user.id,
         status: 'pending',
       },
       include: {
