@@ -6,7 +6,7 @@
 -- ============================================================================
 
 -- Add twoFactorEnabled column if it doesn't exist
-DO $$
+DO $$ 
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns 
@@ -49,7 +49,7 @@ BEGIN
     AND column_name = 'twoFactorBackupCodes'
   ) THEN
     ALTER TABLE "public"."User" 
-    ADD COLUMN "twoFactorBackupCodes" TEXT[] DEFAULT ARRAY[]::TEXT[];
+    ADD COLUMN "twoFactorBackupCodes" TEXT[] DEFAULT '{}'::text[];
     RAISE NOTICE 'Added twoFactorBackupCodes column';
   ELSE
     RAISE NOTICE 'twoFactorBackupCodes column already exists';
