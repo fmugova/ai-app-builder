@@ -93,6 +93,8 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         try {
+          console.log('[DEBUG] Credentials received:', credentials)
+
           if (!credentials?.email || !credentials?.password) {
             throw new Error('Email and password required')
           }
@@ -117,6 +119,8 @@ export const authOptions: NextAuthOptions = {
             },
           })
 
+          console.log('[DEBUG] User from DB:', user)
+
           if (!user || !user.password) {
             // Track failed login attempt using comprehensive function
             await trackFailedLoginAttempt(credentials.email, ipAddress, userAgent)
@@ -127,6 +131,8 @@ export const authOptions: NextAuthOptions = {
             credentials.password,
             user.password
           )
+
+          console.log('[DEBUG] Password valid:', isPasswordValid)
 
           if (!isPasswordValid) {
             // Track failed login attempt using comprehensive function
@@ -276,6 +282,8 @@ export const authOptions: NextAuthOptions = {
             subscriptions: true,
           },
         })
+
+        console.log('[DEBUG] User from DB:', dbUser)
 
         if (dbUser) {
           token.id = dbUser.id
