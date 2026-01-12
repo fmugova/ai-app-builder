@@ -1,35 +1,34 @@
--- COMPLETE FIX: Delete failed migration records and let Prisma reapply
--- Run this in your Supabase SQL Editor for PRODUCTION database
--- Go to: https://supabase.com/dashboard/project/YOUR_PROJECT/sql/new
+-- ============================================================================
+-- COMPREHENSIVE MIGRATION CLEANUP FOR PRODUCTION
+-- ============================================================================
+-- This will delete ALL failed migration records and keep only successful ones
+-- ============================================================================
 
--- Step 1: Check current state
+-- Step 1: View current mess
 SELECT 
-    id,
     migration_name,
-    applied_steps_count,
     started_at,
     finished_at,
-    logs
+    applied_steps_count
 FROM "_prisma_migrations" 
-WHERE migration_name = '20260110181255_baseline'
+WHERE finished_at IS NULL
 ORDER BY started_at DESC;
 
--- Step 2: DELETE all failed migration records completely
--- This allows Prisma to reapply the migration cleanly
-DELETE FROM "_prisma_migrations" 
-WHERE migration_name = '20260110181255_baseline';
+-- Step 2: DELETE ALL failed migration records (finished_at IS NULL)
+-- These are causing the P3009 errors
+DELETE FROM "_prisma_migrations"
+WHERE finished_at IS NULL;
 
--- Step 3: Verify deletion (should return 0 rows)
+-- Step 3: View all remaining successfully applied migrations
 SELECT 
-    id,
     migration_name,
-    applied_steps_count,
     started_at,
     finished_at,
-    logs
+    applied_steps_count
 FROM "_prisma_migrations" 
-WHERE migration_name = '20260110181255_baseline'
 ORDER BY started_at DESC;
 
--- Expected result: No rows (migration record deleted)
--- Next Vercel deployment will reapply this migration from scratch
+-- ============================================================================
+-- After running this, run: npx prisma migrate deploy
+-- It will apply any missing migrations cleanly
+-- ============================================================================

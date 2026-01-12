@@ -100,6 +100,7 @@ model User {
   accounts              Account[]
   activeSessions        ActiveSession[]
   activities            Activity[]
+  customDomains         CustomDomain[]
   DatabaseConnections   DatabaseConnection[]
   Deployment            Deployment[]
   DripEnrollment        DripEnrollment[]
@@ -426,6 +427,7 @@ model FormSubmission {
 model CustomDomain {
   id              String    @id @default(cuid())
   projectId       String
+  userId          String    @map("user_id")
   domain          String    @unique
   status          String    @default("pending")
   verificationKey String?
@@ -436,10 +438,12 @@ model CustomDomain {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@index([domain])
   @@index([status])
+  @@index([userId])
   @@schema("public")
 }
 
