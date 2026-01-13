@@ -4,6 +4,7 @@ export const runtime = 'nodejs'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import { sendSecurityAlert } from '@/lib/security-emails'
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,6 +53,16 @@ export async function POST(request: NextRequest) {
         resetTokenExpiry: null
       }
     })
+
+    // Send password reset confirmation email
+    try {
+      await sendSecurityAlert(user.id, 'password_change', {
+        ipAddress: request.headers.get('x-forwarded-for'),
+        userAgent: request.headers.get('user-agent')
+      })
+    } catch (emailError) {
+      console.error('Failed to send password reset confirmation email:', emailError)
+    }
 
     return NextResponse.json({
       success: true,
