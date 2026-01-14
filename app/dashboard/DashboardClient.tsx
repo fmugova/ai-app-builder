@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { signOut } from 'next-auth/react'
 import ProjectCard from '@/components/ProjectCard'
@@ -57,7 +57,6 @@ export default function DashboardClient({
   userEmail,
   isAdmin = false,
 }: DashboardClientProps) {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const [projects, setProjects] = useState<Project[]>(initialProjects || [])
   const [searchQuery, setSearchQuery] = useState('')
@@ -71,7 +70,6 @@ export default function DashboardClient({
   const [toasts, setToasts] = useState<Toast[]>([])
 
   // Toast notification system
-  // Reliable toast id counter
   const toastIdRef = React.useRef(0)
   const addToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     toastIdRef.current += 1
@@ -79,7 +77,7 @@ export default function DashboardClient({
     setToasts(prev => [...prev, { id, message, type }])
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id))
-    }, 4000) // 4 seconds
+    }, 4000)
   }
 
   const removeToast = (id: number) => {
@@ -94,7 +92,6 @@ export default function DashboardClient({
 
     if (created === 'true') {
       addToast('🎉 Project created successfully!', 'success')
-      // Clean up URL
       const newUrl = window.location.pathname
       window.history.replaceState({}, '', newUrl)
     }
@@ -174,16 +171,6 @@ export default function DashboardClient({
 
   const { data: session } = useSession()
 
-  // Usage stats removed - not used in current implementation
-  // const usageStats = [
-  //   {
-  //     label: 'Projects',
-  //     used: projectsUsed,
-  //     limit: limits.projectsPerMonth,
-  //     icon: FolderIcon,
-  //   },
-  // ]
-
   if (!session) return null
 
   return (
@@ -217,42 +204,44 @@ export default function DashboardClient({
         ))}
       </div>
 
-        {/* Header */}
-        <header className="bg-gray-900/50 backdrop-blur-sm border-b border-gray-800 sticky top-0 z-10">
-          <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-            {/* Logo - Always visible */}
-            <Link href="/" className="text-2xl font-bold text-white">
-              BuildFlow
+      {/* Header */}
+      <header className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b sticky top-0 z-40 backdrop-blur-sm bg-opacity-90`}>
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo */}
+            <Link href="/dashboard" className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg"></div>
+              <span className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>BuildFlow</span>
             </Link>
 
-            {/* Desktop Navigation - Hidden on mobile (< lg) */}
-            <div className="hidden lg:flex items-center gap-3">
-              <Link href="/workspaces" className="px-4 py-2 text-gray-300 hover:text-white text-sm flex items-center gap-2">
-                👥 Workspaces
+            {/* Navigation */}
+            <nav className="hidden md:flex items-center gap-6">
+              <Link href="/dashboard/workspaces" className={`flex items-center gap-2 ${isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition text-sm`}>
+                <span>🏢</span> Workspaces
               </Link>
-              <Link href="/dashboard/submissions" className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition text-sm font-medium">
-                Forms Submissions
+              <Link href="/dashboard/submissions" className={`flex items-center gap-2 ${isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition text-sm`}>
+                <span>📋</span> Forms Submissions
               </Link>
-              <Link href="/dashboard/analytics" className="px-4 py-2 text-gray-300 hover:text-white text-sm flex items-center gap-2">
-                📊 Analytics
+              <Link href="/dashboard/analytics" className={`flex items-center gap-2 ${isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition text-sm`}>
+                <span>📊</span> Analytics
               </Link>
-              <Link href="/dashboard/domains" className="px-4 py-2 text-gray-300 hover:text-white text-sm flex items-center gap-2">
-                🌐 Custom Domains
+              <Link href="/dashboard/domains" className={`flex items-center gap-2 ${isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition text-sm`}>
+                <span>🌐</span> Custom Domains
               </Link>
-              <Link href="/dashboard/database" className="px-4 py-2 text-gray-300 hover:text-white text-sm flex items-center gap-2">
-                🗄️ Database
+              <Link href="/dashboard/database" className={`flex items-center gap-2 ${isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition text-sm`}>
+                <span>🗄️</span> Database
               </Link>
+            </nav>
+
+            {/* Right Section */}
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => setIsDarkMode(!isDarkMode)}
-                className="p-2 hover:bg-gray-800 rounded-lg transition"
-                aria-label="Toggle theme"
+                className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} transition`}
               >
                 {isDarkMode ? <SunIcon /> : <MoonIcon />}
               </button>
-              <button
-                className="p-2 hover:bg-gray-800 rounded-lg transition text-gray-300"
-                aria-label="Favorites"
-              >
+              <button className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} transition`}>
                 <StarIcon />
               </button>
               <Link href="/pricing" className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition text-sm font-medium">
@@ -261,7 +250,8 @@ export default function DashboardClient({
               <Link href="/contact" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm font-medium">
                 Contact Support
               </Link>
-              {/* Desktop Account Menu */}
+              
+              {/* Account Menu */}
               <div className="relative">
                 <button
                   onClick={() => setShowAccountMenu(!showAccountMenu)}
@@ -284,7 +274,7 @@ export default function DashboardClient({
                         <p className="text-gray-400 text-xs truncate">{userEmail}</p>
                       </div>
                       <div className="py-1">
-                        <Link href="/settings" className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm">
+                        <Link href="/dashboard/settings" className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm">
                           ⚙️ Settings
                         </Link>
                         <Link href="/billing" className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm">
@@ -309,10 +299,11 @@ export default function DashboardClient({
                 )}
               </div>
             </div>
-
           </div>
-        </header>
+        </div>
+      </header>
 
+      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Builder Navigation */}
         <div className="grid grid-cols-2 gap-4 mb-8">
@@ -348,7 +339,7 @@ export default function DashboardClient({
                   <span className="text-2xl">📊</span>
                 </div>
                 <div>
-                  <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Projects</p>
+                  <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Projects This Month</p>
                   <p className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                     {stats.projectsThisMonth}/{stats.projectsLimit}
                   </p>
@@ -359,7 +350,7 @@ export default function DashboardClient({
               <div className={`w-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'} rounded-full h-2`}>
                 <div className={`h-2 rounded-full ${getUsageColor(projectsPercentage)}`} style={{ width: `${projectsPercentage}%` }}></div>
               </div>
-              <p className="text-xs text-gray-400">{projectsPercentage.toFixed(0)}% used this month</p>
+              <p className="text-xs text-gray-400">{stats.projectsLimit - stats.projectsThisMonth} remaining</p>
             </div>
           </div>
 
@@ -381,32 +372,39 @@ export default function DashboardClient({
               <div className={`w-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'} rounded-full h-2`}>
                 <div className={`h-2 rounded-full ${getUsageColor(generationsPercentage)}`} style={{ width: `${generationsPercentage}%` }}></div>
               </div>
-              <p className="text-xs text-gray-400">{generationsPercentage.toFixed(0)}% used this month</p>
+              <p className="text-xs text-gray-400">{stats.generationsLimit - stats.generationsUsed} remaining</p>
             </div>
           </div>
 
           <div className={`bg-gradient-to-br ${getTierColor(stats.subscriptionTier)} rounded-2xl p-6 border border-gray-700`}>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <p className="text-sm text-white/80">Your Plan</p>
+                <p className="text-sm text-white/80">Subscription</p>
                 <p className="text-2xl font-bold text-white capitalize">{stats.subscriptionTier}</p>
               </div>
               <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
                 <span className="text-2xl">👑</span>
               </div>
             </div>
-            {stats.subscriptionTier === 'free' && (
-              <Link href="/pricing" className="block w-full bg-white text-gray-900 hover:bg-gray-100 py-2 rounded-lg transition font-semibold text-sm text-center">
-                Upgrade to Pro
-              </Link>
-            )}
+            <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+              stats.subscriptionStatus === 'active' 
+                ? 'bg-green-500/20 text-green-300' 
+                : 'bg-yellow-500/20 text-yellow-300'
+            }`}>
+              {stats.subscriptionStatus}
+            </span>
+            <p className="text-sm text-white/80 mt-2">All features included</p>
           </div>
         </div>
 
-        {/* Quick Actions */}
+        {/* TEST BUTTON - visibility check before Quick Actions */}
+        <button className="w-full p-4 bg-green-500 text-white text-xl mb-4">
+          TEST BUTTON - Can you see this?
+        </button>
+        {/* Quick Actions - CORRECT LOCATION! */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <button 
-            onClick={() => router.push('/builder')} 
+          <Link 
+            href="/builder"
             className="flex items-center gap-3 p-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-xl transition group"
           >
             <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition">
@@ -416,10 +414,10 @@ export default function DashboardClient({
               <p className="font-semibold text-white">New Project</p>
               <p className="text-xs text-white/80">Create with AI</p>
             </div>
-          </button>
+          </Link>
 
-          <button 
-            onClick={() => router.push('/templates')}
+          <Link 
+            href="/templates"
             className={`flex items-center gap-3 p-4 rounded-xl transition group ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-50'} border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}
           >
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center group-hover:scale-110 transition ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
@@ -429,10 +427,23 @@ export default function DashboardClient({
               <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Templates</p>
               <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>6 ready to use</p>
             </div>
-          </button>
+          </Link>
 
-          <button 
-            onClick={() => window.location.href = 'mailto:support@buildflow-ai.app'}
+          <Link 
+            href="/tutorial"
+            className={`flex items-center gap-3 p-4 rounded-xl transition group ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-50'} border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}
+          >
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center group-hover:scale-110 transition ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+              <span className="text-2xl">💡</span>
+            </div>
+            <div className="text-left">
+              <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Tutorial</p>
+              <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Learn the basics</p>
+            </div>
+          </Link>
+
+          <Link 
+            href="/contact"
             className={`flex items-center gap-3 p-4 rounded-xl transition group ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-50'} border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}
           >
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center group-hover:scale-110 transition ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
@@ -442,7 +453,7 @@ export default function DashboardClient({
               <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Get Help</p>
               <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Email support</p>
             </div>
-          </button>
+          </Link>
         </div>
 
         {/* Multi-Page Features Banner */}
@@ -575,7 +586,7 @@ export default function DashboardClient({
         </div>
       </div>
 
-      {/* Add CSS for toast animation */}
+      {/* Toast Animation CSS */}
       <style jsx global>{`
         @keyframes slide-in-right {
           from {
