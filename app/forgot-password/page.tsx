@@ -29,12 +29,12 @@ export default function ForgotPasswordPage() {
       if (res.ok) {
         setMessage('✅ Password reset link sent! Check your email (or console in dev mode).')
         setTimeout(() => {
-          router.push('/signin')
+          router.push('/auth/signin')
         }, 3000)
       } else {
         setError(data.error || 'Failed to send reset link')
       }
-    } catch {
+    } catch (err) {
       setError('An error occurred. Please try again.')
     } finally {
       setLoading(false)
@@ -89,7 +89,7 @@ export default function ForgotPasswordPage() {
         </form>
 
         <div className="mt-6 text-center">
-          <Link href="/signin" className="text-purple-400 hover:text-purple-300 text-sm">
+          <Link href="/auth/signin" className="text-purple-400 hover:text-purple-300 text-sm">
             ← Back to Sign In
           </Link>
         </div>

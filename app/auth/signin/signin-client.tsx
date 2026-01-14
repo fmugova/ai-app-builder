@@ -171,7 +171,7 @@ export default function SignInClient() {
                     Password
                   </label>
                   <Link 
-                    href="/auth/forgot-password" 
+                    href="/forgot-password" 
                     className="text-sm text-purple-400 hover:text-purple-300"
                   >
                     Forgot password?

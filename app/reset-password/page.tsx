@@ -54,12 +54,12 @@ function ResetPasswordForm() {
       if (res.ok) {
         setMessage('✅ Password reset successful! Redirecting to login...')
         setTimeout(() => {
-          router.push('/signin')
+          router.push('/auth/signin')
         }, 2000)
       } else {
         setError(data.error || 'Failed to reset password')
       }
-    } catch {
+    } catch (err) {
       setError('An error occurred. Please try again.')
     } finally {
       setLoading(false)
@@ -152,7 +152,7 @@ function ResetPasswordForm() {
         </form>
 
         <div className="mt-6 text-center">
-          <Link href="/signin" className="text-purple-400 hover:text-purple-300 text-sm">
+          <Link href="/auth/signin" className="text-purple-400 hover:text-purple-300 text-sm">
             ← Back to Sign In
           </Link>
         </div>
