@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { templates as registeredTemplates } from '@/lib/templates';
 import Link from 'next/link';
 import { ArrowLeft, Search, Star, Download, DollarSign, Crown, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -36,81 +37,19 @@ export default function TemplateMarketplace({
   const [filter, setFilter] = useState<'all' | 'free' | 'pro' | 'collection'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Mock templates for UI demonstration
-  const mockTemplates = [
-    {
-      id: '1',
-      name: 'Modern Landing Page',
-      description: 'Clean and professional landing page template with animations',
-      tier: 'FREE',
-      price: 0,
-      thumbnail: '/templates/landing.jpg',
-      category: 'Landing Pages',
-      downloads: 1234,
-      rating: 4.8,
-      reviewCount: 45,
-    },
-    {
-      id: '2',
-      name: 'E-commerce Storefront',
-      description: 'Complete e-commerce template with product pages and cart',
-      tier: 'PRO',
-      price: 9.99,
-      thumbnail: '/templates/ecommerce.jpg',
-      category: 'E-commerce',
-      downloads: 567,
-      rating: 4.9,
-      reviewCount: 78,
-    },
-    {
-      id: '3',
-      name: 'SaaS Dashboard Collection',
-      description: '10 premium dashboard templates for SaaS applications',
-      tier: 'COLLECTION',
-      price: 49.99,
-      thumbnail: '/templates/dashboard.jpg',
-      category: 'Collections',
-      downloads: 234,
-      rating: 5.0,
-      reviewCount: 23,
-    },
-    {
-      id: '4',
-      name: 'Blog Template',
-      description: 'Simple and elegant blog layout',
-      tier: 'FREE',
-      price: 0,
-      thumbnail: '/templates/blog.jpg',
-      category: 'Blogs',
-      downloads: 890,
-      rating: 4.6,
-      reviewCount: 34,
-    },
-    {
-      id: '5',
-      name: 'Portfolio Showcase',
-      description: 'Creative portfolio template for designers and developers',
-      tier: 'PRO',
-      price: 9.99,
-      thumbnail: '/templates/portfolio.jpg',
-      category: 'Portfolio',
-      downloads: 445,
-      rating: 4.7,
-      reviewCount: 56,
-    },
-    {
-      id: '6',
-      name: 'Business Starter Pack',
-      description: '5 essential business templates in one package',
-      tier: 'COLLECTION',
-      price: 49.99,
-      thumbnail: '/templates/business.jpg',
-      category: 'Collections',
-      downloads: 123,
-      rating: 4.9,
-      reviewCount: 12,
-    },
-  ];
+  // Use registered templates and map to UI structure
+  const mockTemplates = registeredTemplates.map((t, idx) => ({
+    id: String(idx + 1),
+    name: t.name,
+    description: t.description,
+    tier: t.category === 'portfolio' ? 'PRO' : 'FREE',
+    price: t.category === 'portfolio' ? 9.99 : 0,
+    thumbnail: '',
+    category: t.category,
+    downloads: 100 + idx * 10,
+    rating: 4.8,
+    reviewCount: 10 + idx * 2,
+  }));
 
   const filteredTemplates = mockTemplates.filter((template) => {
     const matchesFilter =

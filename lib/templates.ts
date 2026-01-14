@@ -131,8 +131,23 @@ export default function AdminDashboard() {
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
             {[
-              { label: 'Total Users', value: '12,345', change: '+12%' },
-              { label: 'Revenue', value: '$45,678', change: '+8%' },
+              },
+              {
+                name: portfolioTemplate.name,
+                displayName: portfolioTemplate.displayName,
+                description: portfolioTemplate.description,
+                category: portfolioTemplate.category,
+                icon: portfolioTemplate.icon,
+                template: portfolioTemplate.template,
+              },
+              {
+                name: landingPageTemplate.name,
+                displayName: landingPageTemplate.displayName,
+                description: landingPageTemplate.description,
+                category: landingPageTemplate.category,
+                icon: landingPageTemplate.icon,
+                template: landingPageTemplate.template,
+              },
               { label: 'Orders', value: '1,234', change: '+23%' },
               { label: 'Conversion', value: '3.2%', change: '+0.5%' },
             ].map((stat, i) => (
