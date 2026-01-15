@@ -774,7 +774,7 @@ Built with BuildFlow AI 🚀
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
               placeholder="Project name..."
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-900"
             />
           )}
         </div>
@@ -795,7 +795,7 @@ Built with BuildFlow AI 🚀
                     : 'bg-gray-100 text-gray-900'
                 }`}
               >
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                <p className="text-sm whitespace-pre-wrap text-gray-900 dark:text-gray-100">{message.content}</p>
                 <MessageTimestamp timestamp={message.timestamp} />
               </div>
             </div>
@@ -973,7 +973,7 @@ Built with BuildFlow AI 🚀
                   ? "Tell me what to change, upload files, or paste URLs..."
                   : "What do you want to build? (Paste URLs or upload files)"
               }
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none min-h-[60px] max-h-[200px]"
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none min-h-[60px] max-h-[200px] text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-900"
               disabled={loading}
               rows={1}
             />
@@ -1109,8 +1109,8 @@ Built with BuildFlow AI 🚀
                   className="p-6 border-2 border-gray-200 rounded-lg hover:border-purple-500 transition-all text-left group"
                 >
                   <div className="text-4xl mb-3">{getCategoryIcon(template.category)}</div>
-                  <h3 className="font-bold mb-2 group-hover:text-purple-600">{template.name}</h3>
-                  <p className="text-sm text-gray-600 mb-3">{template.description}</p>
+                  <h3 className="font-bold mb-2 group-hover:text-purple-600 text-gray-900 dark:text-gray-100">{template.name}</h3>
+                  <p className="text-sm text-gray-700 dark:text-gray-200 mb-3">{template.description}</p>
                   <div className="flex flex-wrap gap-1">
                     {template.tags?.slice(0, 2).map((tag, i) => (
                       <span
