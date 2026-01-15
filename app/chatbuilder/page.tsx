@@ -328,7 +328,20 @@ export default function ChatBuilderPage() {
       clean = clean.replace(pattern, '')
     })
     // Remove feedback buttons
-    clean = clean.replace(/<[^>]*feedback[^>]*>[\s\S]*?<\/[^ 0]*>/gi, '')
+    clean = clean.replace(/<[^>]*feedback[^>]*>[\s\S]*?<\/[^ ]*>/gi, '')
+
+    // Remove common overlay elements
+    clean = clean.replace(/<div[^>]*class=["'][^"']*overlay[^"']*["'][^>]*>[\s\S]*?<\/div>/gi, '')
+    clean = clean.replace(/<div[^>]*id=["']overlay["'][^>]*>[\s\S]*?<\/div>/gi, '')
+
+    // Remove inline styles that add black/semiblack overlays
+    clean = clean.replace(/background\s*:\s*rgba\(0,\s*0,\s*0,\s*(0\.5|0\.6|0\.7|0\.8|0\.9|1)\);?/gi, '')
+    clean = clean.replace(/background-color\s*:\s*rgba\(0,\s*0,\s*0,\s*(0\.5|0\.6|0\.7|0\.8|0\.9|1)\);?/gi, '')
+
+    // Remove CSS overlay selectors
+    clean = clean.replace(/\.overlay\s*\{[^}]*\}/gi, '')
+    clean = clean.replace(/#overlay\s*\{[^}]*\}/gi, '')
+
     return clean.trim()
   }
 
