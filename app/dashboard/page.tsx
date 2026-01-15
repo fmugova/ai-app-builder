@@ -5,8 +5,11 @@ import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import DashboardClientOptimized from './DashboardClientOptimized'
 import { DashboardSkeleton } from '@/components/LoadingSkeleton'
+import dynamic from 'next/dynamic'
 
 export const dynamic = 'force-dynamic'
+
+const DashboardTutorialPopUp = dynamic(() => import('./components/DashboardTutorialPopUp'), { ssr: false })
 
 async function DashboardContent() {
   // Get session
@@ -61,8 +64,11 @@ async function DashboardContent() {
 
 export default function DashboardPage() {
   return (
-    <Suspense fallback={<DashboardSkeleton />}>
-      <DashboardContent />
-    </Suspense>
+    <>
+      <Suspense fallback={<DashboardSkeleton />}>
+        <DashboardContent />
+      </Suspense>
+      <DashboardTutorialPopUp />
+    </>
   )
 }
