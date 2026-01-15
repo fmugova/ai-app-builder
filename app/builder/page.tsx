@@ -682,7 +682,7 @@ function BuilderContent() {
                   </div>
                 </div>
               ))
-            }
+            )}
           </div>
 
           {/* Chat Input */}
@@ -743,11 +743,11 @@ function BuilderContent() {
             )}
           </div>
         </div>
-      )}
+      )} {/* <-- This parenthesis closes the {chatOpen && ( ... )} block */}
 
       <Toaster position="top-right" />
     </div>
-  )
+  );
 }
 
 export default function Builder() {
