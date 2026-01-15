@@ -422,7 +422,7 @@ function BuilderContent() {
                     <span className="text-3xl">{template.icon}</span>
                     <h4 className="font-semibold text-gray-900 group-hover:text-purple-600 transition">{template.name}</h4>
                   </div>
-                  <p className="text-sm text-gray-600 line-clamp-2">{template.description}</p>
+                  <p className="text-sm text-gray-700 dark:text-gray-200 line-clamp-2">{template.description}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {template.tags.slice(0, 3).map(tag => (
                       <span key={tag} className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
@@ -512,7 +512,7 @@ function BuilderContent() {
                     value={projectName}
                     onChange={(e) => setProjectName(e.target.value)}
                     placeholder="My Awesome Project"
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-900"
                     disabled={generating}
                   />
                 </div>
@@ -524,7 +524,7 @@ function BuilderContent() {
                     onChange={(e) => setProjectDescription(e.target.value)}
                     placeholder="Describe your project..."
                     rows={2}
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-900"
                     disabled={generating}
                   />
                 </div>
@@ -534,7 +534,7 @@ function BuilderContent() {
                   <select
                     value={projectType}
                     onChange={(e) => setProjectType(e.target.value)}
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-900"
                     disabled={generating}
                   >
                     <option value="landing">Landing Page</option>
@@ -682,7 +682,7 @@ function BuilderContent() {
                   </div>
                 </div>
               ))
-            )}
+            }
           </div>
 
           {/* Chat Input */}
