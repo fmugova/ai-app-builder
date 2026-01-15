@@ -52,6 +52,7 @@ export default function UnifiedMobileNav({
     { href: '/dashboard/domains', label: 'Custom Domains', icon: '🌐', active: pathname === '/dashboard/domains' },
     { href: '/dashboard/settings', label: 'Settings', icon: '⚙️', active: pathname === '/dashboard/settings' },
     { href: '/dashboard/billing', label: 'Billing', icon: '💳', active: pathname === '/dashboard/billing' },
+    { href: '/billing', label: 'Billing (Direct)', icon: '💳', active: pathname === '/billing' },
     { href: '/contact', label: 'Contact Support', icon: '💬', active: pathname === '/contact' },
     { href: '/pricing', label: 'Upgrade', icon: '⭐', active: pathname === '/pricing' },
   ]

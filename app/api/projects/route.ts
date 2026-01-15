@@ -42,13 +42,14 @@ export const POST = compose(
     )
   }
 
+  // ✅ FIX: Include code and type from body if provided
   const project = await prisma.project.create({
     data: {
       name: result.data.name,
       description: result.data.description,
       userId: session.user.id,
-      type: '',
-      code: '',
+      type: body.type || 'landing',      // ✅ Use provided type
+      code: body.code || '',             // ✅ Use provided code
     },
   })
 

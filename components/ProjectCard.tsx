@@ -242,7 +242,7 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
                   <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-20">
                     <a
                       href={`/chatbuilder?project=${project.id}`}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition"
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition"
                     >
                       <Edit3 className="w-4 h-4" />
                       Edit Project
@@ -252,7 +252,7 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
                         handleExport('github');
                         setMenuOpen(false);
                       }}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition"
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition"
                       type="button"
                     >
                       <Github className="w-4 h-4" />
@@ -263,7 +263,7 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
                         handleExport('zip');
                         setMenuOpen(false);
                       }}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition"
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition"
                       type="button"
                     >
                       <Download className="w-4 h-4" />
@@ -275,7 +275,7 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
                         onDelete?.();
                         setMenuOpen(false);
                       }}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 flex items-center gap-2 transition"
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 flex items-center gap-2 transition"
                       type="button"
                     >
                       <Trash2 className="w-4 h-4" />

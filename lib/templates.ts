@@ -131,23 +131,8 @@ export default function AdminDashboard() {
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
             {[
-              },
-              {
-                name: portfolioTemplate.name,
-                displayName: portfolioTemplate.displayName,
-                description: portfolioTemplate.description,
-                category: portfolioTemplate.category,
-                icon: portfolioTemplate.icon,
-                template: portfolioTemplate.template,
-              },
-              {
-                name: landingPageTemplate.name,
-                displayName: landingPageTemplate.displayName,
-                description: landingPageTemplate.description,
-                category: landingPageTemplate.category,
-                icon: landingPageTemplate.icon,
-                template: landingPageTemplate.template,
-              },
+              { label: 'Revenue', value: '$45,231', change: '+12%' },
+              { label: 'Users', value: '8,567', change: '+8%' },
               { label: 'Orders', value: '1,234', change: '+23%' },
               { label: 'Conversion', value: '3.2%', change: '+0.5%' },
             ].map((stat, i) => (
@@ -580,21 +565,6 @@ export default function AuthForms() {
     </div>
   )
 }`
-  },
-
-  {
-    id: 'supabase-app',
-    name: 'Full-Stack App with Database',
-    description: 'Complete app with Supabase database, auth, and real-time features',
-    type: 'webapp',
-    category: 'saas',
-    icon: '🗄️',
-    tags: ['supabase', 'database', 'auth', 'realtime', 'fullstack', 'saas'],
-    preview: '/templates/supabase-app.png',
-    code: `
-    <!-- Supabase-powered app template -->
-    <!-- Includes: Database, Auth, Real-time -->
-    `
   },
 ]
 

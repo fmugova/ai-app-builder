@@ -1,14 +1,10 @@
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
-
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
-import { sendSecurityAlert } from '@/lib/security-emails'
 
-export async function POST(request: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const { token, password } = await request.json()
+    const { token, password } = await req.json()
 
     if (!token || !password) {
       return NextResponse.json(
@@ -29,9 +25,9 @@ export async function POST(request: NextRequest) {
       where: {
         resetToken: token,
         resetTokenExpiry: {
-          gt: new Date() // Token not expired
-        }
-      }
+          gt: new Date(), // Token not expired
+        },
+      },
     })
 
     if (!user) {
@@ -42,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Hash new password
-    const hashedPassword = await bcrypt.hash(password, 12)
+    const hashedPassword = await bcrypt.hash(password, 10)
 
     // Update password and clear reset token
     await prisma.user.update({
@@ -50,25 +46,18 @@ export async function POST(request: NextRequest) {
       data: {
         password: hashedPassword,
         resetToken: null,
-        resetTokenExpiry: null
-      }
+        resetTokenExpiry: null,
+        // Reset failed login attempts on successful password reset
+        failedLoginAttempts: 0,
+        accountLockedUntil: null,
+      },
     })
 
-    // Send password reset confirmation email
-    try {
-      await sendSecurityAlert(user.id, 'password_change', {
-        ipAddress: request.headers.get('x-forwarded-for'),
-        userAgent: request.headers.get('user-agent')
-      })
-    } catch (emailError) {
-      console.error('Failed to send password reset confirmation email:', emailError)
-    }
+    console.log(`✅ Password reset successful for user: ${user.email}`)
 
     return NextResponse.json({
-      success: true,
-      message: 'Password reset successfully'
+      message: 'Password reset successful',
     })
-
   } catch (error) {
     console.error('Reset password error:', error)
     return NextResponse.json(

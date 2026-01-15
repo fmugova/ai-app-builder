@@ -7,6 +7,27 @@ import { useSession } from 'next-auth/react'
 import { templates, getTemplatesByCategory } from '@/lib/templates'
 import dynamic from 'next/dynamic'
 
+// MessageTimestamp component for displaying formatted timestamps
+function MessageTimestamp({ timestamp }: { timestamp: Date }) {
+  const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  let display = '';
+  if (diffSec < 60) {
+    display = `${diffSec}s ago`;
+  } else if (diffSec < 3600) {
+    display = `${Math.floor(diffSec / 60)}m ago`;
+  } else if (diffSec < 86400) {
+    display = `${Math.floor(diffSec / 3600)}h ago`;
+  } else {
+    display = date.toLocaleDateString();
+  }
+  return (
+    <span className="block text-xs text-gray-400 mt-1 text-right">{display}</span>
+  );
+}
+
 // Lazy load heavy components
 const PromptGuide = dynamic(() => import('@/components/PromptGuide'), {
   loading: () => null,
@@ -102,15 +123,15 @@ export default function ChatBuilderPage() {
       const res = await fetch(`/api/projects/${projectId}`)
       const data = await res.json()
 
-      if (data.code) {
+      if (data.project && data.project.code) {
         setProjectId(projectId)
-        setProjectName(data.name || 'Untitled Project')
-        setCurrentCode(data.code)
+        setProjectName(data.project.name || 'Untitled Project')
+        setCurrentCode(data.project.code)
 
         const loadMessage: Message = {
           id: Date.now().toString(),
           role: 'system',
-          content: `✅ Loaded: ${data.name}. Ready to iterate!`,
+          content: `✅ Loaded: ${data.project.name}. Ready to iterate!`,
           timestamp: new Date()
         }
         setMessages(prev => [...prev, loadMessage])
@@ -762,9 +783,7 @@ Built with BuildFlow AI 🚀
                 }`}
               >
                 <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                <p className="text-xs mt-1 opacity-60">
-                  {message.timestamp.toLocaleTimeString()}
-                </p>
+                <MessageTimestamp timestamp={message.timestamp} />
               </div>
             </div>
           ))}
