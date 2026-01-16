@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { templates, getTemplatesByCategory } from '@/lib/templates'
 import dynamic from 'next/dynamic'
+import PromptAssistant from '@/components/PromptAssistant'
+import { HelpCircle } from 'lucide-react'
 
 // MessageTimestamp component for displaying formatted timestamps
 function MessageTimestamp({ timestamp }: { timestamp: Date }) {
@@ -61,8 +63,6 @@ export default function ChatBuilderPage() {
     }
   }, [])
 
-
-
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -83,6 +83,7 @@ export default function ChatBuilderPage() {
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [includeAuth, setIncludeAuth] = useState(false)
   const [authProvider, setAuthProvider] = useState<'nextauth' | 'supabase' | 'jwt'>('nextauth')
+  const [showAssistant, setShowAssistant] = useState(false)
 
   // Load project or page from URL parameter
   useEffect(() => {
@@ -1139,6 +1140,20 @@ Built with BuildFlow AI 🚀
           </div>
         </div>
       )}
+
+      {/* NEW: Help Icon Floating Button */}
+      <button
+        onClick={() => setShowAssistant(true)}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-purple-600 hover:bg-purple-700 text-white rounded-full shadow-lg flex items-center justify-center z-40"
+        title="Get help with prompts"
+      >
+        <HelpCircle className="w-6 h-6" />
+      </button>
+      <PromptAssistant
+        isOpen={showAssistant}
+        onClose={() => setShowAssistant(false)}
+        onUsePrompt={() => setShowAssistant(false)}
+      />
     </div>
   )
 }

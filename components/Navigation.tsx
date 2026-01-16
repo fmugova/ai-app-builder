@@ -82,6 +82,12 @@ export function Navigation({ variant = 'dashboard' }: NavigationProps) {
           <Link href="/contact" className="px-4 py-2 text-gray-300 hover:text-white transition">
             Contact
           </Link>
+          <Link href="/examples" className="px-4 py-2 text-gray-300 hover:text-white transition">
+            Examples
+          </Link>
+          <Link href="/tutorial" className="px-4 py-2 text-gray-300 hover:text-white transition">
+            Tutorial
+          </Link>
           
           <button
             onClick={toggleDarkMode}
@@ -154,6 +160,14 @@ export function Navigation({ variant = 'dashboard' }: NavigationProps) {
                 <Link href="/contact" onClick={closeMenu} className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition text-white">
                   <Mail className="w-5 h-5" />
                   <span>Contact</span>
+                </Link>
+                <Link href="/examples" onClick={closeMenu} className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition text-white">
+                  <FolderOpen className="w-5 h-5" />
+                  <span>Examples</span>
+                </Link>
+                <Link href="/tutorial" onClick={closeMenu} className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition text-white">
+                  <FolderOpen className="w-5 h-5" />
+                  <span>Tutorial</span>
                 </Link>
 
                 {status === 'authenticated' ? (

@@ -339,9 +339,15 @@ export default function PreviewClient({ project }: PreviewClientProps) {
             <iframe
               srcDoc={sanitizedCode}
               className="absolute inset-0 w-full h-full border-0"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
               title={project.name}
-              onError={() => setIframeError(true)}
+              onError={() => {
+                console.error('Preview iframe error')
+                setIframeError(true)
+              }}
+              onLoad={() => {
+                console.log('✅ Preview loaded successfully')
+              }}
             />
           )
         )}

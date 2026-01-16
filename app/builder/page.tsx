@@ -4,11 +4,13 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast, Toaster } from 'react-hot-toast'
 import dynamic from 'next/dynamic'
+import { HelpCircle } from 'lucide-react'
 
 import { templates } from '@/lib/templates'
 import { analytics } from '@/lib/analytics'
 import { Loader2 } from 'lucide-react'
 import { sanitizeForPreview } from '@/lib/sanitizeForPreview'
+import PromptAssistant from '@/components/PromptAssistant'
 
 // Lazy load heavy components
 const EnhancedPromptInput = dynamic(
@@ -58,7 +60,7 @@ function BuilderContent() {
   const [saving, setSaving] = useState(false)
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
   const [isLoadedProject, setIsLoadedProject] = useState(false)
-  // ✅ REMOVED: showReactWarning state - no longer needed!
+  const [showAssistant, setShowAssistant] = useState(false)
 
   // Animating generating text
   useEffect(() => {
@@ -745,7 +747,26 @@ function BuilderContent() {
         </div>
       )} {/* <-- This parenthesis closes the {chatOpen && ( ... )} block */}
 
+      {/* ✨ Floating Help Button */}
+      <button
+        onClick={() => setShowAssistant(true)}
+        className="fixed bottom-6 right-24 w-14 h-14 bg-purple-600 hover:bg-purple-700 text-white rounded-full shadow-lg flex items-center justify-center z-40"
+        title="Get help with prompts"
+      >
+        <HelpCircle className="w-6 h-6" />
+      </button>
+
       <Toaster position="top-right" />
+
+      {/* Prompt Assistant Modal */}
+      <PromptAssistant
+        isOpen={showAssistant}
+        onClose={() => setShowAssistant(false)}
+        onUsePrompt={(newPrompt) => {
+          setPrompt(newPrompt)
+          setShowAssistant(false)
+        }}
+      />
     </div>
   );
 }
