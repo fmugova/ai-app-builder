@@ -23,7 +23,7 @@ export default function ShareModal({
 
   if (!isOpen) return null;
 
-  const embedCode = `<iframe src="${publicUrl}" width="100%" height="600" frameborder="0" sandbox="allow-scripts allow-same-origin"></iframe>`;
+  const embedCode = `<iframe src="${publicUrl}" width="100%" height="600" frameborder="0" sandbox="allow-scripts"></iframe>`;
 
   const copyToClipboard = async (text: string) => {
     try {

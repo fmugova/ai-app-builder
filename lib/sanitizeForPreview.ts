@@ -61,7 +61,11 @@ export function sanitizeForPreview(code: string): string {
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-router-dom@6.20.1/dist/umd/react-router-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!--
+    WARNING: In-browser Babel is for development preview only. Remove for production builds!
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  -->
+  <!-- Tailwind CDN is always included for preview styling -->
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { margin: 0; padding: 0; }

@@ -87,7 +87,10 @@ REQUIRED CDN LIBRARIES:
   <title>Generated App</title>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!--
+    WARNING: In-browser Babel is for development preview only. Remove for production builds!
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Include Supabase if data persistence or auth is needed -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

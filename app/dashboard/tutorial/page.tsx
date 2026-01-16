@@ -54,7 +54,7 @@ export default function DashboardTutorial() {
         <h2 className="text-xl font-semibold mb-2 text-gray-900">How to Use the Dashboard</h2>
         <ol className="list-decimal list-inside text-gray-700 space-y-2">
           <li>Navigate between sections using the sidebar or top navigation.</li>
-          <li>Click "New Project" to start building instantly.</li>
+          <li>Click &quot;New Project&quot; to start building instantly.</li>
           <li>Access analytics and settings from the dashboard menu.</li>
           <li>Use the help icon for documentation and support.</li>
         </ol>
