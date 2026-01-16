@@ -60,9 +60,41 @@ async function callClaudeWithRetry(anthropic: Anthropic, messages: Anthropic.Mes
 // Helper to inject analytics script
 function injectAnalytics(code: string, projectId: string): string {
   const analyticsScript = getAnalyticsScript(projectId)
-  if (code.includes('</body>')) {
-    return code.replace('</body>', `${analyticsScript}\n</body>`)
+  
+  // Find the LAST occurrence of </body> (not the first)
+  const bodyCloseIndex = code.lastIndexOf('</body>')
+  
+  if (bodyCloseIndex !== -1) {
+    // Validate we're not inside a script block
+    const scriptOpenBefore = code.lastIndexOf('<script', bodyCloseIndex)
+    const scriptCloseBefore = code.lastIndexOf('</script>', bodyCloseIndex)
+    
+    // If there's an unclosed script tag before </body>, we're inside a script block
+    if (scriptOpenBefore > scriptCloseBefore && scriptOpenBefore !== -1) {
+      console.warn('⚠️ Cannot inject analytics - </body> is inside script block')
+      // Try to append at the very end instead
+      return code + '\n' + analyticsScript
+    }
+    
+    // Safe to inject before </body>
+    return (
+      code.substring(0, bodyCloseIndex) +
+      '\n' + analyticsScript + '\n' +
+      code.substring(bodyCloseIndex)
+    )
   }
+  
+  // Fallback: check for </html>
+  const htmlCloseIndex = code.lastIndexOf('</html>')
+  if (htmlCloseIndex !== -1) {
+    return (
+      code.substring(0, htmlCloseIndex) +
+      '\n' + analyticsScript + '\n' +
+      code.substring(htmlCloseIndex)
+    )
+  }
+  
+  // Last resort: append at end
   return code + '\n' + analyticsScript
 }
 
@@ -92,6 +124,13 @@ REQUIRED CDN LIBRARIES:
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!--
+    To customize Tailwind, use:
+    <script>
+      tailwindcss.config = { /* your config */ }
+    </script>
+    (Do NOT use tailwind.config = ...)
+  -->
   <!-- Include Supabase if data persistence or auth is needed -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>

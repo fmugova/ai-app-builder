@@ -1,12 +1,14 @@
 /**
  * Analytics tracking script that gets injected into published sites
  * Tracks page views, form submissions, and user interactions
+ * 
+ * FIXED: Removed HTML comment to prevent Babel parse errors
  */
 
 export function getAnalyticsScript(projectId: string) {
   return `
-<!-- BuildFlow Analytics -->
 <script>
+// BuildFlow Analytics - Auto-injected tracking
 (function() {
   const ANALYTICS_ENDPOINT = '${process.env.NEXT_PUBLIC_APP_URL || 'https://buildflow-ai.app'}/api/analytics/track';
   const PROJECT_ID = '${projectId}';

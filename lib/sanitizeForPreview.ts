@@ -45,7 +45,7 @@ export function sanitizeForPreview(code: string): string {
   console.log('⚠️ Code fragment detected - wrapping with React infrastructure');
   
   // Escape any unmatched template literals or problematic syntax
-  let safeCode = trimmed;
+  const safeCode = trimmed;
   
   // Check if code has JSX/React syntax
   const hasJSX = /<[A-Z][a-zA-Z0-9]*/.test(safeCode) || /className=/.test(safeCode);
