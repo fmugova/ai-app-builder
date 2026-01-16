@@ -85,7 +85,7 @@ export default function DashboardQuickActions({ isDarkMode, hasProjects }: Quick
 
         {/* Tutorial */}
         <Link 
-          href="/tutorial"
+          href="/dashboard/tutorial"
           className={`flex items-center gap-3 p-4 rounded-xl transition group shadow-md hover:shadow-lg ${
             isDarkMode 
               ? 'bg-gray-800 hover:bg-gray-700 border border-gray-700' 

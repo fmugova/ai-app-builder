@@ -430,7 +430,7 @@ export default function DashboardClient({
           </Link>
 
           <Link 
-            href="/tutorial"
+            href="/dashboard/tutorial"
             className={`flex items-center gap-3 p-4 rounded-xl transition group ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-50'} border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}
           >
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center group-hover:scale-110 transition ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
