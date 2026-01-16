@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function DashboardTutorial() {
   const [showTips, setShowTips] = useState(true);
+  const router = useRouter();
 
   const tips = [
     {
@@ -26,6 +28,12 @@ export default function DashboardTutorial() {
 
   return (
     <div className="max-w-2xl mx-auto py-12 px-4">
+      <button
+        onClick={() => router.push('/dashboard')}
+        className="mb-6 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg border border-gray-300"
+      >
+        ← Back to Dashboard
+      </button>
       <h1 className="text-3xl font-bold mb-6 text-gray-900">Dashboard Tutorial</h1>
       <p className="mb-8 text-gray-600">Get started with your dashboard using these quick tips. You can close the pop-up advice at any time.</p>
       {showTips && (
