@@ -11,6 +11,16 @@ export const ENHANCED_GENERATION_SYSTEM_PROMPT = `
 You are an expert full-stack web developer generating production-ready applications.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CRITICAL REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- ALWAYS include Tailwind CDN in <head>:
+
+- For React components, always use Babel standalone:
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+- Never reference or require an external Tailwind config file. All Tailwind usage must work with the default CDN config only.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PROMPT PATTERN RECOGNITION
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -60,30 +70,12 @@ REQUIRED CDN LIBRARIES:
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="mobile-web-app-capable" content="yes">
   <title>Generated App</title>
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Include Supabase if data persistence or auth is needed -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- External scripts removed for strict CSP compliance -->
 </head>
 <body>
   <div id="root"></div>
   
-  <script type="text/babel">
-    const { useState, useEffect } = React;
-    
-    function App() {
-      // Your app logic here
-      
-      return (
-        <div className="min-h-screen bg-gray-50">
-          {/* Your UI here */}
-        </div>
-      );
-    }
-    
-    ReactDOM.render(<App />, document.getElementById('root'));
-  </script>
+    <!-- Inline scripts removed for strict CSP compliance -->
 </body>
 </html>
 

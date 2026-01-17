@@ -2,15 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions, checkUserPermission, verifyResourceOwnership } from './auth'
 
-export type ApiHandler = (
+export type ApiHandler<P = Record<string, unknown>> = (
   req: NextRequest,
-  context: { params: any }
+  context: { params: P }
 ) => Promise<NextResponse>
 
-export interface AuthenticatedApiHandler {
+export interface AuthenticatedApiHandler<P = Record<string, unknown>> {
   (
     req: NextRequest,
-    context: { params: any },
+    context: { params: P },
     session: {
       user: {
         id: string
@@ -26,7 +26,7 @@ export interface AuthenticatedApiHandler {
  * Wraps an API route with authentication
  * Returns 401 if user is not authenticated
  */
-export function withAuth(handler: AuthenticatedApiHandler): ApiHandler {
+export function withAuth<P = Record<string, unknown>>(handler: AuthenticatedApiHandler<P>): ApiHandler<P> {
   return async (req, context) => {
     const session = await getServerSession(authOptions)
 
@@ -37,7 +37,7 @@ export function withAuth(handler: AuthenticatedApiHandler): ApiHandler {
       )
     }
 
-    return handler(req, context, session as any)
+    return handler(req, context, session as Parameters<AuthenticatedApiHandler<P>>[2])
   }
 }
 
@@ -45,7 +45,7 @@ export function withAuth(handler: AuthenticatedApiHandler): ApiHandler {
  * Wraps an API route with admin role check
  * Returns 403 if user is not an admin
  */
-export function withAdmin(handler: AuthenticatedApiHandler): ApiHandler {
+export function withAdmin<P = Record<string, unknown>>(handler: AuthenticatedApiHandler<P>): ApiHandler<P> {
   return withAuth(async (req, context, session) => {
     if (session.user.role !== 'admin') {
       return NextResponse.json(
@@ -62,13 +62,13 @@ export function withAdmin(handler: AuthenticatedApiHandler): ApiHandler {
  * Wraps an API route with subscription tier check
  * Returns 403 if user doesn't have required tier
  */
-export function withSubscription(
+export function withSubscription<P = Record<string, unknown>>(
   minTier: 'pro' | 'business' | 'enterprise'
-): (handler: AuthenticatedApiHandler) => ApiHandler {
+): (handler: AuthenticatedApiHandler<P>) => ApiHandler<P> {
   const tierHierarchy = ['free', 'pro', 'business', 'enterprise']
   const minTierIndex = tierHierarchy.indexOf(minTier)
 
-  return (handler: AuthenticatedApiHandler) => {
+  return (handler: AuthenticatedApiHandler<P>) => {
     return withAuth(async (req, context, session) => {
       const userTierIndex = tierHierarchy.indexOf(session.user.subscriptionTier)
 
@@ -92,10 +92,10 @@ export function withSubscription(
  * Wraps an API route with usage limit check
  * Returns 429 if user has exceeded limits
  */
-export function withUsageCheck(
+export function withUsageCheck<P = Record<string, unknown>>(
   action: 'create_project' | 'create_database' | 'add_domain' | 'invite_member'
-): (handler: AuthenticatedApiHandler) => ApiHandler {
-  return (handler: AuthenticatedApiHandler) => {
+): (handler: AuthenticatedApiHandler<P>) => ApiHandler<P> {
+  return (handler: AuthenticatedApiHandler<P>) => {
     return withAuth(async (req, context, session) => {
       const permission = await checkUserPermission(session.user.id, action)
 
@@ -118,11 +118,11 @@ export function withUsageCheck(
  * Wraps an API route with resource ownership verification
  * Returns 404 if resource doesn't exist or user doesn't own it
  */
-export function withResourceOwnership(
+export function withResourceOwnership<P = Record<string, unknown>>(
   resourceType: 'project' | 'database' | 'domain',
-  getResourceId: (params: any) => string
-): (handler: AuthenticatedApiHandler) => ApiHandler {
-  return (handler: AuthenticatedApiHandler) => {
+  getResourceId: (params: P) => string
+): (handler: AuthenticatedApiHandler<P>) => ApiHandler<P> {
+  return (handler: AuthenticatedApiHandler<P>) => {
     return withAuth(async (req, context, session) => {
       const resourceId = getResourceId(context.params)
 
@@ -197,8 +197,8 @@ export function withRateLimit(
 /**
  * Combines multiple middleware functions
  */
-export function compose(...middlewares: Array<(handler: any) => any>) {
-  return (handler: any) => {
+export function compose<T>(...middlewares: Array<(handler: T) => T>) {
+  return (handler: T) => {
     return middlewares.reduceRight((acc, middleware) => middleware(acc), handler)
   }
 }

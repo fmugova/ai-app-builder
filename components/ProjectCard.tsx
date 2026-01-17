@@ -1,46 +1,44 @@
 'use client';
 
 import { useState } from 'react';
-import { 
-  Eye, 
-  Code, 
-  Download, 
-  Copy, 
-  Trash2, 
-  Globe,
-  GlobeLock,
-  ExternalLink,
-  Github,
-  Share2,
-  Rocket,
-  MoreVertical,
-  Edit3,
-  Zap
-} from 'lucide-react';
+import * as Icons from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import ShareModal from './ShareModal';
 
+
+interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  type?: string;
+  isPublished: boolean;
+  publicUrl?: string | null;
+  publicSlug?: string | null;
+  views?: number;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+  // ... other fields
+}
+
 interface ProjectCardProps {
-  project: {
-    id: string;
-    name: string;
-    description: string;
-    type: string;
-    isPublished: boolean;
-    publicUrl: string | null;
-    views: number;
-    createdAt: Date;
-    updatedAt: Date;
-  };
+  project: Project;
   onDelete?: () => void;
   onRefresh?: () => void;
 }
 
 export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCardProps) {
+  // Debugging helper
+  console.log('Project data:', {
+    id: project.id,
+    publicUrl: project.publicUrl,
+    publicSlug: project.publicSlug,
+    isPublished: project.isPublished
+  });
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [deployingVercel, setDeployingVercel] = useState(false);
+
 
   // BuildFlow Hosting - Simple publish
   const handlePublishToBuildFlow = async () => {
@@ -61,11 +59,47 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
         const data = await res.json();
         toast.error(data.error || 'Failed to publish');
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to publish');
     } finally {
       setPublishing(false);
     }
+  };
+
+  // Copy URL logic
+  const handleCopyUrl = async (project: Project) => {
+    try {
+      let urlToCopy = '';
+      if (project.publicUrl) {
+        urlToCopy = project.publicUrl;
+      } else if (project.publicSlug) {
+        urlToCopy = `https://buildflow-ai.app/p/${project.publicSlug}`;
+      } else if (project.id) {
+        urlToCopy = `https://buildflow-ai.app/projects/${project.id}`;
+      } else {
+        toast.error('No URL available to copy');
+        return;
+      }
+      await navigator.clipboard.writeText(urlToCopy);
+      toast.success(`✅ Copied: ${urlToCopy}`);
+      console.log('✅ Copied URL:', urlToCopy);
+    } catch {
+      toast.error('Failed to copy URL');
+    }
+  };
+
+  // View Site logic
+  const handleViewSite = (project: Project) => {
+    let siteUrl = '';
+    if (project.publicUrl) {
+      siteUrl = project.publicUrl;
+    } else if (project.publicSlug) {
+      siteUrl = `/p/${project.publicSlug}`;
+    } else {
+      toast.error('This project is not published yet');
+      return;
+    }
+    window.open(siteUrl, '_blank');
   };
 
   // Vercel Deployment - Requires GitHub first
@@ -116,7 +150,7 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
         toast.loading('Deploying to Vercel...', { id: 'deploy-vercel' });
         await deployToVercel(githubData.repoName);
       }
-    } catch (error) {
+    } catch {
       toast.error('Deployment failed', { id: 'deploy-vercel' });
       setDeployingVercel(false);
     }
@@ -146,7 +180,7 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
         const errorData = await res.json();
         toast.error(errorData.error || 'Deployment failed', { id: 'deploy-vercel' });
       }
-    } catch (error) {
+    } catch {
       toast.error('Deployment failed', { id: 'deploy-vercel' });
     } finally {
       setDeployingVercel(false);
@@ -185,7 +219,7 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
           id: 'project-downloaded',
         });
       }
-    } catch (error) {
+    } catch {
       toast.error('Export failed');
     }
   };
@@ -207,19 +241,20 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
                 </h3>
                 {project.isPublished ? (
                   <span className="flex items-center gap-1 px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded-full font-medium whitespace-nowrap">
-                    <Globe className="w-3 h-3" />
+                    <Icons.Globe className="w-3 h-3" />
                     Live
                   </span>
                 ) : (
                   <span className="flex items-center gap-1 px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 text-xs rounded-full font-medium whitespace-nowrap">
-                    <GlobeLock className="w-3 h-3" />
+                    <Icons.GlobeLock className="w-3 h-3" />
                     Draft
                   </span>
                 )}
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-                {project.description || 'No description provided'}
-              </p>
+              <div className="flex items-center gap-2 mb-2">
+                <Icons.Github className="w-4 h-4" />
+                <span>{project.description || 'No description provided'}</span>
+              </div>
             </div>
 
             {/* More Menu */}
@@ -227,10 +262,9 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
                 className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
-                aria-label="More options"
                 type="button"
               >
-                <MoreVertical className="w-5 h-5 text-gray-500" />
+                <Icons.MoreVertical className="w-5 h-5 text-gray-500" />
               </button>
 
               {menuOpen && (
@@ -244,7 +278,7 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
                       href={`/chatbuilder?project=${project.id}`}
                       className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition"
                     >
-                      <Edit3 className="w-4 h-4" />
+                      <Icons.Edit3 className="w-4 h-4" />
                       Edit Project
                     </a>
                     <button
@@ -255,7 +289,7 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
                       className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition"
                       type="button"
                     >
-                      <Github className="w-4 h-4" />
+                      <Icons.Github className="w-4 h-4" />
                       Export to GitHub
                     </button>
                     <button
@@ -266,7 +300,7 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
                       className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition"
                       type="button"
                     >
-                      <Download className="w-4 h-4" />
+                      <Icons.Download className="w-4 h-4" />
                       Download ZIP
                     </button>
                     <hr className="my-1 border-gray-200 dark:border-gray-700" />
@@ -278,7 +312,7 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
                       className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 flex items-center gap-2 transition"
                       type="button"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Icons.Trash2 className="w-4 h-4" />
                       Delete Project
                     </button>
                   </div>
@@ -291,52 +325,73 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
           {project.isPublished && (
             <div className="flex items-center gap-4 mb-4 text-xs text-gray-600 dark:text-gray-400">
               <div className="flex items-center gap-1">
-                <Eye className="w-3.5 h-3.5" />
+                <Icons.Eye className="w-3.5 h-3.5" />
                 <span>{project.views} views</span>
               </div>
               <div>
-                Published {new Date(project.createdAt).toLocaleDateString()}
+                Published {project.createdAt ? new Date(project.createdAt).toLocaleDateString() : 'Unknown date'}
               </div>
             </div>
           )}
 
           {/* Primary Actions */}
-          <div className="grid grid-cols-3 gap-2 mb-3">
-            <button
-              onClick={() => window.open(`/preview/${project.id}`, '_blank')}
-              className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition text-sm font-medium"
-              title="Preview project"
-              type="button"
-            >
-              <Eye className="w-4 h-4" />
-              Preview
-            </button>
+          <div className="flex items-center gap-2 mb-3">
+            {/* View Site Button - Only show if published */}
+            {project.isPublished && (project.publicUrl || project.publicSlug) && (
+              <button
+                onClick={() => handleViewSite(project)}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+                title="View published site"
+                type="button"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                View Site
+              </button>
+            )}
 
-            {/* ✅ NEW - Goes to chat builder with AI iteration */}
+            {/* Preview Button - Always available */}
             <a
-              href={`/chatbuilder?project=${project.id}`}
-              className="flex items-center justify-center gap-2 px-3 py-2 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition text-sm font-medium"
-              title="Edit project code"
+              href={
+                project.publicSlug
+                  ? `/preview/${project.publicSlug}`
+                  : project.id
+                  ? `/preview/${project.id}`
+                  : '#'
+              }
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors"
+              title="Preview project code and site"
+              target="_blank"
+              rel="noopener noreferrer"
             >
-              <Code className="w-4 h-4" />
-              Code
+              <Icons.Eye className="w-4 h-4" />
+              Preview
             </a>
 
+            {/* Copy URL Button */}
             <button
-              onClick={() => {
-                navigator.clipboard.writeText(project.publicUrl || '');
-                toast.success('URL copied!', {
-                  duration: 2000,
-                  id: 'url-copied',
-                });
-              }}
-              className="flex items-center justify-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition text-sm font-medium"
+              onClick={() => handleCopyUrl(project)}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-lg transition-colors"
               title="Copy project URL"
               type="button"
             >
-              <Copy className="w-4 h-4" />
-              Copy
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              Copy URL
             </button>
+
+            {/* Publish Status Badge */}
+            {project.isPublished ? (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                Published
+              </span>
+            ) : (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                Draft
+              </span>
+            )}
           </div>
 
           {/* DISTINCT DEPLOYMENT BUTTONS */}
@@ -350,7 +405,7 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
                 title="Publish to BuildFlow hosting (instant)"
                 type="button"
               >
-                <Zap className="w-4 h-4" />
+                <Icons.Zap className="w-4 h-4" />
                 {publishing ? 'Publishing...' : 'Publish to BuildFlow'}
               </button>
             ) : (
@@ -360,7 +415,7 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
                 title="Share your published site"
                 type="button"
               >
-                <Share2 className="w-4 h-4" />
+                <Icons.Share2 className="w-4 h-4" />
                 Share BuildFlow Site
               </button>
             )}
@@ -392,7 +447,7 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
           {/* Helpful Info */}
           <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 space-y-1">
             <div className="flex items-center gap-1">
-              <Zap className="w-3 h-3 text-purple-500" />
+              <Icons.Zap className="w-3 h-3 text-purple-500" />
               <span>BuildFlow: Instant hosting on our domain</span>
             </div>
             <div className="flex items-center gap-1">
@@ -411,7 +466,7 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
           isOpen={shareModalOpen}
           onClose={() => setShareModalOpen(false)}
           projectName={project.name}
-          publicUrl={project.publicUrl}
+          publicUrl={project.publicUrl ?? ''}
           views={project.views}
         />
       )}

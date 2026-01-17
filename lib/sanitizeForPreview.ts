@@ -66,7 +66,7 @@ export function sanitizeForPreview(code: string): string {
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   -->
   <!-- Tailwind CDN is always included for preview styling -->
-  <script src="https://cdn.tailwindcss.com"></script>
+
   <style>
     body { margin: 0; padding: 0; }
     #root { min-height: 100vh; }

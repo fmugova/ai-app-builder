@@ -8,6 +8,7 @@ import { templates, getTemplatesByCategory } from '@/lib/templates'
 import dynamic from 'next/dynamic'
 import PromptAssistant from '@/components/PromptAssistant'
 import { HelpCircle } from 'lucide-react'
+import { useAutoSave, useKeyboardShortcuts, downloadAsHTML } from '@/lib/chatbuilder-hooks'
 
 // MessageTimestamp component for displaying formatted timestamps
 function MessageTimestamp({ timestamp }: { timestamp: Date }) {
@@ -189,7 +190,6 @@ export default function ChatBuilderPage() {
         timestamp: new Date()
       }
       setMessages(prev => [...prev, urlMessage])
-      
       enhancedInput = await detectAndFetchUrls(input)
     }
 
@@ -208,7 +208,7 @@ export default function ChatBuilderPage() {
       const isIteration = currentCode !== null
 
       if (isIteration) {
-        // ITERATION
+        // ITERATION (using existing /api/chat/iterate)
         const formData = new FormData()
         formData.append('message', enhancedInput)
         formData.append('currentCode', currentCode)
@@ -243,47 +243,20 @@ export default function ChatBuilderPage() {
           throw new Error(data.error || 'Failed to iterate')
         }
       } else {
-        // INITIAL GENERATION
-        const response = await fetch('/api/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt: enhancedInput,
-            type: 'landing-page',
-            includeAuth,
-            authProvider
-          })
-        })
-
-        const data = await response.json()
-
-        if (response.ok) {
-          let messageContent = "Great! I've created your site. You can see it in the preview. Want me to make any changes?"
-          
-          // Add auth success message
-          if (data.message && includeAuth) {
-            messageContent = `✅ ${data.message}\n\n${messageContent}`
-          }
-          
-          const assistantMessage: Message = {
-            id: Date.now().toString(),
-            role: 'assistant',
-            content: messageContent,
-            timestamp: new Date()
-          }
-
-          setMessages(prev => [...prev, assistantMessage])
-          setCurrentCode(data.code)
-          
-          // Reset auth checkbox after generation
-          setIncludeAuth(false)
-          
-          // Set default project name from prompt
-          if (!projectName) {
-            setProjectName(input.slice(0, 50) || 'New Project')
-          }
-        } else {
-          throw new Error(data.error || 'Failed to generate')
+        // ✅ INITIAL GENERATION - Use handleRegenerate!
+        await handleRegenerate(enhancedInput)
+        
+        const assistantMessage: Message = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: "Great! I've created your site. You can see it in the preview. Want me to make any changes?",
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, assistantMessage])
+        
+        // Set default project name from prompt
+        if (!projectName) {
+          setProjectName(input.slice(0, 50) || 'New Project')
         }
       }
     } catch (error: unknown) {
@@ -431,8 +404,7 @@ export default function ChatBuilderPage() {
           })
         }
       }
-    } catch (error) {
-      console.error('Save error:', error)
+    } catch {
       toast({
         variant: 'destructive',
         description: 'Error saving project'
@@ -545,97 +517,26 @@ export default function ChatBuilderPage() {
   }
 
   const handleDownload = () => {
-    if (!currentCode) return
-    
-    // Check if code includes Supabase auth (has supabase auth keywords)
-    const hasAuth = currentCode.includes('supabase.auth') || 
-                    currentCode.includes('signIn') || 
-                    currentCode.includes('signUp')
-    
-    if (hasAuth) {
-      // Create README with setup instructions
-      const readme = `# ${projectName || 'Your Website'}
-
-## 🎉 Your site includes user authentication!
-
-### Quick Setup:
-
-1. **Create a Supabase Account** (Free)
-   - Go to https://supabase.com
-   - Create a new project
-   - Wait for setup to complete (~2 minutes)
-
-2. **Get Your Credentials**
-   - Go to Project Settings → API
-   - Copy your Project URL and anon/public key
-   - Replace these values in the HTML file:
-     \`\`\`javascript
-     const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-     const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
-     \`\`\`
-
-3. **Enable Email Authentication**
-   - In Supabase Dashboard: Authentication → Providers
-   - Enable "Email" provider
-   - Configure email templates (optional)
-
-4. **Test Your Site**
-   - Open the HTML file in your browser
-   - Try signing up with an email/password
-   - Check Supabase Dashboard → Authentication → Users
-
-### Features Included:
-✅ User signup/login
-✅ Protected content
-✅ Session management
-✅ Secure authentication
-
-### Deploy:
-Upload your HTML file to:
-- Vercel (https://vercel.com)
-- Netlify (https://netlify.com)
-- GitHub Pages
-
-Need help? Check Supabase docs: https://supabase.com/docs
-
----
-Built with BuildFlow AI 🚀
-`
-      
-      // Download both files
-      const htmlBlob = new Blob([currentCode], { type: 'text/html' })
-      const readmeBlob = new Blob([readme], { type: 'text/markdown' })
-      
-      const htmlUrl = URL.createObjectURL(htmlBlob)
-      const readmeUrl = URL.createObjectURL(readmeBlob)
-      
-      const htmlLink = document.createElement('a')
-      htmlLink.href = htmlUrl
-      htmlLink.download = `${projectName || 'website'}.html`
-      htmlLink.click()
-      
-      setTimeout(() => {
-        const readmeLink = document.createElement('a')
-        readmeLink.href = readmeUrl
-        readmeLink.download = 'README.md'
-        readmeLink.click()
-        URL.revokeObjectURL(htmlUrl)
-        URL.revokeObjectURL(readmeUrl)
-      }, 100)
-      
+    if (!currentCode) {
       toast({
-        title: '📦 Downloaded!',
-        description: 'HTML file + README with setup instructions',
+        variant: 'destructive',
+        description: 'No code to download!'
+      })
+      return
+    }
+
+    const success = downloadAsHTML(currentCode, projectName)
+    
+    if (success) {
+      toast({
+        variant: 'default',
+        description: '📥 Downloaded successfully!'
       })
     } else {
-      // Regular download without auth
-      const blob = new Blob([currentCode], { type: 'text/html' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${projectName || 'website'}.html`
-      a.click()
-      URL.revokeObjectURL(url)
+      toast({
+        variant: 'destructive',
+        description: 'Download failed'
+      })
     }
   }
 
@@ -743,6 +644,45 @@ Built with BuildFlow AI 🚀
       </html>
     `
   }
+
+  // Optimistic Regenerate Handler
+  const handleRegenerate = async (prompt: string) => {
+    // Optimistically update UI
+    setCurrentCode('<!-- Generating... -->')
+
+    try {
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: prompt,
+          projectId: projectId, // Pass existing ID to UPDATE
+          type: 'website'
+        })
+      })
+      const data = await res.json()
+      setCurrentCode(data.code)
+      // Update URL if new project
+      if (!projectId && data.projectId) {
+        window.history.pushState({}, '', `/chatbuilder?project=${data.projectId}`)
+        setProjectId(data.projectId)
+      }
+    } catch {
+      toast({ 
+        variant: 'destructive', 
+        description: 'Generation failed'
+      })
+    }
+  }
+
+  // Auto-save functionality (moved after all function definitions)
+  useAutoSave(currentCode, projectId, projectName, pageId, 3000)
+
+  // Keyboard shortcuts (moved after all function definitions)
+  useKeyboardShortcuts({
+    onSave: handleSave,
+    onDownload: handleDownload
+  })
 
   return (
   <div className="flex flex-col md:flex-row h-screen bg-gray-50">
@@ -985,6 +925,16 @@ Built with BuildFlow AI 🚀
             >
               {loading ? 'Thinking...' : currentCode ? 'Update' : 'Generate'}
             </button>
+            {currentCode && (
+              <button
+                onClick={() => handleRegenerate(input)}
+                disabled={loading || !input.trim()}
+                className="px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors font-medium h-[60px]"
+                title="Regenerate from scratch with this prompt"
+              >
+                🔄 Regenerate
+              </button>
+            )}
           </div>
           
           <div className="text-xs text-gray-500 mt-2">

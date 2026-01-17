@@ -31,6 +31,8 @@ export default async function ProjectsPage() {
       description: true,
       createdAt: true,
       updatedAt: true,
+      publicUrl: true,
+      isPublished: true,
     }
   })
 

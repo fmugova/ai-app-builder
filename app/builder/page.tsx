@@ -308,8 +308,7 @@ function BuilderContent() {
     try {
       const url = currentProjectId 
         ? `/api/projects/${currentProjectId}`
-        : '/api/projects'
-      
+        : '/api/projects';
       const method = currentProjectId ? 'PUT' : 'POST'
 
       const res = await fetch(url, {
@@ -684,7 +683,7 @@ function BuilderContent() {
                   </div>
                 </div>
               ))
-            )}
+            }
           </div>
 
           {/* Chat Input */}

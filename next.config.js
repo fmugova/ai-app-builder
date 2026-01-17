@@ -88,17 +88,7 @@ const nextConfig = {
           // Content Security Policy
           {
             key: 'Content-Security-Policy',
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com",
-              "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com",
-              "img-src 'self' data: https: blob:",
-              "font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com",
-              "connect-src 'self' https://api.anthropic.com https://api.openai.com https://api.github.com https://api.vercel.com https://*.vercel.app https://buildflow-ai.app https://unpkg.com https://cdn.jsdelivr.net",
-              "frame-ancestors 'none'",
-              "base-uri 'self'",
-              "form-action 'self'"
-            ].join('; ')
+            value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data: https://fonts.gstatic.com;"
           }
         ],
       },
