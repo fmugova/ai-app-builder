@@ -2,6 +2,9 @@
 export const trackEvent = (eventName: string, properties?: Record<string, any>) => {
   // Google Analytics
   // Google Tag Manager and gtag removed for strict CSP compliance
+  // Console log in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('📊 Event:', eventName, properties)
   }
 
   // Console log in development
