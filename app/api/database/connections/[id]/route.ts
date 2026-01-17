@@ -30,7 +30,7 @@ export const GET = withAuth(async (req, context, session) => {
     // Check ownership
     const connection = await prisma.databaseConnection.findFirst({
       where: {
-        id: context.params.id,
+        id: typeof context.params.id === 'string' ? context.params.id : String(context.params.id),
         userId: session.user.id
       },
       select: {
