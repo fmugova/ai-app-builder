@@ -415,101 +415,47 @@ export default function ChatBuilderPage() {
   }
 
   const handlePublish = async () => {
-    if (!currentCode) {
+    if (!projectId) {
       toast({
         variant: 'destructive',
-        description: 'No code to publish. Generate a site first!'
+        description: 'Please save your project first!'
       })
       return
     }
+
     setPublishing(true)
-    const cleanCode = sanitizeCode(currentCode)
+    
     try {
-      if (projectId && pageId) {
-        // UPDATE and publish existing page
-        const res = await fetch(`/api/projects/${projectId}/pages/${pageId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: projectName,
-            content: cleanCode,
-            isPublished: true
-          })
+      // First save any changes
+      if (currentCode && projectName) {
+        await handleSave()
+      }
+
+      // Then publish
+      const res = await fetch(`/api/projects/${projectId}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        toast({
+          description: `✅ Published! Your site is live at ${data.publicSlug}`
         })
-        if (res.ok) {
-          toast({
-            variant: 'default',
-            description: 'Page published!'
-          })
-          router.push('/dashboard')
-        } else {
-          const error = await res.text()
-          console.error('Publish failed:', error)
-          toast({
-            variant: 'destructive',
-            description: 'Failed to publish'
-          })
-        }
-      } else if (!projectId) {
-        // CREATE and publish new project
-        const res = await fetch('/api/projects', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: projectName,
-            code: cleanCode,
-            type: 'website',
-            published: true
-          })
-        })
-        if (res.ok) {
-          const data = await res.json()
-          window.history.pushState({}, '', `/chatbuilder?project=${data.id}`)
-          setProjectId(data.id)
-          toast({
-            variant: 'default',
-            description: 'Project published!'
-          })
-          router.push('/dashboard')
-        } else {
-          const error = await res.text()
-          console.error('Publish failed:', error)
-          toast({
-            variant: 'destructive',
-            description: 'Failed to publish'
-          })
+        
+        // Open the published site
+        if (data.publicUrl) {
+          window.open(data.publicUrl, '_blank', 'noopener,noreferrer')
         }
       } else {
-        // UPDATE and publish existing project
-        const res = await fetch(`/api/projects/${projectId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: projectName,
-            code: cleanCode,
-            published: true
-          })
-        })
-        if (res.ok) {
-          toast({
-            variant: 'default',
-            description: 'Project published!'
-          })
-          router.push('/dashboard')
-        } else {
-          const error = await res.text()
-          console.error('Publish failed:', error)
-          toast({
-            variant: 'destructive',
-            description: 'Failed to publish'
-          })
-        }
+        throw new Error(data.error || 'Publish failed')
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Publish error:', error)
       toast({
         variant: 'destructive',
-        description: 'Error publishing project'
+        description: error instanceof Error ? error.message : 'Failed to publish'
       })
     } finally {
       setPublishing(false)
