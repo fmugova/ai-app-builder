@@ -1,0 +1,2 @@
+-- This is a baseline migration for the existing production schema
+-- All tables and indexes already exist in the database
