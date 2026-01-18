@@ -37,10 +37,10 @@ export async function GET(
       project = customDomain.project
     } else {
       // Regular buildflow.ai subdomain
-      const { searchParams } = new URL(request.url)
+      // searchParams assignment removed (unused)
       const { id } = await params
       project = await prisma.project.findUnique({
-        where: { id },
+        where: { id: id as string },
         include: {
           pages: {
             where: { isPublished: true },
@@ -177,7 +177,7 @@ export async function GET(
       headers: { 'Content-Type': 'text/html' }
     })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Render error:', error)
     return new NextResponse('Internal Server Error', { status: 500 })
   }

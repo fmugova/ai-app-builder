@@ -7,30 +7,60 @@ import {
   withRateLimit,
   compose 
 } from '@/lib/api-middleware'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth'
 
 // Simple authenticated route
-export const GET = withAuth(async (req: NextRequest, context: { params: any }, session: any) => {
-  return NextResponse.json({ 
-    message: 'Authenticated!',
-    user: session.user 
-  })
+export const GET = compose(
+  withSubscription('pro'),
+  withAuth
+)(async (req: NextRequest) => {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  const body = await req.json();
+  return NextResponse.json({
+    message: 'Success',
+    userId: session.user.id,
+    tier: session.user.subscriptionTier,
+    data: body
+  });
 })
 
 // Protected POST with multiple middleware
+interface SessionUser {
+  id: string;
+  email: string;
+  subscriptionTier: string;
+}
+
+interface Session {
+  user: SessionUser;
+}
+
 export const POST = compose(
   withRateLimit(20),
   withUsageCheck('create_project'),
   withSubscription('pro'),
   withAuth
-)(async (req: NextRequest, context: { params: any }, session: any) => {
-  const body = await req.json()
-  
+)(async (
+  req: NextRequest,
+  context: { params: Record<string, unknown>; session?: Session }
+) => {
+  const session = context.session;
+  const body = await req.json();
+
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   return NextResponse.json({ 
     message: 'All checks passed!',
     userId: session.user.id,
     tier: session.user.subscriptionTier,
     data: body
-  })
+  });
 })
 
 // Admin-only DELETE

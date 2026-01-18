@@ -44,8 +44,9 @@ async function checkWorkspacePermission(
 // POST /api/workspaces/[id]/members/invite - Invite a member
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const session = await getServerSession(authOptions);
     
@@ -62,7 +63,7 @@ export async function POST(
     }
 
     // Only admins and owners can invite members
-    const { hasPermission } = await checkWorkspacePermission(params.id, user.id, 'admin');
+    const { hasPermission } = await checkWorkspacePermission(id, user.id, 'admin');
 
     if (!hasPermission) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
@@ -73,7 +74,7 @@ export async function POST(
 
     // Get workspace
     const workspace = await prisma.workspace.findUnique({
-      where: { id: params.id },
+      where: { id: id as string },
       include: {
         _count: {
           select: { members: true },
@@ -102,7 +103,7 @@ export async function POST(
       const existingMember = await prisma.workspaceMember.findUnique({
         where: {
           workspaceId_userId: {
-            workspaceId: params.id,
+            workspaceId: id,
             userId: existingUser.id,
           },
         },
@@ -119,7 +120,7 @@ export async function POST(
     // Check for existing pending invite
     const existingInvite = await prisma.workspaceInvite.findFirst({
       where: {
-        workspaceId: params.id,
+        workspaceId: id,
         email: validatedData.email,
         status: 'pending',
       },
@@ -139,7 +140,7 @@ export async function POST(
 
     const invite = await prisma.workspaceInvite.create({
       data: {
-        workspaceId: params.id,
+        workspaceId: id,
         email: validatedData.email,
         role: validatedData.role,
         token,

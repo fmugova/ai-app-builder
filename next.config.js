@@ -7,6 +7,10 @@ const withBundleAnalyzer = bundleAnalyzer({
 /** @type {import('next').NextConfig} */
 
 const nextConfig = {
+    eslint: {
+      // Only run ESLint on these directories during production builds
+      dirs: ['app', 'components', 'lib', 'hooks'],
+    },
   images: {
     remotePatterns: [
       {
@@ -51,6 +55,8 @@ const nextConfig = {
   },
   // Add comprehensive security headers
   async headers() {
+    const isDev = process.env.NODE_ENV === 'development';
+    const scriptSrc = isDev ? "'self' 'unsafe-eval' 'unsafe-inline'" : "'self'";
     return [
       {
         source: '/:path*',
@@ -88,7 +94,7 @@ const nextConfig = {
           // Content Security Policy
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data: https://fonts.gstatic.com;"
+            value: `default-src 'self'; script-src ${scriptSrc}; style-src 'self' 'unsafe-inline'; font-src 'self' data: https://fonts.gstatic.com;`
           }
         ],
       },

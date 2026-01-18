@@ -5,10 +5,10 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const { slug } = params;
+    const { slug } = await params;
 
     // Find the published project
     const project = await prisma.project.findFirst({
@@ -45,7 +45,7 @@ export async function GET(
 
     return NextResponse.json(project);
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Site fetch error:', error);
     return NextResponse.json(
       { error: 'Failed to load site' },

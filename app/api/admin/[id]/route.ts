@@ -25,7 +25,7 @@ export async function PATCH(
 
     // Update user
     const updatedUser = await prisma.user.update({
-      where: { id },
+      where: { id: id as string },
       data: {
         subscriptionTier,
         projectsLimit,
@@ -85,7 +85,7 @@ export async function DELETE(
 
     // Get user email before deleting
     const user = await prisma.user.findUnique({
-      where: { id },
+      where: { id: id as string },
       select: { email: true }
     })
 
@@ -95,7 +95,7 @@ export async function DELETE(
 
     // Delete user (this will cascade delete related records)
     await prisma.user.delete({
-      where: { id }
+      where: { id: id as string }
     })
 
     // Get admin user ID

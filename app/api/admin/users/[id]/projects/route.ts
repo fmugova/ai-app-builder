@@ -7,8 +7,9 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const session = await getServerSession(authOptions)
     
@@ -17,7 +18,7 @@ export async function GET(
     }
 
     const projects = await prisma.project.findMany({
-      where: { userId: params.id },
+      where: { userId: id },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,

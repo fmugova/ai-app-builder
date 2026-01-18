@@ -18,9 +18,10 @@ function generatePassword(length = 12): string {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await getServerSession(authOptions)
     
     if (!session?.user || session.user.role !== 'admin') {
@@ -33,7 +34,7 @@ export async function POST(
     const hashedPassword = await bcrypt.hash(newPassword, 10)
 
     await prisma.user.update({
-      where: { id: params.id },
+      where: { id },
       data: { password: hashedPassword }
     })
 

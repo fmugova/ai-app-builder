@@ -28,9 +28,10 @@ export const GET = withAuth(async (req, context, session) => {
     }
 
     // Check ownership
+    const { id } = await context.params as { id: string };
     const connection = await prisma.databaseConnection.findFirst({
       where: {
-        id: typeof context.params.id === 'string' ? context.params.id : String(context.params.id),
+        id,
         userId: session.user.id
       },
       select: {
@@ -76,9 +77,10 @@ export const PUT = withAuth(async (req, context, session) => {
     }
 
     // Check ownership
+    const { id } = await context.params as { id: string };
     const existing = await prisma.databaseConnection.findFirst({
       where: {
-        id: context.params.id,
+        id,
         userId: session.user.id
       }
     })
@@ -103,7 +105,7 @@ export const PUT = withAuth(async (req, context, session) => {
     
     // Update database connection
     const connection = await prisma.databaseConnection.update({
-      where: { id: context.params.id },
+      where: { id: id as string },
       data: result.data,
       select: {
         id: true,
@@ -151,10 +153,13 @@ export const DELETE = withAuth(async (req, context, session) => {
       )
     }
 
+    // Await context.params if it's a Promise
+    const { id } = await context.params as { id: string };
+
     // Check ownership
     const connection = await prisma.databaseConnection.findFirst({
       where: {
-        id: context.params.id,
+        id,
         userId: session.user.id
       }
     })
@@ -167,7 +172,7 @@ export const DELETE = withAuth(async (req, context, session) => {
     }
 
     await prisma.databaseConnection.delete({
-      where: { id: context.params.id },
+      where: { id: id as string },
     })
     
     // Log security event
@@ -176,7 +181,7 @@ export const DELETE = withAuth(async (req, context, session) => {
       type: 'database_connection_deleted',
       action: 'success',
       metadata: {
-        connectionId: context.params.id,
+        connectionId: id,
       },
       severity: 'info',
     })

@@ -11,15 +11,15 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { domainId: string } }
 ) {
+  const { domainId } = params;
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
     const domain = await prisma.customDomain.findFirst({
       where: {
-        id: params.domainId,
+        id: domainId,
         project: {
           User: {
             email: session.user.email
@@ -46,7 +46,7 @@ export async function GET(
       
       // Update database with latest status
       const updatedDomain = await prisma.customDomain.update({
-        where: { id: params.domainId },
+        where: { id: domainId },
         data: {
           status: vercelStatus.verified ? 'active' : 'pending',
           verifiedAt: vercelStatus.verified ? new Date() : null
@@ -66,12 +66,12 @@ export async function GET(
         vercelStatus
       })
 
-    } catch (vercelError) {
+    } catch {
       // Return database status if Vercel API fails
       return NextResponse.json({ domain })
     }
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Domain GET error:', error)
     return NextResponse.json(
       { error: 'Failed to fetch domain' },
@@ -81,19 +81,16 @@ export async function GET(
 }
 
 // POST: Verify domain
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { domainId: string } }
-) {
+export async function POST(request: NextRequest, context: { params: { domainId: string } }) {
+  const { domainId } = context.params;
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
     const domain = await prisma.customDomain.findFirst({
       where: {
-        id: params.domainId,
+        id: domainId,
         project: {
           User: {
             email: session.user.email
@@ -111,7 +108,7 @@ export async function POST(
 
     // Update database
     const updatedDomain = await prisma.customDomain.update({
-      where: { id: params.domainId },
+      where: { id: domainId },
       data: {
         status: vercelStatus.verified ? 'active' : 'verifying',
         verifiedAt: vercelStatus.verified ? new Date() : null,
@@ -133,39 +130,35 @@ export async function POST(
       verified: vercelStatus.verified
     })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Domain verify error:', error)
-    
     // Update with error
+    const errorMessage = typeof error === 'object' && error && 'message' in error ? (error as { message?: string }).message : String(error);
     await prisma.customDomain.update({
-      where: { id: params.domainId },
+      where: { id: domainId },
       data: {
         status: 'failed',
-        errorMessage: error.message
+        errorMessage
       }
     })
-
     return NextResponse.json(
-      { error: 'Failed to verify domain', message: error.message },
+      { error: 'Failed to verify domain', message: errorMessage },
       { status: 500 }
     )
   }
 }
 
 // DELETE: Remove custom domain
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { domainId: string } }
-) {
+export async function DELETE(request: NextRequest, context: { params: { domainId: string } }) {
+  const { domainId } = context.params;
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
     const domain = await prisma.customDomain.findFirst({
       where: {
-        id: params.domainId,
+        id: domainId,
         project: {
           User: {
             email: session.user.email
@@ -188,12 +181,12 @@ export async function DELETE(
 
     // Delete from database
     await prisma.customDomain.delete({
-      where: { id: params.domainId }
+      where: { id: domainId }
     })
 
     return NextResponse.json({ success: true })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Domain DELETE error:', error)
     return NextResponse.json(
       { error: 'Failed to delete domain' },

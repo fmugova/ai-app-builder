@@ -6,7 +6,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions)
     
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ promoCodes })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Get promo codes error:', error)
     return NextResponse.json(
       { error: 'Failed to fetch promo codes' },
@@ -91,10 +91,15 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ promoCode })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Create promo code error:', error)
     
-    if (error.code === 'P2002') {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code?: string }).code === 'P2002'
+    ) {
       return NextResponse.json(
         { error: 'A promo code with this code already exists' },
         { status: 400 }
@@ -135,12 +140,12 @@ export async function DELETE(req: NextRequest) {
 
     // Delete promo code
     await prisma.promoCodes.delete({
-      where: { id },
+      where: { id: id as string },
     })
 
     return NextResponse.json({ success: true })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Delete promo code error:', error)
     return NextResponse.json(
       { error: 'Failed to delete promo code' },

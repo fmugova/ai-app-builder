@@ -6,13 +6,15 @@ import { prisma } from '@/lib/prisma'
 import ApiEndpointsPage from '@/components/ApiEndpointsPage'
 import { ApiEndpointsSkeleton } from '@/components/LoadingSkeleton'
 
-async function EndpointsContent({ params }: { params: { id: string } }) {
+async function EndpointsContent({ params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
 
+  const { id } = await params
+
   const project = await prisma.project.findFirst({
     where: {
-      id: params.id,
+      id,
       User: { email: session.user.email }
     }
   })
@@ -27,7 +29,7 @@ async function EndpointsContent({ params }: { params: { id: string } }) {
   )
 }
 
-export default function EndpointsPage({ params }: { params: { id: string } }) {
+export default function EndpointsPage({ params }: { params: Promise<{ id: string }> }) {
   return (
     <Suspense fallback={<ApiEndpointsSkeleton />}>
       <EndpointsContent params={params} />

@@ -8,15 +8,16 @@ export const dynamic = 'force-dynamic'
 
 // GET single project
 export const GET = withAuth(async (
-  req: NextRequest,  // ✅ Now using the type
-  context: { params: { id: string } },
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> },
   session: { user: { id: string } }
 ) => {
   try {
+    const { id } = await context.params;
     // Check ownership
     const project = await prisma.project.findFirst({
       where: {
-        id: context.params.id,
+        id,
         userId: session.user.id
       },
       include: {
@@ -45,14 +46,15 @@ export const GET = withAuth(async (
 // PUBLISH project (PUT method)
 export const PUT = withAuth(async (
   req: NextRequest,
-  context: { params: { id: string } },
+  context: { params: Promise<{ id: string }> },
   session: { user: { id: string; email: string } }
 ) => {
   try {
+    const { id } = await context.params;
     // Check ownership
     const project = await prisma.project.findFirst({
       where: {
-        id: context.params.id,
+        id,
         userId: session.user.id
       }
     })
@@ -84,7 +86,7 @@ export const PUT = withAuth(async (
     const publicUrl = `https://buildflow-ai.app/p/${publicSlug}`
 
     const updatedProject = await prisma.project.update({
-      where: { id: context.params.id },
+      where: { id: id as string },
       data: {
         isPublished: true,
         publishedAt: new Date(),
@@ -127,16 +129,17 @@ export const PUT = withAuth(async (
 // UPDATE project (PATCH method - partial updates)
 export const PATCH = withAuth(async (
   req: NextRequest,
-  context: { params: { id: string } },
+  context: { params: Promise<{ id: string }> },
   session: { user: { id: string } }
 ) => {
   try {
     const body = await req.json()
 
     // Check ownership
+    const { id } = await context.params;
     const project = await prisma.project.findFirst({
       where: {
-        id: context.params.id,
+        id,
         userId: session.user.id
       }
     })
@@ -170,11 +173,11 @@ export const PATCH = withAuth(async (
 
     // Update project with sanitized data
     const updated = await prisma.project.update({
-      where: { id: context.params.id },
+      where: { id: id as string },
       data: dataToUpdate
     })
 
-    console.log('✅ Project updated via PATCH:', context.params.id)
+    console.log('✅ Project updated via PATCH:', id)
     
     return NextResponse.json({ success: true, project: updated })
   } catch (error) {
@@ -189,14 +192,15 @@ export const PATCH = withAuth(async (
 // DELETE project
 export const DELETE = withAuth(async (
   req: NextRequest,
-  context: { params: { id: string } },
+  context: { params: Promise<{ id: string }> },
   session: { user: { id: string } }
 ) => {
   try {
     // Check ownership
+    const { id } = await context.params;
     const project = await prisma.project.findFirst({
       where: {
-        id: context.params.id,
+        id,
         userId: session.user.id
       }
     })
@@ -210,10 +214,10 @@ export const DELETE = withAuth(async (
 
     // Delete project
     await prisma.project.delete({
-      where: { id: context.params.id }
+      where: { id: id as string }
     })
 
-    console.log('✅ Project deleted:', context.params.id)
+    console.log('✅ Project deleted:', id)
     
     return NextResponse.json({ success: true })
   } catch (error) {

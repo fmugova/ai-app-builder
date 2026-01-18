@@ -6,7 +6,7 @@ import { revokeSession } from '@/lib/security'
 // DELETE /api/user/sessions/[sessionId] - Revoke a specific session
 export async function DELETE(
   request: Request,
-  { params }: { params: { sessionId: string } }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -15,7 +15,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { sessionId } = params
+    const { sessionId } = await params
 
     // Revoke the session
     await revokeSession(sessionId, 'User requested revocation')

@@ -4,11 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import PreviewClient from './PreviewClient'
 
-export default async function PreviewPage({
-  params,
-}: {
-  params: { id: string }
-}) {
+export default async function PreviewPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) {
     redirect('/auth/signin')
@@ -66,14 +62,14 @@ export default async function PreviewPage({
           </a>
         </div>
       </div>
-    )
+    );
   }
 
   // Increment views
   await prisma.project.update({
     where: { id: project.id },
     data: { views: { increment: 1 } }
-  })
+  });
 
-  return <PreviewClient project={project} />
+  return <PreviewClient project={project} />;
 }

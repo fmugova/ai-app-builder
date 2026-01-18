@@ -3,14 +3,16 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
-export default function ChatBuilderIdPage({ params }: { params: { id: string } }) {
+export default function ChatBuilderIdPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
-  
+
   useEffect(() => {
-    // Redirect to chatbuilder with project query parameter
-    router.replace(`/chatbuilder?project=${params.id}`)
-  }, [params.id, router])
-  
+    (async () => {
+      const { id } = await params
+      router.replace(`/chatbuilder?project=${id}`)
+    })()
+  }, [params, router])
+
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center">
       <div className="text-center">

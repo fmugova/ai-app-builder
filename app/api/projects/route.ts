@@ -1,8 +1,10 @@
 import { compose, withAuth, withRateLimit, withUsageCheck } from '@/lib/api-middleware'
 import { incrementUsage } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { authOptions } from '@/lib/auth'
 
 const createProjectSchema = z.object({
   name: z.string().min(1).max(100),
@@ -16,7 +18,12 @@ export const dynamic = 'force-dynamic'
 export const GET = compose(
   withRateLimit(100),
   withAuth
-)(async (req: NextRequest, context: { params: any }, session: any) => {
+)(async () => {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const projects = await prisma.project.findMany({
     where: { userId: session.user.id },
     orderBy: { createdAt: 'desc' },
@@ -30,8 +37,13 @@ export const POST = compose(
   withRateLimit(20),
   withUsageCheck('create_project'),
   withAuth
-)(async (req: NextRequest, context: { params: any }, session: any) => {
-  const body = await req.json()
+)(async (_req: NextRequest) => {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const body = await _req.json()
 
   // Validate input
   const result = createProjectSchema.safeParse(body)

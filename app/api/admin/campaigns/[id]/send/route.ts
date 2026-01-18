@@ -8,8 +8,9 @@ import { sendEmail } from '@/lib/email'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const session = await getServerSession(authOptions)
 
@@ -23,7 +24,7 @@ export async function POST(
     }
 
     const campaign = await prisma.emailCampaign.findUnique({
-      where: { id: params.id }
+      where: { id }
     })
 
     if (!campaign) {
@@ -53,7 +54,7 @@ export async function POST(
 
     // Update campaign status
     await prisma.emailCampaign.update({
-      where: { id: params.id },
+      where: { id },
       data: { status: 'sending' }
     })
 
@@ -88,7 +89,7 @@ export async function POST(
 
     // Update campaign with results
     await prisma.emailCampaign.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         status: 'sent',
         sentAt: new Date(),
@@ -105,7 +106,7 @@ export async function POST(
     
     // Rollback campaign status
     await prisma.emailCampaign.update({
-      where: { id: params.id },
+      where: { id },
       data: { status: 'draft' }
     })
     

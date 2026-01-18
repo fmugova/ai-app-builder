@@ -6,10 +6,8 @@ import JSZip from 'jszip';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(
-  req: NextRequest, 
-  { params }: { params: { id: string } }
-) {
+export async function GET(req: NextRequest, context: { params: { id: string } }) {
+  const { id } = context.params;
   try {
     const session = await getServerSession(authOptions);
     
@@ -27,7 +25,7 @@ export async function GET(
 
     const project = await prisma.project.findFirst({
       where: {
-        id: params.id,
+        id: id,
         userId: user.id
       }
     });
@@ -147,7 +145,7 @@ root.render(
       }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Download error:', error);
     return NextResponse.json(
       { error: 'Failed to create ZIP file' },

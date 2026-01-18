@@ -7,7 +7,7 @@ import { nanoid } from 'nanoid'
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Get session
@@ -16,7 +16,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const projectId = params.id
+    const { id: projectId } = await params
 
     // Check ownership
     const project = await prisma.project.findFirst({
@@ -114,7 +114,7 @@ export async function POST(
 // UNPUBLISH endpoint
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -122,7 +122,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const projectId = params.id
+    const { id: projectId } = await params
 
     // Check ownership
     const project = await prisma.project.findFirst({

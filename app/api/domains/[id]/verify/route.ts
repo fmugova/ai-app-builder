@@ -14,9 +14,10 @@ export const POST = withAuth(async (req, context, session) => {
     }
 
     // Check ownership
+    const { id } = await context.params;
     const domain = await prisma.customDomain.findFirst({
       where: {
-        id: context.params.id,
+        id: id as string,
         project: {
           userId: session.user.id
         }
@@ -35,7 +36,7 @@ export const POST = withAuth(async (req, context, session) => {
     
     // Update domain status - removed 'verified' field, only using 'verifiedAt'
     await prisma.customDomain.update({
-      where: { id: context.params.id },
+      where: { id: id as string },
       data: {
         status: verificationResult.verified ? 'active' : 'pending',
         verifiedAt: verificationResult.verified ? new Date() : null,
@@ -48,7 +49,7 @@ export const POST = withAuth(async (req, context, session) => {
       type: 'domain_verification_attempted',
       action: verificationResult.verified ? 'success' : 'failure',
       metadata: {
-        domainId: context.params.id,
+        domainId: id,
         domain: domain.domain,
         success: verificationResult.verified,
       },

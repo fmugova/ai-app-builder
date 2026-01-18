@@ -41,8 +41,9 @@ async function checkWorkspacePermission(
 // PATCH /api/workspaces/[id]/members/[memberId] - Update member role
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string; memberId: string } }
+  { params }: { params: Promise<{ id: string; memberId: string }> }
 ) {
+  const { id, memberId } = await params;
   try {
     const session = await getServerSession(authOptions);
     
@@ -63,16 +64,16 @@ export async function PATCH(
 
     // Get the member to be updated
     const targetMember = await prisma.workspaceMember.findUnique({
-      where: { id: params.memberId },
+      where: { id: memberId },
     });
 
-    if (!targetMember || targetMember.workspaceId !== params.id) {
+    if (!targetMember || targetMember.workspaceId !== id) {
       return NextResponse.json({ error: 'Member not found' }, { status: 404 });
     }
 
     // Only owners can change roles
-    const { hasPermission, member } = await checkWorkspacePermission(
-      params.id,
+    const { hasPermission } = await checkWorkspacePermission(
+      id,
       user.id,
       'owner'
     );
@@ -96,7 +97,7 @@ export async function PATCH(
     if (targetMember.role === 'owner' && validatedData.role !== 'owner') {
       const ownerCount = await prisma.workspaceMember.count({
         where: {
-          workspaceId: params.id,
+          workspaceId: id,
           role: 'owner',
         },
       });
@@ -110,7 +111,7 @@ export async function PATCH(
     }
 
     const updatedMember = await prisma.workspaceMember.update({
-      where: { id: params.memberId },
+      where: { id: memberId },
       data: { role: validatedData.role },
       include: {
         user: {
@@ -131,8 +132,8 @@ export async function PATCH(
         type: 'workspace',
         action: 'member_role_updated',
         metadata: {
-          workspaceId: params.id,
-          memberId: params.memberId,
+          workspaceId: id,
+          memberId: memberId,
           memberEmail: updatedMember.user.email,
           oldRole: targetMember.role,
           newRole: validatedData.role,
@@ -159,8 +160,9 @@ export async function PATCH(
 // DELETE /api/workspaces/[id]/members/[memberId] - Remove member
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string; memberId: string } }
+  { params }: { params: Promise<{ id: string; memberId: string }> }
 ) {
+  const { id, memberId } = await params;
   try {
     const session = await getServerSession(authOptions);
     
@@ -177,7 +179,7 @@ export async function DELETE(
     }
 
     const targetMember = await prisma.workspaceMember.findUnique({
-      where: { id: params.memberId },
+      where: { id: memberId },
       include: {
         user: {
           select: {
@@ -189,7 +191,7 @@ export async function DELETE(
       },
     });
 
-    if (!targetMember || targetMember.workspaceId !== params.id) {
+    if (!targetMember || targetMember.workspaceId !== id) {
       return NextResponse.json({ error: 'Member not found' }, { status: 404 });
     }
 
@@ -198,7 +200,7 @@ export async function DELETE(
     
     if (!isSelf) {
       const { hasPermission } = await checkWorkspacePermission(
-        params.id,
+        id,
         user.id,
         'admin'
       );
@@ -215,7 +217,7 @@ export async function DELETE(
     if (targetMember.role === 'owner') {
       const ownerCount = await prisma.workspaceMember.count({
         where: {
-          workspaceId: params.id,
+          workspaceId: id,
           role: 'owner',
         },
       });
@@ -229,7 +231,7 @@ export async function DELETE(
     }
 
     await prisma.workspaceMember.delete({
-      where: { id: params.memberId },
+      where: { id: memberId },
     });
 
     // Log activity
@@ -239,8 +241,8 @@ export async function DELETE(
         type: 'workspace',
         action: isSelf ? 'member_left' : 'member_removed',
         metadata: {
-          workspaceId: params.id,
-          memberId: params.memberId,
+          workspaceId: id,
+          memberId: memberId,
           memberEmail: targetMember.user.email,
           role: targetMember.role,
         },

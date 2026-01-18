@@ -16,8 +16,9 @@ import { logSecurityEvent } from '@/lib/security'
 // GET - List all environment variables for a project
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
@@ -27,7 +28,7 @@ export async function GET(
     // Verify project ownership
     const project = await prisma.project.findFirst({
       where: {
-        id: params.id,
+        id,
         User: { email: session.user.email }
       },
       include: {
@@ -65,8 +66,9 @@ export async function GET(
 // POST - Add new environment variable
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
@@ -101,7 +103,7 @@ export async function POST(
     // Verify project ownership
     const project = await prisma.project.findFirst({
       where: {
-        id: params.id,
+        id,
         User: { email: session.user.email }
       }
     })
@@ -119,7 +121,7 @@ export async function POST(
     const existing = await prisma.environmentVariable.findUnique({
       where: {
         projectId_key_environment: {
-          projectId: params.id,
+          projectId: id,
           key,
           environment
         }
@@ -139,7 +141,7 @@ export async function POST(
     // Create variable
     const variable = await prisma.environmentVariable.create({
       data: {
-        projectId: params.id,
+        projectId: id,
         key,
         value: encryptedValue,
         description,
@@ -154,7 +156,7 @@ export async function POST(
         type: 'env_var_created',
         action: 'success',
         metadata: {
-          projectId: params.id,
+          projectId: id,
           key,
           environment
         },
@@ -184,8 +186,9 @@ export async function POST(
 // PUT - Update environment variable
 export async function PUT(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
@@ -206,7 +209,7 @@ export async function PUT(
       where: {
         id: variableId,
         project: {
-          id: params.id,
+          id,
           User: { email: session.user.email }
         }
       }
@@ -245,7 +248,7 @@ export async function PUT(
         type: 'env_var_updated',
         action: 'success',
         metadata: {
-          projectId: params.id,
+          projectId: id,
           key: variable.key,
           environment: variable.environment,
           changedValue: !!value

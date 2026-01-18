@@ -12,6 +12,7 @@ export async function GET(
   req: Request,
   { params }: { params: { id: string } }
 ) {
+  const { id } = params;
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
@@ -25,7 +26,7 @@ export async function GET(
     // Verify project ownership
     const project = await prisma.project.findFirst({
       where: {
-        id: params.id,
+        id: id,
         User: { email: session.user.email }
       },
       include: {
@@ -59,7 +60,7 @@ export async function GET(
         type: 'env_vars_exported',
         action: 'success',
         metadata: {
-          projectId: params.id,
+          projectId: id,
           environment,
           count: variables.length,
           format

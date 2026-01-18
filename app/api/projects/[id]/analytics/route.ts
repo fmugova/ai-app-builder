@@ -40,7 +40,13 @@ function getBrowser(userAgent: string): string {
 }
 
 // Helper to parse location from properties
-function parseLocation(properties: any): { country: string; city: string } {
+type AnalyticsEventProperties = {
+  country?: string;
+  city?: string;
+  [key: string]: unknown;
+};
+
+function parseLocation(properties: AnalyticsEventProperties): { country: string; city: string } {
   // In production, you would use IP geolocation service
   // For now, return defaults or parse from headers
   return {
@@ -51,7 +57,7 @@ function parseLocation(properties: any): { country: string; city: string } {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -70,7 +76,7 @@ export async function GET(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const projectId = params.id
+    const projectId = context.params.id
 
     // Verify project access
     const project = await prisma.project.findFirst({
@@ -117,7 +123,8 @@ export async function GET(
     // Calculate unique visitors (using session-like logic from user agent + date)
     const uniqueVisitorSet = new Set(
       pageViews.map(e => {
-        const ua = (e.properties as any)?.userAgent || 'unknown'
+        const props = e.properties as AnalyticsEventProperties
+        const ua = typeof props.userAgent === 'string' ? props.userAgent : 'unknown'
         const date = new Date(e.createdAt).toDateString()
         return `${ua}-${date}`
       })
@@ -126,7 +133,10 @@ export async function GET(
 
     // Calculate average time on page
     const pageTimes = pageViews
-      .map(e => (e.properties as any)?.timeOnPage || 0)
+      .map(e => {
+        const props = e.properties as AnalyticsEventProperties
+        return typeof props.timeOnPage === 'number' ? props.timeOnPage : 0
+      })
       .filter(t => t > 0)
     const avgTimeOnPage = pageTimes.length > 0
       ? Math.round(pageTimes.reduce((a, b) => a + b, 0) / pageTimes.length)
@@ -135,7 +145,8 @@ export async function GET(
     // Calculate bounce rate (simplified: single page view sessions)
     const sessionCounts = new Map()
     pageViews.forEach(e => {
-      const ua = (e.properties as any)?.userAgent || 'unknown'
+      const props = e.properties as AnalyticsEventProperties
+      const ua = typeof props.userAgent === 'string' ? props.userAgent : 'unknown'
       const date = new Date(e.createdAt).toDateString()
       const sessionId = `${ua}-${date}`
       sessionCounts.set(sessionId, (sessionCounts.get(sessionId) || 0) + 1)
@@ -160,7 +171,8 @@ export async function GET(
       }
       const data = viewsByDate.get(date)!
       data.views++
-      data.visitors.add((e.properties as any)?.userAgent || 'unknown')
+      const props = e.properties as AnalyticsEventProperties
+      data.visitors.add(typeof props.userAgent === 'string' ? props.userAgent : 'unknown')
     })
 
     const pageViewsOverTime = Array.from(viewsByDate.entries())
@@ -174,7 +186,8 @@ export async function GET(
     // Top traffic sources
     const referrerCounts = new Map<string, number>()
     pageViews.forEach(e => {
-      const referrer = (e.properties as any)?.referrer || 'Direct'
+      const props = e.properties as AnalyticsEventProperties
+      const referrer = typeof props.referrer === 'string' ? props.referrer : 'Direct'
       const url = referrer === 'Direct' ? 'Direct' : new URL(referrer).hostname
       referrerCounts.set(url, (referrerCounts.get(url) || 0) + 1)
     })
@@ -200,7 +213,8 @@ export async function GET(
     // Device breakdown
     const deviceCounts = new Map<string, number>()
     pageViews.forEach(e => {
-      const ua = (e.properties as any)?.userAgent || 'unknown'
+      const props = e.properties as AnalyticsEventProperties
+      const ua = typeof props.userAgent === 'string' ? props.userAgent : 'unknown'
       const device = getDeviceType(ua)
       deviceCounts.set(device, (deviceCounts.get(device) || 0) + 1)
     })
@@ -216,7 +230,8 @@ export async function GET(
     // Browser breakdown
     const browserCounts = new Map<string, number>()
     pageViews.forEach(e => {
-      const ua = (e.properties as any)?.userAgent || 'unknown'
+      const props = e.properties as AnalyticsEventProperties
+      const ua = typeof props.userAgent === 'string' ? props.userAgent : 'unknown'
       const browser = getBrowser(ua)
       browserCounts.set(browser, (browserCounts.get(browser) || 0) + 1)
     })
@@ -232,7 +247,7 @@ export async function GET(
     // Geographic distribution (simplified)
     const locationCounts = new Map<string, number>()
     pageViews.forEach(e => {
-      const location = parseLocation(e.properties)
+      const location = parseLocation((e.properties ?? {}) as AnalyticsEventProperties)
       const key = `${location.country}-${location.city}`
       locationCounts.set(key, (locationCounts.get(key) || 0) + 1)
     })
@@ -253,13 +268,14 @@ export async function GET(
     // Top pages
     const pageCounts = new Map<string, { views: number; times: number[] }>()
     pageViews.forEach(e => {
-      const path = (e.properties as any)?.path || '/'
+      const props = e.properties as AnalyticsEventProperties
+      const path = typeof props.path === 'string' ? props.path : '/'
       if (!pageCounts.has(path)) {
         pageCounts.set(path, { views: 0, times: [] })
       }
       const data = pageCounts.get(path)!
       data.views++
-      const time = (e.properties as any)?.timeOnPage || 0
+      const time = typeof props.timeOnPage === 'number' ? props.timeOnPage : 0
       if (time > 0) data.times.push(time)
     })
 

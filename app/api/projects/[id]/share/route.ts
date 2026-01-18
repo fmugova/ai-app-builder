@@ -8,8 +8,9 @@ export const dynamic = "force-dynamic";
 
 export async function POST(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
+  const { id } = params;
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
@@ -20,11 +21,9 @@ export async function POST(
       );
     }
 
-    const params = await context.params;
-    
     // Verify project ownership
     const existingProject = await prisma.project.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: { userId: true }
     });
 
@@ -48,7 +47,7 @@ export async function POST(
     const shareToken = isPublic ? randomBytes(16).toString("hex") : null;
 
     const project = await prisma.project.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         isPublic,
         shareToken,

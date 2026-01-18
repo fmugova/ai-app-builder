@@ -13,9 +13,10 @@ export const DELETE = withAuth(async (req, context, session) => {
     }
 
     // 2. Check ownership
+    const { id } = await context.params;
     const domain = await prisma.customDomain.findFirst({
       where: {
-        id: context.params.id,
+        id: id as string,
         project: { userId: session.user.id }
       }
     })
@@ -29,7 +30,7 @@ export const DELETE = withAuth(async (req, context, session) => {
 
     // 3. Delete domain
     await prisma.customDomain.delete({
-      where: { id: context.params.id }
+      where: { id: id as string }
     })
 
     return NextResponse.json({ success: true })

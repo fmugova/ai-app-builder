@@ -8,8 +8,9 @@ import { prisma } from '@/lib/prisma'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const session = await getServerSession(authOptions)
 
@@ -20,7 +21,7 @@ export async function PATCH(
     const { response, status } = await request.json()
 
     const updatedFeedback = await prisma.feedback.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         response,
         status

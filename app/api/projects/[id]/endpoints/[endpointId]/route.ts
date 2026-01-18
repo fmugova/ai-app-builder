@@ -11,6 +11,7 @@ export async function DELETE(
   req: Request,
   { params }: { params: { id: string; endpointId: string } }
 ) {
+  const { id, endpointId } = params;
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
@@ -20,9 +21,9 @@ export async function DELETE(
     // Verify ownership
     const endpoint = await prisma.apiEndpoint.findFirst({
       where: {
-        id: params.endpointId,
+        id: endpointId,
         project: {
-          id: params.id,
+          id: id,
           User: { email: session.user.email }
         }
       }
@@ -33,7 +34,7 @@ export async function DELETE(
     }
 
     await prisma.apiEndpoint.delete({
-      where: { id: params.endpointId }
+      where: { id: endpointId }
     })
 
     return NextResponse.json({ success: true })

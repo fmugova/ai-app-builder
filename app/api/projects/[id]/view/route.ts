@@ -22,7 +22,7 @@ export async function GET(
 
     // Get project with user info
     const project = await prisma.project.findUnique({
-      where: { id },
+      where: { id: id as string },
       include: {
         User: {
           select: {

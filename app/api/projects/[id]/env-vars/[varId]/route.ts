@@ -7,22 +7,21 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logSecurityEvent } from '@/lib/security'
 
-export async function DELETE(
-  req: Request,
-  { params }: { params: { id: string; varId: string } }
-) {
+export async function POST(req: Request, context: { params: { id: string; varId: string } }) {
+  const { id, varId } = context.params;
   try {
-    const session = await getServerSession(authOptions)
+    // Verify ownership
+    const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Verify ownership
     const variable = await prisma.environmentVariable.findFirst({
       where: {
-        id: params.varId,
+        id: varId,
         project: {
-          id: params.id,
+          id: id,
           User: { email: session.user.email }
         }
       }
@@ -39,7 +38,7 @@ export async function DELETE(
 
     // Delete variable
     await prisma.environmentVariable.delete({
-      where: { id: params.varId }
+      where: { id: varId }
     })
 
     // Log security event
@@ -49,7 +48,7 @@ export async function DELETE(
         type: 'env_var_deleted',
         action: 'success',
         metadata: {
-          projectId: params.id,
+          projectId: id,
           key: variable.key,
           environment: variable.environment
         },

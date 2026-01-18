@@ -8,8 +8,9 @@ import { sendEmail } from '@/lib/email'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const session = await getServerSession(authOptions)
 
@@ -29,7 +30,7 @@ export async function POST(
     }
 
     const campaign = await prisma.emailCampaign.findUnique({
-      where: { id: params.id }
+      where: { id: id as string }
     })
 
     if (!campaign) {

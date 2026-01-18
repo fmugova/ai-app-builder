@@ -5,10 +5,8 @@ import { prisma } from '@/lib/prisma'
 import { promises as dns } from 'dns'
 
 // POST /api/projects/[id]/domains/[domainId]/verify - Verify DNS configuration
-export async function POST(
-  req: Request,
-  { params }: { params: { id: string; domainId: string } }
-) {
+export async function POST(req: Request, context: { params: { id: string; domainId: string } }) {
+  const { id, domainId } = context.params;
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
@@ -27,9 +25,9 @@ export async function POST(
     // Get domain
     const domain = await prisma.customDomain.findFirst({
       where: {
-        id: params.domainId,
+        id: domainId,
         project: {
-          id: params.id,
+          id: id,
           userId: user.id
         }
       }
@@ -61,7 +59,7 @@ export async function POST(
 
     // Update domain status
     const updatedDomain = await prisma.customDomain.update({
-      where: { id: params.domainId },
+      where: { id: domainId },
       data: {
         status: dnsCheck.verified ? 'active' : 'pending',
         verifiedAt: dnsCheck.verified ? new Date() : null,
@@ -76,7 +74,7 @@ export async function POST(
         type: 'domain',
         action: 'verified',
         metadata: {
-          projectId: params.id,
+          projectId: id,
           domain: domain.domain,
           sslConfigured: vercelCheck.sslConfigured
         },

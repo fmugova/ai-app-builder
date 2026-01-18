@@ -8,7 +8,7 @@ import { prisma } from '@/lib/prisma'
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string; endpointId: string } }
+  context: { params: { id: string; endpointId: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -19,9 +19,9 @@ export async function POST(
     // Get endpoint
     const endpoint = await prisma.apiEndpoint.findFirst({
       where: {
-        id: params.endpointId,
+        id: context.params.endpointId,
         project: {
-          id: params.id,
+          id: context.params.id,
           User: { email: session.user.email }
         }
       }
@@ -44,7 +44,7 @@ export async function POST(
 
     // Update test status
     await prisma.apiEndpoint.update({
-      where: { id: params.endpointId },
+      where: { id: context.params.endpointId },
       data: {
         testsPassed: testResult.success,
         lastTested: new Date()

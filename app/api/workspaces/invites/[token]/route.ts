@@ -6,11 +6,12 @@ import prisma from '@/lib/prisma';
 // GET /api/workspaces/invites/[token] - Get invite details
 export async function GET(
   req: NextRequest,
-  { params }: { params: { token: string } }
+  { params }: { params: Promise<{ token: string }> }
 ) {
+  const { token } = await params;
   try {
     const invite = await prisma.workspaceInvite.findUnique({
-      where: { token: params.token },
+      where: { token },
       include: {
         workspace: {
           select: {
@@ -55,8 +56,9 @@ export async function GET(
 // POST /api/workspaces/invites/[token]/accept - Accept invite
 export async function POST(
   req: NextRequest,
-  { params }: { params: { token: string } }
+  { params }: { params: Promise<{ token: string }> }
 ) {
+  const { token } = await params;
   try {
     const session = await getServerSession(authOptions);
     
@@ -73,7 +75,7 @@ export async function POST(
     }
 
     const invite = await prisma.workspaceInvite.findUnique({
-      where: { token: params.token },
+      where: { token },
       include: {
         workspace: true,
       },
@@ -116,7 +118,7 @@ export async function POST(
     }
 
     // Add user to workspace and update invite
-    const [member, updatedInvite] = await prisma.$transaction([
+    const [member] = await prisma.$transaction([
       prisma.workspaceMember.create({
         data: {
           workspaceId: invite.workspaceId,

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
@@ -84,18 +84,7 @@ export default function ProjectAnalyticsPage() {
   const params = useParams()
   const projectId = params.id as string
 
-  useEffect(() => {
-    if (status === 'loading') return
-
-    if (!session) {
-      router.push('/auth/signin')
-      return
-    }
-
-    loadAnalytics()
-  }, [session, status, period, projectId])
-
-  const loadAnalytics = async () => {
+  const loadAnalytics = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -113,13 +102,28 @@ export default function ProjectAnalyticsPage() {
       
       const data = await response.json()
       setAnalytics(data)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error loading analytics:', error)
-      setError(error.message || 'Failed to load analytics')
+      if (error instanceof Error) {
+        setError(error.message)
+      } else {
+        setError('Failed to load analytics')
+      }
     } finally {
       setLoading(false)
     }
-  }
+  }, [projectId, period])
+
+  useEffect(() => {
+    if (status === 'loading') return
+
+    if (!session) {
+      router.push('/auth/signin')
+      return
+    }
+
+    loadAnalytics()
+  }, [session, status, period, projectId, loadAnalytics, router])
 
   if (status === 'loading' || loading) {
     return (

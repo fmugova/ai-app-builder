@@ -9,13 +9,15 @@ import { generateApiEndpoint, validateGeneratedCode } from '@/lib/api-generator'
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const { id } = await params;
 
     const {
       description,
@@ -36,7 +38,7 @@ export async function POST(
     // Verify project ownership
     const project = await prisma.project.findFirst({
       where: {
-        id: params.id,
+        id,
         User: { email: session.user.email }
       }
     })

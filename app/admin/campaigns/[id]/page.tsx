@@ -30,10 +30,6 @@ export default function CampaignDetailPage() {
   const [sending, setSending] = useState(false)
   const [testEmail, setTestEmail] = useState('')
 
-  useEffect(() => {
-    loadCampaign()
-  }, [campaignId])
-
   const loadCampaign = async () => {
     try {
       const res = await fetch(`/api/admin/campaigns/${campaignId}`)
@@ -44,12 +40,17 @@ export default function CampaignDetailPage() {
         toast.error('Campaign not found')
         router.push('/admin/campaigns')
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to load campaign')
     } finally {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    loadCampaign()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaignId])
 
   const handleSendTest = async () => {
     if (!testEmail) {
@@ -74,7 +75,7 @@ export default function CampaignDetailPage() {
       } else {
         toast.error('Failed to send test', { id: 'test' })
       }
-    } catch (error) {
+    } catch {
       toast.error('Error sending test', { id: 'test' })
     }
   }
@@ -104,7 +105,7 @@ export default function CampaignDetailPage() {
         const error = await res.json()
         toast.error(error.error || 'Failed to send campaign', { id: 'send' })
       }
-    } catch (error) {
+    } catch {
       toast.error('Error sending campaign', { id: 'send' })
     } finally {
       setSending(false)

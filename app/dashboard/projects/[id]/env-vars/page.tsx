@@ -6,13 +6,15 @@ import { prisma } from '@/lib/prisma'
 import EnvironmentVariablesPage from '@/components/EnvironmentVariablesPage'
 import { EnvironmentVariablesSkeleton } from '@/components/LoadingSkeleton'
 
-async function EnvVarsContent({ params }: { params: { id: string } }) {
+async function EnvVarsContent({ params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
 
+  const { id } = await params
+
   const project = await prisma.project.findFirst({
     where: {
-      id: params.id,
+      id,
       User: { email: session.user.email }
     }
   })
@@ -27,7 +29,7 @@ async function EnvVarsContent({ params }: { params: { id: string } }) {
   )
 }
 
-export default function EnvVarsPage({ params }: { params: { id: string } }) {
+export default function EnvVarsPage({ params }: { params: Promise<{ id: string }> }) {
   return (
     <Suspense fallback={<EnvironmentVariablesSkeleton />}>
       <EnvVarsContent params={params} />

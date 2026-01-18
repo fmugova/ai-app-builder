@@ -42,8 +42,9 @@ async function checkWorkspacePermission(
 // GET /api/workspaces/[id]/projects - Get all projects in workspace
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const session = await getServerSession(authOptions);
     
@@ -59,14 +60,14 @@ export async function GET(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const { hasPermission } = await checkWorkspacePermission(params.id, user.id);
+    const { hasPermission } = await checkWorkspacePermission(id, user.id);
 
     if (!hasPermission) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
     const projects = await prisma.workspaceProject.findMany({
-      where: { workspaceId: params.id },
+      where: { workspaceId: id },
       include: {
         // Note: We'll need to add a relation to the Project model later
       },
@@ -88,8 +89,9 @@ export async function GET(
 // POST /api/workspaces/[id]/projects - Add project to workspace
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const session = await getServerSession(authOptions);
     
@@ -105,7 +107,7 @@ export async function POST(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const { hasPermission } = await checkWorkspacePermission(params.id, user.id, 'admin');
+    const { hasPermission } = await checkWorkspacePermission(id, user.id, 'admin');
 
     if (!hasPermission) {
       return NextResponse.json(
@@ -130,7 +132,7 @@ export async function POST(
     const existingProject = await prisma.workspaceProject.findUnique({
       where: {
         workspaceId_projectId: {
-          workspaceId: params.id,
+          workspaceId: id,
           projectId: validatedData.projectId,
         },
       },
@@ -145,7 +147,7 @@ export async function POST(
 
     // Check workspace project limit
     const workspace = await prisma.workspace.findUnique({
-      where: { id: params.id },
+      where: { id: id as string },
       include: {
         _count: {
           select: { projects: true },
@@ -162,7 +164,7 @@ export async function POST(
 
     const workspaceProject = await prisma.workspaceProject.create({
       data: {
-        workspaceId: params.id,
+        workspaceId: id,
         projectId: validatedData.projectId,
         permission: validatedData.permission,
         addedBy: user.id,
@@ -176,7 +178,7 @@ export async function POST(
         type: 'workspace',
         action: 'project_added',
         metadata: {
-          workspaceId: params.id,
+          workspaceId: id,
           projectId: validatedData.projectId,
           projectName: project.name,
         },

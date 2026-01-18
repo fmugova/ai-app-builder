@@ -6,10 +6,8 @@ import prisma from '@/lib/prisma';
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, context: { params: { id: string } }) {
+  const { id } = context.params;
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
@@ -27,7 +25,7 @@ export async function GET(
     // Check if project has been exported to GitHub
     const deployment = await prisma.deployment.findFirst({
       where: {
-        projectId: params.id,
+        projectId: id,
         platform: 'github',
         status: 'success'
       },
@@ -38,14 +36,13 @@ export async function GET(
 
     return NextResponse.json({
       hasGithubRepo: !!deployment,
-      repoName: deployment?.vercelProjectId || null,
-      exportedAt: deployment?.createdAt || null
+      deployment
     });
 
-  } catch (error: any) {
-    console.error('GitHub status check error:', error);
+  } catch (error) {
+    console.error('Github status error:', error);
     return NextResponse.json(
-      { error: 'Failed to check GitHub status' },
+      { error: 'Failed to fetch Github status' },
       { status: 500 }
     );
   }

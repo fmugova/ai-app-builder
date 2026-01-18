@@ -17,7 +17,7 @@ export async function POST(
     }
 
     const project = await prisma.project.findUnique({
-      where: { id },
+      where: { id: id as string },
       include: { User: true }
     })
 
@@ -38,9 +38,9 @@ export async function POST(
       canConvert: false
     })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error.message },
+      { error: typeof error === 'object' && error !== null && 'message' in error ? (error as { message: string }).message : String(error) },
       { status: 500 }
     )
   }
