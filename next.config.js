@@ -75,7 +75,18 @@ const nextConfig = {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()'
           },
-          // Content Security Policy - NOW HANDLED IN MIDDLEWARE
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://unpkg.com https://cdnjs.cloudflare.com",
+              "style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com",
+              "img-src 'self' data: https: blob:",
+              "font-src 'self' data:",
+              "connect-src 'self' https://api.anthropic.com https://*.supabase.co wss://*.supabase.co",
+              "frame-src 'self' blob: data:",
+            ].join('; ')
+          },
         ],
       },
     ]
