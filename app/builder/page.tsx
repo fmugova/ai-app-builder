@@ -262,7 +262,8 @@ function BuilderContent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             prompt, 
-            type: projectType 
+            type: projectType,
+            projectId: currentProjectId // ✅ Pass projectId to prevent duplication
           })
         })
 
@@ -276,6 +277,10 @@ function BuilderContent() {
 
         if (res.ok) {
           setGeneratedCode(data.code)
+          // ✅ Set projectId from response if it's a new project
+          if (data.projectId && !currentProjectId) {
+            setCurrentProjectId(data.projectId)
+          }
           analytics.aiGeneration(true, projectType)
           toast.success('Code generated successfully!', {
             duration: 2000,

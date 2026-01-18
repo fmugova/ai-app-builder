@@ -97,6 +97,7 @@ model User {
   lastLoginAt           DateTime?
   lastLoginIp           String?
   twoFactorBackupCodes  String[]               @default([])
+  hasSeenOnboarding     Boolean                @default(false)
   accounts              Account[]
   activeSessions        ActiveSession[]
   activities            Activity[]

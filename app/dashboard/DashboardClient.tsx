@@ -1,6 +1,9 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
+const WelcomeModal = dynamic(() => import('@/components/WelcomeModal'), { ssr: false }) as React.ComponentType<{ onClose: () => void }>;
+
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { signOut } from 'next-auth/react'
@@ -68,6 +71,28 @@ export default function DashboardClient({
   })
   const [showAccountMenu, setShowAccountMenu] = useState(false)
   const [toasts, setToasts] = useState<Toast[]>([])
+
+  // Onboarding modal state and logic
+  const [showOnboarding, setShowOnboarding] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/user/onboarding-status')
+      .then(res => res.json())
+      .then(data => {
+        if (!data.hasSeenOnboarding) {
+          setShowOnboarding(true)
+        }
+      })
+  }, [])
+
+  const handleCloseOnboarding = async () => {
+    setShowOnboarding(false)
+    await fetch('/api/user/onboarding-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hasSeenOnboarding: true })
+    })
+  }
 
   // Toast notification system
   const toastIdRef = React.useRef(0)
@@ -174,7 +199,11 @@ export default function DashboardClient({
   if (!session) return null
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
+    <>
+      {showOnboarding && (
+        <WelcomeModal onClose={handleCloseOnboarding} />
+      )}
+      <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
       {/* Toast Notifications */}
       <div className="fixed top-4 right-4 z-50 space-y-2">
         {toasts.map((toast) => (
@@ -603,5 +632,6 @@ export default function DashboardClient({
         }
       `}</style>
     </div>
+    </>
   )
 }
