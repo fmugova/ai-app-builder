@@ -55,8 +55,6 @@ const nextConfig = {
   },
   // Add comprehensive security headers
   async headers() {
-    const isDev = process.env.NODE_ENV === 'development';
-    const scriptSrc = isDev ? "'self' 'unsafe-eval' 'unsafe-inline'" : "'self'";
     return [
       {
         source: '/:path*',
@@ -91,11 +89,11 @@ const nextConfig = {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()'
           },
-          // Content Security Policy
-          {
-            key: 'Content-Security-Policy',
-            value: `default-src 'self'; script-src ${scriptSrc}; style-src 'self' 'unsafe-inline'; font-src 'self' data: https://fonts.gstatic.com;`
-          }
+            // Content Security Policy - NOW HANDLED IN MIDDLEWARE
+            // {
+            //   key: 'Content-Security-Policy',
+            //   value: ContentSecurityPolicy
+            // }
         ],
       },
     ]
