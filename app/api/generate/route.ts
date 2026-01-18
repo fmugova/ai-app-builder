@@ -61,45 +61,31 @@ async function callClaudeWithRetry(anthropic: Anthropic, messages: Anthropic.Mes
 function injectAnalytics(code: string, projectId: string): string {
   const analyticsScript = getAnalyticsScript(projectId)
   
-  // Find the LAST occurrence of </body> (not the first)
-  const bodyCloseIndex = code.lastIndexOf('</body>')
+  // Find the LAST </script> tag, then inject before the </body> that comes AFTER it
+  const lastScriptClose = code.lastIndexOf('</script>')
   
-  if (bodyCloseIndex === -1) {
-    // No </body> tag found - append at end
-    console.warn('⚠️ No </body> tag found, appending analytics at end')
+  if (lastScriptClose === -1) {
+    // No scripts at all - just inject before </body>
+    const bodyClose = code.lastIndexOf('</body>')
+    if (bodyClose === -1) return code + '\n' + analyticsScript
+    return code.substring(0, bodyClose) + '\n' + analyticsScript + '\n' + code.substring(bodyClose)
+  }
+  
+  // Find the </body> that comes AFTER the last </script>
+  const actualBodyClose = code.indexOf('</body>', lastScriptClose)
+  
+  if (actualBodyClose === -1) {
+    // No </body> after scripts - append at end
+    console.warn('⚠️ No </body> after scripts, appending at end')
     return code + '\n' + analyticsScript
   }
   
-  // Additional safety: verify there's a <script type="text/babel"> before this </body>
-  // If so, we might be inside it - find the previous </body>
-  const codeBeforeBody = code.substring(0, bodyCloseIndex)
-  const lastScriptBabelOpen = codeBeforeBody.lastIndexOf('<script type="text/babel">')
-  const lastScriptClose = codeBeforeBody.lastIndexOf('</script>')
-  
-  // If there's an unclosed <script type="text/babel"> before this </body>, we're inside it!
-  if (lastScriptBabelOpen > lastScriptClose && lastScriptBabelOpen !== -1) {
-    console.warn('⚠️ Found </body> inside script block, looking for correct one')
-    
-    // Find the </script> that closes this babel block
-    const nextScriptClose = code.indexOf('</script>', bodyCloseIndex)
-    if (nextScriptClose !== -1) {
-      // Find the </body> after that script close
-      const correctBodyClose = code.indexOf('</body>', nextScriptClose)
-      if (correctBodyClose !== -1) {
-        return (
-          code.substring(0, correctBodyClose) +
-          '\n' + analyticsScript + '\n' +
-          code.substring(correctBodyClose)
-        )
-      }
-    }
-  }
-  
-  // Safe to inject at this </body>
+  // Inject before the ACTUAL </body> tag
+  console.log('✅ Injecting analytics at position:', actualBodyClose)
   return (
-    code.substring(0, bodyCloseIndex) +
+    code.substring(0, actualBodyClose) +
     '\n' + analyticsScript + '\n' +
-    code.substring(bodyCloseIndex)
+    code.substring(actualBodyClose)
   )
 }
 
