@@ -13,7 +13,7 @@ import SupportChat from '@/components/SupportChat'
 import FeedbackWidget from '@/components/FeedbackWidget'
 import Script from 'next/script'
 import type { Metadata, Viewport } from 'next'
-import WelcomeModal from '@/components/WelcomeModal'
+
 
 // Optimize Inter font loading
 const inter = Inter({
@@ -195,7 +195,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <GoogleTagManager gtmId="GTM-KNTK3Z8G" />
         <SupportChat />
         <FeedbackWidget />
-        <WelcomeModal />
+
       </body>
     </html>
   )
