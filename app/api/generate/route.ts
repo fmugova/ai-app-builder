@@ -1,3 +1,83 @@
+// Check if generated code is complete before validation
+function isCodeComplete(code: string): { complete: boolean; reason?: string } {
+  if (!code.includes('<!DOCTYPE html>') && !code.includes('<html')) {
+    return { complete: false, reason: 'Missing HTML start tag' };
+  }
+  if (!code.includes('</html>')) {
+    return { complete: false, reason: 'Missing closing </html> tag' };
+  }
+  if (!code.includes('</body>')) {
+    return { complete: false, reason: 'Missing closing </body> tag' };
+  }
+  // Check for unterminated strings (common in truncated code)
+  const lines = code.split('\n');
+  const lastLine = lines[lines.length - 1];
+  if (lastLine.trim().endsWith(',') || lastLine.trim().endsWith('{')) {
+    return { complete: false, reason: 'Code appears truncated (ends with comma or brace)' };
+  }
+  return { complete: true };
+}
+/**
+ * Remove restrictive CSP meta tags from generated code
+ * This prevents Google Fonts and other resources from being blocked
+ */
+function removeRestrictiveCSP(html: string): string {
+  // Remove any CSP meta tags
+  return html.replace(
+    /<meta\s+http-equiv=["']Content-Security-Policy["'][^>]*>/gi,
+    ''
+  );
+}
+// Validate and fix generated code before saving
+function isCodeValid(code: string): { valid: boolean; reason?: string } {
+  // Unterminated className (className opened but not closed on same line)
+  if (/className="[^"]*\n[^"]*</.test(code)) {
+    const reason = 'Unterminated className attribute detected';
+    console.error('Validation failed:', reason);
+    return { valid: false, reason };
+  }
+  // Incomplete HTML (missing </html>)
+  if (!code.includes('</html>')) {
+    const reason = 'Missing </html> tag';
+    console.error('Validation failed:', reason);
+    return { valid: false, reason };
+  }
+  // Unbalanced quotes
+  const quotes = (code.match(/"/g) || []).length;
+  if (quotes % 2 !== 0) {
+    const reason = 'Unmatched quotes detected';
+    console.error('Validation failed:', reason);
+    return { valid: false, reason };
+  }
+  // Hooks in class or constructor (React error #321)
+  if (/class\s+\w+\s*\{[\s\S]*use(State|Effect|Ref|Context|Reducer|Callback|Memo|ImperativeHandle|LayoutEffect|DebugValue)\s*\(/.test(code)) {
+    const reason = 'React hooks used inside a class or constructor';
+    console.error('Validation failed:', reason);
+    return { valid: false, reason };
+  }
+  // (Removed) Hooks outside function components check: was too broad and caused false positives
+  return { valid: true };
+}
+
+function validateAndFixGeneratedCode(code: string): string {
+  // Remove any preamble text before <!DOCTYPE html>
+  const doctypeIndex = code.indexOf('<!DOCTYPE html>');
+  if (doctypeIndex > 0) {
+    code = code.substring(doctypeIndex);
+  }
+  const validation = isCodeValid(code);
+  if (!validation.valid) {
+    throw new Error(validation.reason || 'Invalid code generated');
+  }
+  // Ensure ReactRouterDOM is accessed safely
+  if (code.includes('ReactRouterDOM')) {
+    if (!code.includes('window.ReactRouterDOM') && !code.includes('const ReactRouterDOM = window.ReactRouterDOM')) {
+      console.warn('⚠️  React Router usage detected - adding safety check');
+    }
+  }
+  return code;
+}
+
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import Anthropic from "@anthropic-ai/sdk"
@@ -178,6 +258,24 @@ export async function POST(request: NextRequest) {
     if (message.content && message.content[0]) {
       const content = message.content[0];
       code = content.type === 'text' ? content.text : '';
+      // Remove markdown code blocks if present
+      if (code.includes('```html')) {
+        code = code
+          .replace(/```html\n?/g, '')
+          .replace(/```\n?$/g, '')
+          .trim();
+        console.log('After markdown removal:', code.substring(0, 100));
+      }
+      // Log AI response stats for diagnostics
+      console.log('📊 CODE STATS:');
+      console.log('Length:', code.length, 'characters');
+      console.log('Lines:', code.split('\n').length);
+      console.log('Starts with:', code.substring(0, 100));
+      console.log('Ends with:', code.substring(Math.max(0, code.length - 100)));
+      const hasHtmlStart = code.includes('<!DOCTYPE html>') || code.includes('<html');
+      const hasHtmlEnd = code.includes('</html>');
+      const hasBodyEnd = code.includes('</body>');
+      console.log('Complete HTML?', { hasHtmlStart, hasHtmlEnd, hasBodyEnd });
     } else {
       console.error('Invalid AI response structure:', message)
       return NextResponse.json({ error: 'Invalid AI response' }, { status: 500 });
@@ -195,6 +293,36 @@ export async function POST(request: NextRequest) {
     // Ensure DOCTYPE
     if (!code.startsWith('<!DOCTYPE')) {
       code = `<!DOCTYPE html>\n${code}`
+    }
+
+    // Remove restrictive CSP meta tags
+    code = removeRestrictiveCSP(code);
+
+    // Check for completeness before validation
+    const completeness = isCodeComplete(code);
+    if (!completeness.complete) {
+      console.error('Incomplete code:', completeness.reason);
+      return NextResponse.json({
+        error: 'Generated code is incomplete',
+        reason: completeness.reason,
+        suggestion: 'Try simplifying your request or breaking it into smaller features',
+        codePreview: code.substring(0, 500)
+      }, { status: 400 });
+    }
+
+    // Validate and fix generated code
+    try {
+      code = validateAndFixGeneratedCode(code);
+    } catch (validationError) {
+      console.error('❌ Code validation failed:', validationError);
+      console.error('--- AI generated code start ---');
+      console.error(code);
+      console.error('--- AI generated code end ---');
+      return NextResponse.json({ 
+        error: 'Generated code has syntax errors. Please try a different prompt.',
+        details: validationError instanceof Error ? validationError.message : String(validationError),
+        codePreview: code.substring(0, 500)
+      }, { status: 400 });
     }
 
     // Inject analytics with placeholder

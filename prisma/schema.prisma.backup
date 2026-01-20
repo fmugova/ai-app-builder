@@ -1,31 +1,13 @@
-// This is your Prisma schema file
-// Learn more: https://pris.ly/d/prisma-schema
-
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
-}
-
-model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  password      String
-  image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  // Relations
-  accounts      Account[]
-  sessions      Session[]
-  projects      Project[]
-  subscription  Subscription?
+  schemas   = ["auth", "public"]
 }
 
 model Account {
@@ -41,10 +23,10 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-  
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  User              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([provider, providerAccountId])
+  @@schema("public")
 }
 
 model Session {
@@ -52,91 +34,1346 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-  
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  ipAddress    String?
+  lastActive   DateTime @default(now())
+  userAgent    String?
+  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionToken])
+  @@index([userId, lastActive])
+  @@schema("public")
 }
 
 model VerificationToken {
   identifier String
   token      String   @unique
   expires    DateTime
-  
+
   @@unique([identifier, token])
+  @@schema("public")
+}
+
+model User {
+  id                    String                 @id @default(cuid())
+  name                  String?
+  email                 String                 @unique
+  emailVerified         DateTime?
+  password              String?
+  image                 String?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  autoSave              Boolean                @default(true)
+  notifications         Boolean                @default(true)
+  theme                 String                 @default("dark")
+  bio                   String?
+  promoCodeUsed         String?
+  discountRate          Float                  @default(0)
+  subscriptionTier      String                 @default("free")
+  subscriptionStatus    String                 @default("active")
+  stripeCustomerId      String?                @unique
+  stripeSubscriptionId  String?                @unique
+  subscriptionResetDate DateTime?
+  cancelAtPeriodEnd     Boolean                @default(false)
+  currentPeriodStart    DateTime?
+  currentPeriodEnd      DateTime?
+  generationsUsed       Int                    @default(0)
+  generationsLimit      Int                    @default(10)
+  projectsThisMonth     Int                    @default(0)
+  projectsLimit         Int                    @default(3)
+  role                  String                 @default("user")
+  githubAccessToken     String?
+  githubUsername        String?
+  twoFactorEnabled      Boolean                @default(false)
+  twoFactorSecret       String?
+  resetToken            String?                @unique
+  resetTokenExpiry      DateTime?
+  vercelToken           String?
+  vercelProjectName     String?
+  vercelTeamId          String?
+  accountLockedUntil    DateTime?
+  failedLoginAttempts   Int                    @default(0)
+  lastLoginAt           DateTime?
+  lastLoginIp           String?
+  twoFactorBackupCodes  String[]               @default([])
+  hasSeenOnboarding     Boolean                @default(false)
+  accounts              Account[]
+  activeSessions        ActiveSession[]
+  activities            Activity[]
+  customDomains         CustomDomain[]
+  DatabaseConnections   DatabaseConnection[]
+  Deployment            Deployment[]
+  DripEnrollment        DripEnrollment[]
+  EmailCampaign         EmailCampaign[]
+  feedback              Feedback[]
+  formSubmissions       FormSubmission[]
+  generations           Generation[]
+  generationHistory     GenerationHistory[]
+  NewsletterSubscriber  NewsletterSubscriber[]
+  passwordHistory       PasswordHistory[]
+  projects              Project[]
+  projectSharesReceived ProjectShare[]         @relation("UserProjectShares")
+  projectVersions       ProjectVersion[]
+  securityEvents        SecurityEvent[]
+  sessions              Session[]
+  subscriptions         Subscription?
+  createdTemplates      Template[]             @relation("TemplateCreator")
+  templatePurchases     TemplatePurchase[]
+  templateRevenue       TemplateRevenue[]
+  templateReviews       TemplateReview[]
+  VercelConnection      VercelConnection?
+  workspaceMembers      WorkspaceMember[]
+
+  @@schema("public")
 }
 
 model Project {
-  id          String   @id @default(cuid())
-  userId      String
-  name        String
-  description String
-  type        String
-  code        String   @db.Text
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // 🆕 NEW FIELDS FOR SHARING
-  isPublic    Boolean  @default(false)
-  shareToken  String?  @unique
-  
-  // Relations
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  versions    ProjectVersion[]  // 🆕 NEW RELATION
-  
+  id                   String                @id @default(cuid())
+  userId               String
+  name                 String
+  description          String?
+  type                 String
+  code                 String
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @default(now()) @updatedAt
+  downloads            Int                   @default(0)
+  framework            String?
+  isPublic             Boolean               @default(false)
+  isPublished          Boolean               @default(false)
+  publishedAt          DateTime?
+  publicSlug           String?               @unique
+  publicUrl            String?
+  language             String?
+  prompt               String?
+  shareToken           String?               @unique
+  tags                 String[]              @default([])
+  views                Int                   @default(0)
+  multiPage            Boolean               @default(false)
+  apiEndpoints         ApiEndpoint[]
+  customDomains        CustomDomain[]
+  DatabaseConnection   DatabaseConnection?
+  Deployment           Deployment[]
+  environmentVariables EnvironmentVariable[]
+  formSubmissions      FormSubmission[]
+  pages                Page[]
+  User                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ProjectShare         ProjectShare[]
+  ProjectVersion       ProjectVersion[]
+
+  @@index([isPublic])
+  @@index([isPublished])
+  @@index([publicSlug])
+  @@index([shareToken])
+  @@index([updatedAt])
   @@index([userId])
-  @@index([shareToken])  // 🆕 NEW INDEX
+  @@index([userId, updatedAt])
+  @@schema("public")
 }
 
-// 🆕 NEW MODEL - Project Version History
+model Page {
+  id              String   @id @default(cuid())
+  projectId       String
+  slug            String
+  title           String
+  description     String?
+  content         String
+  order           Int      @default(0)
+  ogImage         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  isHomepage      Boolean  @default(false)
+  isPublished     Boolean  @default(true)
+  metaDescription String?
+  metaTitle       String?
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, slug])
+  @@index([projectId])
+  @@schema("public")
+}
+
 model ProjectVersion {
   id          String   @id @default(cuid())
   projectId   String
   version     Int
-  code        String   @db.Text
+  code        String
   description String?
   createdAt   DateTime @default(now())
-  
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  @@index([projectId])
-}
+  userId      String?
+  Project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  User        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-// 🆕 NEW MODEL - Analytics Events
-model AnalyticsEvent {
-  id         String   @id @default(cuid())
-  userId     String
-  event      String
-  properties Json?
-  createdAt  DateTime @default(now())
-  
+  @@index([projectId])
   @@index([userId])
   @@index([createdAt])
-}
-
-model Subscription {
-  id                String    @id @default(cuid())
-  userId            String    @unique
-  stripeCustomerId  String    @unique
-  stripeSubscriptionId String? @unique
-  stripePriceId     String?
-  stripeCurrentPeriodEnd DateTime?
-  plan              String    @default("free")
-  status            String    @default("active")
-  generationsUsed   Int       @default(0)
-  generationsLimit  Int       @default(3)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@schema("public")
 }
 
 model Generation {
-  id          String   @id @default(cuid())
+  id         String   @id @default(cuid())
+  userId     String
+  createdAt  DateTime @default(now())
+  code       String
+  prompt     String
+  type       String
+  projectId  String?
+  success    Boolean  @default(true)
+  tokensUsed Int      @default(0)
+  User       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([userId])
+  @@schema("public")
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  action    String
+  metadata  Json?
+  createdAt DateTime @default(now())
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([userId])
+  @@schema("public")
+}
+
+model Feedback {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  subject   String
+  message   String
+  status    String   @default("pending")
+  priority  String   @default("medium")
+  response  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([status])
+  @@index([userId])
+  @@schema("public")
+}
+
+model ProjectShare {
+  id         String    @id @default(cuid())
+  projectId  String
+  sharedWith String
+  permission String    @default("view")
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime?
+  Project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user       User      @relation("UserProjectShares", fields: [sharedWith], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([sharedWith])
+  @@schema("public")
+}
+
+model PromoCodes {
+  id            String    @id @default(cuid())
+  code          String    @unique
+  discountType  String
+  discountValue Int
+  maxUses       Int
+  timesUsed     Int       @default(0)
+  validUntil    DateTime?
+  applicableTo  String[]  @default([])
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([active], map: "idx_promo_codes_active")
+  @@index([code])
+  @@map("promo_codes")
+  @@schema("public")
+}
+
+model Subscription {
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  stripePriceId        String?
+  plan                 String    @default("free")
+  status               String    @default("active")
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  cancelAtPeriodEnd    Boolean   @default(false)
+  currentPeriodEnd     DateTime?
+  currentPeriodStart   DateTime  @default(now())
+  User                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+  @@index([userId])
+  @@index([status])
+  @@schema("public")
+}
+
+model Workspace {
+  id                   String             @id @default(cuid())
+  name                 String
+  slug                 String             @unique
+  description          String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  subscriptionTier     String             @default("free")
+  subscriptionStatus   String             @default("active")
+  stripeCustomerId     String?            @unique
+  stripeSubscriptionId String?            @unique
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  generationsUsed      Int                @default(0)
+  generationsLimit     Int                @default(50)
+  projectsLimit        Int                @default(10)
+  membersLimit         Int                @default(5)
+  invites              WorkspaceInvite[]
+  members              WorkspaceMember[]
+  projects             WorkspaceProject[]
+
+  @@index([slug])
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+  @@schema("public")
+}
+
+model WorkspaceMember {
+  id          String    @id @default(cuid())
+  workspaceId String
   userId      String
-  projectType String
-  description String
-  tokensUsed  Int
-  createdAt   DateTime @default(now())
-  
+  role        String    @default("member")
+  joinedAt    DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([role])
+  @@schema("public")
+}
+
+model WorkspaceInvite {
+  id          String    @id @default(cuid())
+  workspaceId String
+  email       String
+  role        String    @default("member")
+  token       String    @unique
+  status      String    @default("pending")
+  invitedBy   String
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([email])
+  @@index([token])
+  @@index([status])
+  @@schema("public")
+}
+
+model WorkspaceProject {
+  id          String    @id @default(cuid())
+  workspaceId String
+  projectId   String
+  permission  String    @default("edit")
+  addedAt     DateTime  @default(now())
+  addedBy     String?
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, projectId])
+  @@index([workspaceId])
+  @@index([projectId])
+  @@schema("public")
+}
+
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  userId     String?
+  event      String
+  properties Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([event])
+  @@index([userId])
+  @@schema("public")
+}
+
+model FormSubmission {
+  id          String   @id @default(cuid())
+  projectId   String
+  userId      String
+  type        String
+  data        Json
+  submittedAt DateTime @default(now())
+  read        Boolean  @default(false)
+  Project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  User        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([userId])
+  @@map("FormSubmission")
+  @@schema("public")
+}
+
+model CustomDomain {
+  id              String    @id @default(cuid())
+  projectId       String
+  userId          String    @map("user_id")
+  domain          String    @unique
+  status          String    @default("pending")
+  verificationKey String?
+  verifiedAt      DateTime?
+  sslStatus       String    @default("pending")
+  sslIssuedAt     DateTime?
+  errorMessage    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([domain])
+  @@index([status])
+  @@index([userId])
+  @@schema("public")
+}
+
+model DatabaseConnection {
+  id                 String          @id @default(cuid())
+  userId             String
+  projectId          String?         @unique
+  name               String
+  provider           String          @default("supabase")
+  host               String?
+  port               Int?
+  database           String?
+  username           String?
+  password           String?
+  supabaseUrl        String?
+  supabaseAnonKey    String?
+  supabaseServiceKey String?
+  status             String          @default("connected")
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  Project            Project?        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  User               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Tables             DatabaseTable[]
+
+  @@index([userId])
+  @@index([projectId])
+  @@schema("public")
+}
+
+model DatabaseTable {
+  id                   String             @id @default(cuid())
+  databaseConnectionId String
+  name                 String
+  schema               Json
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  DatabaseConnection   DatabaseConnection @relation(fields: [databaseConnectionId], references: [id], onDelete: Cascade)
+
+  @@unique([databaseConnectionId, name])
+  @@index([databaseConnectionId])
+  @@schema("public")
+}
+
+model Deployment {
+  id              String   @id
+  projectId       String
+  userId          String
+  platform        String   @default("vercel")
+  deploymentUrl   String?
+  deploymentId    String?
+  vercelProjectId String?
+  status          String   @default("pending")
+  errorMessage    String?
+  logs            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime
+  Project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  User            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([deploymentId])
+  @@index([projectId])
+  @@index([status])
+  @@index([userId])
+  @@schema("public")
+}
+
+model DripCampaign {
+  id             String           @id
+  name           String
+  description    String?
+  status         String           @default("active")
+  trigger        String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @default(now())
+  DripEmail      DripEmail[]
+  DripEnrollment DripEnrollment[]
+
+  @@index([status])
+  @@index([trigger])
+  @@schema("public")
+}
+
+model DripEmail {
+  id           String       @id
+  campaignId   String
+  name         String
+  subject      String
+  htmlContent  String
+  delayDays    Int
+  delayHours   Int          @default(0)
+  order        Int          @default(0)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @default(now())
+  DripCampaign DripCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([order])
+  @@schema("public")
+}
+
+model DripEnrollment {
+  id             String       @id
+  campaignId     String
+  userEmail      String
+  userId         String
+  enrolledAt     DateTime     @default(now())
+  completedAt    DateTime?
+  unsubscribedAt DateTime?
+  emailsSent     Json?
+  DripCampaign   DripCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  User           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([enrolledAt])
+  @@index([userEmail])
+  @@index([userId])
+  @@schema("public")
+}
+
+model EmailCampaign {
+  id                String      @id
+  name              String
+  subject           String
+  previewText       String?
+  htmlContent       String
+  status            String      @default("draft")
+  scheduledFor      DateTime?
+  sentAt            DateTime?
+  segment           String      @default("all")
+  totalSent         Int         @default(0)
+  totalOpened       Int         @default(0)
+  totalClicked      Int         @default(0)
+  totalBounced      Int         @default(0)
+  totalUnsubscribed Int         @default(0)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @default(now())
+  createdBy         String
+  User              User        @relation(fields: [createdBy], references: [id])
+  EmailSend         EmailSend[]
+
+  @@index([createdAt])
+  @@index([scheduledFor])
+  @@index([status])
+  @@index([createdBy], map: "idx_emailcampaign_createdby")
+  @@schema("public")
+}
+
+model EmailSend {
+  id              String        @id
+  campaignId      String
+  subscriberEmail String
+  sentAt          DateTime      @default(now())
+  openedAt        DateTime?
+  clickedAt       DateTime?
+  bouncedAt       DateTime?
+  unsubscribedAt  DateTime?
+  metadata        Json?
+  user_id         String        @db.Uuid
+  EmailCampaign   EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([sentAt])
+  @@index([subscriberEmail])
+  @@index([user_id], map: "idx_emailsend_user_id")
+  @@schema("public")
+}
+
+model NewsletterSubscriber {
+  id             String    @id
+  email          String    @unique
+  name           String?
+  status         String    @default("active")
+  source         String?
+  subscribedAt   DateTime  @default(now())
+  unsubscribedAt DateTime?
+  preferences    Json?
+  metadata       Json?
+  userId         String?
+  User           User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([subscribedAt])
+  @@index([email], map: "idx_newslettersubscriber_email")
+  @@index([userId], map: "idx_newslettersubscriber_userid")
+  @@schema("public")
+}
+
+model VercelConnection {
+  id              String   @id
+  userId          String   @unique
+  accessToken     String
+  refreshToken    String?
+  teamId          String?
+  configurationId String?
+  username        String?
+  email           String?
+  connectedAt     DateTime @default(now())
+  updatedAt       DateTime
+  User            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@schema("public")
+}
+
+model GenerationHistory {
+  id         String   @id @default(cuid())
+  userId     String
+  projectId  String?
+  prompt     String
+  tokensUsed Int      @default(0)
+  success    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
   @@index([createdAt])
+  @@schema("public")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model audit_log_entries {
+  instance_id String?   @db.Uuid
+  id          String    @id @db.Uuid
+  payload     Json?     @db.Json
+  created_at  DateTime? @db.Timestamptz(6)
+  ip_address  String    @default("") @db.VarChar(64)
+
+  @@index([instance_id], map: "audit_logs_instance_id_idx")
+  @@schema("auth")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model flow_state {
+  id                     String                @id @db.Uuid
+  user_id                String?               @db.Uuid
+  auth_code              String
+  code_challenge_method  code_challenge_method
+  code_challenge         String
+  provider_type          String
+  provider_access_token  String?
+  provider_refresh_token String?
+  created_at             DateTime?             @db.Timestamptz(6)
+  updated_at             DateTime?             @db.Timestamptz(6)
+  authentication_method  String
+  auth_code_issued_at    DateTime?             @db.Timestamptz(6)
+  saml_relay_states      saml_relay_states[]
+
+  @@index([created_at(sort: Desc)])
+  @@index([auth_code], map: "idx_auth_code")
+  @@index([user_id, authentication_method], map: "idx_user_id_auth_method")
+  @@schema("auth")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model identities {
+  provider_id     String
+  user_id         String    @db.Uuid
+  identity_data   Json
+  provider        String
+  last_sign_in_at DateTime? @db.Timestamptz(6)
+  created_at      DateTime? @db.Timestamptz(6)
+  updated_at      DateTime? @db.Timestamptz(6)
+  email           String?   @default(dbgenerated("lower((identity_data ->> 'email'::text))"))
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  users           users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([provider_id, provider], map: "identities_provider_id_provider_unique")
+  @@index([email])
+  @@index([user_id])
+  @@schema("auth")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model instances {
+  id              String    @id @db.Uuid
+  uuid            String?   @db.Uuid
+  raw_base_config String?
+  created_at      DateTime? @db.Timestamptz(6)
+  updated_at      DateTime? @db.Timestamptz(6)
+
+  @@schema("auth")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mfa_amr_claims {
+  session_id            String   @db.Uuid
+  created_at            DateTime @db.Timestamptz(6)
+  updated_at            DateTime @db.Timestamptz(6)
+  authentication_method String
+  id                    String   @id(map: "amr_id_pk") @db.Uuid
+  sessions              sessions @relation(fields: [session_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([session_id, authentication_method], map: "mfa_amr_claims_session_id_authentication_method_pkey")
+  @@schema("auth")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mfa_challenges {
+  id                     String      @id @db.Uuid
+  factor_id              String      @db.Uuid
+  created_at             DateTime    @db.Timestamptz(6)
+  verified_at            DateTime?   @db.Timestamptz(6)
+  ip_address             String      @db.Inet
+  otp_code               String?
+  web_authn_session_data Json?
+  mfa_factors            mfa_factors @relation(fields: [factor_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "mfa_challenges_auth_factor_id_fkey")
+
+  @@index([created_at(sort: Desc)], map: "mfa_challenge_created_at_idx")
+  @@schema("auth")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mfa_factors {
+  id                           String           @id @db.Uuid
+  user_id                      String           @db.Uuid
+  friendly_name                String?
+  factor_type                  factor_type
+  status                       factor_status
+  created_at                   DateTime         @db.Timestamptz(6)
+  updated_at                   DateTime         @db.Timestamptz(6)
+  secret                       String?
+  phone                        String?
+  last_challenged_at           DateTime?        @unique @db.Timestamptz(6)
+  web_authn_credential         Json?
+  web_authn_aaguid             String?          @db.Uuid
+  last_webauthn_challenge_data Json?
+  mfa_challenges               mfa_challenges[]
+  users                        users            @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, phone], map: "unique_phone_factor_per_user")
+  @@index([user_id, created_at], map: "factor_id_created_at_idx")
+  @@index([user_id])
+  @@schema("auth")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model oauth_authorizations {
+  id                    String                     @id @db.Uuid
+  authorization_id      String                     @unique
+  client_id             String                     @db.Uuid
+  user_id               String?                    @db.Uuid
+  redirect_uri          String
+  scope                 String
+  state                 String?
+  resource              String?
+  code_challenge        String?
+  code_challenge_method code_challenge_method?
+  response_type         oauth_response_type        @default(code)
+  status                oauth_authorization_status @default(pending)
+  authorization_code    String?                    @unique
+  created_at            DateTime                   @default(now()) @db.Timestamptz(6)
+  expires_at            DateTime                   @default(dbgenerated("(now() + '00:03:00'::interval)")) @db.Timestamptz(6)
+  approved_at           DateTime?                  @db.Timestamptz(6)
+  nonce                 String?
+  oauth_clients         oauth_clients              @relation(fields: [client_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users                 users?                     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@schema("auth")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model oauth_client_states {
+  id            String   @id @db.Uuid
+  provider_type String
+  code_verifier String?
+  created_at    DateTime @db.Timestamptz(6)
+
+  @@index([created_at], map: "idx_oauth_client_states_created_at")
+  @@schema("auth")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model oauth_clients {
+  id                   String                  @id @db.Uuid
+  client_secret_hash   String?
+  registration_type    oauth_registration_type
+  redirect_uris        String
+  grant_types          String
+  client_name          String?
+  client_uri           String?
+  logo_uri             String?
+  created_at           DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime                @default(now()) @db.Timestamptz(6)
+  deleted_at           DateTime?               @db.Timestamptz(6)
+  client_type          oauth_client_type       @default(confidential)
+  oauth_authorizations oauth_authorizations[]
+  oauth_consents       oauth_consents[]
+  sessions             sessions[]
+
+  @@index([deleted_at])
+  @@schema("auth")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model oauth_consents {
+  id            String        @id @db.Uuid
+  user_id       String        @db.Uuid
+  client_id     String        @db.Uuid
+  scopes        String
+  granted_at    DateTime      @default(now()) @db.Timestamptz(6)
+  revoked_at    DateTime?     @db.Timestamptz(6)
+  oauth_clients oauth_clients @relation(fields: [client_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users         users         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, client_id], map: "oauth_consents_user_client_unique")
+  @@index([user_id, granted_at(sort: Desc)], map: "oauth_consents_user_order_idx")
+  @@schema("auth")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model one_time_tokens {
+  id         String              @id @db.Uuid
+  user_id    String              @db.Uuid
+  token_type one_time_token_type
+  token_hash String
+  relates_to String
+  created_at DateTime            @default(now()) @db.Timestamp(6)
+  updated_at DateTime            @default(now()) @db.Timestamp(6)
+  users      users               @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, token_type])
+  @@index([relates_to], map: "one_time_tokens_relates_to_hash_idx", type: Hash)
+  @@index([token_hash], map: "one_time_tokens_token_hash_hash_idx", type: Hash)
+  @@schema("auth")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model refresh_tokens {
+  instance_id String?   @db.Uuid
+  id          BigInt    @id @default(autoincrement())
+  token       String?   @unique(map: "refresh_tokens_token_unique") @db.VarChar(255)
+  user_id     String?   @db.VarChar(255)
+  revoked     Boolean?
+  created_at  DateTime? @db.Timestamptz(6)
+  updated_at  DateTime? @db.Timestamptz(6)
+  parent      String?   @db.VarChar(255)
+  session_id  String?   @db.Uuid
+  sessions    sessions? @relation(fields: [session_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([instance_id])
+  @@index([instance_id, user_id])
+  @@index([parent])
+  @@index([session_id, revoked])
+  @@index([updated_at(sort: Desc)])
+  @@schema("auth")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model saml_providers {
+  id                String        @id @db.Uuid
+  sso_provider_id   String        @db.Uuid
+  entity_id         String        @unique
+  metadata_xml      String
+  metadata_url      String?
+  attribute_mapping Json?
+  created_at        DateTime?     @db.Timestamptz(6)
+  updated_at        DateTime?     @db.Timestamptz(6)
+  name_id_format    String?
+  sso_providers     sso_providers @relation(fields: [sso_provider_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([sso_provider_id])
+  @@schema("auth")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model saml_relay_states {
+  id              String        @id @db.Uuid
+  sso_provider_id String        @db.Uuid
+  request_id      String
+  for_email       String?
+  redirect_to     String?
+  created_at      DateTime?     @db.Timestamptz(6)
+  updated_at      DateTime?     @db.Timestamptz(6)
+  flow_state_id   String?       @db.Uuid
+  flow_state      flow_state?   @relation(fields: [flow_state_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sso_providers   sso_providers @relation(fields: [sso_provider_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([created_at(sort: Desc)])
+  @@index([for_email])
+  @@index([sso_provider_id])
+  @@schema("auth")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model schema_migrations {
+  version String @id @db.VarChar(255)
+
+  @@schema("auth")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model sessions {
+  id                     String           @id @db.Uuid
+  user_id                String           @db.Uuid
+  created_at             DateTime?        @db.Timestamptz(6)
+  updated_at             DateTime?        @db.Timestamptz(6)
+  factor_id              String?          @db.Uuid
+  aal                    aal_level?
+  not_after              DateTime?        @db.Timestamptz(6)
+  refreshed_at           DateTime?        @db.Timestamp(6)
+  user_agent             String?
+  ip                     String?          @db.Inet
+  tag                    String?
+  oauth_client_id        String?          @db.Uuid
+  refresh_token_hmac_key String?
+  refresh_token_counter  BigInt?
+  scopes                 String?
+  mfa_amr_claims         mfa_amr_claims[]
+  refresh_tokens         refresh_tokens[]
+  oauth_clients          oauth_clients?   @relation(fields: [oauth_client_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users                  users            @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([not_after(sort: Desc)])
+  @@index([oauth_client_id])
+  @@index([user_id])
+  @@index([user_id, created_at], map: "user_id_created_at_idx")
+  @@schema("auth")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model sso_domains {
+  id              String        @id @db.Uuid
+  sso_provider_id String        @db.Uuid
+  domain          String
+  created_at      DateTime?     @db.Timestamptz(6)
+  updated_at      DateTime?     @db.Timestamptz(6)
+  sso_providers   sso_providers @relation(fields: [sso_provider_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([sso_provider_id])
+  @@schema("auth")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model sso_providers {
+  id                String              @id @db.Uuid
+  resource_id       String?
+  created_at        DateTime?           @db.Timestamptz(6)
+  updated_at        DateTime?           @db.Timestamptz(6)
+  disabled          Boolean?
+  saml_providers    saml_providers[]
+  saml_relay_states saml_relay_states[]
+  sso_domains       sso_domains[]
+
+  @@index([resource_id], map: "sso_providers_resource_id_pattern_idx")
+  @@schema("auth")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model users {
+  instance_id                 String?                @db.Uuid
+  id                          String                 @id @db.Uuid
+  aud                         String?                @db.VarChar(255)
+  role                        String?                @db.VarChar(255)
+  email                       String?                @db.VarChar(255)
+  encrypted_password          String?                @db.VarChar(255)
+  email_confirmed_at          DateTime?              @db.Timestamptz(6)
+  invited_at                  DateTime?              @db.Timestamptz(6)
+  confirmation_token          String?                @db.VarChar(255)
+  confirmation_sent_at        DateTime?              @db.Timestamptz(6)
+  recovery_token              String?                @db.VarChar(255)
+  recovery_sent_at            DateTime?              @db.Timestamptz(6)
+  email_change_token_new      String?                @db.VarChar(255)
+  email_change                String?                @db.VarChar(255)
+  email_change_sent_at        DateTime?              @db.Timestamptz(6)
+  last_sign_in_at             DateTime?              @db.Timestamptz(6)
+  raw_app_meta_data           Json?
+  raw_user_meta_data          Json?
+  is_super_admin              Boolean?
+  created_at                  DateTime?              @db.Timestamptz(6)
+  updated_at                  DateTime?              @db.Timestamptz(6)
+  phone                       String?                @unique
+  phone_confirmed_at          DateTime?              @db.Timestamptz(6)
+  phone_change                String?                @default("")
+  phone_change_token          String?                @default("") @db.VarChar(255)
+  phone_change_sent_at        DateTime?              @db.Timestamptz(6)
+  confirmed_at                DateTime?              @default(dbgenerated("LEAST(email_confirmed_at, phone_confirmed_at)")) @db.Timestamptz(6)
+  email_change_token_current  String?                @default("") @db.VarChar(255)
+  email_change_confirm_status Int?                   @default(0) @db.SmallInt
+  banned_until                DateTime?              @db.Timestamptz(6)
+  reauthentication_token      String?                @default("") @db.VarChar(255)
+  reauthentication_sent_at    DateTime?              @db.Timestamptz(6)
+  is_sso_user                 Boolean                @default(false)
+  deleted_at                  DateTime?              @db.Timestamptz(6)
+  is_anonymous                Boolean                @default(false)
+  identities                  identities[]
+  mfa_factors                 mfa_factors[]
+  oauth_authorizations        oauth_authorizations[]
+  oauth_consents              oauth_consents[]
+  one_time_tokens             one_time_tokens[]
+  sessions                    sessions[]
+
+  @@index([instance_id])
+  @@index([is_anonymous])
+  @@schema("auth")
+}
+
+model Template {
+  id          String             @id @default(cuid())
+  name        String
+  description String
+  tier        TemplateTier       @default(FREE)
+  price       Float              @default(0)
+  status      TemplateStatus     @default(DRAFT)
+  thumbnail   String?
+  category    String
+  tags        String[]           @default([])
+  downloads   Int                @default(0)
+  views       Int                @default(0)
+  rating      Float              @default(0)
+  reviewCount Int                @default(0)
+  creatorId   String
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @default(now()) @updatedAt
+  cssCode     String?
+  htmlCode    String
+  jsCode      String?
+  creator     User               @relation("TemplateCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  purchases   TemplatePurchase[]
+  revenue     TemplateRevenue[]
+  reviews     TemplateReview[]
+
+  @@index([creatorId])
+  @@index([status])
+  @@index([tier])
+  @@index([category])
+  @@schema("public")
+}
+
+model TemplatePurchase {
+  id          String   @id @default(cuid())
+  templateId  String
+  userId      String
+  price       Float
+  purchasedAt DateTime @default(now())
+  template    Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, userId])
+  @@index([userId])
+  @@index([templateId])
+  @@schema("public")
+}
+
+model TemplateRevenue {
+  id              String    @id @default(cuid())
+  templateId      String
+  creatorId       String
+  creatorShare    Float
+  platformShare   Float
+  amount          Float
+  createdAt       DateTime  @default(now())
+  paidOut         Boolean   @default(false)
+  paidOutAt       DateTime?
+  stripePaymentId String?
+  creator         User      @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  template        Template  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([creatorId])
+  @@index([templateId])
+  @@index([paidOut])
+  @@schema("public")
+}
+
+model TemplateReview {
+  id         String   @id @default(cuid())
+  templateId String
+  userId     String
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  template   Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, userId])
+  @@index([templateId])
+  @@index([userId])
+  @@schema("public")
+}
+
+model SecurityEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  type      String
+  ipAddress String?
+  userAgent String?
+  metadata  Json?
+  severity  String
+  createdAt DateTime @default(now())
+  action    String   @default("success")
+  location  String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+  @@index([severity, createdAt])
+  @@index([action])
+  @@schema("public")
+}
+
+model FailedLoginAttempt {
+  id          String    @id @default(cuid())
+  email       String
+  ipAddress   String
+  attempts    Int       @default(1)
+  lockedUntil DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  lastAttempt DateTime  @default(now())
+  userAgent   String?
+
+  @@unique([email, ipAddress])
+  @@index([email])
+  @@index([ipAddress])
+  @@index([lockedUntil])
+  @@schema("public")
+}
+
+model ActiveSession {
+  id           String   @id @default(cuid())
+  userId       String
+  sessionToken String   @unique
+  ipAddress    String?
+  userAgent    String?
+  deviceType   String?
+  deviceName   String?
+  location     String?
+  lastActive   DateTime @default(now())
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionToken])
+  @@index([userId, lastActive])
+  @@index([expiresAt])
+  @@schema("public")
+}
+
+model PasswordHistory {
+  id             String   @id @default(cuid())
+  userId         String
+  hashedPassword String
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@schema("public")
+}
+
+model EnvironmentVariable {
+  id          String   @id @default(cuid())
+  projectId   String
+  key         String
+  value       String
+  description String?
+  environment String   @default("all")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, key, environment])
+  @@index([projectId])
+  @@index([key])
+  @@schema("public")
+}
+
+model ApiEndpoint {
+  id             String    @id @default(cuid())
+  projectId      String
+  name           String
+  path           String
+  method         String
+  description    String?
+  code           String
+  requiresAuth   Boolean   @default(false)
+  rateLimit      Int?
+  responseType   String    @default("json")
+  statusCode     Int       @default(200)
+  usesDatabase   Boolean   @default(false)
+  databaseTable  String?
+  requestSchema  Json?
+  responseSchema Json?
+  tags           String[]  @default([])
+  isActive       Boolean   @default(true)
+  testsPassed    Boolean   @default(false)
+  lastTested     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, path, method])
+  @@index([projectId])
+  @@index([method])
+  @@index([tags])
+  @@schema("public")
+}
+
+model ApiTemplate {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  displayName    String
+  description    String
+  category       String
+  icon           String
+  tags           String[] @default([])
+  template       String
+  requiresAuth   Boolean  @default(false)
+  usesDatabase   Boolean  @default(false)
+  usesSendEmail  Boolean  @default(false)
+  usesFileUpload Boolean  @default(false)
+  configSchema   Json?
+  isActive       Boolean  @default(true)
+  usageCount     Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@index([category])
+  @@index([isActive])
+  @@schema("public")
+}
+
+enum TemplateTier {
+  FREE
+  PRO
+  COLLECTION
+
+  @@schema("public")
+}
+
+enum TemplateStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+
+  @@schema("public")
+}
+
+enum aal_level {
+  aal1
+  aal2
+  aal3
+
+  @@schema("auth")
+}
+
+enum code_challenge_method {
+  s256
+  plain
+
+  @@schema("auth")
+}
+
+enum factor_status {
+  unverified
+  verified
+
+  @@schema("auth")
+}
+
+enum factor_type {
+  totp
+  webauthn
+  phone
+
+  @@schema("auth")
+}
+
+enum oauth_authorization_status {
+  pending
+  approved
+  denied
+  expired
+
+  @@schema("auth")
+}
+
+enum oauth_client_type {
+  public
+  confidential
+
+  @@schema("auth")
+}
+
+enum oauth_registration_type {
+  dynamic
+  manual
+
+  @@schema("auth")
+}
+
+enum oauth_response_type {
+  code
+
+  @@schema("auth")
+}
+
+enum one_time_token_type {
+  confirmation_token
+  reauthentication_token
+  recovery_token
+  email_change_token_new
+  email_change_token_current
+  phone_change_token
+
+  @@schema("auth")
 }

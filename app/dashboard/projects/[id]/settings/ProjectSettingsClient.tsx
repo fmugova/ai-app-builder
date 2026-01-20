@@ -17,18 +17,12 @@ interface Project {
   updatedAt: string
 }
 
-interface User {
-  name: string
-  email: string
-  isAdmin: boolean
-}
 
 interface ProjectSettingsClientProps {
   project: Project
-  user: User
 }
 
-export default function ProjectSettingsClient({ project, user }: ProjectSettingsClientProps) {
+export default function ProjectSettingsClient({ project }: ProjectSettingsClientProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -36,6 +30,7 @@ export default function ProjectSettingsClient({ project, user }: ProjectSettings
     name: project.name,
     description: project.description || '',
     type: project.type || 'website',
+    code: project.code || '',
   })
 
   const handleUpdateProject = async (e: React.FormEvent) => {

@@ -46,11 +46,6 @@ export default async function ProjectSettingsPage({ params }: PageProps) {
         createdAt: project.createdAt.toISOString(),
         updatedAt: project.updatedAt.toISOString(),
       }}
-      user={{
-        name: user.name || '',
-        email: user.email,
-        isAdmin: user.role === 'admin',
-      }}
     />
   )
 }

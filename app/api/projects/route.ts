@@ -9,6 +9,7 @@ import { authOptions } from '@/lib/auth'
 const createProjectSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
+  code: z.string().optional(),
 })
 
 // Force dynamic rendering
@@ -59,9 +60,9 @@ export const POST = compose(
     data: {
       name: result.data.name,
       description: result.data.description,
+      code: body.code || '',             // ✅ Use provided code
       userId: session.user.id,
       type: body.type || 'landing',      // ✅ Use provided type
-      code: body.code || '',             // ✅ Use provided code
     },
   })
 

@@ -47,17 +47,20 @@ export default function PreviewClient({ project }: PreviewClientProps) {
   const handlePublish = async () => {
     setPublishing(true)
     try {
-      const res = await fetch(`/api/projects/${project.id}/publish`, {
+      const res = await fetch('/api/publish', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: project.id })
       })
 
-      if (res.ok) {
-        toast.success('🎉 Published to BuildFlow!', {
-          duration: 2000,
-        })
-        router.refresh()
+      const data = await res.json()
+
+      if (res.ok && data.success) {
+        toast.success('🎉 Published to BuildFlow!', { duration: 2000 })
+        setTimeout(() => {
+          router.push(data.redirectTo || '/dashboard')
+        }, 1000)
       } else {
-        const data = await res.json()
         toast.error(data.error || 'Failed to publish')
       }
     } catch (error) {

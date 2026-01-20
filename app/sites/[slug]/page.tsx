@@ -1,3 +1,71 @@
+// WORKING REACT ROUTER TEMPLATE FOR CODE GENERATION/REFERENCE:
+//
+// <!DOCTYPE html>
+// <html lang="en">
+// <head>
+//   <meta charset="UTF-8">
+//   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+//   <meta name="mobile-web-app-capable" content="yes">
+//   <title>My App</title>
+//   <script src="https://cdn.tailwindcss.com"></script>
+//   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+//   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+//   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+//   <script src="https://unpkg.com/react-router-dom@6.8.1/dist/umd/react-router-dom.production.min.js"></script>
+// </head>
+// <body class="bg-gray-50">
+//   <div id="root"></div>
+//   <script type="text/babel">
+//     const { useState, useEffect } = React;
+//     const ReactRouterDOM = window.ReactRouterDOM;
+//     if (!ReactRouterDOM) {
+//       console.error('React Router DOM failed to load');
+//       document.getElementById('root').innerHTML = 
+//         '<div class="flex items-center justify-center h-screen"><h1 class="text-2xl text-red-600">Error loading application</h1></div>';
+//     } else {
+//       const { BrowserRouter, Routes, Route, Link, useNavigate } = ReactRouterDOM;
+//       function HomePage() {
+//         return (
+//           <div className="container mx-auto p-8">
+//             <h1 className="text-4xl font-bold mb-4">Home Page</h1>
+//             <Link to="/about" className="text-blue-600 hover:underline">
+//               Go to About
+//             </Link>
+//           </div>
+//         );
+//       }
+//       function AboutPage() {
+//         const navigate = useNavigate();
+//         return (
+//           <div className="container mx-auto p-8">
+//             <h1 className="text-4xl font-bold mb-4">About Page</h1>
+//             <button 
+//               onClick={() => navigate('/')}
+//               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+//             >
+//               Back to Home
+//             </button>
+//           </div>
+//         );
+//       }
+//       function App() {
+//         return (
+//           <BrowserRouter>
+//             <Routes>
+//               <Route path="/" element={<HomePage />} />
+//               <Route path="/about" element={<AboutPage />} />
+//             </Routes>
+//           </BrowserRouter>
+//         );
+//       }
+//       // React 18 - use createRoot
+//       const root = ReactDOM.createRoot(document.getElementById('root'));
+//       root.render(<App />);
+//     }
+//   </script>
+// </body>
+// </html>
+//
 'use client';
 
 import { useParams } from 'next/navigation';
@@ -12,6 +80,18 @@ interface SiteData {
   User: {
     name: string | null;
   };
+// IMPORTANT: When generating React Router code for site.code, always use this pattern:
+// <script type="text/babel">
+//   const ReactRouterDOM = window.ReactRouterDOM;
+//   if (!ReactRouterDOM) {
+//     console.error('React Router DOM not loaded!');
+//     document.getElementById('root').innerHTML = '<h1>Error loading application</h1>';
+//   } else {
+//     const { BrowserRouter, Routes, Route, Link } = ReactRouterDOM;
+//     // ...rest of your app code...
+//   }
+// </script>
+// This prevents runtime errors if ReactRouterDOM is not loaded.
 }
 
 export default function SitePage() {
