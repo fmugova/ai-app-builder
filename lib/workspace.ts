@@ -48,9 +48,9 @@ export async function checkProjectAccessThroughWorkspace(
   const workspaceProjects = await prisma.workspaceProject.findMany({
     where: { projectId },
     include: {
-      workspace: {
+      Workspace: {
         include: {
-          members: {
+          WorkspaceMember: {
             where: { userId },
           },
         },
@@ -60,7 +60,7 @@ export async function checkProjectAccessThroughWorkspace(
 
   // Check if user is a member of any workspace containing this project
   for (const wp of workspaceProjects) {
-    if (wp.workspace.members.length > 0) {
+    if (wp.Workspace.WorkspaceMember.length > 0) {
       return { hasAccess: true, permission: wp.permission };
     }
   }
@@ -75,12 +75,12 @@ export async function getUserWorkspaces(userId: string) {
   const members = await prisma.workspaceMember.findMany({
     where: { userId },
     include: {
-      workspace: {
+      Workspace: {
         include: {
           _count: {
             select: {
-              members: true,
-              projects: true,
+              WorkspaceMember: true,
+              WorkspaceProject: true,
             },
           },
         },
@@ -91,11 +91,11 @@ export async function getUserWorkspaces(userId: string) {
     },
   });
 
-  return members.map((m) => ({
-    ...m.workspace,
+  return members.map((m: typeof members[number]) => ({
+    ...m.Workspace,
     userRole: m.role,
-    memberCount: m.workspace._count.members,
-    projectCount: m.workspace._count.projects,
+    memberCount: m.Workspace._count.WorkspaceMember,
+    projectCount: m.Workspace._count.WorkspaceProject,
   }));
 }
 
@@ -103,77 +103,77 @@ export async function getUserWorkspaces(userId: string) {
  * Check if workspace has capacity for more members
  */
 export async function canAddMember(workspaceId: string): Promise<boolean> {
-  const workspace = await prisma.workspace.findUnique({
+  const Workspace = await prisma.workspace.findUnique({
     where: { id: workspaceId },
     include: {
       _count: {
-        select: { members: true },
+        select: { WorkspaceMember: true },
       },
     },
   });
 
-  if (!workspace) {
+  if (!Workspace) {
     return false;
   }
 
-  return workspace._count.members < workspace.membersLimit;
+  return Workspace._count.WorkspaceMember < Workspace.membersLimit;
 }
 
 /**
  * Check if workspace has capacity for more projects
  */
 export async function canAddProject(workspaceId: string): Promise<boolean> {
-  const workspace = await prisma.workspace.findUnique({
+  const Workspace = await prisma.workspace.findUnique({
     where: { id: workspaceId },
     include: {
       _count: {
-        select: { projects: true },
+        select: { WorkspaceProject: true },
       },
     },
   });
 
-  if (!workspace) {
+  if (!Workspace) {
     return false;
   }
 
-  return workspace._count.projects < workspace.projectsLimit;
+  return Workspace._count.WorkspaceProject < Workspace.projectsLimit;
 }
 
 /**
  * Get workspace usage stats
  */
 export async function getWorkspaceUsage(workspaceId: string) {
-  const workspace = await prisma.workspace.findUnique({
+  const Workspace = await prisma.workspace.findUnique({
     where: { id: workspaceId },
     include: {
       _count: {
         select: {
-          members: true,
-          projects: true,
+          WorkspaceMember: true,
+          WorkspaceProject: true,
         },
       },
     },
   });
 
-  if (!workspace) {
+  if (!Workspace) {
     return null;
   }
 
   return {
-    members: {
-      used: workspace._count.members,
-      limit: workspace.membersLimit,
-      percentage: (workspace._count.members / workspace.membersLimit) * 100,
+    WorkspaceMember: {
+      used: Workspace._count.WorkspaceMember,
+      limit: Workspace.membersLimit,
+      percentage: (Workspace._count.WorkspaceMember / Workspace.membersLimit) * 100,
     },
     projects: {
-      used: workspace._count.projects,
-      limit: workspace.projectsLimit,
-      percentage: (workspace._count.projects / workspace.projectsLimit) * 100,
+      used: Workspace._count.WorkspaceProject,
+      limit: Workspace.projectsLimit,
+      percentage: (Workspace._count.WorkspaceProject / Workspace.projectsLimit) * 100,
     },
     generations: {
-      used: workspace.generationsUsed,
-      limit: workspace.generationsLimit,
-      percentage: (workspace.generationsUsed / workspace.generationsLimit) * 100,
+      used: Workspace.generationsUsed,
+      limit: Workspace.generationsLimit,
+      percentage: (Workspace.generationsUsed / Workspace.generationsLimit) * 100,
     },
   };
 }

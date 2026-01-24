@@ -195,4 +195,13 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+
+  /* Enterprise Additions */
+  .toast-exit {
+    animation: slideInRight 0.3s ease-out reverse;
+  }
+
+  .modal-open {
+    overflow: hidden;
+  }
 }

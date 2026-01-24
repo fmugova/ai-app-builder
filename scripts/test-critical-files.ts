@@ -58,28 +58,28 @@ function testFile(filePath: string): TestResult {
     issues: [],
     status: 'pass'
   }
-  
+
   if (!existsSync(filePath)) {
     result.issues.push('File does not exist')
     result.status = 'fail'
     return result
   }
-  
+
   result.exists = true
   const content = readFileSync(filePath, 'utf-8')
-  
+
   // Check for Promise type
   result.hasPromiseType = /params:\s*Promise</.test(content)
-  
+
   // Check for await
   result.hasAwait = /await\s+(context\.)?params/.test(content)
-  
-  // Check HTTP methods
+
+  // Check HTTP methods and their await usage
   const methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
-  for (const method of methods) {
-    if (content.includes(`export async function ${method}`)) {
+  methods.forEach(method => {
+    const methodRegex = new RegExp(`export async function ${method}`)
+    if (methodRegex.test(content)) {
       result.multipleHttpMethods.push(method)
-      
       // Check if this method awaits params
       const methodContent = content.split(`export async function ${method}`)[1]?.split('export async function')[0] || ''
       if (methodContent.includes('params') && !methodContent.includes('await')) {
@@ -87,34 +87,34 @@ function testFile(filePath: string): TestResult {
         result.issues.push(`${method} method doesn't await params`)
       }
     }
-  }
-  
-  // Check for searchParams
-  result.hasSearchParams = content.includes('searchParams')
-  if (result.hasSearchParams) {
+  })
+
+  // Check for searchParams and Promise usage
+  if (content.includes('searchParams')) {
+    result.hasSearchParams = true
     result.hasAsyncSearchParams = /searchParams:\s*Promise</.test(content)
     if (!result.hasAsyncSearchParams) {
       result.issues.push('searchParams should also be Promise<>')
     }
   }
-  
+
   // Direct params access without await
   if (/context\.params\.\w+/.test(content) && !result.hasAwait) {
     result.issues.push('Direct params.* access without await')
   }
-  
+
   // Missing Promise type but has params
   if (content.includes('params') && !result.hasPromiseType && content.includes('context: {')) {
     result.issues.push('params missing Promise<> wrapper in type')
   }
-  
+
   // Determine status
   if (result.issues.length > 0) {
-    result.status = result.issues.some(i => 
+    result.status = result.issues.some(i =>
       i.includes('without await') || i.includes('missing Promise')
     ) ? 'fail' : 'warning'
   }
-  
+
   return result
 }
 

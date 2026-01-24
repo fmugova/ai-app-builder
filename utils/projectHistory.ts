@@ -22,8 +22,8 @@ export function saveProject(project: Omit<Project, "id" | "createdAt" | "updated
   const projects = getAllProjects();
   
   const newProject: Project = {
-    ...project,
     id: generateId(),
+    ...project,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -47,7 +47,7 @@ export function getAllProjects(): Project[] {
     
     const projects = JSON.parse(stored);
     // Convert date strings back to Date objects
-    return projects.map((p: any) => ({
+    return projects.map((p: Project) => ({
       ...p,
       createdAt: new Date(p.createdAt),
       updatedAt: new Date(p.updatedAt),
@@ -107,7 +107,7 @@ export function getRecentProjects(): Project[] {
     if (!stored) return [];
     
     const projects = JSON.parse(stored);
-    return projects.map((p: any) => ({
+    return projects.map((p: Project) => ({
       ...p,
       createdAt: new Date(p.createdAt),
       updatedAt: new Date(p.updatedAt),

@@ -1,0 +1,71 @@
+/* ===================================
+   ROAST & REVEL - ENTERPRISE CSS
+   ================================ */
+
+/* Base Variables */
+:root {
+    /* Color Palette */
+    --primary-color: #8B4513;
+    --secondary-color: #D2B48C;
+    --accent-color: #CD853F;
+    --dark-brown: #5D4037;
+    --light-cream: #F5F5DC;
+    --white: #FFFFFF;
+    --black: #2C1810;
+    --gray: #6C6C6C;
+    --light-gray: #F8F8F8;
+    --gold: #DAA520;
+    --green: #228B22;
+    --green-dark: #1e7e1e;
+    --red: #DC143C;
+    
+    /* Spacing */
+    --spacing-xs: 0.5rem;
+    --spacing-sm: 1rem;
+    --spacing-md: 1.5rem;
+    --spacing-lg: 2rem;
+    --spacing-xl: 3rem;
+    --spacing-xxl: 4rem;
+    
+    /* Typography */
+    --font-primary: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    --font-size-base: 1rem;
+    --font-size-sm: 0.9rem;
+    --font-size-lg: 1.1rem;
+    --font-size-xl: 1.2rem;
+    --line-height: 1.6;
+    
+    /* Borders & Shadows */
+    --radius-sm: 5px;
+    --radius-md: 8px;
+    --radius-lg: 15px;
+    --radius-xl: 25px;
+    --radius-full: 50px;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --shadow-md: 0 5px 20px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.15);
+    --shadow-hover: 0 6px 20px rgba(139, 69, 19, 0.4);
+    
+    /* Transitions */
+    --transition-fast: 0.15s ease;
+    --transition-base: 0.3s ease;
+    --transition-slow: 0.5s ease;
+    
+    /* Z-Index Scale */
+    --z-dropdown: 100;
+    --z-sticky: 500;
+    --z-fixed: 1000;
+    --z-modal-backdrop: 2000;
+    --z-modal: 2001;
+    --z-toast: 3000;
+}
+
+/* ...rest of your CSS from the provided block... */
+
+.toast-exit {
+    animation: slideInRight 0.3s ease-out reverse;
+}
+
+.modal-open {
+    overflow: hidden;
+}

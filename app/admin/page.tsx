@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { toast, Toaster } from 'react-hot-toast'
+import { formatMetadataPreview } from '@/lib/formatters'
 
 interface User {
   id: string
@@ -25,7 +26,7 @@ interface Activity {
   userId: string
   type: string
   action: string
-  metadata?: any
+  metadata?: Record<string, unknown>
   createdAt: string
   User?: {
     name: string | null
@@ -59,7 +60,7 @@ interface SystemHealth {
 export default function AdminDashboard() {
   const router = useRouter()
   const { data: session, status } = useSession()
-  const [stats, setStats] = useState<any>(null)
+  const [stats, setStats] = useState<Record<string, unknown> | null>(null)
   const [users, setUsers] = useState<User[]>([])
   const [activities, setActivities] = useState<Activity[]>([])
   const [feedback, setFeedback] = useState<Feedback[]>([])
@@ -90,7 +91,7 @@ export default function AdminDashboard() {
   const [userNote, setUserNote] = useState('')
 
   // ADD EMAIL MODAL STATE HERE:
-  const [emailSubject, setEmailSubject] = useState('')
+  const [_emailSubject, setEmailSubject] = useState('')
   const [emailMessage, setEmailMessage] = useState('')
   const [showEmailModal, setShowEmailModal] = useState(false)
 
@@ -373,42 +374,6 @@ export default function AdminDashboard() {
     setShowQuickActionsModal(true)
   }
 
-  const sendNotification = async (userId: string, _message: string) => {
-    const subject = prompt('Email subject:')
-    if (!subject) return
-
-    const emailMessage = prompt('Email message:')
-    if (!emailMessage) return
-
-    try {
-      toast.loading('Sending email...', { id: 'send-email' })
-
-      const res = await fetch('/api/admin/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          subject,
-          message: emailMessage
-        })
-      })
-
-      if (res.ok) {
-        toast.success('✅ Email sent successfully!', {
-          duration: 2000,
-          id: 'send-email',
-        })
-        setShowQuickActionsModal(false)
-      } else {
-        const error = await res.json()
-        toast.error(`❌ Failed: ${error.error}`, { id: 'send-email' })
-      }
-    } catch (error) {
-      console.error('Email error:', error)
-      toast.error('❌ Error sending email', { id: 'send-email' })
-    }
-  }
-
   const viewUserProjects = (userId: string) => {
     router.push(`/admin/users/${userId}/projects`)
   }
@@ -569,7 +534,7 @@ export default function AdminDashboard() {
                   </div>
                   
                   <div className="flex items-end justify-between">
-                    <p className="text-4xl font-bold">{stat.value}</p>
+                    <p className="text-4xl font-bold">{String(stat.value ?? '')}</p>
                     <span className="text-green-400 text-sm font-semibold bg-green-900/30 px-2 py-1 rounded-lg">
                       {stat.change}
                     </span>
@@ -586,7 +551,7 @@ export default function AdminDashboard() {
               <div className="text-4xl mb-3">👥</div>
               <h3 className="text-xl font-bold mb-2">Users</h3>
               <p className="text-gray-400 text-sm mb-4">
-                {stats?.totalUsers || 0} registered
+                {String(stats?.totalUsers || 0)} registered
               </p>
               <button 
                 onClick={() => setShowUsers(!showUsers)}
@@ -601,7 +566,7 @@ export default function AdminDashboard() {
               <div className="text-4xl mb-3">📊</div>
               <h3 className="text-xl font-bold mb-2">Projects</h3>
               <p className="text-gray-400 text-sm mb-4">
-                {stats?.totalProjects || 0} total
+                {String(stats?.totalProjects || 0)} total
               </p>
               <button 
                 onClick={() => setShowProjects(!showProjects)}
@@ -819,7 +784,7 @@ export default function AdminDashboard() {
                           </span>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-300">
-                          {user.projectCount || 0} ({user.projectsThisMonth} this month)
+                          {String(user.projectCount || 0)} ({user.projectsThisMonth} this month)
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-300">
                           {user.generationsUsed}/{user.generationsLimit}
@@ -936,11 +901,9 @@ export default function AdminDashboard() {
                       <div className="flex-1">
                         <p className="font-medium text-white">{activity.action}</p>
                         <p className="text-sm text-gray-400">
-                          {activity.metadata 
-                            ? (typeof activity.metadata === 'string' 
-                                ? activity.metadata.substring(0, 100)
-                                : JSON.stringify(activity.metadata).substring(0, 100))
-                            : `${activity.type} activity`}
+                        {activity.metadata 
+                          ? formatMetadataPreview(activity.metadata, 100)
+                          : `${activity.type} activity`}
                         </p>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-xs text-gray-500">
@@ -966,7 +929,7 @@ export default function AdminDashboard() {
             <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700 mb-8 animate-fadeIn">
               <h3 className="text-xl font-bold mb-4">Projects Overview</h3>
               <p className="text-gray-400 mb-4">
-                Total of {stats?.totalProjects || 0} projects created across all users.
+                Total of {String(stats?.totalProjects || 0)} projects created across all users.
               </p>
               <button
                 onClick={() => router.push('/admin/projects')}
@@ -1165,7 +1128,7 @@ export default function AdminDashboard() {
                 <span className="text-2xl">📊</span>
                 <div>
                   <p className="font-medium text-white">View Projects</p>
-                  <p className="text-xs text-blue-200">See all user's projects</p>
+                  <p className="text-xs text-blue-200">See all user&apos;s projects</p>
                 </div>
               </button>
 
@@ -1194,89 +1157,9 @@ export default function AdminDashboard() {
                 <span className="text-2xl">📧</span>
                 <div>
                   <p className="font-medium text-white">Send Email</p>
-                  <p className="text-xs text-green-200">Send message to user's inbox</p>
+                  <p className="text-xs text-green-200">Send message to user&apos;s inbox</p>
                 </div>
               </button>
-      {/* Email Modal */}
-      {showEmailModal && quickActionUser && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-gray-800 rounded-2xl p-6 max-w-md w-full border border-gray-700 animate-scaleIn">
-            <h3 className="text-xl font-bold mb-4 text-white">Send Email to User</h3>
-            <p className="text-gray-400 mb-6">To: {quickActionUser.email}</p>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Subject</label>
-                <input
-                  type="text"
-                  value={emailSubject}
-                  onChange={(e) => setEmailSubject(e.target.value)}
-                  placeholder="Email subject..."
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Message</label>
-                <textarea
-                  value={emailMessage}
-                  onChange={(e) => setEmailMessage(e.target.value)}
-                  placeholder="Type your message here..."
-                  rows={6}
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={async () => {
-                  if (!emailSubject.trim() || !emailMessage.trim()) {
-                    toast.error('Please fill in subject and message')
-                    return
-                  }
-                  try {
-                    toast.loading('Sending email...', { id: 'send-email' })
-                    const res = await fetch('/api/admin/send-email', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        userId: quickActionUser.id,
-                        subject: emailSubject,
-                        message: emailMessage
-                      })
-                    })
-                    if (res.ok) {
-                      toast.success('✅ Email sent!', {
-                        duration: 2000,
-                        id: 'send-email-2',
-                      })
-                      setShowEmailModal(false)
-                      setEmailSubject('')
-                      setEmailMessage('')
-                    } else {
-                      const error = await res.json()
-                      toast.error(`❌ Failed: ${error.error}`, { id: 'send-email' })
-                    }
-                  } catch (error) {
-                    toast.error('❌ Error sending email', { id: 'send-email' })
-                  }
-                }}
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg transition font-medium"
-              >
-                Send Email
-              </button>
-              <button
-                onClick={() => {
-                  setShowEmailModal(false)
-                  setEmailSubject('')
-                  setEmailMessage('')
-                }}
-                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg transition font-medium"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
               <button
                 onClick={() => {

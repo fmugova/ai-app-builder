@@ -23,7 +23,7 @@ export default function DripEmailTester() {
       }
 
       setResult(data)
-      toast.success(`Successfully sent ${data.details?.processed || 0} emails!`)
+      toast.success(`Successfully sent ${String(data.details?.processed || 0)} emails!`)
     } catch (error: any) {
       console.error('Trigger error:', error)
       toast.error(error.message || 'Failed to trigger drip emails')
@@ -79,7 +79,7 @@ export default function DripEmailTester() {
             ✅ Processing Complete
           </h3>
           <div className="text-sm text-green-800 dark:text-green-200 space-y-1">
-            <p><strong>Emails Processed:</strong> {result.details?.processed || 0}</p>
+            <p><strong>Emails Processed:</strong> {String(result.details?.processed || 0)}</p>
             {result.details?.details && result.details.details.length > 0 && (
               <div className="mt-3">
                 <p className="font-semibold mb-2">Details:</p>

@@ -33,7 +33,7 @@ export async function POST(
         projectId,
       },
       include: {
-        project: true
+        Project: true
       }
     })
 
@@ -42,7 +42,7 @@ export async function POST(
     }
 
     // Verify user owns the project
-    if (domain.project.userId !== user.id && user.role !== 'admin') {
+    if (domain.Project?.userId !== user.id && user.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -127,7 +127,7 @@ export async function DELETE(
         projectId,
       },
       include: {
-        project: true
+        Project: true
       }
     })
 
@@ -136,7 +136,7 @@ export async function DELETE(
     }
 
     // Verify user owns the project
-    if (domain.project.userId !== user.id && user.role !== 'admin') {
+    if (domain.Project?.userId !== user.id && user.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

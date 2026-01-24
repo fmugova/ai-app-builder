@@ -2,7 +2,8 @@ import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import PreviewClient from './PreviewClient'
+import PreviewFrame from '@/components/PreviewFrame'
+import { getValidationForProjectCode } from '@/lib/getValidationForProjectCode'
 
 export default async function PreviewPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -71,5 +72,27 @@ export default async function PreviewPage({ params }: { params: { id: string } }
     data: { views: { increment: 1 } }
   });
 
-  return <PreviewClient project={project} />;
+  // Parse and validate code for preview
+  const { html, css, js, validation } = getValidationForProjectCode(project.code);
+  // Map validation result to PreviewFrame's ValidationResult interface
+  const mappedValidation = {
+    validationScore: validation.score ?? 0,
+    validationPassed: validation.passed ?? false,
+    errors: validation.errors || [],
+    warnings: validation.warnings || [],
+    cspViolations: [],
+    isComplete: true,
+    hasHtml: true,
+    hasCss: true,
+    hasJs: true,
+    passed: validation.passed ?? false,
+  };
+  return (
+    <PreviewFrame
+      html={html || ''}
+      css={css || ''}
+      js={js || ''}
+      validation={mappedValidation}
+    />
+  );
 }

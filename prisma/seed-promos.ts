@@ -6,7 +6,7 @@ async function main() {
   console.log('🌱 Seeding promo codes...')
 
   // Launch promotion
-  await prisma.promoCodes.upsert({
+  await prisma.promo_codes.upsert({
     where: { code: 'LAUNCH2024' },
     update: {},
     create: {
@@ -22,7 +22,7 @@ async function main() {
     },
   })
   // Product Hunt special
-  await prisma.promoCodes.upsert({
+  await prisma.promo_codes.upsert({
     where: { code: 'PRODUCTHUNT50' },
     update: {},
     create: {
@@ -38,7 +38,7 @@ async function main() {
     },
   })
   // Early bird
-  await prisma.promoCodes.upsert({
+  await prisma.promo_codes.upsert({
     where: { code: 'EARLYBIRD40' },
     update: {},
     create: {
@@ -54,7 +54,7 @@ async function main() {
     },
   })
   // Student discount
-  await prisma.promoCodes.upsert({
+  await prisma.promo_codes.upsert({
     where: { code: 'STUDENT70' },
     update: {},
     create: {

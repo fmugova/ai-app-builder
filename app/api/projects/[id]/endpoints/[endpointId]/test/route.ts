@@ -20,7 +20,7 @@ export async function POST(
     const endpoint = await prisma.apiEndpoint.findFirst({
       where: {
         id: context.params.endpointId,
-        project: {
+        Project: {
           id: context.params.id,
           User: { email: session.user.email }
         }

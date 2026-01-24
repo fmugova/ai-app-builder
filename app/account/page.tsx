@@ -6,9 +6,19 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 
+interface User {
+  name?: string;
+  email: string;
+  createdAt: string;
+  generationsUsed?: number;
+  generationsLimit?: number;
+  stripeSubscriptionId?: string;
+  stripeCustomerId?: string;
+}
+
 export default function AccountPage() {
   const { data: session, status } = useSession()
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [projectCount, setProjectCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [managingSubscription, setManagingSubscription] = useState(false)
@@ -48,9 +58,13 @@ export default function AccountPage() {
       
       const { url } = await res.json()
       window.location.href = url
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Portal error:', error)
-      toast.error(error.message || 'Failed to open billing portal')
+      if (error instanceof Error) {
+        toast.error(error.message || 'Failed to open billing portal')
+      } else {
+        toast.error('Failed to open billing portal')
+      }
       setManagingSubscription(false)
     }
   }
@@ -150,7 +164,7 @@ export default function AccountPage() {
               <div className="bg-gray-800 rounded-lg p-3">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-white">
-                    {user.generationsUsed || 0} / {user.generationsLimit || 10} used
+                    {String(user.generationsUsed || 0)} / {String(user.generationsLimit || 10)} used
                   </span>
                   <span className="text-gray-400 text-sm">
                     {Math.round(((user.generationsUsed || 0) / (user.generationsLimit || 10)) * 100)}%

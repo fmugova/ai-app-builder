@@ -25,12 +25,12 @@ interface Project {
 
 interface PagesManagementClientProps {
   project: Project
-  initialPages: Page[]
+  initialPage: Page[]
 }
 
-export default function PagesManagementClient({ project, initialPages }: PagesManagementClientProps) {
+export default function PagesManagementClient({ project, initialPage }: PagesManagementClientProps) {
   const router = useRouter()
-  const [pages, setPages] = useState<Page[]>(initialPages)
+  const [pages, setPages] = useState<Page[]>(initialPage)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedPage, setSelectedPage] = useState<Page | null>(null)

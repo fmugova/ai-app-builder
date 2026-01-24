@@ -60,7 +60,6 @@ export async function POST(
 
     // Send emails (in production, use a queue system like Bull or Inngest)
     let sentCount = 0
-    let openedCount = 0
 
     for (const subscriber of subscribers) {
       try {

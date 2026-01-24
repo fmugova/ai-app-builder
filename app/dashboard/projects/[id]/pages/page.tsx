@@ -34,7 +34,7 @@ export default async function PagesManagementPage({ params }: PageProps) {
       ...(user.role !== 'admin' && { userId: user.id }),
     },
     include: {
-      pages: {
+      Page: {
         orderBy: [
           { isHomepage: 'desc' },
           { order: 'asc' },
@@ -54,7 +54,7 @@ export default async function PagesManagementPage({ params }: PageProps) {
         id: project.id,
         name: project.name,
       }}
-      initialPages={project.pages.map(page => ({
+      initialPage={project.Page.map(page => ({
         ...page,
         createdAt: page.createdAt.toISOString(),
         updatedAt: page.updatedAt.toISOString(),

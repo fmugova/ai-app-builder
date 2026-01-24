@@ -23,8 +23,8 @@ export const GET = withAuth(async (
         userId: session.user.id
       },
       include: {
-        pages: true,
-        customDomains: true,
+        Page: true,
+        CustomDomain: true,
       },
     })
 

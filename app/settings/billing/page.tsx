@@ -177,7 +177,7 @@ export default function BillingPage() {
                 <div className="flex justify-between mb-2">
                   <span className="text-gray-400">Projects</span>
                   <span className="text-white font-medium">
-                    {billing?.projectsUsed || 0} / {billing?.projectsLimit || 0}
+                    {String(billing?.projectsUsed || 0)} / {String(billing?.projectsLimit || 0)}
                   </span>
                 </div>
                 <div className="w-full bg-gray-800 rounded-full h-2">
@@ -195,7 +195,7 @@ export default function BillingPage() {
                 <div className="flex justify-between mb-2">
                   <span className="text-gray-400">AI Generations</span>
                   <span className="text-white font-medium">
-                    {billing?.generationsUsed || 0} / {billing?.generationsLimit || 0}
+                    {String(billing?.generationsUsed || 0)} / {String(billing?.generationsLimit || 0)}
                   </span>
                 </div>
                 <div className="w-full bg-gray-800 rounded-full h-2">

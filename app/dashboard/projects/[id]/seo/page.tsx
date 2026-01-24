@@ -60,7 +60,7 @@ export default async function SEOManagerPage({ params }: SEOPageProps) {
   return (
     <SEOManagerClient
       projectId={projectId}
-      initialPages={pages}
+      initialPage={pages}
     />
   )
 }

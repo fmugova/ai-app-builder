@@ -1,7 +1,15 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { useToast } from '@/hooks/use-toast'
+// Unique message ID generator to avoid duplicate keys
+let messageCounter = 0;
+const generateMessageId = () => {
+  return `${Date.now()}-${++messageCounter}`;
+};
+import { toast, Toaster } from 'react-hot-toast'
+import { useGenerateStream } from '@/hooks/useGenerateStream'
+import { GenerationProgress } from '@/components/GenerationProgress'
+import CodePreviewModal from '@/components/CodePreviewModal'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { templates, getTemplatesByCategory } from '@/lib/templates'
@@ -44,40 +52,16 @@ interface Message {
   timestamp: Date
 }
 
-export default function ChatBuilderPage() {
-  const { toast } = useToast()
-  useSession()
+export default function ChatBuilder() {
   const router = useRouter()
-  const searchParams = typeof window !== 'undefined'
-    ? new URLSearchParams(window.location.search)
-    : null;
-  const pageId = searchParams?.get('page') || null;
-
-  // Auto-open PromptGuide on first visit
-  const [showGuideOnLoad, setShowGuideOnLoad] = useState(false)
-  useEffect(() => {
-    // Check if user has seen the guide
-    const hasSeenGuide = typeof window !== 'undefined' && localStorage.getItem('hasSeenPromptGuide')
-    if (!hasSeenGuide) {
-      setShowGuideOnLoad(true)
-      localStorage.setItem('hasSeenPromptGuide', 'true')
-    }
-  }, [])
-
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      role: 'system',
-      content: "Hi! I'm BuildFlow AI. Tell me what you want to build, or upload broken code from Replit/Bubble and I'll fix it!",
-      timestamp: new Date()
-    }
-  ])
+  const { data: session } = useSession()
+  
+  const [prompt, setPrompt] = useState('')
   const [input, setInput] = useState('')
+  const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [publishing, setPublishing] = useState(false)
   const [currentCode, setCurrentCode] = useState<string | null>(null)
-  const [projectId, setProjectId] = useState<string | null>(null)
+  const [projectId, setProjectId] = useState<string | undefined>()
   const [projectName, setProjectName] = useState<string>('')
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [showTemplates, setShowTemplates] = useState(false)
@@ -85,6 +69,28 @@ export default function ChatBuilderPage() {
   const [includeAuth, setIncludeAuth] = useState(false)
   const [authProvider, setAuthProvider] = useState<'nextauth' | 'supabase' | 'jwt'>('nextauth')
   const [showAssistant, setShowAssistant] = useState(false)
+  const [showPreview, setShowPreview] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [showMobileMenu, setShowMobileMenu] = useState(false)
+  const [isPublishing, setIsPublishing] = useState(false)
+
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const {
+    isGenerating,
+    status,
+    progress,
+    estimate,
+    elapsed,
+    error,
+    generatedCode,
+    projectId: newProjectId,
+    stats,
+    generate,
+    reset,
+  } = useGenerateStream()
 
   // Load project or page from URL parameter
   useEffect(() => {
@@ -107,7 +113,7 @@ export default function ChatBuilderPage() {
         setProjectName(data.title || 'Untitled Page')
         setCurrentCode(data.content)
         const loadMessage: Message = {
-          id: Date.now().toString(),
+          id: generateMessageId(),
           role: 'system',
           content: `✅ Loaded page: ${data.title || 'Untitled Page'}. Ready to iterate!`,
           timestamp: new Date()
@@ -116,7 +122,7 @@ export default function ChatBuilderPage() {
       }
     } catch (err) {
       console.error('Failed to load page:', err)
-      alert('Failed to load page')
+      toast.error('Failed to load page')
     }
   }
 
@@ -131,7 +137,7 @@ export default function ChatBuilderPage() {
         setCurrentCode(data.project.code)
 
         const loadMessage: Message = {
-          id: Date.now().toString(),
+          id: generateMessageId(),
           role: 'system',
           content: `✅ Loaded: ${data.project.name}. Ready to iterate!`,
           timestamp: new Date()
@@ -140,13 +146,9 @@ export default function ChatBuilderPage() {
       }
     } catch (err) {
       console.error('Failed to load project:', err)
-      alert('Failed to load project')
+      toast.error('Failed to load project')
     }
   }
-  
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -172,19 +174,90 @@ export default function ChatBuilderPage() {
   async function detectAndFetchUrls(text: string): Promise<string> {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     text.match(urlRegex); // Reserved for future URL processing
-    // You can add logic here to fetch and process URLs if needed
-    // For now, just return the original text
     return text;
+  }
+
+  const handleGenerate = async () => {
+    if (!prompt.trim()) {
+      toast.error('Please enter a prompt')
+      return
+    }
+
+    const result = await generate(prompt, {
+      type: 'landing-page',
+      projectId,
+    })
+
+    if (result.success) {
+      if (result.fromCache) {
+        toast.success('Retrieved from cache instantly!')
+      } else {
+        toast.success(`Generated in ${stats?.generationTime}s!`)
+      }
+      if (result.projectId) {
+        setProjectId(result.projectId)
+      }
+      if (result.code) {
+        setCurrentCode(result.code)
+      }
+    } else {
+      toast.error(result.error || 'Generation failed')
+    }
+  }
+
+  const handleRegenerate = async (customPrompt?: string) => {
+    const promptToUse = customPrompt || prompt
+    
+    try {
+      const result = await generate(promptToUse, {
+        type: 'landing-page',
+        projectId,
+      })
+      if (result.success) {
+        toast.success('Project generated!')
+        if (result.code) {
+          setCurrentCode(result.code)
+        }
+        if (result.projectId && !projectId) {
+          setProjectId(result.projectId)
+        }
+      } else {
+        // Fix: Always add Message object, not string
+        const errorContent = result.error || 'Generation failed';
+        const errorMessage: Message = {
+          id: generateMessageId(),
+          role: 'assistant',
+          content: errorContent,
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, errorMessage]);
+        throw new Error(errorContent);
+      }
+      return result;
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Generation failed';
+      toast.error(errorMsg || 'Generation failed');
+      // Fix: Always add Message object, not string
+      const errorMessage: Message = {
+        id: generateMessageId(),
+        role: 'assistant',
+        content: errorMsg || 'Generation failed',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      throw error;
+    }
   }
 
   const handleSend = async () => {
     if ((!input.trim() && uploadedFiles.length === 0) || loading) return
 
     // Detect and fetch URLs if present
+
     let enhancedInput = input
     if (input.includes('http')) {
       const urlMessage: Message = {
-        id: Date.now().toString(),
+        id: generateMessageId(),
         role: 'system',
         content: '🔍 Detected URL in your message. Fetching content...',
         timestamp: new Date()
@@ -194,7 +267,7 @@ export default function ChatBuilderPage() {
     }
 
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: generateMessageId(),
       role: 'user',
       content: input || `[Uploaded ${uploadedFiles.length} file(s)]`,
       timestamp: new Date()
@@ -228,7 +301,7 @@ export default function ChatBuilderPage() {
 
         if (response.ok) {
           const assistantMessage: Message = {
-            id: Date.now().toString(),
+            id: generateMessageId(),
             role: 'assistant',
             content: uploadedFiles.length > 0 
               ? 'I analyzed your files and fixed the issues. Check the preview!' 
@@ -243,30 +316,48 @@ export default function ChatBuilderPage() {
           throw new Error(data.error || 'Failed to iterate')
         }
       } else {
-        // ✅ INITIAL GENERATION - Use handleRegenerate!
-        await handleRegenerate(enhancedInput)
-        
-        const assistantMessage: Message = {
-          id: Date.now().toString(),
-          role: 'assistant',
-          content: "Great! I've created your site. You can see it in the preview. Want me to make any changes?",
-          timestamp: new Date()
-        }
-        setMessages(prev => [...prev, assistantMessage])
-        
-        // Set default project name from prompt
-        if (!projectName) {
-          setProjectName(input.slice(0, 50) || 'New Project')
+        // INITIAL GENERATION
+        try {
+          const result = await handleRegenerate(enhancedInput)
+          
+          if (!result.success) {
+            throw new Error(result.error || 'Generation failed')
+          }
+          
+          const assistantMessage: Message = {
+            id: generateMessageId(),
+            role: 'assistant',
+            content: "Great! I've created your site. You can see it in the preview. Want me to make any changes?",
+            timestamp: new Date()
+          }
+          setMessages(prev => [...prev, assistantMessage])
+          
+          // Set default project name from prompt
+          if (!projectName) {
+            setProjectName(input.slice(0, 50) || 'New Project')
+          }
+        } catch (genError) {
+          const genErrorMsg = genError instanceof Error ? genError.message : 'Generation failed'
+          throw new Error(`Failed to generate: ${genErrorMsg}`)
         }
       }
     } catch (error: unknown) {
       const errorMessage: Message = {
-        id: Date.now().toString(),
+        id: generateMessageId(),
         role: 'assistant',
-        content: `Sorry, something went wrong: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+        content: `Sorry, something went wrong: ${error instanceof Error ? error.message : 'Unknown error'}. 
+
+${error instanceof Error && error.message.includes('truncated') 
+  ? `💡 **Tip:** Your request might be too complex. Try:
+  • Breaking it into smaller parts
+  • Simplifying the design
+  • Removing some features
+  • Being more specific about what you want` 
+  : 'Please try again or rephrase your request.'}`,
         timestamp: new Date()
       }
       setMessages(prev => [...prev, errorMessage])
+      toast.error(error instanceof Error ? error.message : 'Something went wrong')
     } finally {
       setLoading(false)
     }
@@ -278,7 +369,7 @@ export default function ChatBuilderPage() {
       setUploadedFiles(prev => [...prev, ...filesArray])
       
       const fileMessage: Message = {
-        id: Date.now().toString(),
+        id: generateMessageId(),
         role: 'user',
         content: `📎 Uploaded: ${filesArray.map(f => f.name).join(', ')}`,
         timestamp: new Date()
@@ -287,13 +378,138 @@ export default function ChatBuilderPage() {
     }
   }
 
+  const handleTemplateSelect = (template: typeof templates[0]) => {
+    setPrompt(template.description)
+    setCurrentCode(template.code)
+    setProjectName(`${template.name} Project`)
+    setShowTemplates(false)
+    
+    const templateMessage: Message = {
+      id: generateMessageId(),
+      role: 'system',
+      content: `✅ Loaded template: ${template.name}. Ready to customize!`,
+      timestamp: new Date()
+    }
+    setMessages(prev => [...prev, templateMessage])
+    toast.success(`Template "${template.name}" loaded!`)
+  }
+
+  const handleSaveProject = async () => {
+    if (!currentCode || !projectName.trim()) {
+      toast.error('Please generate code and provide a project name')
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const url = projectId ? `/api/projects/${projectId}` : '/api/projects'
+      const method = projectId ? 'PUT' : 'POST'
+
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: projectName,
+          code: sanitizeCode(currentCode),
+          type: 'landing-page',
+          description: prompt.slice(0, 200)
+        })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        if (!projectId) {
+          setProjectId(data.id)
+        }
+        toast.success('Project saved successfully!')
+      } else {
+        throw new Error(data.error || 'Failed to save')
+      }
+    } catch (error) {
+      console.error('Save error:', error)
+      toast.error('Failed to save project')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleDownload = () => {
+    if (!currentCode) {
+      toast.error('No code to download')
+      return
+    }
+
+    const sanitized = sanitizeCode(currentCode)
+    const blob = new Blob([sanitized], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${projectName || 'project'}.html`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    toast.success('Downloaded!')
+  }
+
+  const handlePublish = async () => {
+    if (!currentCode || !projectId) {
+      toast.error('Please save your project first')
+      return
+    }
+
+    setIsPublishing(true)
+    try {
+      const response = await fetch(`/api/projects/${projectId}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: sanitizeCode(currentCode) })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        toast.success('Published successfully!')
+        if (data.url) {
+          window.open(data.url, '_blank')
+        }
+      } else {
+        throw new Error(data.error || 'Failed to publish')
+      }
+    } catch (error) {
+      console.error('Publish error:', error)
+      toast.error('Failed to publish project')
+    } finally {
+      setIsPublishing(false)
+    }
+  }
+
+  const handleGitHub = () => {
+    if (!projectId) {
+      toast.error('Please save your project first')
+      return
+    }
+    router.push(`/projects/${projectId}/github`)
+  }
+
+  const handleVercel = () => {
+    if (!projectId) {
+      toast.error('Please save your project first')
+      return
+    }
+    router.push(`/projects/${projectId}/deploy`)
+  }
+
   // Helper: sanitize generated code before saving/updating
   const sanitizeCode = (code: string) => {
     if (!code) return code
     let clean = code
+    
     // Remove BuildFlow navigation that got captured
     clean = clean.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
     clean = clean.replace(/<header[^>]*class="[^"]*buildflow[^"]*"[^>]*>[\s\S]*?<\/header>/gi, '')
+    
     // Remove these specific menu items that are appearing
     const menuItems = ['Dashboard', 'Analytics', 'Submissions', 'Download', 'GitHub', 'Vercel']
     menuItems.forEach(item => {
@@ -301,718 +517,247 @@ export default function ChatBuilderPage() {
       const pattern = new RegExp(`<[^>]*>\\s*[📊📈📋📥🐙▲]?\\s*${item}\\s*<\\/[^>]*>`, 'gi')
       clean = clean.replace(pattern, '')
     })
+    
     // Remove feedback buttons
-    clean = clean.replace(/<[^>]*feedback[^>]*>[\s\S]*?<\/[^ ]*>/gi, '')
-
-    // Remove common overlay elements
-    clean = clean.replace(/<div[^>]*class=["'][^"']*overlay[^"']*["'][^>]*>[\s\S]*?<\/div>/gi, '')
-    clean = clean.replace(/<div[^>]*id=["']overlay["'][^>]*>[\s\S]*?<\/div>/gi, '')
-
-    // Remove inline styles that add black/semiblack overlays
-    clean = clean.replace(/background\s*:\s*rgba\(0,\s*0,\s*0,\s*(0\.5|0\.6|0\.7|0\.8|0\.9|1)\);?/gi, '')
-    clean = clean.replace(/background-color\s*:\s*rgba\(0,\s*0,\s*0,\s*(0\.5|0\.6|0\.7|0\.8|0\.9|1)\);?/gi, '')
-
-    // Remove CSS overlay selectors
-    clean = clean.replace(/\.overlay\s*\{[^}]*\}/gi, '')
-    clean = clean.replace(/#overlay\s*\{[^}]*\}/gi, '')
-
-    return clean.trim()
-  }
-
-  const handleSave = async () => {
-    if (!currentCode) {
-      toast({
-        variant: 'destructive',
-        description: 'No code to save. Generate a site first!'
-      })
-      return
-    }
-    setSaving(true)
-    const cleanCode = sanitizeCode(currentCode)
-    try {
-      if (projectId && pageId) {
-        // UPDATE existing page
-        const res = await fetch(`/api/projects/${projectId}/pages/${pageId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: projectName,
-            content: cleanCode
-          })
-        })
-        if (res.ok) {
-          toast({
-            variant: 'default',
-            description: 'Page updated!'
-          })
-        } else {
-          const error = await res.text()
-          console.error('Save failed:', error)
-          toast({
-            variant: 'destructive',
-            description: 'Failed to save'
-          })
-        }
-      } else if (projectId) {
-        // UPDATE existing project
-        const res = await fetch(`/api/projects/${projectId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: projectName,
-            code: cleanCode
-          })
-        })
-        if (res.ok) {
-          toast({
-            variant: 'default',
-            description: 'Project updated!'
-          })
-        } else {
-          const error = await res.text()
-          console.error('Save failed:', error)
-          toast({
-            variant: 'destructive',
-            description: 'Failed to save'
-          })
-        }
-      } else {
-        // CREATE new project
-        const res = await fetch('/api/projects', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: projectName,
-            code: cleanCode,
-            type: 'website'
-          })
-        })
-        if (res.ok) {
-          const data = await res.json()
-          window.history.pushState({}, '', `/chatbuilder?project=${data.id}`)
-          setProjectId(data.id)
-          toast({
-            variant: 'default',
-            description: 'Project created!'
-          })
-        } else {
-          const error = await res.text()
-          console.error('Save failed:', error)
-          toast({
-            variant: 'destructive',
-            description: 'Failed to save'
-          })
-        }
-      }
-    } catch {
-      toast({
-        variant: 'destructive',
-        description: 'Error saving project'
-      })
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handlePublish = async () => {
-    if (!projectId) {
-      toast({
-        variant: 'destructive',
-        description: 'Please save your project first!'
-      })
-      return
-    }
-
-    setPublishing(true)
+    clean = clean.replace(/<[^>]*feedback[^>]*>[\s\S]*?<\/[^>]*>/gi, '')
     
-    try {
-      // First save any changes
-      if (currentCode && projectName) {
-        await handleSave()
-      }
-
-      // Then publish
-      const res = await fetch(`/api/projects/${projectId}/publish`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      })
-
-      const data = await res.json()
-
-      if (res.ok) {
-        toast({
-          description: `✅ Published! Your site is live at ${data.publicSlug}`
-        })
-        
-        // Open the published site
-        if (data.publicUrl) {
-          window.open(data.publicUrl, '_blank', 'noopener,noreferrer')
-        }
-      } else {
-        throw new Error(data.error || 'Publish failed')
-      }
-    } catch (error: unknown) {
-      console.error('Publish error:', error)
-      toast({
-        variant: 'destructive',
-        description: error instanceof Error ? error.message : 'Failed to publish'
-      })
-    } finally {
-      setPublishing(false)
-    }
+    return clean
   }
-
-  const handleDownload = () => {
-    if (!currentCode) {
-      toast({
-        variant: 'destructive',
-        description: 'No code to download!'
-      })
-      return
-    }
-
-    const success = downloadAsHTML(currentCode, projectName)
-    
-    if (success) {
-      toast({
-        variant: 'default',
-        description: '📥 Downloaded successfully!'
-      })
-    } else {
-      toast({
-        variant: 'destructive',
-        description: 'Download failed'
-      })
-    }
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleExportToGitHub = async () => {
-    if (!projectId) {
-      alert('Please save your project first!')
-      return
-    }
-    try {
-      const response = await fetch('/api/export/github', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId: projectId,
-          repoName: projectName,
-          code: currentCode
-        })
-      })
-      if (response.ok) {
-        const data = await response.json()
-        window.open(data.repoUrl, '_blank')
-      }
-    } catch (error) {
-      console.error('GitHub export error:', error)
-      alert('Failed to export to GitHub')
-    }
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleDeployToVercel = async () => {
-    if (!projectId) {
-      alert('Please save your project first!')
-      return
-    }
-    try {
-      const response = await fetch('/api/deploy/vercel', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId: projectId,
-          projectName: projectName,
-          code: currentCode
-        })
-      })
-      if (response.ok) {
-        const data = await response.json()
-        window.open(data.deploymentUrl, '_blank')
-      }
-    } catch (error) {
-      console.error('Vercel deploy error:', error)
-      alert('Failed to deploy to Vercel')
-    }
-  }
-
-  const handleLoadTemplate = (template: typeof templates[0]) => {
-    setShowTemplates(false)
-    setCurrentCode(template.code)
-    setProjectName(template.name)
-    const templateMessage: Message = {
-      id: Date.now().toString(),
-      role: 'assistant',
-      content: `Loaded template: ${template.name}. You can now customize it by chatting with me!`,
-      timestamp: new Date()
-    }
-    setMessages(prev => [...prev, templateMessage])
-  }
-
-  // Clean code for existing projects
-  const cleanExistingProject = async () => {
-    if (!projectId || !currentCode) return
-    const cleanCode = sanitizeCode(currentCode)
-    setCurrentCode(cleanCode)
-    await handleSave()
-  }
-
-  // Helper function for category icons
-  function getCategoryIcon(category: string): string {
-    switch (category.toLowerCase()) {
-      case 'landing-page': return '🚀'
-      case 'dashboard': return '📊'
-      case 'blog': return '📝'
-      case 'portfolio': return '💼'
-      case 'e-commerce': return '🛒'
-      case 'saas': return '⚡'
-      case 'marketing': return '📈'
-      case 'startup': return '🎯'
-      default: return '📄'
-    }
-  }
-
-  // Helper: wrap preview code in full HTML document
-  function getPreviewHTML(code: string) {
-    return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-          <script src="https://cdn.tailwindcss.com"></script>
-        </head>
-        <body>
-          ${code}
-        </body>
-      </html>
-    `
-  }
-
-  // Optimistic Regenerate Handler
-  const handleRegenerate = async (prompt: string) => {
-    // Optimistically update UI
-    setCurrentCode('<!-- Generating... -->')
-
-    try {
-      const res = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: prompt,
-          projectId: projectId, // Pass existing ID to UPDATE
-          type: 'website'
-        })
-      })
-      const data = await res.json()
-      setCurrentCode(data.code)
-      // Update URL if new project
-      if (!projectId && data.projectId) {
-        window.history.pushState({}, '', `/chatbuilder?project=${data.projectId}`)
-        setProjectId(data.projectId)
-      }
-    } catch {
-      toast({ 
-        variant: 'destructive', 
-        description: 'Generation failed'
-      })
-    }
-  }
-
-  // Auto-save functionality (moved after all function definitions)
-  useAutoSave(currentCode, projectId, projectName, pageId, 3000)
-
-  // Keyboard shortcuts (moved after all function definitions)
-  useKeyboardShortcuts({
-    onSave: handleSave,
-    onDownload: handleDownload
-  })
 
   return (
-  <div className="flex flex-col md:flex-row h-screen bg-gray-50">
-    
-    {/* Mobile navigation removed. UnifiedMobileNav now handles navigation. */}
-   
-      {/* Chat Section */}
-      <div className="w-full md:w-1/2 h-1/2 md:h-full flex flex-col border-b md:border-b-0 md:border-r border-gray-200 bg-white">
-        {/* Header */}
-        <div className="hidden md:block px-6 py-4 border-b border-gray-200">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <h1 className="text-2xl font-bold">BuildFlow AI Chat</h1>
-              <p className="text-sm text-gray-600">
-                {currentCode ? 'Chat to iterate on your site' : 'Chat to build your site'}
-              </p>
-            </div>
+    <div className="flex flex-col h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
             <button
               onClick={() => router.push('/dashboard')}
-              className="text-gray-600 hover:text-gray-900"
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
             >
-              ← Back
+              ← Back to Dashboard
             </button>
-          </div>
-          
-          {/* Project Name Input */}
-          {currentCode && (
+            <div className="border-l border-gray-300 h-6 hidden sm:block"></div>
             <input
               type="text"
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
-              placeholder="Project name..."
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-900"
+              placeholder="Project Name"
+              className="px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent hidden sm:block"
             />
-          )}
-        </div>
-
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {messages.map(message => (
-            <div
-              key={message.id}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-[80%] rounded-lg px-4 py-3 ${
-                  message.role === 'user'
-                    ? 'bg-blue-600 text-white'
-                    : message.role === 'system'
-                    ? 'bg-purple-100 text-purple-900 border-2 border-purple-300'
-                    : 'bg-gray-100 text-gray-900'
-                }`}
-              >
-                <p className="text-sm whitespace-pre-wrap text-gray-900 dark:text-gray-100">{message.content}</p>
-                <MessageTimestamp timestamp={message.timestamp} />
-              </div>
-            </div>
-          ))}
-          
-          {loading && (
-            <div className="flex justify-start">
-              <div className="bg-gray-100 rounded-lg px-4 py-3">
-                <div className="flex space-x-2">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Input Area - Buttons MOVED TO TOP, mb-16 to clear feedback widget */}
-        <div className="p-4 border-t border-gray-200 bg-white mb-16">
-          {/* Action Buttons Row - NOW AT TOP */}
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex gap-3 items-center">
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept=".html,.js,.jsx,.tsx,.css,.zip,.txt"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors font-medium shadow-sm"
-                disabled={loading}
-              >
-                📎 Upload Files
-              </button>
-              <button
-                onClick={() => setShowTemplates(!showTemplates)}
-                className="flex items-center gap-1 px-4 py-2 bg-purple-600 text-white hover:bg-purple-700 rounded-lg transition-colors font-medium shadow-sm"
-                disabled={loading}
-              >
-                📋 Templates
-              </button>
-              {/* Prompt Guide with autoOpen */}
-              <PromptGuide autoOpen={showGuideOnLoad} />
-            </div>
-            {/* Separate Save & Publish Buttons */}
-            {currentCode && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="flex items-center gap-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg font-medium transition-all disabled:opacity-50 shadow-sm"
-                >
-                  {saving ? '💾 Saving...' : '💾 Save Draft'}
-                </button>
-                <button
-                  onClick={handlePublish}
-                  disabled={publishing}
-                  className="flex items-center gap-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all disabled:opacity-50 shadow-sm"
-                  title="Save and publish to live site"
-                >
-                  {publishing ? '🚀 Publishing...' : '🚀 Publish'}
-                </button>
-                <button
-                  onClick={cleanExistingProject}
-                  disabled={saving || !projectId}
-                  className="flex items-center gap-1 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-medium transition-all disabled:opacity-50 shadow-sm"
-                  title="Clean navigation and menu from code"
-                >
-                  🧹 Clean Code
-                </button>
-              </div>
-            )}
           </div>
-
-          {/* Uploaded files preview */}
-          {uploadedFiles.length > 0 && (
-            <div className="mb-3 flex flex-wrap gap-2">
-              {uploadedFiles.map((file, idx) => (
-                <div key={idx} className="bg-blue-50 text-blue-700 px-3 py-1 rounded-lg text-sm flex items-center gap-2">
-                  <span>📎 {file.name}</span>
-                  <button
-                    onClick={() => setUploadedFiles(prev => prev.filter((_, i) => i !== idx))}
-                    className="hover:text-blue-900"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Authentication Options */}
-          <div className="mb-3 border-t border-gray-200 pt-3">
-            <label className="flex items-center gap-2 mb-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={includeAuth}
-                onChange={(e) => setIncludeAuth(e.target.checked)}
-                className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-              />
-              <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-                Include User Authentication
-              </span>
-            </label>
-            
-            {includeAuth && (
-              <div className="ml-6 space-y-2 animate-fadeIn">
-                <p className="text-xs text-gray-500 mb-2">Choose authentication method:</p>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    value="supabase"
-                    checked={authProvider === 'supabase'}
-                    onChange={(e) => setAuthProvider(e.target.value as 'nextauth' | 'supabase' | 'jwt')}
-                    className="w-4 h-4 text-blue-600"
-                  />
-                  <span className="text-sm">
-                    <strong>Supabase Auth</strong> - Login, signup, protected content (Recommended for single-file HTML)
-                  </span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    value="nextauth"
-                    checked={authProvider === 'nextauth'}
-                    onChange={(e) => setAuthProvider(e.target.value as 'nextauth' | 'supabase' | 'jwt')}
-                    className="w-4 h-4 text-blue-600"
-                  />
-                  <span className="text-sm">
-                    <strong>NextAuth.js</strong> - Full auth system with Google/GitHub OAuth (Better for multi-page apps)
-                  </span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    value="jwt"
-                    checked={authProvider === 'jwt'}
-                    onChange={(e) => setAuthProvider(e.target.value as 'nextauth' | 'supabase' | 'jwt')}
-                    className="w-4 h-4 text-blue-600"
-                  />
-                  <span className="text-sm">
-                    <strong>Custom JWT</strong> - Maximum control, custom implementation
-                  </span>
-                </label>
-                <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
-                  ✨ Authentication will include login/signup pages, protected routes, and session management
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Larger Textarea Input */}
-          <div className="flex gap-2 items-end">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  handleSend()
-                }
-              }}
-              placeholder={
-                currentCode
-                  ? "Tell me what to change, upload files, or paste URLs..."
-                  : "What do you want to build? (Paste URLs or upload files)"
-              }
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none min-h-[60px] max-h-[200px] text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-900"
-              disabled={loading}
-              rows={1}
-            />
+          
+          {/* Desktop Menu */}
+          <div className="hidden lg:flex items-center gap-3">
             <button
-              onClick={handleSend}
-              disabled={loading || (!input.trim() && uploadedFiles.length === 0)}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium h-[60px]"
+              onClick={() => setShowTemplates(!showTemplates)}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
             >
-              {loading ? 'Thinking...' : currentCode ? 'Update' : 'Generate'}
+              📋 Templates
             </button>
-            {currentCode && (
-              <button
-                onClick={() => handleRegenerate(input)}
-                disabled={loading || !input.trim()}
-                className="px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors font-medium h-[60px]"
-                title="Regenerate from scratch with this prompt"
-              >
-                🔄 Regenerate
-              </button>
-            )}
-          </div>
-          
-          <div className="text-xs text-gray-500 mt-2">
-            💡 Tip: Press Enter to send, Shift+Enter for new line. Paste URLs to analyze websites.
-          </div>
-        </div>
-      </div>
-
-      {/* Preview Section */}
-      <div className="w-full md:w-1/2 h-1/2 md:h-full flex flex-col bg-gray-50">
-        <div className="px-6 py-4 border-b border-gray-200 bg-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">Live Preview</h2>
-              {projectId && (
-                <p className="text-sm text-gray-600">ID: {projectId}</p>
-              )}
-            </div>
             
-            {/* Action Buttons */}
             {currentCode && (
-              <div className="flex items-center gap-2">
+              <>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(sanitizeCode(currentCode))
+                    toast.success('Code copied!')
+                  }}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+                >
+                  📋 Copy
+                </button>
                 <button
                   onClick={handleDownload}
-                  className="flex items-center gap-1 px-3 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                  title="Download HTML"
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
                 >
-                  ⬇️ Download
+                  💾 Download
                 </button>
-                <a
-                  href="https://github.com/new"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition"
-                  title="Export to GitHub"
+                {projectId && (
+                  <>
+                    <button
+                      onClick={handleGitHub}
+                      className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+                    >
+                      🐙 GitHub
+                    </button>
+                    <button
+                      onClick={handleVercel}
+                      className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+                    >
+                      ▲ Vercel
+                    </button>
+                    <button
+                      onClick={handlePublish}
+                      disabled={isPublishing}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+                    >
+                      {isPublishing ? 'Publishing...' : '🚀 Publish'}
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={handleSaveProject}
+                  disabled={isSaving}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 text-sm font-medium"
                 >
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                  </svg>
-                  GitHub
-                </a>
-                <a
-                  href="https://vercel.com/new"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition"
-                  title="Deploy to Vercel"
-                >
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M24 22.525H0l12-21.05 12 21.05z"/>
-                  </svg>
-                  Vercel
-                </a>
-              </div>
+                  {isSaving ? 'Saving...' : '✅ Save'}
+                </button>
+              </>
             )}
+            
+            <PromptGuide />
+            
+            <button
+              onClick={() => setShowAssistant(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200"
+            >
+              <HelpCircle className="w-4 h-4" />
+              <span className="hidden xl:inline">Help</span>
+            </button>
           </div>
-        </div>
-        
-        <div className="flex-1 p-4 relative">
-          {currentCode ? (
-            <iframe
-              srcDoc={getPreviewHTML(currentCode)}
-              className="w-full h-full bg-white rounded-lg shadow-lg border border-gray-200"
-              title="Preview"
-              sandbox="allow-scripts allow-same-origin"
-            />
-          ) : (
-            <div className="h-full flex items-center justify-center text-gray-400">
-              <div className="text-center">
-                <div className="text-6xl mb-4">🚀</div>
-                <p className="text-lg font-semibold">Your site will appear here</p>
-                <p className="text-sm mt-2">Start by telling me what you want to build</p>
-                <div className="mt-6 text-left max-w-md mx-auto space-y-2 text-sm">
-                  <p className="font-semibold text-gray-600">Examples:</p>
-                  <p className="text-gray-500">• &ldquo;Create a coffee shop website&rdquo;</p>
-                  <p className="text-gray-500">• &ldquo;Build a gym landing page&rdquo;</p>
-                  <p className="text-gray-500">• Upload broken Replit code to fix</p>
-                  <p className="text-gray-500">• Paste website URL to analyze</p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
 
-      {/* Template Modal */}
-      {showTemplates && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-6xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setShowMobileMenu(!showMobileMenu)}
+            className="lg:hidden p-2 hover:bg-gray-100 rounded-lg"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {showMobileMenu ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+          </button>
+        </div>
+
+        {/* Mobile Menu Dropdown */}
+        {showMobileMenu && (
+          <div className="lg:hidden mt-4 pt-4 border-t border-gray-200 space-y-2">
+            <input
+              type="text"
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              placeholder="Project Name"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 mb-3"
+            />
+            <button
+              onClick={() => { setShowTemplates(!showTemplates); setShowMobileMenu(false); }}
+              className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium text-left"
+            >
+              📋 Templates
+            </button>
+            {currentCode && (
+              <>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(sanitizeCode(currentCode))
+                    toast.success('Code copied!')
+                    setShowMobileMenu(false)
+                  }}
+                  className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium text-left"
+                >
+                  📋 Copy Code
+                </button>
+                <button
+                  onClick={() => { handleDownload(); setShowMobileMenu(false); }}
+                  className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium text-left"
+                >
+                  💾 Download
+                </button>
+                {projectId && (
+                  <>
+                    <button
+                      onClick={() => { handleGitHub(); setShowMobileMenu(false); }}
+                      className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium text-left"
+                    >
+                      🐙 Export to GitHub
+                    </button>
+                    <button
+                      onClick={() => { handleVercel(); setShowMobileMenu(false); }}
+                      className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium text-left"
+                    >
+                      ▲ Deploy to Vercel
+                    </button>
+                    <button
+                      onClick={() => { handlePublish(); setShowMobileMenu(false); }}
+                      disabled={isPublishing}
+                      className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium text-left"
+                    >
+                      {isPublishing ? 'Publishing...' : '🚀 Publish Live'}
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => { handleSaveProject(); setShowMobileMenu(false); }}
+                  disabled={isSaving}
+                  className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 text-sm font-medium text-left"
+                >
+                  {isSaving ? 'Saving...' : '✅ Save Project'}
+                </button>
+              </>
+            )}
+            <button
+              onClick={() => { setShowAssistant(true); setShowMobileMenu(false); }}
+              className="w-full px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 text-sm font-medium text-left"
+            >
+              💡 Help & Prompt Guide
+            </button>
+          </div>
+        )}
+
+        {/* Templates Panel */}
+        {showTemplates && (
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold">Start from a Template</h2>
+              <h3 className="text-lg font-semibold">Choose a Template</h3>
               <button
                 onClick={() => setShowTemplates(false)}
-                className="text-gray-500 hover:text-gray-700 text-2xl"
+                className="text-gray-500 hover:text-gray-700"
               >
-                ×
+                ✕
               </button>
             </div>
 
             {/* Category Filter */}
-            <div className="flex flex-wrap gap-2 mb-6">
-              {categories.map((category) => (
+            <div className="flex gap-2 mb-4 overflow-x-auto">
+              {categories.map((cat) => (
                 <button
-                  key={category}
-                  onClick={() => setSelectedCategory(category)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all capitalize ${
-                    selectedCategory === category
-                      ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
+                    selectedCategory === cat
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-100'
                   }`}
                 >
-                  {category === 'all' ? '🎨 All' : `${getCategoryIcon(category)} ${category}`}
+                  {cat.charAt(0).toUpperCase() + cat.slice(1)}
                 </button>
               ))}
             </div>
-            
-            {/* Template Grid */}
-            <div className="grid md:grid-cols-3 gap-4">
-              {filteredTemplates.map(template => (
+
+            {/* Templates Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
+              {filteredTemplates.map((template) => (
                 <button
                   key={template.id}
-                  onClick={() => handleLoadTemplate(template)}
-                  className="p-6 border-2 border-gray-200 rounded-lg hover:border-purple-500 transition-all text-left group"
+                  onClick={() => handleTemplateSelect(template)}
+                  className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg hover:border-purple-300 transition text-left group"
                 >
-                  <div className="text-4xl mb-3">{getCategoryIcon(template.category)}</div>
-                  <h3 className="font-bold mb-2 group-hover:text-purple-600 text-gray-900 dark:text-gray-100">{template.name}</h3>
-                  <p className="text-sm text-gray-700 dark:text-gray-200 mb-3">{template.description}</p>
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="text-3xl">{template.icon}</span>
+                    <h4 className="font-semibold text-gray-900 group-hover:text-purple-600 transition">
+                      {template.name}
+                    </h4>
+                  </div>
+                  <p className="text-sm text-gray-600 line-clamp-2 mb-3">
+                    {template.description}
+                  </p>
                   <div className="flex flex-wrap gap-1">
-                    {template.tags?.slice(0, 2).map((tag, i) => (
+                    {template.tags.slice(0, 3).map((tag) => (
                       <span
-                        key={i}
-                        className="px-2 py-1 bg-purple-50 text-purple-600 rounded text-xs"
+                        key={tag}
+                        className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full"
                       >
                         {tag}
                       </span>
@@ -1021,35 +766,234 @@ export default function ChatBuilderPage() {
                 </button>
               ))}
             </div>
+          </div>
+        )}
 
-            {filteredTemplates.length === 0 && (
+        {/* Auth Options */}
+        <div className="mt-4 flex items-center gap-4">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={includeAuth}
+              onChange={(e) => setIncludeAuth(e.target.checked)}
+              className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+            />
+            <span className="text-sm text-gray-700">Include Authentication</span>
+          </label>
+          
+          {includeAuth && (
+            <select
+              value={authProvider}
+              onChange={(e) => setAuthProvider(e.target.value as 'nextauth' | 'supabase' | 'jwt')}
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="nextauth">NextAuth.js</option>
+              <option value="supabase">Supabase Auth</option>
+              <option value="jwt">JWT</option>
+            </select>
+          )}
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left: Chat Panel */}
+        <div className="w-1/2 flex flex-col bg-white border-r border-gray-200">
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            {messages.length === 0 && (
               <div className="text-center py-12">
-                <p className="text-gray-600">No templates found in this category</p>
-                <button
-                  onClick={() => setSelectedCategory('all')}
-                  className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                <div className="text-6xl mb-4">💬</div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  Start Building with AI
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  Describe what you want to build, or choose a template
+                </p>
+                <div className="max-w-md mx-auto text-left space-y-3">
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                    <p className="text-sm text-gray-700">
+                      💡 <strong>Tip:</strong> Be specific about colors, layout, and features
+                    </p>
+                  </div>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="text-sm text-gray-700">
+                      📎 <strong>Upload files:</strong> Share designs, screenshots, or docs
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[80%] rounded-lg p-4 ${
+                    msg.role === 'user'
+                      ? 'bg-purple-600 text-white'
+                      : msg.role === 'system'
+                      ? 'bg-blue-50 text-gray-800 border border-blue-200'
+                      : 'bg-gray-50 text-gray-900 border border-gray-200'
+                  }`}
                 >
-                  View All Templates
-                </button>
+                  <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+                  <MessageTimestamp timestamp={msg.timestamp} />
+                </div>
+              </div>
+            ))}
+
+            {loading && (
+              <div className="flex justify-start">
+                <div className="bg-gray-100 border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"></div>
+                    <div
+                      className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"
+                      style={{ animationDelay: '0.2s' }}
+                    ></div>
+                    <div
+                      className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"
+                      style={{ animationDelay: '0.4s' }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input Area */}
+          <div className="border-t border-gray-200 p-4 bg-white">
+            {uploadedFiles.length > 0 && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {uploadedFiles.map((file, i) => (
+                  <span
+                    key={i}
+                    className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm flex items-center gap-2"
+                  >
+                    📎 {file.name}
+                    <button
+                      onClick={() => setUploadedFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                      className="text-purple-900 hover:text-purple-700 font-bold"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSend()
+                  }
+                }}
+                placeholder="Describe what you want to build..."
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                rows={1}
+                disabled={loading}
+              />
+              <button
+                onClick={handleSend}
+                disabled={loading || (!input.trim() && uploadedFiles.length === 0)}
+                className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 font-medium"
+              >
+                {loading ? '...' : '→'}
+              </button>
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={handleFileUpload}
+              className="hidden"
+              accept=".pdf,.doc,.docx,.txt,.md,.png,.jpg,.jpeg"
+            />
+
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={loading}
+              className="mt-2 text-sm text-gray-700 hover:text-gray-900 flex items-center gap-1"
+            >
+              📎 Attach files
+            </button>
+          </div>
+        </div>
+
+        {/* Right: Preview Panel */}
+        <div className="w-1/2 bg-gray-50 flex flex-col">
+          <div className="p-4 bg-white border-b border-gray-200 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900">Preview</h3>
+            <button
+              onClick={() => setShowPreview(!showPreview)}
+              className="text-sm text-gray-600 hover:text-gray-900"
+            >
+              {showPreview ? '🙈 Hide' : '👁️ Show'}
+            </button>
+          </div>
+
+          <div className="flex-1 p-6 overflow-hidden">
+            {currentCode && showPreview ? (
+              <div className="w-full h-full bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <iframe
+                  srcDoc={sanitizeCode(currentCode)}
+                  className="w-full h-full"
+                  title="Preview"
+                  sandbox="allow-scripts allow-same-origin allow-forms"
+                />
+              </div>
+            ) : (
+              <div className="h-full flex items-center justify-center text-gray-400">
+                <div className="text-center">
+                  <div className="text-6xl mb-4">🎨</div>
+                  <p className="text-lg mb-2">No preview yet</p>
+                  <p className="text-sm">Start chatting to generate your project</p>
+                </div>
               </div>
             )}
           </div>
         </div>
+      </div>
+
+      {/* Progress Indicator */}
+      <GenerationProgress
+        status={status as 'idle' | 'initializing' | 'generating' | 'validating' | 'saving' | 'complete' | 'error'}
+        progress={progress}
+        estimate={estimate || undefined}
+        elapsed={elapsed}
+        error={error || undefined}
+      />
+
+      {/* Code Preview Modal */}
+      {generatedCode && (
+        <CodePreviewModal code={generatedCode} projectId={projectId} />
       )}
 
-      {/* NEW: Help Icon Floating Button */}
-      <button
-        onClick={() => setShowAssistant(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-purple-600 hover:bg-purple-700 text-white rounded-full shadow-lg flex items-center justify-center z-40"
-        title="Get help with prompts"
-      >
-        <HelpCircle className="w-6 h-6" />
-      </button>
-      <PromptAssistant
-        isOpen={showAssistant}
-        onClose={() => setShowAssistant(false)}
-        onUsePrompt={() => setShowAssistant(false)}
-      />
+      {/* Prompt Assistant Modal */}
+      {showAssistant && (
+        <PromptAssistant
+          isOpen={showAssistant}
+          onClose={() => setShowAssistant(false)}
+          onUsePrompt={(newPrompt) => {
+            setPrompt(newPrompt)
+            setInput(newPrompt)
+            setShowAssistant(false)
+          }}
+        />
+      )}
+
+      <Toaster position="top-right" />
     </div>
   )
 }

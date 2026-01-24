@@ -45,10 +45,11 @@ export async function POST(req: NextRequest) {
       details: data,
     })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Manual drip trigger error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json(
-      { error: 'Failed to trigger drip emails', details: error.message },
+      { error: 'Failed to trigger drip emails', details: errorMessage },
       { status: 500 }
     )
   }

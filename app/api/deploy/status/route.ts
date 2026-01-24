@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
       error: deployment.error?.message || null
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Status check error:', error);
     return NextResponse.json(
       { error: 'Failed to check status' },

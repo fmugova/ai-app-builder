@@ -12,13 +12,13 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://va.vercel-scripts.com",
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com https://cdnjs.cloudflare.com",
-              "font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com",
-              "img-src 'self' data: https: blob:",
-              "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co",
-              "frame-src 'self' blob: data:",
-              "worker-src 'self' blob:",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http:",
+              "script-src-elem 'self' 'unsafe-inline' https: http:",
+              "style-src 'self' 'unsafe-inline' https:",
+              "img-src 'self' data: https: http:",
+              "font-src 'self' data: https:",
+              "connect-src 'self' https: http:",
+              "frame-src 'self' https: http:"
             ].join('; ')
           },
           {

@@ -201,10 +201,10 @@ export async function POST(request: Request) {
       message: 'Project exported to GitHub successfully',
     });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('GitHub export error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to export to GitHub' },
+      { error: (error instanceof Error ? error.message : 'Failed to export to GitHub') },
       { status: 500 }
     );
   }

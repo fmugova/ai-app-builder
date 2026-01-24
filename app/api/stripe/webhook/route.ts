@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
         // Apply promo code if present
         if (session.metadata?.promoCode) {
           try {
-            const promo = await prisma.promoCodes.findFirst({
+            const promo = await prisma.promo_codes.findFirst({
               where: {
                 code: session.metadata.promoCode.toUpperCase(),
                 active: true,
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
 
             if (promo) {
               // Increment usage count
-              await prisma.promoCodes.update({
+              await prisma.promo_codes.update({
                 where: { id: promo.id },
                 data: { timesUsed: { increment: 1 } },
               })

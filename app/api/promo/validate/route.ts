@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const promo = await prisma.promoCodes.findUnique({
+    const promo = await prisma.promo_codes.findUnique({
       where: { code: code.toUpperCase() },
     })
 

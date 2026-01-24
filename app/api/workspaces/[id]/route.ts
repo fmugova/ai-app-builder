@@ -70,9 +70,9 @@ export async function GET(
     const workspace = await prisma.workspace.findUnique({
       where: { id: id as string },
       include: {
-        members: {
+        WorkspaceMember: {
           include: {
-            user: {
+            User: {
               select: {
                 id: true,
                 name: true,
@@ -85,12 +85,12 @@ export async function GET(
             joinedAt: 'asc',
           },
         },
-        projects: true,
+        WorkspaceProject: true,
         _count: {
           select: {
-            members: true,
-            projects: true,
-            invites: true,
+            WorkspaceMember: true,
+            WorkspaceProject: true,
+            WorkspaceInvite: true,
           },
         },
       },
@@ -164,9 +164,9 @@ export async function PATCH(
       where: { id: id as string },
       data: validatedData,
       include: {
-        members: {
+        WorkspaceMember: {
           include: {
-            user: {
+            User: {
               select: {
                 id: true,
                 name: true,

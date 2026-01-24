@@ -59,7 +59,7 @@ export default async function NavigationBuilderPage({ params }: NavigationPagePr
   return (
     <NavigationBuilderClient
       projectId={projectId}
-      initialPages={pages}
+      initialPage={pages}
     />
   )
 }

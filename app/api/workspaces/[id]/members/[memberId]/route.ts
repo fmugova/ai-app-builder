@@ -114,7 +114,7 @@ export async function PATCH(
       where: { id: memberId },
       data: { role: validatedData.role },
       include: {
-        user: {
+        User: {
           select: {
             id: true,
             name: true,
@@ -134,7 +134,7 @@ export async function PATCH(
         metadata: {
           workspaceId: id,
           memberId: memberId,
-          memberEmail: updatedMember.user.email,
+          memberEmail: updatedMember.User.email,
           oldRole: targetMember.role,
           newRole: validatedData.role,
         },
@@ -181,7 +181,7 @@ export async function DELETE(
     const targetMember = await prisma.workspaceMember.findUnique({
       where: { id: memberId },
       include: {
-        user: {
+        User: {
           select: {
             id: true,
             name: true,
@@ -243,7 +243,7 @@ export async function DELETE(
         metadata: {
           workspaceId: id,
           memberId: memberId,
-          memberEmail: targetMember.user.email,
+          memberEmail: targetMember.User.email,
           role: targetMember.role,
         },
       },

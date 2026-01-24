@@ -14,15 +14,15 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const userId = session.user.id
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: {
-        generationsUsed: true,
-        generationsLimit: true,
-        subscriptionTier: true,
+      where: { id: userId },
+      include: {
         _count: {
-          select: { projects: true },
-        },
+          select: {
+            Project: true
+          }
+        }
       },
     })
 
@@ -36,10 +36,10 @@ export async function GET() {
 
     return NextResponse.json({
       canGenerate: (user.generationsUsed || 0) < aiLimit,
-      canCreateProject: user._count.projects < projectLimit,
+      canCreateProject: user._count.Project < projectLimit,
       limits: {
         aiRequests: { used: user.generationsUsed || 0, limit: aiLimit },
-        projects: { used: user._count.projects, limit: projectLimit },
+        projects: { used: user._count.Project, limit: projectLimit },
       },
       plan,
     })

@@ -480,12 +480,24 @@ export function getPromptsByCategory(category: keyof typeof PROMPT_EXAMPLES) {
 /**
  * Search prompts by tags or title
  */
+type Prompt = {
+  title: string;
+  category?: string;
+  tags?: string[];
+  prompt?: string;
+  estimatedTime?: string;
+  difficulty?: string;
+  template?: string;
+  key?: string;
+  // Add other fields as needed
+};
+
 export function searchPrompts(query: string) {
-  const results: any[] = [];
+  const results: Prompt[] = [];
   const lowerQuery = query.toLowerCase();
   
   Object.entries(PROMPT_EXAMPLES).forEach(([category, prompts]) => {
-    Object.entries(prompts).forEach(([key, prompt]: [string, any]) => {
+    Object.entries(prompts).forEach(([key, prompt]: [string, Prompt]) => {
       const matchesTitle = prompt.title?.toLowerCase().includes(lowerQuery);
       const matchesTags = prompt.tags?.some((tag: string) => tag.includes(lowerQuery));
       const matchesCategory = category.toLowerCase().includes(lowerQuery);
@@ -503,7 +515,7 @@ export function searchPrompts(query: string) {
  * Get all prompts as flat array
  */
 export function getAllPrompts() {
-  const allPrompts: any[] = [];
+  const allPrompts: Prompt[] = [];
   
   Object.entries(PROMPT_EXAMPLES).forEach(([category, prompts]) => {
     Object.entries(prompts).forEach(([key, prompt]) => {

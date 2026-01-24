@@ -13,7 +13,7 @@ export async function GET(
     const invite = await prisma.workspaceInvite.findUnique({
       where: { token },
       include: {
-        workspace: {
+        Workspace: {
           select: {
             id: true,
             name: true,
@@ -37,10 +37,10 @@ export async function GET(
     }
 
     return NextResponse.json({ 
-      invite: {
+      WorkspaceInvite: {
         email: invite.email,
         role: invite.role,
-        workspace: invite.workspace,
+        Workspace: invite.Workspace,
         expiresAt: invite.expiresAt,
       }
     });
@@ -77,7 +77,7 @@ export async function POST(
     const invite = await prisma.workspaceInvite.findUnique({
       where: { token },
       include: {
-        workspace: true,
+        Workspace: true,
       },
     });
 
@@ -126,7 +126,7 @@ export async function POST(
           role: invite.role,
         },
         include: {
-          workspace: true,
+          Workspace: true,
         },
       }),
       prisma.workspaceInvite.update({
@@ -146,14 +146,14 @@ export async function POST(
         action: 'member_joined',
         metadata: {
           workspaceId: invite.workspaceId,
-          workspaceName: invite.workspace.name,
+          workspaceName: invite.Workspace.name,
           role: invite.role,
         },
       },
     });
 
     return NextResponse.json({ 
-      workspace: member.workspace,
+      Workspace: member.Workspace,
       role: member.role,
     });
   } catch (error) {

@@ -17,7 +17,7 @@ export const DELETE = withAuth(async (req, context, session) => {
     const domain = await prisma.customDomain.findFirst({
       where: {
         id: id as string,
-        project: { userId: session.user.id }
+        Project: { userId: session.user.id }
       }
     })
 

@@ -70,8 +70,8 @@ export function UsageDashboard() {
           <ul className="space-y-2 text-sm text-muted-foreground">
             <li>✓ Custom Domains: {limits.customDomains === -1 ? 'Unlimited' : limits.customDomains}</li>
             <li>✓ Databases: {limits.databases === -1 ? 'Unlimited' : limits.databases}</li>
-            <li>✓ Team Members: {limits.teamMembers === -1 ? 'Unlimited' : limits.teamMembers}</li>
-            <li>✓ Max Pages: {limits.maxPages === -1 ? 'Unlimited' : limits.maxPages}</li>
+            <li>✓ Team WorkspaceMember: {limits.teamMembers === -1 ? 'Unlimited' : limits.teamMembers}</li>
+            <li>✓ Max Page: {limits.maxPages === -1 ? 'Unlimited' : limits.maxPages}</li>
           </ul>
         </div>
       </CardContent>

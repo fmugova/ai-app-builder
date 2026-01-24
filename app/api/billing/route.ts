@@ -23,7 +23,7 @@ export async function GET() {
         projectsLimit: true,
         generationsUsed: true,
         generationsLimit: true,
-        subscriptions: {
+        Subscription: {
           select: {
             currentPeriodStart: true,
             currentPeriodEnd: true,
@@ -38,10 +38,10 @@ export async function GET() {
     }
 
     // Use subscription data if exists, otherwise use calculated values
-    const currentPeriodEnd = user.subscriptions?.currentPeriodEnd 
+    const currentPeriodEnd = user.Subscription?.currentPeriodEnd 
       || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
     
-    const currentPeriodStart = user.subscriptions?.currentPeriodStart
+    const currentPeriodStart = user.Subscription?.currentPeriodStart
       || new Date()
 
     // Mock invoices (replace with actual Stripe invoices later)
@@ -60,7 +60,7 @@ export async function GET() {
       status: user.subscriptionStatus,
       currentPeriodStart: currentPeriodStart.toISOString(),
       currentPeriodEnd: currentPeriodEnd.toISOString(),
-      cancelAtPeriodEnd: user.subscriptions?.cancelAtPeriodEnd || false,
+      cancelAtPeriodEnd: user.Subscription?.cancelAtPeriodEnd || false,
       projectsUsed: user.projectsThisMonth,
       projectsLimit: user.projectsLimit,
       generationsUsed: user.generationsUsed,

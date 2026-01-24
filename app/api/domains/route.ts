@@ -28,12 +28,12 @@ export const GET = compose(
   }
   const domains = await prisma.customDomain.findMany({
     where: {
-      project: {
+      Project: {
         userId: session.user.id,
       },
     },
     include: {
-      project: {
+      Project: {
         select: {
           id: true,
           name: true,
@@ -104,11 +104,11 @@ export const POST = compose(
       data: {
         domain,
         projectId,
-        userId: session.user.id,
+        user_id: session.user.id,
         status: 'pending',
       },
       include: {
-        project: {
+        Project: {
           select: {
             id: true,
             name: true,

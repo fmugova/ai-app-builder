@@ -20,14 +20,14 @@ export async function GET(
     const domain = await prisma.customDomain.findFirst({
       where: {
         id: domainId,
-        project: {
+        Project: {
           User: {
             email: session.user.email
           }
         }
       },
       include: {
-        project: {
+        Project: {
           select: {
             id: true,
             name: true
@@ -52,7 +52,7 @@ export async function GET(
           verifiedAt: vercelStatus.verified ? new Date() : null
         },
         include: {
-          project: {
+          Project: {
             select: {
               id: true,
               name: true
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest, context: { params: { domainId: 
     const domain = await prisma.customDomain.findFirst({
       where: {
         id: domainId,
-        project: {
+        Project: {
           User: {
             email: session.user.email
           }
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest, context: { params: { domainId: 
         errorMessage: vercelStatus.verified ? null : 'Verification pending'
       },
       include: {
-        project: {
+        Project: {
           select: {
             id: true,
             name: true
@@ -159,7 +159,7 @@ export async function DELETE(request: NextRequest, context: { params: { domainId
     const domain = await prisma.customDomain.findFirst({
       where: {
         id: domainId,
-        project: {
+        Project: {
           User: {
             email: session.user.email
           }

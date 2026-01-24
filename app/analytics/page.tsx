@@ -9,7 +9,17 @@ import { BarChart3, TrendingUp, Clock, ArrowLeft } from 'lucide-react'
 export default function AnalyticsPage() {
   const { status } = useSession()
   const router = useRouter()
-  const [data, setData] = useState<any>(null)
+  type AnalyticsData = {
+    totalProjects: number
+    generationsUsed: number
+    recentProjects?: {
+      id: string
+      name: string
+      createdAt: string
+    }[]
+  }
+
+  const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -98,7 +108,7 @@ export default function AnalyticsPage() {
                   <h2 className="text-2xl font-bold text-gray-900">Recent Projects</h2>
                 </div>
                 <div className="space-y-3">
-                  {data.recentProjects.map((project: any) => (
+                  {data.recentProjects.map((project: { id: string; name: string; createdAt: string }) => (
                     <div
                       key={project.id}
                       className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"

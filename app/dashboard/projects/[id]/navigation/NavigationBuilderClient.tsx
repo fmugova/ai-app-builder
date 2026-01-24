@@ -14,12 +14,12 @@ interface Page {
 
 interface NavigationBuilderClientProps {
   projectId: string
-  initialPages: Page[]
+  initialPage: Page[]
 }
 
-export default function NavigationBuilderClient({ projectId, initialPages }: NavigationBuilderClientProps) {
+export default function NavigationBuilderClient({ projectId, initialPage }: NavigationBuilderClientProps) {
   const router = useRouter()
-  const [pages, setPages] = useState<Page[]>(initialPages)
+  const [pages, setPages] = useState<Page[]>(initialPage)
   const [isSaving, setIsSaving] = useState(false)
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
 
@@ -84,7 +84,7 @@ export default function NavigationBuilderClient({ projectId, initialPages }: Nav
       const response = await fetch(`/api/projects/${projectId}/pages/reorder`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pages: updates })
+        body: JSON.stringify({ Page: updates })
       })
 
       if (response.ok) {
@@ -151,7 +151,7 @@ export default function NavigationBuilderClient({ projectId, initialPages }: Nav
                     Drag and drop to reorder pages, or use the arrow buttons
                   </p>
                   <p className="text-xs text-yellow-700 dark:text-yellow-300">
-                    The order here determines how pages appear in your site's navigation menu
+                    The order here determines how pages appear in your site&apos;s navigation menu
                   </p>
                 </div>
               </div>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { Prisma } from '@prisma/client'
+// ...existing code...
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
     
-    const whereClause: any = {
+    const whereClause: Record<string, unknown> = {
       userId: user.id,
       createdAt: { gte: startDate }
     }
@@ -162,10 +162,10 @@ export async function GET(request: NextRequest) {
     const referrerCounts: Record<string, number> = {}
     events.forEach(event => {
       try {
-        const referrer = (event.properties as any)?.referrer || 'Direct'
+        const referrer = (event.properties as Record<string, unknown>)?.referrer || 'Direct'
         let domain = 'Direct'
         
-        if (referrer !== 'Direct' && referrer) {
+        if (referrer !== 'Direct' && typeof referrer === 'string' && referrer) {
           try {
             domain = new URL(referrer).hostname
           } catch {
@@ -174,7 +174,7 @@ export async function GET(request: NextRequest) {
         }
         
         referrerCounts[domain] = (referrerCounts[domain] || 0) + 1
-      } catch (err) {
+      } catch {
         // Skip invalid entries
       }
     })
@@ -199,12 +199,12 @@ export async function GET(request: NextRequest) {
       topReferrers
     })
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Analytics API error:', error)
     return NextResponse.json(
       { 
         error: 'Failed to fetch analytics',
-        message: error.message 
+        message: error instanceof Error ? error.message : String(error)
       },
       { status: 500 }
     )

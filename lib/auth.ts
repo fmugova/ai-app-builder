@@ -115,7 +115,7 @@ export const authOptions: NextAuthOptions = {
           const user = await prisma.user.findUnique({
             where: { email: credentials.email },
             include: {
-              subscriptions: true,
+              Subscription: true,
             },
           })
 
@@ -279,7 +279,7 @@ export const authOptions: NextAuthOptions = {
         const dbUser = await prisma.user.findUnique({
           where: { email: token.email },
           include: {
-            subscriptions: true,
+            Subscription: true,
           },
         })
 
@@ -291,8 +291,8 @@ export const authOptions: NextAuthOptions = {
           token.emailVerified = dbUser.emailVerified
           
           // Use subscription.plan OR user.subscriptionTier (User model has both)
-          token.subscriptionTier = dbUser.subscriptions?.plan || dbUser.subscriptionTier || 'free'
-          token.subscriptionStatus = dbUser.subscriptions?.status || dbUser.subscriptionStatus || 'active'
+          token.subscriptionTier = dbUser.Subscription?.plan || dbUser.subscriptionTier || 'free'
+          token.subscriptionStatus = dbUser.Subscription?.status || dbUser.subscriptionStatus || 'active'
           
           // Use existing User fields for usage tracking (already calculated in User model)
           token.projectsThisMonth = dbUser.projectsThisMonth || 0
@@ -363,7 +363,7 @@ export async function checkUserPermission(
 ): Promise<{ allowed: boolean; reason?: string }> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    include: { subscriptions: true },
+    include: { Subscription: true },
   })
 
   if (!user) {
@@ -371,13 +371,13 @@ export async function checkUserPermission(
   }
 
   // Get tier from subscription.plan or user.subscriptionTier
-  const tier = (user.subscriptions?.plan || user.subscriptionTier || 'free') as SubscriptionTier
+  const tier = (user.Subscription?.plan || user.subscriptionTier || 'free') as SubscriptionTier
   const limits = TIER_LIMITS[tier]
 
   // Check specific permissions based on action
   switch (action) {
     case 'create_project': {
-      // Use existing User.projectsThisMonth field
+      // Use existing user.projectsThisMonth field
       if (limits.projectsPerMonth !== -1 && user.projectsThisMonth >= limits.projectsPerMonth) {
         return {
           allowed: false,
@@ -404,7 +404,7 @@ export async function checkUserPermission(
     case 'add_domain': {
       const domainCount = await prisma.customDomain.count({
         where: {
-          project: { userId },
+          Project: { userId },
         },
       })
       
@@ -467,7 +467,7 @@ export async function verifyResourceOwnership(
       const domain = await prisma.customDomain.findFirst({
         where: {
           id: resourceId,
-          project: { userId },
+          Project: { userId },
         },
       })
       return !!domain
@@ -525,14 +525,14 @@ export async function incrementUsage(
 export async function getUserLimits(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    include: { subscriptions: true },
+    include: { Subscription: true },
   })
 
   if (!user) {
     throw new Error('User not found')
   }
 
-  const tier = (user.subscriptions?.plan || user.subscriptionTier || 'free') as SubscriptionTier
+  const tier = (user.Subscription?.plan || user.subscriptionTier || 'free') as SubscriptionTier
   const limits = TIER_LIMITS[tier]
 
   return {
@@ -559,12 +559,12 @@ export async function isUserAdmin(userId: string): Promise<boolean> {
 export async function hasActiveSubscription(userId: string): Promise<boolean> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    include: { subscriptions: true },
+    include: { Subscription: true },
   })
   
   if (!user) return false
   
-  const status = user.subscriptions?.status || user.subscriptionStatus
+  const status = user.Subscription?.status || user.subscriptionStatus
   return status === 'active' || status === 'trialing'
 }
 

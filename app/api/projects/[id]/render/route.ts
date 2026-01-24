@@ -20,9 +20,9 @@ export async function GET(
         status: 'active'
       },
       include: {
-        project: {
+        Project: {
           include: {
-            pages: {
+            Page: {
               where: { isPublished: true },
               orderBy: { order: 'asc' }
             }
@@ -34,7 +34,7 @@ export async function GET(
     let project
     if (customDomain) {
       // Serve project via custom domain
-      project = customDomain.project
+      project = customDomain.Project
     } else {
       // Regular buildflow.ai subdomain
       // searchParams assignment removed (unused)
@@ -42,7 +42,7 @@ export async function GET(
       project = await prisma.project.findUnique({
         where: { id: id as string },
         include: {
-          pages: {
+          Page: {
             where: { isPublished: true },
             orderBy: { order: 'asc' }
           }
@@ -58,18 +58,18 @@ export async function GET(
     const slug = searchParams.get('slug') || 'home'
 
     // If not multi-page, return the main project code
-    if (!project.multiPage || !project.pages.length) {
+    if (!project.multiPage || !project.Page.length) {
       return new NextResponse(project.code || '<h1>No content</h1>', {
         headers: { 'Content-Type': 'text/html' }
       })
     }
 
     // Find the requested page
-    let page = project.pages.find(p => p.slug === slug)
+    let page = project.Page.find((p: { slug: string }) => p.slug === slug)
 
     // If not found, try home page
     if (!page) {
-      page = project.pages.find(p => p.isHomepage) || project.pages[0]
+      page = project.Page.find((p: { isHomepage: boolean }) => p.isHomepage) || project.Page[0]
     }
 
     if (!page) {
@@ -80,9 +80,9 @@ export async function GET(
     }
 
     // Build navigation
-    const navLinks = project.pages
-      .filter(p => p.isPublished)
-      .map(p => ({
+    const navLinks = project.Page
+      .filter((p: { isPublished: boolean }) => p.isPublished)
+      .map((p: { title: string; slug: string; id: string }) => ({
         name: p.title,
         slug: p.slug,
         active: p.id === page.id
@@ -122,7 +122,7 @@ export async function GET(
         <div class="flex-1 flex items-center justify-center sm:items-stretch sm:justify-start">
           <div class="hidden sm:block sm:ml-6">
             <div class="flex space-x-4">
-              ${navLinks.map(link => `
+              ${navLinks.map((link) => `
                 <a href="?slug=${link.slug}" 
                    class="px-3 py-2 rounded-md text-sm font-medium ${
                      link.active 
@@ -140,7 +140,7 @@ export async function GET(
     
     <!-- Mobile menu -->
     <div class="sm:hidden px-2 pt-2 pb-3 space-y-1">
-      ${navLinks.map(link => `
+      ${navLinks.map((link) => `
         <a href="?slug=${link.slug}" 
            class="block px-3 py-2 rounded-md text-base font-medium ${
              link.active 

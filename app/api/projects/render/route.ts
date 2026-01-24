@@ -24,9 +24,9 @@ export async function GET(request: NextRequest) {
         status: 'active'
       },
       include: {
-        project: {
+        Project: {
           include: {
-            pages: {
+            Page: {
               where: { isPublished: true },
               orderBy: { order: 'asc' }
             }
@@ -95,21 +95,21 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const project = customDomain.project
+    const project = customDomain.Project
 
     // Find the appropriate page based on the path
     // Convert path to slug (remove leading slash)
     const slug = path === '/' ? 'home' : path.replace(/^\//, '')
-    let page = project.pages.find(p => p.slug === slug)
+    let page = project.Page.find(p => p.slug === slug)
     
     // If no exact match, try home page or homepage flag
     if (!page) {
-      page = project.pages.find(p => p.isHomepage || p.slug === 'home' || p.slug === 'index')
+      page = project.Page.find(p => p.isHomepage || p.slug === 'home' || p.slug === 'index')
     }
 
     // If still no page, use the first published page
-    if (!page && project.pages.length > 0) {
-      page = project.pages[0]
+    if (!page && project.Page.length > 0) {
+      page = project.Page[0]
     }
 
     if (!page) {

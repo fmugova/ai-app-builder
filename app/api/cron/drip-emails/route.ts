@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     console.log('🔄 Starting drip email processor...')
 
     const now = new Date()
-    const processedEmails: any[] = []
+    const processedEmails: unknown[] = []
 
     // Get all users created in the last 30 days who are not paid subscribers
     const users = await prisma.user.findMany({
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
           gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000), // Last 30 days
         },
         subscriptionTier: 'free',
-        email: { not: null as any },
+        email: { not: '' }, // Exclude users with empty email
       },
       select: {
         id: true,
@@ -76,9 +76,9 @@ export async function POST(req: NextRequest) {
             },
           })
 
-          let emailsSent: any = {}
+          let emailsSent: Record<string, unknown> = {}
           if (existingRecord && existingRecord.emailsSent) {
-            emailsSent = existingRecord.emailsSent as any
+            emailsSent = existingRecord.emailsSent as Record<string, unknown>
           }
 
           // Skip if already sent
@@ -142,7 +142,9 @@ export async function POST(req: NextRequest) {
               if (existingRecord) {
                 await prisma.dripEnrollment.update({
                   where: { id: existingRecord.id },
-                  data: { emailsSent },
+                  data: {
+                    emailsSent: emailsSent as Record<string, string>,
+                  },
                 })
               } else {
                 await prisma.dripEnrollment.create({
@@ -151,7 +153,7 @@ export async function POST(req: NextRequest) {
                     campaignId: 'onboarding',
                     userId: user.id,
                     userEmail: user.email,
-                    emailsSent,
+                    emailsSent: emailsSent as Record<string, string>,
                   },
                 })
               }
@@ -188,10 +190,10 @@ export async function POST(req: NextRequest) {
       details: processedEmails,
     })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Drip email processor error:', error)
     return NextResponse.json(
-      { error: 'Failed to process drip emails', details: error.message },
+      { error: 'Failed to process drip emails', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     )
   }

@@ -73,21 +73,21 @@ export async function POST(
     const validatedData = inviteMemberSchema.parse(body);
 
     // Get workspace
-    const workspace = await prisma.workspace.findUnique({
+    const Workspace = await prisma.workspace.findUnique({
       where: { id: id as string },
       include: {
         _count: {
-          select: { members: true },
+          select: { WorkspaceMember: true },
         },
       },
     });
 
-    if (!workspace) {
+    if (!Workspace) {
       return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
     }
 
     // Check member limit
-    if (workspace._count.members >= workspace.membersLimit) {
+    if (Workspace._count.WorkspaceMember >= Workspace.membersLimit) {
       return NextResponse.json(
         { error: 'Workspace member limit reached' },
         { status: 400 }
@@ -140,6 +140,7 @@ export async function POST(
 
     const invite = await prisma.workspaceInvite.create({
       data: {
+        id: undefined, // Let Prisma auto-generate
         workspaceId: id,
         email: validatedData.email,
         role: validatedData.role,
@@ -155,10 +156,10 @@ export async function POST(
     try {
       await sendEmail({
         to: validatedData.email,
-        subject: `You've been invited to join ${workspace.name}`,
+        subject: `You've been invited to join ${Workspace.name}`,
         html: `
           <h2>Workspace Invitation</h2>
-          <p>${user.name || user.email} has invited you to join the workspace "${workspace.name}".</p>
+          <p>${user.name || user.email} has invited you to join the workspace "${Workspace.name}".</p>
           <p>Role: ${validatedData.role}</p>
           <p>Click the link below to accept the invitation:</p>
           <a href="${inviteUrl}">${inviteUrl}</a>
@@ -173,12 +174,13 @@ export async function POST(
     // Log activity
     await prisma.activity.create({
       data: {
+        id: undefined, // Let Prisma auto-generate
         userId: user.id,
         type: 'workspace',
         action: 'member_invited',
         metadata: {
-          workspaceId: workspace.id,
-          workspaceName: workspace.name,
+          workspaceId: Workspace.id,
+          workspaceName: Workspace.name,
           invitedEmail: validatedData.email,
           role: validatedData.role,
         },
@@ -186,7 +188,7 @@ export async function POST(
     });
 
     return NextResponse.json({ 
-      invite: {
+      WorkspaceInvite: {
         id: invite.id,
         email: invite.email,
         role: invite.role,

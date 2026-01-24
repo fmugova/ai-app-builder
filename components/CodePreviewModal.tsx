@@ -1,163 +1,141 @@
-"use client";
+'use client'
 
-import { useState } from "react";
-import { X, Copy, Check, Download, Eye, Code, Maximize2 } from "lucide-react";
+import { useState } from 'react'
+import { X, Copy, Check, Maximize2, Minimize2, Code } from 'lucide-react'
+import { toast } from 'react-hot-toast'
 
 interface CodePreviewModalProps {
-  project: {
-    id: string;
-    name: string;
-    code: string;
-    type: string;
-  } | null;
-  isOpen: boolean;
-  onClose: () => void;
-  onEdit?: () => void;
+  code: string
+  projectId?: string
+  isOpen?: boolean
+  onClose?: () => void
+  onEdit?: (code: string) => void
 }
 
 export default function CodePreviewModal({
-  project,
-  isOpen,
+  code,
+  projectId,
+  isOpen = true,
   onClose,
   onEdit,
 }: CodePreviewModalProps) {
-  const [copied, setCopied] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [copied, setCopied] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [showCode, setShowCode] = useState(false)
 
-  if (!isOpen || !project) return null;
+  if (!isOpen) return null
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(project.code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopied(true)
+      toast.success('Code copied to clipboard!')
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      toast.error('Failed to copy code')
+    }
+  }
 
   const handleDownload = () => {
-    const blob = new Blob([project.code], { type: "text/javascript" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${project.name}.jsx`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const lineCount = project.code.split("\n").length;
-  const charCount = project.code.length;
-  const wordCount = project.code.split(/\s+/).filter((w) => w.length > 0).length;
+    const blob = new Blob([code], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `project-${projectId || 'preview'}.html`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    toast.success('Code downloaded!')
+  }
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div
-        className={`bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col transition-all ${
-          isFullscreen
-            ? "w-full h-full"
-            : "max-w-6xl w-full max-h-[90vh]"
+        className={`bg-white rounded-xl shadow-2xl flex flex-col ${
+          isFullscreen ? 'w-full h-full' : 'max-w-6xl w-full max-h-[90vh]'
         }`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-              <Code className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                {project.name}
-              </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {project.type} • {lineCount} lines • {wordCount} words • {charCount} chars
-              </p>
-            </div>
-          </div>
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <h3 className="text-xl font-bold text-gray-900">Preview & Code</h3>
           <div className="flex items-center gap-2">
             <button
-              onClick={handleCopy}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
-              title="Copy code"
+              onClick={() => setShowCode(!showCode)}
+              className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center gap-2"
             >
-              {copied ? (
-                <>
-                  <Check className="w-4 h-4" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4" />
-                  Copy
-                </>
-              )}
+              <Code className="w-4 h-4" />
+              <span className="hidden sm:inline">{showCode ? 'Show Preview' : 'Show Code'}</span>
+            </button>
+            <button
+              onClick={handleCopy}
+              className="px-3 py-2 text-sm bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg flex items-center gap-2"
+            >
+              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              <span className="hidden sm:inline">{copied ? 'Copied!' : 'Copy'}</span>
             </button>
             <button
               onClick={handleDownload}
-              className="flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium"
-              title="Download code"
+              className="px-3 py-2 text-sm bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg flex items-center gap-2"
             >
-              <Download className="w-4 h-4" />
-              Download
+              <span className="hidden sm:inline">Download</span>
+              <span className="sm:hidden">📥</span>
             </button>
-            {onEdit && (
-              <button
-                onClick={onEdit}
-                className="flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
-                title="Edit in builder"
-              >
-                <Eye className="w-4 h-4" />
-                Edit
-              </button>
-            )}
             <button
               onClick={() => setIsFullscreen(!isFullscreen)}
-              className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              className="p-2 hover:bg-gray-100 rounded-lg"
             >
-              <Maximize2 className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              {isFullscreen ? (
+                <Minimize2 className="w-5 h-5 text-gray-600" />
+              ) : (
+                <Maximize2 className="w-5 h-5 text-gray-600" />
+              )}
             </button>
             <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              onClick={onClose || (() => window.location.reload())}
+              className="p-2 hover:bg-red-100 rounded-lg text-gray-600 hover:text-red-600"
               title="Close"
             >
-              <X className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Code Display */}
-        <div className="flex-1 overflow-hidden flex">
-          {/* Line Numbers */}
-          <div className="bg-gray-800 text-gray-500 p-4 font-mono text-sm select-none overflow-auto">
-            {Array.from({ length: lineCount }, (_, i) => (
-              <div key={i} className="text-right pr-4">
-                {i + 1}
-              </div>
-            ))}
-          </div>
-
-          {/* Code Content */}
-          <div className="flex-1 bg-gray-900 overflow-auto">
-            <pre className="p-4 text-sm font-mono text-green-400 whitespace-pre">
-              <code>{project.code}</code>
-            </pre>
-          </div>
+        {/* Content */}
+        <div className="flex-1 overflow-hidden">
+          {showCode ? (
+            <div className="h-full overflow-auto p-4 bg-gray-900">
+              <pre className="text-sm text-green-400 font-mono">
+                <code>{code}</code>
+              </pre>
+            </div>
+          ) : (
+            <iframe
+              srcDoc={code}
+              className="w-full h-full border-0"
+              title="Preview"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
+            />
+          )}
         </div>
 
-        {/* Footer Info */}
-        <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
-          <div className="flex items-center gap-4">
-            <span>Language: JSX/React</span>
-            <span>•</span>
-            <span>Tab Size: 2 spaces</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <span>{lineCount} lines</span>
-            <span>•</span>
-            <span>{wordCount} words</span>
-            <span>•</span>
-            <span>{(charCount / 1024).toFixed(1)} KB</span>
+        {/* Footer */}
+        <div className="p-4 border-t border-gray-200 bg-gray-50">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-600">
+              {code.length.toLocaleString()} characters
+            </p>
+            {onEdit && (
+              <button
+                onClick={() => onEdit(code)}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium"
+              >
+                Edit Code
+              </button>
+            )}
           </div>
         </div>
       </div>
     </div>
-  );
+  )
 }

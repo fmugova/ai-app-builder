@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     const user = session?.user?.email 
       ? await prisma.user.findUnique({
           where: { email: session.user.email },
-          include: { projects: { take: 5, orderBy: { createdAt: 'desc' } } }
+          include: { Project: { take: 5, orderBy: { createdAt: 'desc' } } }
         })
       : null;
 
@@ -54,7 +54,7 @@ ${user ? `
 - Name: ${user.name}
 - Email: ${user.email}
 - Tier: ${user.subscriptionTier}
-- Projects created: ${user.projects.length}
+- Projects created: ${user.Project.length}
 - Generations used: ${user.generationsUsed}/${user.generationsLimit}
 ` : 'Not logged in'}
 
@@ -96,7 +96,7 @@ Guidelines:
 
     return NextResponse.json({ reply });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Support chat error:', error);
     return NextResponse.json(
       { error: 'Failed to process request' },

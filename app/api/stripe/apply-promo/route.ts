@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Find promo code (model is PromoCodes plural)
-    const promo = await prisma.promoCodes.findUnique({
+    const promo = await prisma.promo_codes.findUnique({
       where: { code: code.toUpperCase() },
     })
 
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
     })
 
     // Increment promo code usage count
-    await prisma.promoCodes.update({
+    await prisma.promo_codes.update({
       where: { code: promo.code },
       data: {
         timesUsed: {

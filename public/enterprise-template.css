@@ -1,0 +1,21 @@
+/* Always use CSS variables */
+:root {
+    --primary: #2563eb;
+    --spacing: 1rem;
+    --radius: 8px;
+    --shadow: 0 4px 24px rgba(0,0,0,0.08);
+}
+
+/* Utility classes for common patterns */
+.btn-loading {
+    position: relative;
+    color: transparent !important;
+    pointer-events: none;
+}
+
+.toast {
+    position: fixed;
+    top: 100px;
+    right: 20px;
+    /* ... */
+}

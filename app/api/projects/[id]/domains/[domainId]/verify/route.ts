@@ -26,7 +26,7 @@ export async function POST(req: Request, context: { params: { id: string; domain
     const domain = await prisma.customDomain.findFirst({
       where: {
         id: domainId,
-        project: {
+        Project: {
           id: id,
           userId: user.id
         }

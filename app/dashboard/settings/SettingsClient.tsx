@@ -34,7 +34,7 @@ export default function SettingsClient({ user: initialUser }: SettingsClientProp
   const [user, setUser] = useState(initialUser)
   
   const [name, setName] = useState(user.name)
-  const [bio, setBio] = useState(user.bio || '')
+  // const [bio, setBio] = useState(user.bio || '')
   const [autoSave, setAutoSave] = useState(user.autoSave)
   const [notifications, setNotifications] = useState(user.notifications)
   const [theme, setTheme] = useState(user.theme)
@@ -49,7 +49,6 @@ export default function SettingsClient({ user: initialUser }: SettingsClientProp
           const data = await res.json()
           setUser(data)
           setName(data.name)
-          setBio(data.bio || '')
           setAutoSave(data.autoSave)
           setNotifications(data.notifications)
           setTheme(data.theme)
@@ -84,7 +83,7 @@ export default function SettingsClient({ user: initialUser }: SettingsClientProp
         const error = await res.json()
         alert(`❌ Failed to save: ${error.error}`)
       }
-    } catch (error) {
+    } catch {
       alert('❌ Failed to save settings')
     } finally {
       setIsLoading(false)

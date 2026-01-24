@@ -32,7 +32,7 @@ export async function GET(
         User: { email: session.user.email }
       },
       include: {
-        environmentVariables: {
+        EnvironmentVariable: {
           orderBy: { key: 'asc' }
         }
       }
@@ -43,7 +43,7 @@ export async function GET(
     }
 
     // Decrypt values for display (mask sensitive ones)
-    const variables = project.environmentVariables.map(v => ({
+    const variables = project.EnvironmentVariable.map(v => ({
       id: v.id,
       key: v.key,
       value: decrypt(v.value), // Client will mask if needed
@@ -208,7 +208,7 @@ export async function PUT(
     const variable = await prisma.environmentVariable.findFirst({
       where: {
         id: variableId,
-        project: {
+        Project: {
           id,
           User: { email: session.user.email }
         }

@@ -92,15 +92,15 @@ export async function POST(request: NextRequest) {
     if (!vercelRes.ok) {
       const errorText = await vercelRes.text();
       console.error('Vercel API error:', errorText);
-      
+    
       let errorMessage = 'Vercel deployment failed';
       try {
         const errorJson = JSON.parse(errorText);
         errorMessage = errorJson.error?.message || errorMessage;
-      } catch (e) {
+      } catch {
         // Keep default message
       }
-
+      
       return NextResponse.json(
         { 
           error: errorMessage,
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
     console.log('✅ Vercel deployment created:', deployment);
 
     // Save deployment record
-    const dbDeployment = await prisma.deployment.create({
+    await prisma.deployment.create({
       data: {
         id: crypto.randomUUID(),
         projectId,
@@ -144,13 +144,12 @@ export async function POST(request: NextRequest) {
         status: deployment.readyState || 'BUILDING'
       }
     });
-
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Vercel deploy error:', error);
     return NextResponse.json(
       { 
         error: 'Deployment failed', 
-        details: error.message 
+        details: error instanceof Error ? error.message : String(error)
       },
       { status: 500 }
     );

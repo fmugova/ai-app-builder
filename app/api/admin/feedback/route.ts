@@ -20,7 +20,7 @@ export async function GET() {
           createdAt: 'desc'
         },
         include: {
-          user: {
+          User: {
             select: {
               name: true,
               email: true

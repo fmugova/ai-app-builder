@@ -22,7 +22,7 @@ export async function DELETE(
     const endpoint = await prisma.apiEndpoint.findFirst({
       where: {
         id: endpointId,
-        project: {
+        Project: {
           id: id,
           User: { email: session.user.email }
         }

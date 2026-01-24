@@ -20,7 +20,7 @@ export async function POST(req: Request, context: { params: { id: string; varId:
     const variable = await prisma.environmentVariable.findFirst({
       where: {
         id: varId,
-        project: {
+        Project: {
           id: id,
           User: { email: session.user.email }
         }

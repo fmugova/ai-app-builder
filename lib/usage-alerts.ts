@@ -39,7 +39,7 @@ export async function checkUsageAlerts(userId: string): Promise<UsageAlertResult
       await sendEmail({
         to: user.email,
         subject: '⚠️ You\'re approaching your project limit',
-        html: getProjectLimitAlertHTML(
+        html: getProjectsLimitAlertHTML(
           user.name || 'there',
           user.projectsThisMonth,
           user.projectsLimit,
@@ -104,7 +104,7 @@ export async function checkUsageAlerts(userId: string): Promise<UsageAlertResult
   }
 }
 
-function getProjectLimitAlertHTML(
+function getProjectsLimitAlertHTML(
   userName: string,
   used: number,
   limit: number,

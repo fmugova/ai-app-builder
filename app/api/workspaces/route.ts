@@ -11,7 +11,7 @@ const createWorkspaceSchema = z.object({
 });
 
 // GET /api/workspaces - Get all workspaces for the current user
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     
@@ -28,15 +28,16 @@ export async function GET(req: NextRequest) {
     }
 
     // Get all workspaces where user is a member
-    const workspaceMembers = await prisma.workspaceMember.findMany({
+
+    const workspaceMemberships = await prisma.workspaceMember.findMany({
       where: { userId: user.id },
       include: {
-        workspace: {
+        Workspace: {
           include: {
             _count: {
               select: {
-                members: true,
-                projects: true,
+                WorkspaceMember: true,
+                WorkspaceProject: true,
               },
             },
           },
@@ -47,14 +48,14 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    const workspaces = workspaceMembers.map((wm) => ({
-      ...wm.workspace,
+    const Workspaces = workspaceMemberships.map((wm: typeof workspaceMemberships[number]) => ({
+      ...wm.Workspace,
       userRole: wm.role,
-      memberCount: wm.workspace._count.members,
-      projectCount: wm.workspace._count.projects,
+      memberCount: wm.Workspace._count.WorkspaceMember,
+      projectCount: wm.Workspace._count.WorkspaceProject,
     }));
 
-    return NextResponse.json({ workspaces });
+    return NextResponse.json({ Workspaces });
   } catch (error) {
     console.error('Error fetching workspaces:', error);
     return NextResponse.json(
@@ -97,12 +98,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Create workspace and add creator as owner
-    const workspace = await prisma.workspace.create({
+    const workspaceData = await prisma.workspace.create({
       data: {
         name: validatedData.name,
         slug: validatedData.slug,
         description: validatedData.description,
-        members: {
+        WorkspaceMember: {
           create: {
             userId: user.id,
             role: 'owner',
@@ -110,9 +111,9 @@ export async function POST(req: NextRequest) {
         },
       },
       include: {
-        members: {
+        WorkspaceMember: {
           include: {
-            user: {
+            User: {
               select: {
                 id: true,
                 name: true,
@@ -132,13 +133,13 @@ export async function POST(req: NextRequest) {
         type: 'workspace',
         action: 'created',
         metadata: {
-          workspaceId: workspace.id,
-          workspaceName: workspace.name,
+          workspaceId: workspaceData.id,
+          workspaceName: workspaceData.name,
         },
       },
     });
 
-    return NextResponse.json({ workspace }, { status: 201 });
+    return NextResponse.json({ workspace: workspaceData }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

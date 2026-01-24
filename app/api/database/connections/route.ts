@@ -1,21 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withAuth } from '@/lib/api-middleware'
-import { z } from 'zod'
+// ...existing code...
 import { testSupabaseConnection } from '@/lib/supabase-integration'
 
-const createConnectionSchema = z.object({
-  name: z.string().min(1).max(100),
-  provider: z.enum(['supabase', 'postgres', 'mysql', 'mongodb', 'sqlite']).default('supabase'),
-  host: z.string().optional(),
-  port: z.number().int().min(1).max(65535).optional(),
-  database: z.string().optional(),
-  username: z.string().optional(),
-  password: z.string().optional(),
-  supabaseUrl: z.string().optional(),
-  supabaseAnonKey: z.string().optional(),
-  supabaseServiceKey: z.string().optional(),
-})
+// ...existing code...
 
 export const dynamic = 'force-dynamic'
 
@@ -31,7 +20,7 @@ export const GET = withAuth(async (req, context, session) => {
             name: true
           }
         },
-        Tables: true
+        DatabaseTable: true
       },
       orderBy: { createdAt: 'desc' }
     })
@@ -44,7 +33,7 @@ export const GET = withAuth(async (req, context, session) => {
     }))
 
     return NextResponse.json({ connections: sanitized })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Database connections GET error:', error)
     return NextResponse.json(
       { error: 'Failed to fetch connections' },
@@ -145,10 +134,10 @@ export const POST = withAuth(async (req, context, session) => {
         supabaseServiceKey: undefined
       }
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Database connection POST error:', error)
     return NextResponse.json(
-      { error: 'Failed to create connection', message: error.message },
+      { error: 'Failed to create connection', message: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     )
   }

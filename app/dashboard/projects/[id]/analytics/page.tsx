@@ -1,5 +1,6 @@
 'use client'
 
+import type { Page } from '@prisma/client';
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -67,7 +68,7 @@ interface ProjectAnalytics {
     linkClicks: number
     totalConversions: number
   }
-  topPages: {
+  topPage: {
     page: string
     views: number
     avgTime: number
@@ -511,8 +512,8 @@ export default function ProjectAnalyticsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-700">
-                {analytics.topPages.length > 0 ? (
-                  analytics.topPages.map((page, index) => (
+                {analytics.topPage.length > 0 ? (
+                  analytics.topPage.map((page, index) => (
                     <tr key={index} className="hover:bg-gray-700/50 transition">
                       <td className="py-4 text-white">{page.page || '/'}</td>
                       <td className="py-4 text-white font-bold text-right">{formatNumber(page.views)}</td>

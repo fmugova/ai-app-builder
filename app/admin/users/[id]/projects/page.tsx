@@ -207,7 +207,7 @@ export default function UserProjectsPage() {
           ) : (
             <div className="text-center py-12">
               <span className="text-6xl mb-4 block">📭</span>
-              <p className="text-gray-400">This user hasn't created any projects yet.</p>
+              <p className="text-gray-400">This user hasn&apos;t created any projects yet.</p>
             </div>
           )}
         </div>

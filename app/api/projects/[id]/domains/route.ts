@@ -101,7 +101,7 @@ export async function POST(
     const customDomain = await prisma.customDomain.create({
       data: {
         projectId,
-        userId: user.id,
+        user_id: user.id,
         domain,
         status: 'pending',
         verificationKey: vercelData.verification?.[0]?.value || null,

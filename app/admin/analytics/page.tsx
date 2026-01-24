@@ -29,7 +29,7 @@ interface SubscriptionAnalytics {
       count: number
     }[]
   }
-  subscriptions: {
+  Subscription: {
     total: number
     active: number
     byTier: {
@@ -46,7 +46,7 @@ interface SubscriptionAnalytics {
   trends: {
     upgrades: number
     downgrades: number
-    newSubscriptions: number
+    newSubscription: number
     cancellations: number
   }
   revenueByPlan: {
@@ -101,7 +101,7 @@ export default function SubscriptionAnalyticsPage() {
   const loadAnalytics = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/admin/analytics/subscriptions?period=${period}`)
+      const response = await fetch(`/api/admin/analytics/Subscription?period=${period}`)
       
       if (!response.ok) throw new Error('Failed to fetch analytics')
       
@@ -219,7 +219,7 @@ export default function SubscriptionAnalyticsPage() {
             </div>
           </div>
 
-          {/* Active Subscriptions */}
+          {/* Active Subscription */}
           <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -227,13 +227,13 @@ export default function SubscriptionAnalyticsPage() {
                   <Users className="w-6 h-6 text-blue-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">Active Subscriptions</p>
-                  <p className="text-2xl font-bold text-white">{analytics.subscriptions.active}</p>
+                  <p className="text-sm text-gray-400">Active Subscription</p>
+                  <p className="text-2xl font-bold text-white">{analytics.Subscription.active}</p>
                 </div>
               </div>
             </div>
             <p className="text-sm text-gray-400">
-              {analytics.subscriptions.total} total subscriptions
+              {analytics.Subscription.total} total Subscription
             </p>
           </div>
 
@@ -265,13 +265,13 @@ export default function SubscriptionAnalyticsPage() {
                 <div>
                   <p className="text-sm text-gray-400">Net Growth</p>
                   <p className="text-2xl font-bold text-white">
-                    {analytics.trends.newSubscriptions - analytics.trends.cancellations}
+                    {analytics.trends.newSubscription - analytics.trends.cancellations}
                   </p>
                 </div>
               </div>
             </div>
             <p className="text-sm text-gray-400">
-              +{analytics.trends.newSubscriptions} new, -{analytics.trends.cancellations} cancelled
+              +{analytics.trends.newSubscription} new, -{analytics.trends.cancellations} cancelled
             </p>
           </div>
         </div>
@@ -328,14 +328,14 @@ export default function SubscriptionAnalyticsPage() {
             </div>
           </div>
 
-          {/* Subscriptions by Tier */}
+          {/* Subscription by Tier */}
           <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <PieChart className="w-5 h-5 text-blue-400" />
-              Subscriptions by Tier
+              Subscription by Tier
             </h3>
             <div className="space-y-3">
-              {analytics.subscriptions.byTier.map((tier) => (
+              {analytics.Subscription.byTier.map((tier) => (
                 <div key={tier.tier} className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
@@ -347,7 +347,7 @@ export default function SubscriptionAnalyticsPage() {
                       }`}>
                         {tier.tier.toUpperCase()}
                       </span>
-                      <span className="text-gray-400">{tier.count} subscriptions</span>
+                      <span className="text-gray-400">{tier.count} Subscription</span>
                     </div>
                     <span className="font-medium text-white">{tier.percentage.toFixed(1)}%</span>
                   </div>

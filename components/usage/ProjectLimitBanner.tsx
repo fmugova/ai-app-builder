@@ -33,7 +33,7 @@ export function ProjectLimitBanner() {
       </AlertTitle>
       <AlertDescription className="flex items-center justify-between">
         <span>
-          You've used {used} of {limit} projects this month.
+          You&apos;ve used {used} of {limit} projects this month.
           {isAtLimit ? ' Upgrade to create more projects.' : ' Consider upgrading soon.'}
         </span>
         {isNearLimit && (

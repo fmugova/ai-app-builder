@@ -208,7 +208,7 @@ export async function GET(request: NextRequest) {
           count: data.count
         }))
       },
-      subscriptions: {
+      Subscription: {
         total: allSubscriptions.length,
         active: activeSubscriptions.length,
         byTier: subscriptionsByTier

@@ -146,16 +146,16 @@ export async function POST(
     }
 
     // Check workspace project limit
-    const workspace = await prisma.workspace.findUnique({
+    const workspaceData = await prisma.workspace.findUnique({
       where: { id: id as string },
       include: {
         _count: {
-          select: { projects: true },
+          select: { WorkspaceProject: true },
         },
       },
     });
 
-    if (workspace && workspace._count.projects >= workspace.projectsLimit) {
+    if (workspaceData && workspaceData._count.WorkspaceProject >= workspaceData.projectsLimit) {
       return NextResponse.json(
         { error: 'Workspace project limit reached' },
         { status: 400 }

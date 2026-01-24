@@ -23,8 +23,8 @@ async function DashboardContent() {
   const user = await prisma.user.findUnique({
     where: { email: session.user.email },
     include: {
-      subscriptions: true,
-    },
+      Subscription: true,
+      },
   })
 
   if (!user) {
@@ -47,8 +47,8 @@ async function DashboardContent() {
     projectsLimit: user.projectsLimit || 3,
     generationsUsed: user.generationsUsed || 0,
     generationsLimit: user.generationsLimit || 10,
-    subscriptionTier: user.subscriptions?.plan || user.subscriptionTier || 'free',
-    subscriptionStatus: user.subscriptions?.status || user.subscriptionStatus || 'active',
+    subscriptionTier: user.Subscription?.plan || user.subscriptionTier || 'free',
+    subscriptionStatus: user.Subscription?.status || user.subscriptionStatus || 'active',
   }
 
   return (

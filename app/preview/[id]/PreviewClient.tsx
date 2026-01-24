@@ -1,430 +1,150 @@
 'use client'
 
-import { useState } from 'react'
-import { 
-  Eye, 
-  Code, 
-  Download,
-  Github,
-  Share2,
-  ArrowLeft,
-  Zap
-} from 'lucide-react'
-import { toast } from 'react-hot-toast'
-import { sanitizeForPreview } from '@/lib/sanitizeForPreview'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, useRef } from 'react'
+import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 
-interface PreviewClientProps {
-  project: {
-    id: string
-    name: string
-    description: string | null
-    code: string
-    type: string
-    isPublished: boolean
-    publicUrl: string | null
-    views: number
-  }
+import type { ValidationMessage } from '@/lib/validator'
+interface ValidationResult {
+  isComplete: boolean
+  hasHtml: boolean
+  hasCss: boolean
+  hasJs: boolean
+  validationScore: number
+  validationPassed: boolean
+  errors: ValidationMessage[]
+  warnings: ValidationMessage[]
+  cspViolations: string[]
+  passed: boolean
 }
 
-export default function PreviewClient({ project }: PreviewClientProps) {
-  const [showCode, setShowCode] = useState(false)
-  const [deployingVercel, setDeployingVercel] = useState(false)
-  const [publishing, setPublishing] = useState(false)
+interface PreviewFrameProps {
+  html: string
+  css: string
+  js: string
+  validation: ValidationResult
+}
+
+export default function PreviewFrame({ html, css, js, validation }: PreviewFrameProps) {
   const [iframeError, setIframeError] = useState(false)
-  const router = useRouter()
+  const iframeRef = useRef<HTMLIFrameElement>(null)
 
-  // Use sanitizeForPreview to wrap React/JSX code
-  let sanitizedCode = ''
-  try {
-    sanitizedCode = sanitizeForPreview(project.code)
-  } catch (error) {
-    console.error('Code sanitization error:', error)
-    setIframeError(true)
-  }
+  useEffect(() => {
+    if (!iframeRef.current) return
 
-  // Publish to BuildFlow
-  const handlePublish = async () => {
-    setPublishing(true)
     try {
-      const res = await fetch('/api/publish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: project.id })
-      })
+      const iframe = iframeRef.current
+      const doc = iframe.contentDocument || iframe.contentWindow?.document
 
-      const data = await res.json()
-
-      if (res.ok && data.success) {
-        toast.success('🎉 Published to BuildFlow!', { duration: 2000 })
-        setTimeout(() => {
-          router.push(data.redirectTo || '/dashboard')
-        }, 1000)
-      } else {
-        toast.error(data.error || 'Failed to publish')
+      if (!doc) {
+        setTimeout(() => setIframeError(true), 0)
+        return
       }
-    } catch (error) {
-      toast.error('Failed to publish')
-    } finally {
-      setPublishing(false)
-    }
-  }
 
-  // Export to GitHub then deploy to Vercel
-  const handleDeployToVercel = async () => {
-    setDeployingVercel(true)
-    
-    try {
-      const githubCheck = await fetch(`/api/projects/${project.id}/github-status`)
-      const githubData = await githubCheck.json()
-      
-      if (!githubData.hasGithubRepo) {
-        const confirmExport = confirm(
-          '⚠️ Vercel requires GitHub.\n\nYour project will be:\n1. Exported to GitHub\n2. Deployed to Vercel\n\nContinue?'
-        )
-        
-        if (!confirmExport) {
-          setDeployingVercel(false)
-          return
-        }
-        
-        toast.loading('Exporting to GitHub...', { id: 'deploy-vercel' })
-        
-        const exportRes = await fetch(`/api/export/github`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectId: project.id })
-        })
-        
-        if (!exportRes.ok) {
-          toast.error('GitHub export failed', { id: 'deploy-vercel' })
-          setDeployingVercel(false)
-          return
-        }
-        
-        const exportData = await exportRes.json()
-        toast.success('✅ Exported to GitHub!', { duration: 1000, id: 'export-gh' })
-        
-        await deployToVercel(exportData.repoName)
-      } else {
-        toast.loading('Deploying to Vercel...', { id: 'deploy-vercel' })
-        await deployToVercel(githubData.repoName)
-      }
-    } catch (error) {
-      toast.error('Deployment failed', { id: 'deploy-vercel' })
-      setDeployingVercel(false)
-    }
-  }
+      // Build complete HTML document
+      const fullHTML = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>${css}</style>
+        </head>
+        <body>
+          ${html}
+          <script>${js}</script>
+        </body>
+        </html>
+      `
 
-  const deployToVercel = async (repoName: string) => {
-    try {
-      const res = await fetch(`/api/deploy/vercel`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          projectId: project.id,
-          githubRepoName: repoName
-        })
-      })
+      doc.open()
+      doc.write(fullHTML)
+      doc.close()
 
-      if (res.ok) {
-        const data = await res.json()
-        toast.success('🚀 Deployed to Vercel!', { duration: 2000, id: 'deployed' })
-        window.open(data.deploymentUrl, '_blank')
-      } else {
-        const errorData = await res.json()
-        toast.error(errorData.error || 'Deployment failed', { id: 'deploy-vercel' })
-      }
+      setTimeout(() => setIframeError(false), 0)
     } catch (error) {
-      toast.error('Deployment failed', { id: 'deploy-vercel' })
-    } finally {
-      setDeployingVercel(false)
+      console.error('Preview error:', error)
+      setTimeout(() => setIframeError(true), 0)
     }
-  }
-
-  // Export to GitHub
-  const handleExportGithub = async () => {
-    try {
-      const res = await fetch(`/api/export/github`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: project.id })
-      })
-      
-      if (res.ok) {
-        const data = await res.json()
-        toast.success('✅ Exported to GitHub!')
-        window.open(data.repoUrl, '_blank')
-      } else {
-        toast.error('GitHub export failed')
-      }
-    } catch (error) {
-      toast.error('Export failed')
-    }
-  }
-
-  // Download ZIP
-  const handleDownload = async () => {
-    try {
-      const res = await fetch(`/api/export/zip`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          projectId: project.id,
-          projectName: project.name,
-          projectCode: project.code
-        })
-      })
-      
-      if (res.ok) {
-        const blob = await res.blob()
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `${project.name.replace(/\s+/g, '-')}.zip`
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-        toast.success('Downloaded!')
-      } else {
-        toast.error('Download failed')
-      }
-    } catch (error) {
-      toast.error('Download failed')
-    }
-  }
+  }, [html, css, js])
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col">
-      {/* Header */}
-      <header className="bg-gray-800 border-b border-gray-700 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="flex items-center gap-2 text-gray-400 hover:text-white transition"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span>Back to Dashboard</span>
-            </button>
+    <div className="absolute inset-0 flex flex-col bg-white">
+      {/* Validation Status Bar */}
+      {(!validation.validationPassed || validation.errors.length > 0) && (
+        <div className="bg-yellow-50 border-b border-yellow-200 p-3">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-yellow-800">
+                Code Quality Issues Detected
+              </p>
+              {validation.errors.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {validation.errors.slice(0, 3).map((error, i) => (
+                    <li key={i} className="text-xs text-yellow-700 flex items-start gap-2">
+                      <XCircle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                      <span>{error.message}</span>
+                    </li>
+                  ))}
+                  {validation.errors.length > 3 && (
+                    <li className="text-xs text-yellow-600">
+                      + {validation.errors.length - 3} more errors
+                    </li>
+                  )}
+                </ul>
+              )}
+              {validation.warnings.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {validation.warnings.slice(0, 2).map((warning, i) => (
+                    <li key={i} className="text-xs text-yellow-600 flex items-start gap-2">
+                      <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                      <span>{warning.message}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
+      {validation.validationPassed && validation.errors.length === 0 && (
+        <div className="bg-green-50 border-b border-green-200 p-2">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-green-600" />
+            <span className="text-sm text-green-800 font-medium">
+              Code validated successfully
+            </span>
+            <span className="text-xs text-green-600 ml-auto">
+              Score: {validation.validationScore}/100
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Preview Frame */}
+      <div className="flex-1 relative overflow-hidden">
+        {iframeError ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
             <div className="text-center">
-              <h1 className="text-xl font-bold text-white">{project.name}</h1>
-              {project.description && (
-                <p className="text-sm text-gray-400">{project.description}</p>
-              )}
+              <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Preview Error
+              </h3>
+              <p className="text-gray-600 text-sm">
+                Unable to render preview. Please check the console for errors.
+              </p>
             </div>
-
-            <button
-              onClick={() => setShowCode(!showCode)}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition"
-            >
-              {showCode ? <Eye className="w-5 h-5" /> : <Code className="w-5 h-5" />}
-              {showCode ? 'Preview' : 'Code'}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Action Bar */}
-      <div className="bg-gray-800 border-b border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {!project.isPublished ? (
-                <button
-                  onClick={handlePublish}
-                  disabled={publishing}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg transition text-sm font-semibold disabled:opacity-50"
-                >
-                  <Zap className="w-4 h-4" />
-                  {publishing ? 'Publishing...' : 'Publish to BuildFlow'}
-                </button>
-              ) : (
-                <div className="flex items-center gap-2 text-green-400 text-sm">
-                  <Zap className="w-4 h-4" />
-                  <span>Published</span>
-                </div>
-              )}
-
-              <button
-                onClick={handleDeployToVercel}
-                disabled={deployingVercel}
-                className="flex items-center gap-2 px-4 py-2 bg-black hover:bg-gray-900 text-white rounded-lg transition text-sm font-semibold disabled:opacity-50 border border-gray-700"
-              >
-                {deployingVercel ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Deploying...
-                  </>
-                ) : (
-                  <>
-                    <svg viewBox="0 0 76 76" className="w-4 h-4" fill="white">
-                      <path d="M38 0L76 76H0L38 0z" />
-                    </svg>
-                    Deploy to Vercel
-                  </>
-                )}
-              </button>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleExportGithub}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition text-sm"
-              >
-                <Github className="w-4 h-4" />
-                Export to GitHub
-              </button>
-
-              {project.isPublished && project.publicUrl && (
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(project.publicUrl!)
-                    toast.success('URL copied!', { duration: 2000 })
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm"
-                >
-                  <Share2 className="w-4 h-4" />
-                  Share
-                </button>
-              )}
-
-              <button
-                onClick={handleDownload}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition text-sm"
-              >
-                <Download className="w-4 h-4" />
-                Download
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Content - FIXED: Full height iframe */}
-      <div className="flex-1 overflow-hidden relative">
-        {showCode ? (
-          /* Code View */
-          <div className="absolute inset-0 bg-gray-900 p-4 overflow-auto">
-            <pre className="text-sm text-gray-300 font-mono">
-              <code>{project.code}</code>
-            </pre>
           </div>
         ) : (
-          /* Preview View - FULL HEIGHT */
-          iframeError ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
-              <div className="text-center max-w-md p-8">
-                <div className="text-6xl mb-4">⚠️</div>
-                <h2 className="text-2xl font-bold text-white mb-4">Preview Error</h2>
-                <p className="text-gray-400 mb-6">
-                  There was an error rendering this project. The code may have syntax errors.
-                </p>
-                <div className="flex gap-3 justify-center">
-                  <button
-                    onClick={() => setShowCode(true)}
-                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg"
-                  >
-                    View Code
-                  </button>
-                  <a
-                    href={`/chatbuilder?project=${project.id}`}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
-                  >
-                    Fix in Chat Builder
-                  </a>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <iframe
-              srcDoc={sanitizedCode}
-              className="absolute inset-0 w-full h-full border-0"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
-              title={project.name}
-              onError={() => {
-                console.error('Preview iframe error')
-                setIframeError(true)
-              }}
-              onLoad={() => {
-                console.log('✅ Preview loaded successfully')
-              }}
-            />
-          )
+          <iframe
+            ref={iframeRef}
+            title="Preview"
+            className="w-full h-full border-0"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"
+          />
         )}
-      </div>
-
-      {/* Info Footer */}
-      <div className="bg-gray-800 border-t border-gray-700 py-2 px-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between text-xs text-gray-400">
-          <div className="flex items-center gap-4">
-            <span>Type: {project.type}</span>
-            <span>•</span>
-            <span>Views: {project.views}</span>
-          </div>
-          <div>
-            {project.isPublished && project.publicUrl && (
-              <a
-                href={project.publicUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-400 hover:text-blue-300"
-              >
-                {project.publicUrl}
-              </a>
-            )}
-          </div>
-        </div>
       </div>
     </div>
   )
 }
-
-// Replace React Router code with state-based navigation example
-// Example usage for your generated previews (not used in this file, but for reference):
-/*
-function App() {
-  const [currentPage, setCurrentPage] = useState('home');
-
-  const renderPage = () => {
-    switch(currentPage) {
-      case 'home': return <HomePage />;
-      case 'about': return <AboutPage />;
-      case 'contact': return <ContactPage />;
-      default: return <HomePage />;
-    }
-  };
-
-  return (
-    <div>
-      <nav className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex gap-4">
-          <button 
-            onClick={() => setCurrentPage('home')}
-            className="px-4 py-2 rounded hover:bg-gray-100"
-          >
-            Home
-          </button>
-          <button 
-            onClick={() => setCurrentPage('about')}
-            className="px-4 py-2 rounded hover:bg-gray-100"
-          >
-            About
-          </button>
-          <button 
-            onClick={() => setCurrentPage('contact')}
-            className="px-4 py-2 rounded hover:bg-gray-100"
-          >
-            Contact
-          </button>
-        </div>
-      </nav>
-      <main>
-        {renderPage()}
-      </main>
-    </div>
-  );
-}
-*/

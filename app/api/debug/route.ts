@@ -29,7 +29,8 @@ export async function GET(request: NextRequest) {
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       include: {
-        projects: true,
+        Project: true,
+        WorkspaceMember: true,
       }
     })
 
@@ -44,12 +45,12 @@ export async function GET(request: NextRequest) {
       user: {
         id: user.id,
         email: user.email,
-        projectCount: user.projects.length,
+        projectCount: user.Project.length,
       },
-      projects: user.projects.map(p => ({ id: p.id, name: p.name })),
+      projects: user.Project.map(p => ({ id: p.id, name: p.name })),
     })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Don't expose error details in production
     console.error('Debug route error:', error)
     return NextResponse.json({ 

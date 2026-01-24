@@ -2,6 +2,7 @@ import { withAuth } from '@/lib/api-middleware'
 import { logSecurityEvent } from '@/lib/security'
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import { promises as dns } from 'dns'
 
 export const POST = withAuth(async (req, context, session) => {
   try {
@@ -18,7 +19,7 @@ export const POST = withAuth(async (req, context, session) => {
     const domain = await prisma.customDomain.findFirst({
       where: {
         id: id as string,
-        project: {
+        Project: {
           userId: session.user.id
         }
       },
@@ -76,7 +77,7 @@ export const POST = withAuth(async (req, context, session) => {
 async function verifyDomainDNS(domain: string) {
   try {
     // Import dns module for DNS lookups
-    const dns = require('dns').promises
+    // (imported at the top of the file)
     
     const checks = {
       cname: false,

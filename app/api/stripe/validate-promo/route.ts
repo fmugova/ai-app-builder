@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if promo code exists in our database
-    const promo = await prisma.promoCodes.findFirst({
+    const promo = await prisma.promo_codes.findFirst({
       where: {
         code: code.toUpperCase(),
         active: true,

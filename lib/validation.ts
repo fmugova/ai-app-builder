@@ -1,3 +1,51 @@
+export interface ValidationResult {
+  isValid: boolean;
+  issues: string[];
+  isTruncated: boolean;
+}
+
+export function validateGeneratedCode(code: string, allowPartial = false): ValidationResult {
+  const issues: string[] = [];
+  
+  // Basic structure checks
+  if (!code.includes('<!DOCTYPE html>') && !allowPartial) {
+    issues.push('Missing DOCTYPE declaration');
+  }
+  
+  if (!code.includes('</html>') && !allowPartial) {
+    issues.push('Incomplete HTML - missing closing tag');
+  }
+  
+  // Check for truncation indicators
+  const truncationSignals = [
+    /\.\.\.$/, // Ends with ...
+    /\/\*[^*]*$/, // Unclosed CSS comment
+    /<!--[^>]*$/, // Unclosed HTML comment
+    /<style[^>]*>[^<]*$/, // Unclosed style tag
+    /<script[^>]*>[^<]*$/, // Unclosed script tag
+  ];
+  
+  for (const pattern of truncationSignals) {
+    if (pattern.test(code.trim())) {
+      issues.push('Code appears to be truncated');
+      break;
+    }
+  }
+  
+  // Count opening vs closing tags
+  const openingTags = (code.match(/<(?!\/)[a-z][^>]*>/gi) || []).length;
+  const closingTags = (code.match(/<\/[a-z][^>]*>/gi) || []).length;
+  
+  if (Math.abs(openingTags - closingTags) > 5 && !allowPartial) {
+    issues.push(`Mismatched tags: ${openingTags} opening, ${closingTags} closing`);
+  }
+  
+  return {
+    isValid: issues.length === 0 || allowPartial,
+    issues,
+    isTruncated: issues.some(i => i.includes('truncated'))
+  };
+}
 // Password validation utilities
 
 export interface PasswordValidationResult {

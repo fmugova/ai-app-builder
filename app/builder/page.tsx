@@ -3,82 +3,157 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast, Toaster } from 'react-hot-toast'
-import dynamic from 'next/dynamic'
-import { HelpCircle } from 'lucide-react'
-
-import { templates } from '@/lib/templates'
 import { analytics } from '@/lib/analytics'
-import { Loader2 } from 'lucide-react'
-import { sanitizeForPreview } from '@/lib/sanitizeForPreview'
+import CodePreview from './code-preview'
+import { HelpCircle, Loader2 } from 'lucide-react'
 import PromptAssistant from '@/components/PromptAssistant'
+import { EnhancedPromptInput } from '@/components/EnhancedPromptInput'
+import { useGenerateStream } from '@/hooks/useGenerateStream'
 
-// Lazy load heavy components
-const EnhancedPromptInput = dynamic(
-  () => import('@/components/EnhancedPromptInput').then(mod => ({ default: mod.EnhancedPromptInput })),
-  {
-    loading: () => (
-      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 animate-pulse">
-        <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
-      </div>
-    ),
-    ssr: false
-  }
-);
+// ...existing code...
 
-const PromptGuide = dynamic(() => import('@/components/PromptGuide'), {
-  loading: () => null,
-  ssr: false
-});
-
-const CodePreview = dynamic(() => import('./code-preview'), {
-  loading: () => (
-    <div className="bg-white rounded-xl shadow-sm border p-6 animate-pulse">
-      <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-4"></div>
-      <div className="bg-gray-100 rounded-lg" style={{ height: '500px' }}>
-        <div className="w-full h-full flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
-        </div>
-      </div>
-    </div>
-  ),
-  ssr: false
-});
-
-
+// Move all hook calls into BuilderContent
 function BuilderContent() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  
-  const [step, setStep] = useState<'select-type' | 'build'>('select-type')
-  const [projectType, setProjectType] = useState<string>('')
-  const [prompt, setPrompt] = useState('')
-  const [generatedCode, setGeneratedCode] = useState('')
-  const [generating, setGenerating] = useState(false)
-  const [generatingStep, setGeneratingStep] = useState(0)
+  const [currentProjectId, setCurrentProjectId] = useState<string | undefined>()
   const [projectName, setProjectName] = useState('')
   const [projectDescription, setProjectDescription] = useState('')
+  const [projectType, setProjectType] = useState<string>('landing')
+  const [prompt, setPrompt] = useState('') // <-- Add this line
+  const [generating, setGenerating] = useState(false)
+  const [generatingStep, setGeneratingStep] = useState(0)
   const [saving, setSaving] = useState(false)
-  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
   const [isLoadedProject, setIsLoadedProject] = useState(false)
+  const [generatedCode, setGeneratedCode] = useState<string>('')
   const [showAssistant, setShowAssistant] = useState(false)
+  // Track incomplete generation state
+  const [incompleteIssues, setIncompleteIssues] = useState<string[] | null>(null)
+  // Add step state for navigation
+  const [step, setStep] = useState<'select-type' | 'build'>('select-type')
 
-  // Animating generating text
-  useEffect(() => {
-    if (generating) {
-      const interval = setInterval(() => {
-        setGeneratingStep(prev => (prev + 1) % 4)
-      }, 500)
-      return () => clearInterval(interval)
+  // Add router instance
+  const router = useRouter();
+
+  const {
+    isGenerating,
+    status,
+    progress,
+    estimate,
+    elapsed,
+    error,
+    generatedCode: streamedCode,
+    projectId: newProjectId,
+    stats,
+    generate,
+    reset,
+  } = useGenerateStream()
+
+  // Utility to check if code is truncated/incomplete
+  function validateGeneratedCode(code: string, checkTruncation: boolean) {
+    // Simple heuristic: check for incomplete HTML tags or abrupt ending
+    const issues: string[] = [];
+    let isTruncated = false;
+    if (checkTruncation) {
+      if (code.trim().endsWith('...')) {
+        isTruncated = true;
+        issues.push('The code appears to be truncated (ends with "...").');
+      }
+      // Check for unclosed <html>, <body>, <div>, etc.
+      if ((code.match(/<html/gi)?.length || 0) > (code.match(/<\/html>/gi)?.length || 0)) {
+        isTruncated = true;
+        issues.push('Missing closing </html> tag.');
+      }
+      if ((code.match(/<body/gi)?.length || 0) > (code.match(/<\/body>/gi)?.length || 0)) {
+        isTruncated = true;
+        issues.push('Missing closing </body> tag.');
+      }
+      if ((code.match(/<div/gi)?.length || 0) > (code.match(/<\/div>/gi)?.length || 0)) {
+        isTruncated = true;
+        issues.push('Some <div> tags are not closed.');
+      }
     }
-  }, [generating])
-
-  const getGeneratingText = () => {
-    const dots = '.'.repeat(generatingStep)
-    const spaces = '\u00A0'.repeat(3 - generatingStep)
-    return `Generating${dots}${spaces}`
+    return { isTruncated, issues };
   }
 
-  // ✨ AI Chat state
+  // Detect incomplete/truncated code
+  useEffect(() => {
+    if (generatedCode) {
+      const validation = validateGeneratedCode(generatedCode, true)
+      if (validation.isTruncated) {
+        setIncompleteIssues(validation.issues)
+      } else {
+        setIncompleteIssues(null)
+      }
+    } else {
+      setIncompleteIssues(null)
+    }
+  }, [generatedCode])
+
+  // Get searchParams from the hook
+  const searchParams = useSearchParams();
+
+  // Handler for continuing generation
+  const handleContinueGeneration = async () => {
+    if (!prompt.trim()) return toast.error('Please enter a prompt')
+    setGenerating(true)
+    setIsLoadedProject(false)
+    try {
+      // Continue from current code
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: prompt + '\n(Continue from where you left off, do not repeat code)',
+          type: projectType,
+          projectId: currentProjectId,
+          continueFrom: generatedCode
+        })
+      })
+      const data = await res.json()
+      if (res.ok && data.code) {
+        setGeneratedCode(data.code)
+        toast.success('Continued generation!')
+      } else {
+        toast.error(data.error || 'Failed to continue generation')
+      }
+    } catch (e) {
+      toast.error('Failed to continue generation')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  // Handler for simplifying and retrying
+  const handleSimplifyAndRetry = async () => {
+    if (!prompt.trim()) return toast.error('Please enter a prompt')
+    setGenerating(true)
+    setIsLoadedProject(false)
+    try {
+      // Retry with a simpler prompt
+      const simplePrompt = prompt + '\n(Simplify the implementation, reduce features, and ensure completion)'
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: simplePrompt,
+          type: projectType,
+          projectId: currentProjectId
+        })
+      })
+      const data = await res.json()
+      if (res.ok && data.code) {
+        setGeneratedCode(data.code)
+        toast.success('Simplified and retried!')
+      } else {
+        toast.error(data.error || 'Failed to retry')
+      }
+    } catch (e) {
+      toast.error('Failed to retry')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  // AI Chat state
   const [chatOpen, setChatOpen] = useState(false)
   const [chatMessage, setChatMessage] = useState('')
   const [chatHistory, setChatHistory] = useState<Array<{role: string, content: string, files?: string[], urls?: string[]}>>([])
@@ -86,7 +161,7 @@ function BuilderContent() {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [uploadedUrls, setUploadedUrls] = useState<string[]>([])
 
-  // ✨ Handle file upload
+  // Handle file upload
   const handleFileUpload = async (files: FileList) => {
     const fileArray = Array.from(files)
     const validFiles = fileArray.filter(file => {
@@ -104,7 +179,7 @@ function BuilderContent() {
     })
   }
 
-  // ✨ Add URL
+  // Add URL
   const handleAddUrl = () => {
     const url = window.prompt('Enter website URL to analyze:\n\nExample: https://example.com')
     if (url) {
@@ -120,17 +195,17 @@ function BuilderContent() {
     }
   }
 
-  // ✨ Remove file
+  // Remove file
   const removeFile = (index: number) => {
     setUploadedFiles(prev => prev.filter((_, i) => i !== index))
   }
 
-  // ✨ Remove URL
+  // Remove URL
   const removeUrl = (index: number) => {
     setUploadedUrls(prev => prev.filter((_, i) => i !== index))
   }
 
-  // ✨ Handle chat with file/URL support
+  // Handle chat with file/URL support
   const handleChat = async () => {
     if (!chatMessage.trim() && uploadedFiles.length === 0 && uploadedUrls.length === 0) {
       toast.error('Please enter a message or add files/URLs')
@@ -228,10 +303,6 @@ function BuilderContent() {
         setGeneratedCode(data.code)
         setProjectType(data.type || 'landing')
         setIsLoadedProject(true)
-
-        // ✅ REMOVED: React detection and warning logic
-        // The sanitizeForPreview function already handles React code properly!
-        // No need to warn - just render it!
       }
     } catch (error) {
       console.error('Failed to load:', error)
@@ -241,6 +312,17 @@ function BuilderContent() {
   const handleTypeSelect = (type: string) => {
     setProjectType(type)
     setStep('build')
+  }
+
+  const getGeneratingText = () => {
+    const texts = [
+      'Analyzing your requirements...',
+      'Generating code structure...',
+      'Building components...',
+      'Adding styling...',
+      'Finalizing your project...'
+    ]
+    return texts[generatingStep % texts.length]
   }
 
   const handleGenerate = async () => {
@@ -263,7 +345,7 @@ function BuilderContent() {
           body: JSON.stringify({ 
             prompt, 
             type: projectType,
-            projectId: currentProjectId // ✅ Pass projectId to prevent duplication
+            projectId: currentProjectId
           })
         })
 
@@ -277,7 +359,6 @@ function BuilderContent() {
 
         if (res.ok) {
           setGeneratedCode(data.code)
-          // ✅ Set projectId from response if it's a new project
           if (data.projectId && !currentProjectId) {
             setCurrentProjectId(data.projectId)
           }
@@ -346,6 +427,11 @@ function BuilderContent() {
     }
   }
 
+  // Simple sanitizer to remove <script> tags for preview/download safety
+  function sanitizeForPreview(code: string): string {
+    return code.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '');
+  }
+
   const downloadCode = () => {
     const sanitizedCode = sanitizeForPreview(generatedCode)
     const blob = new Blob([sanitizedCode], { type: 'text/html' })
@@ -359,8 +445,45 @@ function BuilderContent() {
     URL.revokeObjectURL(url)
   }
 
-  // ✅ REMOVED: React warning screen - no longer needed!
-  // The code just renders normally now
+  // Define templates for the template selection UI
+  const templates = [
+    {
+      id: 'landing-template',
+      icon: '🌐',
+      name: 'Simple Landing',
+      type: 'landing',
+      description: 'A clean and modern landing page template.',
+      code: '<!DOCTYPE html><html><head><title>Landing Page</title></head><body><h1>Welcome to your Landing Page!</h1></body></html>',
+      tags: ['landing', 'marketing', 'simple'],
+    },
+    {
+      id: 'webapp-template',
+      icon: '⚡',
+      name: 'Starter Web App',
+      type: 'webapp',
+      description: 'A basic interactive web app template.',
+      code: '<!DOCTYPE html><html><head><title>Web App</title></head><body><h1>Web App Starter</h1></body></html>',
+      tags: ['webapp', 'starter', 'interactive'],
+    },
+    {
+      id: 'dashboard-template',
+      icon: '📊',
+      name: 'Analytics Dashboard',
+      type: 'dashboard',
+      description: 'A dashboard template for data visualization.',
+      code: '<!DOCTYPE html><html><head><title>Dashboard</title></head><body><h1>Dashboard</h1></body></html>',
+      tags: ['dashboard', 'analytics', 'charts'],
+    },
+    {
+      id: 'portfolio-template',
+      icon: '💼',
+      name: 'Portfolio',
+      type: 'portfolio',
+      description: 'A personal portfolio template.',
+      code: '<!DOCTYPE html><html><head><title>Portfolio</title></head><body><h1>My Portfolio</h1></body></html>',
+      tags: ['portfolio', 'personal', 'resume'],
+    },
+  ];
 
   if (step === 'select-type') {
     return (
@@ -445,8 +568,6 @@ function BuilderContent() {
     )
   }
 
-  // End of BuilderContent logic
-
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
@@ -460,7 +581,6 @@ function BuilderContent() {
             </button>
 
             <div className="flex items-center gap-3">
-              {/* Other buttons */}
               {generatedCode && (
                 <>
                   <button
@@ -491,7 +611,7 @@ function BuilderContent() {
                   )}
                 </>
               )}
-              <PromptGuide />
+              {/* <PromptGuide /> */}
               <button
                 onClick={handleSave}
                 disabled={saving || !generatedCode}
@@ -578,9 +698,41 @@ function BuilderContent() {
           </div>
 
           <div className="space-y-6">
+
+            {/* Enhanced Error Recovery UI for Incomplete Generations */}
+            {incompleteIssues && (
+              <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-xl mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">⚠️</span>
+                    <span className="font-semibold">Generation Incomplete</span>
+                  </div>
+                </div>
+                <ul className="list-disc pl-6 mb-3">
+                  {incompleteIssues.map((issue, idx) => (
+                    <li key={idx} className="text-sm">{issue}</li>
+                  ))}
+                </ul>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleContinueGeneration}
+                    className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-semibold"
+                  >
+                    Continue Generation
+                  </button>
+                  <button
+                    onClick={handleSimplifyAndRetry}
+                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm font-semibold"
+                  >
+                    Simplify & Retry
+                  </button>
+                </div>
+              </div>
+            )}
+
             <CodePreview
               code={generatedCode}
-              projectId={currentProjectId}
+              projectId={currentProjectId || null}
               isLoadedProject={isLoadedProject}
               onRegenerate={() => setIsLoadedProject(false)}
               onSave={handleSave}
@@ -616,7 +768,7 @@ function BuilderContent() {
         </div>
       </div>
 
-      {/* ✨ Floating Chat Button */}
+      {/* Floating Chat Button */}
       <button
         onClick={() => setChatOpen(!chatOpen)}
         className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full shadow-2xl hover:scale-110 transition-transform z-50 flex items-center justify-center"
@@ -625,10 +777,9 @@ function BuilderContent() {
         {chatOpen ? '✕' : '💬'}
       </button>
 
-      {/* ✨ Chat Panel */}
+      {/* Chat Panel */}
       {chatOpen && (
         <div className="fixed bottom-24 right-6 w-96 h-[600px] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col z-50 overflow-hidden">
-          {/* Chat Header */}
           <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-2xl">🤖</span>
@@ -645,7 +796,6 @@ function BuilderContent() {
             </button>
           </div>
 
-          {/* Chat Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
             {chatHistory.length === 0 ? (
               <div className="text-center text-gray-500 py-8">
@@ -693,7 +843,6 @@ function BuilderContent() {
             )}
           </div>
 
-          {/* Chat Input */}
           <div className="p-4 border-t bg-white">
             <div className="flex gap-2 mb-2">
               <input
@@ -732,7 +881,6 @@ function BuilderContent() {
                 ➕ Add URL
               </button>
             </div>
-            {/* Show uploaded files/urls */}
             {(uploadedFiles.length > 0 || uploadedUrls.length > 0) && (
               <div className="mb-2 flex flex-wrap gap-2">
                 {uploadedFiles.map((file, i) => (
@@ -751,9 +899,9 @@ function BuilderContent() {
             )}
           </div>
         </div>
-      )} {/* <-- This parenthesis closes the {chatOpen && ( ... )} block */}
+      )}
 
-      {/* ✨ Floating Help Button */}
+      {/* Floating Help Button */}
       <button
         onClick={() => setShowAssistant(true)}
         className="fixed bottom-6 right-24 w-14 h-14 bg-purple-600 hover:bg-purple-700 text-white rounded-full shadow-lg flex items-center justify-center z-40"
@@ -764,19 +912,20 @@ function BuilderContent() {
 
       <Toaster position="top-right" />
 
-      {/* Prompt Assistant Modal */}
-      <PromptAssistant
-        isOpen={showAssistant}
-        onClose={() => setShowAssistant(false)}
-        onUsePrompt={(newPrompt) => {
-          setPrompt(newPrompt)
-          setShowAssistant(false)
-        }}
-      />
+      {showAssistant && (
+        <PromptAssistant
+          isOpen={showAssistant}
+          onClose={() => setShowAssistant(false)}
+          onUsePrompt={(newPrompt) => {
+            setPrompt(newPrompt)
+            setShowAssistant(false)
+          }}
+        />
+      )}
     </div>
-  );
+  )
 }
-
+ 
 export default function Builder() {
   return (
     <Suspense fallback={

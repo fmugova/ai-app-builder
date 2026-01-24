@@ -30,7 +30,7 @@ export async function GET(
         User: { email: session.user.email }
       },
       include: {
-        environmentVariables: {
+        EnvironmentVariable: {
           where: environment !== 'all' ? { environment } : {},
           orderBy: { key: 'asc' }
         }
@@ -47,7 +47,7 @@ export async function GET(
     })
 
     // Decrypt values
-    const variables = project.environmentVariables.map(v => ({
+    const variables = project.EnvironmentVariable.map(v => ({
       key: v.key,
       value: decrypt(v.value),
       description: v.description || undefined
@@ -72,7 +72,7 @@ export async function GET(
     if (format === 'json') {
       // Export as JSON
       return NextResponse.json({
-        project: project.name,
+        Project: project.name,
         environment,
         exportedAt: new Date().toISOString(),
         variables

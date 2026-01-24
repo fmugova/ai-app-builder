@@ -16,12 +16,12 @@ interface Page {
 
 interface SEOManagerClientProps {
   projectId: string
-  initialPages: Page[]
+  initialPage: Page[]
 }
 
-export default function SEOManagerClient({ projectId, initialPages }: SEOManagerClientProps) {
+export default function SEOManagerClient({ projectId, initialPage }: SEOManagerClientProps) {
   const router = useRouter()
-  const [pages, setPages] = useState<Page[]>(initialPages)
+  const [pages, setPages] = useState<Page[]>(initialPage)
   const [selectedPage, setSelectedPage] = useState<Page | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -151,6 +151,7 @@ export default function SEOManagerClient({ projectId, initialPages }: SEOManager
                     <li>• Meta descriptions should be 150-160 characters</li>
                     <li>• Include target keywords naturally</li>
                     <li>• Make each page's SEO unique</li>
+                      <li>• Make each page&apos;s SEO unique</li>
                   </ul>
                 </div>
               </div>

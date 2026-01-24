@@ -77,11 +77,11 @@ export default function AcceptInvitePage() {
       setAccepted(true);
       toast({
         title: 'Invitation accepted',
-        description: `You've joined ${data.workspace.name}!`,
+        description: `You've joined ${data.Workspace.name}!`,
       });
 
       setTimeout(() => {
-        router.push(`/workspaces/${data.workspace.id}`);
+        router.push(`/workspaces/${data.Workspace.id}`);
       }, 2000);
     } catch (error) {
       toast({
@@ -180,7 +180,7 @@ export default function AcceptInvitePage() {
         <CardHeader>
           <CardTitle>Workspace Invitation</CardTitle>
           <CardDescription>
-            You've been invited to join a workspace
+            You&apos;ve been invited to join a workspace
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

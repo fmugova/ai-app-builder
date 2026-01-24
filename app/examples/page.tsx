@@ -51,6 +51,25 @@ export default function ExamplesPage() {
         
         {/* Results */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* BuildFlow Production Example: Roast & Revel */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-green-400 p-6 hover:shadow-lg transition col-span-full">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-green-700">BuildFlow Production Example: Roast & Revel</h3>
+                <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded">Enterprise</span>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                A full-featured, enterprise-grade e-commerce demo built with React/Next.js, demonstrating best practices in accessibility, security, CSP compliance, and UI/UX. Includes cart, modal, toast, and filtering logic.
+              </p>
+              <div className="flex gap-2">
+                <a
+                  href="/examples/roast-revel"
+                  className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition text-sm flex items-center justify-center gap-2"
+                  aria-label="View Roast & Revel production example"
+                >
+                  View Example
+                </a>
+              </div>
+            </div>
           {results.map((example, index) => (
             <div
               key={index}
@@ -64,13 +83,13 @@ export default function ExamplesPage() {
               </div>
               
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-3">
-                {example.prompt.substring(0, 150)}...
+                {example.prompt?.substring(0, 150) ?? ""}...
               </p>
               
               <div className="flex gap-2">
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText(example.prompt)
+                    navigator.clipboard.writeText(example.prompt ?? "")
                     toast.success('Copied!')
                   }}
                   className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition text-sm flex items-center justify-center gap-2"
@@ -79,7 +98,7 @@ export default function ExamplesPage() {
                   Copy
                 </button>
                 <button
-                  onClick={() => handleUsePrompt(example.prompt)}
+                  onClick={() => handleUsePrompt(example.prompt ?? "")}
                   className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition text-sm flex items-center justify-center gap-2"
                 >
                   Use

@@ -86,12 +86,12 @@ export default async function WorkspacePage({ params }: { params: Promise<{ id: 
     notFound();
   }
 
-  const workspace = await prisma.workspace.findUnique({
+  const Workspace = await prisma.workspace.findUnique({
     where: { id },
     include: {
-      members: {
+      WorkspaceMember: {
         include: {
-          user: {
+          User: {
             select: {
               id: true,
               name: true,
@@ -104,12 +104,12 @@ export default async function WorkspacePage({ params }: { params: Promise<{ id: 
           joinedAt: 'asc',
         },
       },
-      projects: {
+      WorkspaceProject: {
         orderBy: {
           addedAt: 'desc',
         },
       },
-      invites: {
+      WorkspaceInvite: {
         where: {
           status: 'pending',
           expiresAt: {
@@ -122,14 +122,14 @@ export default async function WorkspacePage({ params }: { params: Promise<{ id: 
       },
       _count: {
         select: {
-          members: true,
-          projects: true,
+          WorkspaceMember: true,
+          WorkspaceProject: true,
         },
       },
     },
   });
 
-  if (!workspace) {
+  if (!Workspace) {
     notFound();
   }
 
@@ -147,14 +147,14 @@ export default async function WorkspacePage({ params }: { params: Promise<{ id: 
         <div className="flex items-start justify-between">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-3xl font-bold">{workspace.name}</h1>
+              <h1 className="text-3xl font-bold">{Workspace.name}</h1>
               <Badge variant="outline">{member.role}</Badge>
             </div>
             <p className="text-muted-foreground">
-              {workspace.description || 'No description'}
+              {Workspace.description || 'No description'}
             </p>
           </div>
-          <Link href={`/workspaces/${workspace.id}/settings`}>
+          <Link href={`/workspaces/${Workspace.id}/settings`}>
             <Button variant="outline">
               <Settings className="h-4 w-4 mr-2" />
               Settings
@@ -172,18 +172,30 @@ export default async function WorkspacePage({ params }: { params: Promise<{ id: 
         </TabsList>
 
         <TabsContent value="overview">
-          <Overview workspace={workspace} />
+          <Overview workspace={{ 
+            ...Workspace, 
+            _count: { 
+              members: Workspace.WorkspaceMember?.length ?? 0,
+              projects: Workspace.WorkspaceProject?.length ?? 0 
+            }, 
+            membersLimit: Workspace.membersLimit, 
+            projectsLimit: Workspace.projectsLimit, 
+            subscriptionTier: Workspace.subscriptionTier, 
+            subscriptionStatus: Workspace.subscriptionStatus 
+          }} 
+          />
         </TabsContent>
 
         <TabsContent value="members">
           <Members
-            workspaceId={workspace.id}
-            workspaceName={workspace.name}
-            members={workspace.members.map(m => ({
+            workspaceId={Workspace.id}
+            workspaceName={Workspace.name}
+            members={Array.isArray(Workspace.WorkspaceMember) ? Workspace.WorkspaceMember.map((m) => ({
               ...m,
-              joinedAt: m.joinedAt.toISOString(),
-              updatedAt: m.updatedAt.toISOString(),
-            }))}
+              joinedAt: m.joinedAt instanceof Date ? m.joinedAt.toISOString() : m.joinedAt,
+              updatedAt: m.updatedAt instanceof Date ? m.updatedAt.toISOString() : m.updatedAt,
+              user: m.User
+            })) : []}
             currentUserRole={member.role}
             currentUserId={user.id}
             canManageMembers={canManageMembers}
@@ -191,11 +203,11 @@ export default async function WorkspacePage({ params }: { params: Promise<{ id: 
         </TabsContent>
 
         <TabsContent value="projects">
-          <Projects projects={workspace.projects} />
+          <Projects projects={Workspace.WorkspaceProject} />
         </TabsContent>
 
         <TabsContent value="invites">
-          <Invites invites={workspace.invites} />
+          <Invites invites={Workspace.WorkspaceInvite} />
         </TabsContent>
       </Tabs>
     </div>

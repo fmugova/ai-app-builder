@@ -47,15 +47,33 @@ export default async function WorkspacesPage() {
     redirect('/auth/signin');
   }
 
+  type WorkspaceWithCounts = {
+    id: string;
+    name: string;
+    description: string | null;
+    subscriptionTier: string;
+    // Add other Workspace fields as needed
+    _count: {
+      WorkspaceMember: number;
+      WorkspaceProject: number;
+    };
+  };
+
+  type WorkspaceMemberWithWorkspace = {
+    role: string;
+    Workspace: WorkspaceWithCounts;
+    // Add other WorkspaceMember fields as needed
+  };
+
   const workspaceMembers = await prisma.workspaceMember.findMany({
     where: { userId: user.id },
     include: {
-      workspace: {
+      Workspace: {
         include: {
           _count: {
             select: {
-              members: true,
-              projects: true,
+              WorkspaceMember: true,
+              WorkspaceProject: true,
             },
           },
         },
@@ -66,11 +84,15 @@ export default async function WorkspacesPage() {
     },
   });
 
-  const workspaces = workspaceMembers.map((wm) => ({
-    ...wm.workspace,
+  const workspaces = workspaceMembers.map((wm: WorkspaceMemberWithWorkspace) => ({
+    id: wm.Workspace.id,
+    name: wm.Workspace.name,
+    description: wm.Workspace.description ?? '',
+    subscriptionTier: wm.Workspace.subscriptionTier ?? '',
+    _count: wm.Workspace._count,
     userRole: wm.role,
-    memberCount: wm.workspace._count.members,
-    projectCount: wm.workspace._count.projects,
+    memberCount: wm.Workspace._count.WorkspaceMember,
+    projectCount: wm.Workspace._count.WorkspaceProject,
   }));
 
   return (

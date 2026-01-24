@@ -67,11 +67,18 @@ export function useAutoSave(
           body: JSON.stringify(body)
         })
 
-        if (res.ok) {
-          lastSavedCodeRef.current = code
-          console.log('💾 Auto-saved:', pageId ? 'Page' : 'Project')
-        } else {
-          console.error('Auto-save failed:', await res.text())
+          if (res.ok) {
+            lastSavedCodeRef.current = code
+            console.log('💾 Auto-saved:', pageId ? 'Page' : 'Project')
+          } else {
+            const errorText = await res.text();
+            console.error('Auto-save failed:', errorText)
+            if (typeof window !== 'undefined') {
+              // Dynamically import toast to avoid SSR issues
+              import('react-hot-toast').then(({ toast }) => {
+                toast.error('Auto-save failed', { duration: 4000 });
+              });
+            }
         }
       } catch (error) {
         console.error('Auto-save error:', error)

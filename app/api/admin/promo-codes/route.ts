@@ -25,7 +25,7 @@ export async function GET() {
     }
 
     // Get all promo codes
-    const promoCodes = await prisma.promoCodes.findMany({
+    const promoCodes = await prisma.promo_codes.findMany({
       orderBy: { createdAt: 'desc' },
     })
 
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Create promo code
-    const promoCode = await prisma.promoCodes.create({
+    const promoCode = await prisma.promo_codes.create({
       data: {
         code: code.toUpperCase(),
         discountType,
@@ -139,7 +139,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Delete promo code
-    await prisma.promoCodes.delete({
+    await prisma.promo_codes.delete({
       where: { id: id as string },
     })
 

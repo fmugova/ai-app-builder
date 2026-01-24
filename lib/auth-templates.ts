@@ -77,7 +77,7 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GITHUB_CLIENT_SECRET || ''
     })
   ],
-  pages: {
+  Page: {
     signIn: '/auth/login',
     signOut: '/auth/logout',
     error: '/auth/error'
@@ -436,7 +436,7 @@ export async function POST(req: Request) {
     await prisma.refreshToken.create({
       data: {
         token: refreshToken,
-        userId: user.id,
+        user_id: user.id,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
       }
     })

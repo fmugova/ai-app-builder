@@ -23,7 +23,7 @@ export async function GET(req: Request, context: { params: { id: string } }) {
         User: { email: session.user.email }
       },
       include: {
-        apiEndpoints: {
+        ApiEndpoint: {
           orderBy: { createdAt: 'desc' }
         }
       }
@@ -33,7 +33,7 @@ export async function GET(req: Request, context: { params: { id: string } }) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ endpoints: project.apiEndpoints })
+    return NextResponse.json({ endpoints: project.ApiEndpoint })
   } catch (error) {
     console.error('Get endpoints error:', error)
     return NextResponse.json(
@@ -192,7 +192,7 @@ export async function PUT(req: Request, context: { params: { id: string } }) {
     const endpoint = await prisma.apiEndpoint.findFirst({
       where: {
         id: endpointId,
-        project: {
+        Project: {
           id: id,
           User: { email: session.user.email }
         }
