@@ -17,7 +17,9 @@ export const DELETE = withAuth(async (req, context, session) => {
     const domain = await prisma.customDomain.findFirst({
       where: {
         id: id as string,
-        Project: { userId: session.user.id }
+        Project: {
+          userId: session.user.id
+        }
       }
     })
 
@@ -34,7 +36,7 @@ export const DELETE = withAuth(async (req, context, session) => {
     })
 
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
       { error: 'Failed to delete domain' },
       { status: 500 }
