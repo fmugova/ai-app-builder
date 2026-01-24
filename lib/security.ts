@@ -68,7 +68,8 @@ export async function logSecurityEvent({
 
     await prisma.securityEvent.create({
       data: {
-        userId,
+        id: crypto.randomUUID ? crypto.randomUUID() : (Math.random().toString(36).slice(2) + Date.now().toString(36)),
+        userId: userId ?? null,
         type,
         action,
         ipAddress,
