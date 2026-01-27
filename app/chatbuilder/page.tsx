@@ -251,156 +251,132 @@ export default function ChatBuilder() {
   // ============================================================================
   // CODE GENERATION (UPDATED - AUTO PROJECT HANDLING)
   // ============================================================================
-  
-  const handleGenerate = async (customPrompt?: string): Promise<GenerateResult> => {
-    const promptToUse = customPrompt || prompt
-    
-    if (!promptToUse.trim()) {
-      toast.error('Please enter a prompt')
-      return { success: false, error: 'No prompt provided' }
-    }
-    
-    setLoading(true)
-    setIsGenerating(true)  // ✅ ADD THIS
-    setGenerationProgress(0)  // ✅ ADD THIS
-    setGeneratedCode({ html: null, css: null, js: null })
-    setValidation(null)
-    
-    try {
-      const response = await fetch('/api/chatbot/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: promptToUse,
-          projectId, // Send existing projectId if available
-          includeAuth,
-          authProvider 
-        }),
-      })
-      
-      if (!response.body) {
-        throw new Error('No response body')
-      }
-      
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      let hasError = false
-      let errorMessage = ''
-      let accumulatedHtml = ''
-      let isComplete = false
-      let completionData: Partial<{ validation: ValidationResult; projectId?: string }> | null = null
-      
-      // Process all messages from stream
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        
-        const chunk = decoder.decode(value, { stream: true })
-        const lines = chunk.split('\n')
-        
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const jsonStr = line.slice(6)
-              if (!jsonStr.trim()) continue
-              
-              let data
-              try {
-                data = JSON.parse(jsonStr)
-              } catch (parseError) {
-                console.warn('Parse error (skipping):', jsonStr.substring(0, 50))
-                continue
-              }
-              
-              if (data.type === 'progress') {
-                console.log('Progress:', data.length)
-                // ✅ NEW: Update progress bar
-                const progress = Math.min(95, (data.length / 35000) * 100)
-                setGenerationProgress(progress)
-              } 
-              else if (data.type === 'html') {
-                // HTML arrived - store it
-                accumulatedHtml = data.content
-                console.log('Received HTML:', accumulatedHtml.length, 'chars')
-              }
-              else if (data.type === 'projectCreated') {
-                // ✅ NEW: Server created project automatically
-                console.log('📦 Project created:', data.projectId)
-                setProjectId(data.projectId)
-              }
-              else if (data.type === 'complete') {
-                // Mark as complete but don't process yet
-                isComplete = true
-                completionData = data
-                console.log('Generation complete')
 
-                // ✅ Update projectId if server sent it
-                if (data.projectId && data.projectId !== projectId) {
-                  console.log('📦 Updating projectId:', data.projectId)
-                  setProjectId(data.projectId)
-                }
-              } 
-              else if (data.type === 'error') {
-                hasError = true
-                errorMessage = data.message
-                toast.error(data.message)
-                
-                if (data.errors && data.validationScore !== undefined) {
-                  setValidation({
-                    validationPassed: false,
-                    validationScore: data.validationScore,
-                    errors: data.errors,
-                    warnings: [],
-                    passed: false
-                  })
-                }
-              }
-            } catch (parseError) {
-              console.warn('SSE parse error (skipping):', parseError)
-            }
-          }
-        }
-      }
-      
-      // Process after stream ends - no race condition!
-      if (hasError) {
-        return { success: false, error: errorMessage }
-      }
-      
-      if (isComplete && accumulatedHtml) {
-        // Set BOTH generatedCode AND currentCode
-        setGeneratedCode({
-          html: accumulatedHtml,
-          css: null,
-          js: null,
-        })
-        setCurrentCode(accumulatedHtml) // ✅ This makes buttons appear!
-        
-        // Set validation if provided
-        if (completionData?.validation) {
-          setValidation({
-            validationPassed: completionData.validation.passed,
-            validationScore: completionData.validation.validationScore,
-            errors: [],
-            warnings: [],
-            passed: completionData.validation.passed
-          })
-        }
-        
-        return { success: true }
-      }
-      
-      throw new Error('Generation completed but no HTML received')
+const handleGenerate = async (customPrompt?: string) => {
+  const promptToUse = customPrompt || prompt;
 
-    } catch (error: unknown) {
-      const errorMsg = error instanceof Error ? error.message : 'Generation failed'
-      toast.error(errorMsg)
-      return { success: false, error: errorMsg }
-    } finally {
-      setLoading(false)
-      setIsGenerating(false)  // ✅ ADD THIS
-    }
+  if (!promptToUse.trim()) {
+    toast.error('Please enter a prompt');
+    return { success: false, error: 'No prompt provided' };
   }
+
+  setIsGenerating(true);
+  setGenerationProgress(0);
+  setGeneratedCode({ html: null, css: null, js: null });
+  setValidation(null);
+
+  try {
+    const response = await fetch('/api/chatbot/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: promptToUse,
+        projectId,
+        includeAuth,
+        authProvider,
+      }),
+    });
+
+    if (!response.ok || !response.body) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let accumulatedHtml = '';
+    let localProjectId = projectId;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const jsonStr = line.slice(6).trim();
+          if (!jsonStr) continue;
+          const data = JSON.parse(jsonStr);
+
+          switch (data.type) {
+            case 'progress':
+              if (typeof data.length === 'number') {
+                const progress = Math.min(95, (data.length / 35000) * 100);
+                setGenerationProgress(progress);
+              }
+              break;
+            case 'projectCreated':
+              if (data.projectId) {
+                setProjectId(data.projectId);
+                localProjectId = data.projectId;
+              }
+              break;
+            case 'complete':
+              if (data.projectId && data.projectId !== projectId) {
+                setProjectId(data.projectId);
+                localProjectId = data.projectId;
+              }
+              setGenerationProgress(100);
+              break;
+            case 'html':
+              setGeneratedCode({ html: data.content, css: null, js: null });
+              setCurrentCode(data.content);
+              break;
+            case 'html_chunk':
+              accumulatedHtml += data.content;
+              if (data.isLast) {
+                setGeneratedCode({ html: accumulatedHtml, css: null, js: null });
+                setCurrentCode(accumulatedHtml);
+              }
+              break;
+            case 'error':
+              toast.error(data.message || 'Generation error');
+              setValidation({
+                validationPassed: false,
+                validationScore: data.validationScore ?? 0,
+                errors: data.errors ?? [],
+                warnings: [],
+                passed: false,
+              });
+              break;
+            default:
+              // ignore unknown
+              break;
+          }
+        } catch (parseError) {
+          console.error('❌ Parse error:', parseError);
+        }
+      }
+    }
+
+    // Handle any remaining data in buffer
+    if (buffer.trim().startsWith('data: ')) {
+      try {
+        const jsonStr = buffer.slice(6).trim();
+        const data = JSON.parse(jsonStr);
+        if (data.type === 'html') {
+          setGeneratedCode({ html: data.content, css: null, js: null });
+          setCurrentCode(data.content);
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Generation error:', error);
+    toast.error('Failed to generate. Please try again.');
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  } finally {
+    setIsGenerating(false);
+    setGenerationProgress(0);
+  }
+};
   
   // ============================================================================
   // MESSAGE HANDLING
