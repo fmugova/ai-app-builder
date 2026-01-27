@@ -104,8 +104,8 @@ export default function CodePreviewModal({
         {/* Content */}
         <div className="flex-1 overflow-hidden">
           {showCode ? (
-            <div className="h-full overflow-auto p-4 bg-gray-900">
-              <pre className="text-sm text-green-400 font-mono">
+            <div className="h-full max-h-[400px] overflow-auto p-4 bg-gray-900 rounded-b-xl">
+              <pre className="text-sm text-green-400 font-mono whitespace-pre-wrap">
                 <code>{code}</code>
               </pre>
             </div>

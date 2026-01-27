@@ -16,38 +16,40 @@ const settingsSchema = z.object({
   autoSave: z.boolean().optional(),
 });
 
+import type { Session } from 'next-auth';
+import type { Prisma } from '@prisma/client';
+
+async function getUserFromSession(
+  session: Session | null,
+  select?: Prisma.UserSelect
+) {
+  if (!session?.user?.email) return null;
+  return prisma.user.findUnique({ where: { email: session.user.email }, ...(select ? { select } : {}) });
+}
+
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        theme: true,
-        notifications: true,
-        autoSave: true,
-        subscriptionTier: true,
-        subscriptionStatus: true,
-        generationsUsed: true,
-        generationsLimit: true,
-        projectsThisMonth: true,
-        projectsLimit: true,
-        githubUsername: true,
-        createdAt: true,
-      }
-    });
-
+    const select = {
+      id: true,
+      name: true,
+      email: true,
+      theme: true,
+      notifications: true,
+      autoSave: true,
+      subscriptionTier: true,
+      subscriptionStatus: true,
+      generationsUsed: true,
+      generationsLimit: true,
+      projectsThisMonth: true,
+      projectsLimit: true,
+      githubUsername: true,
+      createdAt: true,
+    };
+    const user = await getUserFromSession(session, select);
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
-
     return NextResponse.json(user);
   } catch (error) {
     console.error('Settings GET error:', error);
@@ -61,22 +63,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const body = await req.json();
-    const validatedData = settingsSchema.parse(body);
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    });
-
+    const user = await getUserFromSession(session);
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
-
+    const body = await req.json();
+    const validatedData = settingsSchema.parse(body);
     // Update user settings
     const updatedUser = await prisma.user.update({
       where: { id: user.id },
@@ -90,21 +82,18 @@ export async function POST(req: NextRequest) {
         autoSave: true,
       }
     });
-
     return NextResponse.json({
       success: true,
       user: updatedUser
     });
   } catch (error) {
     console.error('Settings POST error:', error);
-    
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: 'Invalid data', details: error.issues },
         { status: 400 }
       );
     }
-
     return NextResponse.json(
       { error: 'Failed to update settings' },
       { status: 500 }

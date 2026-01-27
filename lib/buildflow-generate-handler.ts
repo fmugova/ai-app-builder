@@ -26,6 +26,10 @@ export const generateWebApp = async (systemPrompt: string, prompt: string) => {
         .join('')
     : response.content;
 
+  // Log raw content before parsing
+  console.log('🔍 Raw content (first 500 chars):', textContent.substring(0, 500));
+  console.log('🔍 Raw content (last 500 chars):', textContent.substring(textContent.length - 500));
+
   // Parse and validate
   const { html, css, javascript: js } = parseGeneratedCode(textContent);
 

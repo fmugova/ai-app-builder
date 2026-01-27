@@ -6,24 +6,23 @@ import { prisma } from '@/lib/prisma'
 export const dynamic = 'force-dynamic'
 
 // POST - Add custom domain
+import type { Session } from 'next-auth'
+
+async function getUserFromSession(session: Session | null) {
+  if (!session?.user?.email) return null;
+  return prisma.user.findUnique({ where: { email: session.user.email } });
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    })
-
+    const user = await getUserFromSession(session)
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
-
     const { id: projectId } = await params
     const { domain } = await request.json()
 
@@ -148,20 +147,11 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    })
-
+    const user = await getUserFromSession(session)
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
-
     const { id: projectId } = await params
-
     // Verify user owns this project
     const project = await prisma.project.findFirst({
       where: {
@@ -169,19 +159,15 @@ export async function GET(
         ...(user.role !== 'admin' && { userId: user.id })
       }
     })
-
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
-
     // Get all domains for this project
     const domains = await prisma.customDomain.findMany({
       where: { projectId },
       orderBy: { createdAt: 'desc' }
     })
-
     return NextResponse.json({ domains })
-
   } catch (error) {
     console.error('Get domains error:', error)
     return NextResponse.json(

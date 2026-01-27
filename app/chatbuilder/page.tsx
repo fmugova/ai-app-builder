@@ -1,49 +1,24 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-// Unique message ID generator to avoid duplicate keys
-let messageCounter = 0;
-const generateMessageId = () => {
-  return `${Date.now()}-${++messageCounter}`;
-};
 import { toast, Toaster } from 'react-hot-toast'
-import { useGenerateStream } from '@/hooks/useGenerateStream'
-import { GenerationProgress } from '@/components/GenerationProgress'
-import CodePreviewModal from '@/components/CodePreviewModal'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { templates, getTemplatesByCategory } from '@/lib/templates'
 import dynamic from 'next/dynamic'
 import PromptAssistant from '@/components/PromptAssistant'
+import PreviewFrame from '@/components/PreviewFrame'
 import { HelpCircle } from 'lucide-react'
-import { useAutoSave, useKeyboardShortcuts, downloadAsHTML } from '@/lib/chatbuilder-hooks'
-
-// MessageTimestamp component for displaying formatted timestamps
-function MessageTimestamp({ timestamp }: { timestamp: Date }) {
-  const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSec = Math.floor(diffMs / 1000);
-  let display = '';
-  if (diffSec < 60) {
-    display = `${diffSec}s ago`;
-  } else if (diffSec < 3600) {
-    display = `${Math.floor(diffSec / 60)}m ago`;
-  } else if (diffSec < 86400) {
-    display = `${Math.floor(diffSec / 3600)}h ago`;
-  } else {
-    display = date.toLocaleDateString();
-  }
-  return (
-    <span className="block text-xs text-gray-400 mt-1 text-right">{display}</span>
-  );
-}
 
 // Lazy load heavy components
 const PromptGuide = dynamic(() => import('@/components/PromptGuide'), {
   loading: () => null,
   ssr: false
 })
+
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
 
 interface Message {
   id: string
@@ -52,10 +27,73 @@ interface Message {
   timestamp: Date
 }
 
+interface ValidationMessage {
+  message: string
+  line?: number
+  column?: number
+  type?: 'syntax' | 'structure' | 'completeness'
+}
+
+interface ValidationResult {
+  validationPassed: boolean
+  validationScore: number
+  errors: ValidationMessage[]
+  warnings: ValidationMessage[]
+  passed: boolean
+}
+
+interface GenerateResult {
+  success: boolean
+  error?: string
+}
+
+interface GeneratedCode {
+  html: string | null
+  css: string | null
+  js: string | null
+}
+
+// ============================================================================
+// HELPER COMPONENTS
+// ============================================================================
+
+function MessageTimestamp({ timestamp }: { timestamp: Date }) {
+  const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffSec = Math.floor(diffMs / 1000)
+  
+  let display = ''
+  if (diffSec < 60) {
+    display = `${diffSec}s ago`
+  } else if (diffSec < 3600) {
+    display = `${Math.floor(diffSec / 60)}m ago`
+  } else if (diffSec < 86400) {
+    display = `${Math.floor(diffSec / 3600)}h ago`
+  } else {
+    display = date.toLocaleDateString()
+  }
+  
+  return (
+    <span className="block text-xs text-gray-400 mt-1 text-right">{display}</span>
+  )
+}
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
 export default function ChatBuilder() {
   const router = useRouter()
-  const { data: session } = useSession()
+  useSession()
   
+  // Message ID generator
+  let messageCounter = 0
+  const generateMessageId = () => {
+    return `${Date.now()}-${++messageCounter}`
+  }
+  
+  // State
   const [prompt, setPrompt] = useState('')
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<Message[]>([])
@@ -73,87 +111,46 @@ export default function ChatBuilder() {
   const [isSaving, setIsSaving] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
-
+  
+  // State for validation
+  const [generatedCode, setGeneratedCode] = useState<GeneratedCode>({ 
+    html: null, 
+    css: null, 
+    js: null 
+  })
+  const [validation, setValidation] = useState<ValidationResult | null>(null)
+  
+  // ✅ NEW: Progress tracking
+  const [generationProgress, setGenerationProgress] = useState(0)
+  const [isGenerating, setIsGenerating] = useState(false)
+  
+  // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-  const {
-    isGenerating,
-    status,
-    progress,
-    estimate,
-    elapsed,
-    error,
-    generatedCode,
-    projectId: newProjectId,
-    stats,
-    generate,
-    reset,
-  } = useGenerateStream()
-
+  
+  // ============================================================================
+  // EFFECTS
+  // ============================================================================
+  
   // Load project or page from URL parameter
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
-    const projectId = urlParams.get('project')
+    const projectIdParam = urlParams.get('project')
     const pageId = urlParams.get('page')
-    if (projectId && pageId) {
-      loadPage(projectId, pageId)
-    } else if (projectId) {
-      loadProject(projectId)
+    
+    if (projectIdParam && pageId) {
+      loadPage(projectIdParam, pageId)
+    } else if (projectIdParam) {
+      loadProject(projectIdParam)
     }
   }, [])
-
-  const loadPage = async (projectId: string, pageId: string) => {
-    try {
-      const res = await fetch(`/api/projects/${projectId}/pages/${pageId}`)
-      const data = await res.json()
-      if (data.content) {
-        setProjectId(projectId)
-        setProjectName(data.title || 'Untitled Page')
-        setCurrentCode(data.content)
-        const loadMessage: Message = {
-          id: generateMessageId(),
-          role: 'system',
-          content: `✅ Loaded page: ${data.title || 'Untitled Page'}. Ready to iterate!`,
-          timestamp: new Date()
-        }
-        setMessages(prev => [...prev, loadMessage])
-      }
-    } catch (err) {
-      console.error('Failed to load page:', err)
-      toast.error('Failed to load page')
-    }
-  }
-
-  const loadProject = async (projectId: string) => {
-    try {
-      const res = await fetch(`/api/projects/${projectId}`)
-      const data = await res.json()
-
-      if (data.project && data.project.code) {
-        setProjectId(projectId)
-        setProjectName(data.project.name || 'Untitled Project')
-        setCurrentCode(data.project.code)
-
-        const loadMessage: Message = {
-          id: generateMessageId(),
-          role: 'system',
-          content: `✅ Loaded: ${data.project.name}. Ready to iterate!`,
-          timestamp: new Date()
-        }
-        setMessages(prev => [...prev, loadMessage])
-      }
-    } catch (err) {
-      console.error('Failed to load project:', err)
-      toast.error('Failed to load project')
-    }
-  }
-
+  
+  // Auto-scroll messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
-
+  
   // Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
@@ -161,129 +158,276 @@ export default function ChatBuilder() {
       textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px'
     }
   }, [input])
+  
+  // ============================================================================
+  // FIXED PROJECT LOADING - Add to your ChatBuilder page.tsx
+  // ============================================================================
 
-  // Get all categories from templates
-  const categories = ['all', ...Array.from(new Set(templates.map(t => t.category)))];
-
-  // Get filtered templates
-  const filteredTemplates = selectedCategory === 'all' 
-    ? templates 
-    : getTemplatesByCategory(selectedCategory);
-
-  // Helper: Detect and fetch URLs from input
-  async function detectAndFetchUrls(text: string): Promise<string> {
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    text.match(urlRegex); // Reserved for future URL processing
-    return text;
-  }
-
-  const handleGenerate = async () => {
-    if (!prompt.trim()) {
-      toast.error('Please enter a prompt')
-      return
-    }
-
-    const result = await generate(prompt, {
-      type: 'landing-page',
-      projectId,
-    })
-
-    if (result.success) {
-      if (result.fromCache) {
-        toast.success('Retrieved from cache instantly!')
+  const loadProject = async (id: string) => {
+    try {
+      console.log('🔍 Loading project:', id);
+      
+      const response = await fetch(`/api/projects/${id}`)
+      const data = await response.json();
+      
+      console.log('📦 Project data received:', {
+        id: data.id,
+        name: data.name,
+        codeLength: data.code?.length || 0,
+        htmlLength: data.html?.length || 0,
+        htmlCodeLength: data.htmlCode?.length || 0
+      });
+      
+      if (response.ok) {
+        setProjectId(data.id);
+        setProjectName(data.name);
+        
+        // ✅ FIX: Try multiple fields to find the code
+        const code = data.code || data.html || data.htmlCode || '';
+        
+        if (!code) {
+          console.error('❌ No code found in project!');
+          toast.error('Project has no code');
+          return;
+        }
+        
+        console.log('✅ Setting code:', code.length, 'chars');
+        
+        // ✅ FIX: Set BOTH states
+        setCurrentCode(code);
+        setGeneratedCode({ html: code, css: null, js: null });
+        
+        toast.success('Project loaded!');
       } else {
-        toast.success(`Generated in ${stats?.generationTime}s!`)
+        throw new Error(data.error || 'Failed to load project');
       }
-      if (result.projectId) {
-        setProjectId(result.projectId)
-      }
-      if (result.code) {
-        setCurrentCode(result.code)
-      }
-    } else {
-      toast.error(result.error || 'Generation failed')
+    } catch (error) {
+      console.error('❌ Load error:', error);
+      toast.error('Failed to load project');
     }
   }
-
-  const handleRegenerate = async (customPrompt?: string) => {
+  
+  const loadPage = async (projectId: string, pageId: string) => {
+    try {
+      console.log('🔍 Loading page:', pageId, 'from project:', projectId);
+      
+      const response = await fetch(`/api/projects/${projectId}/pages/${pageId}`)
+      const data = await response.json();
+      
+      console.log('📦 Page data received:', {
+        id: data.id,
+        name: data.name,
+        codeLength: data.code?.length || 0
+      });
+      
+      if (response.ok) {
+        setProjectId(projectId);
+        setProjectName(data.name);
+        
+        const code = data.code || '';
+        
+        if (!code) {
+          console.error('❌ No code found in page!');
+          toast.error('Page has no code');
+          return;
+        }
+        
+        console.log('✅ Setting code:', code.length, 'chars');
+        
+        // ✅ FIX: Set BOTH states
+        setCurrentCode(code);
+        setGeneratedCode({ html: code, css: null, js: null });
+        
+        toast.success('Page loaded!');
+      } else {
+        throw new Error(data.error || 'Failed to load page');
+      }
+    } catch (error) {
+      console.error('❌ Load error:', error);
+      toast.error('Failed to load page');
+    }
+  }
+  
+  // ============================================================================
+  // CODE GENERATION (UPDATED - AUTO PROJECT HANDLING)
+  // ============================================================================
+  
+  const handleGenerate = async (customPrompt?: string): Promise<GenerateResult> => {
     const promptToUse = customPrompt || prompt
     
+    if (!promptToUse.trim()) {
+      toast.error('Please enter a prompt')
+      return { success: false, error: 'No prompt provided' }
+    }
+    
+    setLoading(true)
+    setIsGenerating(true)  // ✅ ADD THIS
+    setGenerationProgress(0)  // ✅ ADD THIS
+    setGeneratedCode({ html: null, css: null, js: null })
+    setValidation(null)
+    
     try {
-      const result = await generate(promptToUse, {
-        type: 'landing-page',
-        projectId,
+      const response = await fetch('/api/chatbot/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: promptToUse,
+          projectId, // Send existing projectId if available
+          includeAuth,
+          authProvider 
+        }),
       })
-      if (result.success) {
-        toast.success('Project generated!')
-        if (result.code) {
-          setCurrentCode(result.code)
-        }
-        if (result.projectId && !projectId) {
-          setProjectId(result.projectId)
-        }
-      } else {
-        // Fix: Always add Message object, not string
-        const errorContent = result.error || 'Generation failed';
-        const errorMessage: Message = {
-          id: generateMessageId(),
-          role: 'assistant',
-          content: errorContent,
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, errorMessage]);
-        throw new Error(errorContent);
+      
+      if (!response.body) {
+        throw new Error('No response body')
       }
-      return result;
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Generation failed';
-      toast.error(errorMsg || 'Generation failed');
-      // Fix: Always add Message object, not string
-      const errorMessage: Message = {
-        id: generateMessageId(),
-        role: 'assistant',
-        content: errorMsg || 'Generation failed',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessage]);
-      throw error;
+      
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let hasError = false
+      let errorMessage = ''
+      let accumulatedHtml = ''
+      let isComplete = false
+      let completionData: Partial<{ validation: ValidationResult; projectId?: string }> | null = null
+      
+      // Process all messages from stream
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n')
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const jsonStr = line.slice(6)
+              if (!jsonStr.trim()) continue
+              
+              let data
+              try {
+                data = JSON.parse(jsonStr)
+              } catch (parseError) {
+                console.warn('Parse error (skipping):', jsonStr.substring(0, 50))
+                continue
+              }
+              
+              if (data.type === 'progress') {
+                console.log('Progress:', data.length)
+                // ✅ NEW: Update progress bar
+                const progress = Math.min(95, (data.length / 35000) * 100)
+                setGenerationProgress(progress)
+              } 
+              else if (data.type === 'html') {
+                // HTML arrived - store it
+                accumulatedHtml = data.content
+                console.log('Received HTML:', accumulatedHtml.length, 'chars')
+              }
+              else if (data.type === 'projectCreated') {
+                // ✅ NEW: Server created project automatically
+                console.log('📦 Project created:', data.projectId)
+                setProjectId(data.projectId)
+              }
+              else if (data.type === 'complete') {
+                // Mark as complete but don't process yet
+                isComplete = true
+                completionData = data
+                console.log('Generation complete')
+
+                // ✅ Update projectId if server sent it
+                if (data.projectId && data.projectId !== projectId) {
+                  console.log('📦 Updating projectId:', data.projectId)
+                  setProjectId(data.projectId)
+                }
+              } 
+              else if (data.type === 'error') {
+                hasError = true
+                errorMessage = data.message
+                toast.error(data.message)
+                
+                if (data.errors && data.validationScore !== undefined) {
+                  setValidation({
+                    validationPassed: false,
+                    validationScore: data.validationScore,
+                    errors: data.errors,
+                    warnings: [],
+                    passed: false
+                  })
+                }
+              }
+            } catch (parseError) {
+              console.warn('SSE parse error (skipping):', parseError)
+            }
+          }
+        }
+      }
+      
+      // Process after stream ends - no race condition!
+      if (hasError) {
+        return { success: false, error: errorMessage }
+      }
+      
+      if (isComplete && accumulatedHtml) {
+        // Set BOTH generatedCode AND currentCode
+        setGeneratedCode({
+          html: accumulatedHtml,
+          css: null,
+          js: null,
+        })
+        setCurrentCode(accumulatedHtml) // ✅ This makes buttons appear!
+        
+        // Set validation if provided
+        if (completionData?.validation) {
+          setValidation({
+            validationPassed: completionData.validation.passed,
+            validationScore: completionData.validation.validationScore,
+            errors: [],
+            warnings: [],
+            passed: completionData.validation.passed
+          })
+        }
+        
+        return { success: true }
+      }
+      
+      throw new Error('Generation completed but no HTML received')
+
+    } catch (error: unknown) {
+      const errorMsg = error instanceof Error ? error.message : 'Generation failed'
+      toast.error(errorMsg)
+      return { success: false, error: errorMsg }
+    } finally {
+      setLoading(false)
+      setIsGenerating(false)  // ✅ ADD THIS
     }
   }
-
+  
+  // ============================================================================
+  // MESSAGE HANDLING
+  // ============================================================================
+  
   const handleSend = async () => {
     if ((!input.trim() && uploadedFiles.length === 0) || loading) return
-
-    // Detect and fetch URLs if present
-
-    let enhancedInput = input
-    if (input.includes('http')) {
-      const urlMessage: Message = {
-        id: generateMessageId(),
-        role: 'system',
-        content: '🔍 Detected URL in your message. Fetching content...',
-        timestamp: new Date()
-      }
-      setMessages(prev => [...prev, urlMessage])
-      enhancedInput = await detectAndFetchUrls(input)
-    }
-
+    
     const userMessage: Message = {
       id: generateMessageId(),
       role: 'user',
       content: input || `[Uploaded ${uploadedFiles.length} file(s)]`,
       timestamp: new Date()
     }
-
+    
     setMessages(prev => [...prev, userMessage])
+    const userInput = input
     setInput('')
     setLoading(true)
-
+    
     try {
       const isIteration = currentCode !== null
-
+      
       if (isIteration) {
-        // ITERATION (using existing /api/chat/iterate)
+        // ITERATION MODE - modify existing code
         const formData = new FormData()
-        formData.append('message', enhancedInput)
+        formData.append('message', userInput)
         formData.append('currentCode', currentCode)
         formData.append('projectId', projectId || '')
         formData.append('conversationHistory', JSON.stringify(messages.slice(-5)))
@@ -291,69 +435,57 @@ export default function ChatBuilder() {
         uploadedFiles.forEach(file => {
           formData.append('files', file)
         })
-
+        
         const response = await fetch('/api/chat/iterate', {
           method: 'POST',
           body: formData
         })
-
+        
         const data = await response.json()
-
+        
         if (response.ok) {
           const assistantMessage: Message = {
             id: generateMessageId(),
             role: 'assistant',
             content: uploadedFiles.length > 0 
-              ? 'I analyzed your files and fixed the issues. Check the preview!' 
+              ? 'I analyzed your files and updated the code. Check the preview!' 
               : 'Updated! Check the preview on the right.',
             timestamp: new Date()
           }
-
+          
           setMessages(prev => [...prev, assistantMessage])
           setCurrentCode(data.code)
+          setGeneratedCode({ html: data.code, css: null, js: null })
           setUploadedFiles([])
         } else {
           throw new Error(data.error || 'Failed to iterate')
         }
       } else {
-        // INITIAL GENERATION
-        try {
-          const result = await handleRegenerate(enhancedInput)
-          
-          if (!result.success) {
-            throw new Error(result.error || 'Generation failed')
-          }
-          
-          const assistantMessage: Message = {
-            id: generateMessageId(),
-            role: 'assistant',
-            content: "Great! I've created your site. You can see it in the preview. Want me to make any changes?",
-            timestamp: new Date()
-          }
-          setMessages(prev => [...prev, assistantMessage])
-          
-          // Set default project name from prompt
-          if (!projectName) {
-            setProjectName(input.slice(0, 50) || 'New Project')
-          }
-        } catch (genError) {
-          const genErrorMsg = genError instanceof Error ? genError.message : 'Generation failed'
-          throw new Error(`Failed to generate: ${genErrorMsg}`)
+        // INITIAL GENERATION MODE
+        const result = await handleGenerate(userInput)
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Generation failed')
+        }
+        
+        const assistantMessage: Message = {
+          id: generateMessageId(),
+          role: 'assistant',
+          content: "Great! I've created your site. You can see it in the preview. Want me to make any changes?",
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, assistantMessage])
+        
+        // Set default project name from prompt
+        if (!projectName) {
+          setProjectName(userInput.slice(0, 50) || 'New Project')
         }
       }
     } catch (error: unknown) {
       const errorMessage: Message = {
         id: generateMessageId(),
         role: 'assistant',
-        content: `Sorry, something went wrong: ${error instanceof Error ? error.message : 'Unknown error'}. 
-
-${error instanceof Error && error.message.includes('truncated') 
-  ? `💡 **Tip:** Your request might be too complex. Try:
-  • Breaking it into smaller parts
-  • Simplifying the design
-  • Removing some features
-  • Being more specific about what you want` 
-  : 'Please try again or rephrase your request.'}`,
+        content: `Sorry, something went wrong: ${error instanceof Error ? error.message : 'Unknown error'}`,
         timestamp: new Date()
       }
       setMessages(prev => [...prev, errorMessage])
@@ -362,7 +494,11 @@ ${error instanceof Error && error.message.includes('truncated')
       setLoading(false)
     }
   }
-
+  
+  // ============================================================================
+  // FILE & TEMPLATE HANDLING
+  // ============================================================================
+  
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const filesArray = Array.from(e.target.files)
@@ -377,10 +513,11 @@ ${error instanceof Error && error.message.includes('truncated')
       setMessages(prev => [...prev, fileMessage])
     }
   }
-
+  
   const handleTemplateSelect = (template: typeof templates[0]) => {
     setPrompt(template.description)
     setCurrentCode(template.code)
+    setGeneratedCode({ html: template.code, css: null, js: null })
     setProjectName(`${template.name} Project`)
     setShowTemplates(false)
     
@@ -393,18 +530,43 @@ ${error instanceof Error && error.message.includes('truncated')
     setMessages(prev => [...prev, templateMessage])
     toast.success(`Template "${template.name}" loaded!`)
   }
-
+  
+  // ============================================================================
+  // PROJECT ACTIONS
+  // ============================================================================
+  
+  const sanitizeCode = (code: string) => {
+    if (!code) return code
+    let clean = code
+    
+    // Remove BuildFlow navigation
+    clean = clean.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
+    clean = clean.replace(/<header[^>]*class="[^"]*buildflow[^"]*"[^>]*>[\s\S]*?<\/header>/gi, '')
+    
+    // Remove menu items
+    const menuItems = ['Dashboard', 'Analytics', 'Submissions', 'Download', 'GitHub', 'Vercel']
+    menuItems.forEach(item => {
+      const pattern = new RegExp(`<[^>]*>\\s*[📊📈📋📥🐙▲]?\\s*${item}\\s*<\\/[^>]*>`, 'gi')
+      clean = clean.replace(pattern, '')
+    })
+    
+    // Remove feedback buttons
+    clean = clean.replace(/<[^>]*feedback[^>]*>[\s\S]*?<\/[^>]*>/gi, '')
+    
+    return clean
+  }
+  
   const handleSaveProject = async () => {
     if (!currentCode || !projectName.trim()) {
       toast.error('Please generate code and provide a project name')
       return
     }
-
+    
     setIsSaving(true)
     try {
       const url = projectId ? `/api/projects/${projectId}` : '/api/projects'
       const method = projectId ? 'PUT' : 'POST'
-
+      
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -415,9 +577,9 @@ ${error instanceof Error && error.message.includes('truncated')
           description: prompt.slice(0, 200)
         })
       })
-
+      
       const data = await response.json()
-
+      
       if (response.ok) {
         if (!projectId) {
           setProjectId(data.id)
@@ -433,13 +595,13 @@ ${error instanceof Error && error.message.includes('truncated')
       setIsSaving(false)
     }
   }
-
+  
   const handleDownload = () => {
     if (!currentCode) {
       toast.error('No code to download')
       return
     }
-
+    
     const sanitized = sanitizeCode(currentCode)
     const blob = new Blob([sanitized], { type: 'text/html' })
     const url = URL.createObjectURL(blob)
@@ -452,13 +614,13 @@ ${error instanceof Error && error.message.includes('truncated')
     URL.revokeObjectURL(url)
     toast.success('Downloaded!')
   }
-
+  
   const handlePublish = async () => {
     if (!currentCode || !projectId) {
       toast.error('Please save your project first')
       return
     }
-
+    
     setIsPublishing(true)
     try {
       const response = await fetch(`/api/projects/${projectId}/publish`, {
@@ -466,9 +628,9 @@ ${error instanceof Error && error.message.includes('truncated')
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: sanitizeCode(currentCode) })
       })
-
+      
       const data = await response.json()
-
+      
       if (response.ok) {
         toast.success('Published successfully!')
         if (data.url) {
@@ -484,7 +646,7 @@ ${error instanceof Error && error.message.includes('truncated')
       setIsPublishing(false)
     }
   }
-
+  
   const handleGitHub = () => {
     if (!projectId) {
       toast.error('Please save your project first')
@@ -492,7 +654,7 @@ ${error instanceof Error && error.message.includes('truncated')
     }
     router.push(`/projects/${projectId}/github`)
   }
-
+  
   const handleVercel = () => {
     if (!projectId) {
       toast.error('Please save your project first')
@@ -500,32 +662,24 @@ ${error instanceof Error && error.message.includes('truncated')
     }
     router.push(`/projects/${projectId}/deploy`)
   }
-
-  // Helper: sanitize generated code before saving/updating
-  const sanitizeCode = (code: string) => {
-    if (!code) return code
-    let clean = code
-    
-    // Remove BuildFlow navigation that got captured
-    clean = clean.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
-    clean = clean.replace(/<header[^>]*class="[^"]*buildflow[^"]*"[^>]*>[\s\S]*?<\/header>/gi, '')
-    
-    // Remove these specific menu items that are appearing
-    const menuItems = ['Dashboard', 'Analytics', 'Submissions', 'Download', 'GitHub', 'Vercel']
-    menuItems.forEach(item => {
-      // Only remove if it's in a list/menu context (has emoji or is in a nav structure)
-      const pattern = new RegExp(`<[^>]*>\\s*[📊📈📋📥🐙▲]?\\s*${item}\\s*<\\/[^>]*>`, 'gi')
-      clean = clean.replace(pattern, '')
-    })
-    
-    // Remove feedback buttons
-    clean = clean.replace(/<[^>]*feedback[^>]*>[\s\S]*?<\/[^>]*>/gi, '')
-    
-    return clean
-  }
-
+  
+  // ============================================================================
+  // TEMPLATE HELPERS
+  // ============================================================================
+  
+  const categories = ['all', ...Array.from(new Set(templates.map(t => t.category)))]
+  const filteredTemplates = selectedCategory === 'all' 
+    ? templates 
+    : getTemplatesByCategory(selectedCategory)
+  
+  // ============================================================================
+  // RENDER
+  // ============================================================================
+  
   return (
     <div className="flex flex-col h-screen bg-gray-50">
+      <Toaster position="top-right" />
+      
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-50">
         <div className="flex items-center justify-between">
@@ -555,6 +709,7 @@ ${error instanceof Error && error.message.includes('truncated')
               📋 Templates
             </button>
             
+            {/* ✅ FIX: Show buttons when currentCode exists */}
             {currentCode && (
               <>
                 <button
@@ -572,28 +727,26 @@ ${error instanceof Error && error.message.includes('truncated')
                 >
                   💾 Download
                 </button>
+                <button
+                  onClick={handleGitHub}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+                >
+                  🐙 GitHub
+                </button>
+                <button
+                  onClick={handleVercel}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+                >
+                  ▲ Vercel
+                </button>
                 {projectId && (
-                  <>
-                    <button
-                      onClick={handleGitHub}
-                      className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
-                    >
-                      🐙 GitHub
-                    </button>
-                    <button
-                      onClick={handleVercel}
-                      className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
-                    >
-                      ▲ Vercel
-                    </button>
-                    <button
-                      onClick={handlePublish}
-                      disabled={isPublishing}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
-                    >
-                      {isPublishing ? 'Publishing...' : '🚀 Publish'}
-                    </button>
-                  </>
+                  <button
+                    onClick={handlePublish}
+                    disabled={isPublishing}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+                  >
+                    {isPublishing ? 'Publishing...' : '🚀 Publish'}
+                  </button>
                 )}
                 <button
                   onClick={handleSaveProject}
@@ -615,7 +768,7 @@ ${error instanceof Error && error.message.includes('truncated')
               <span className="hidden xl:inline">Help</span>
             </button>
           </div>
-
+          
           {/* Mobile Menu Button */}
           <button
             onClick={() => setShowMobileMenu(!showMobileMenu)}
@@ -630,8 +783,24 @@ ${error instanceof Error && error.message.includes('truncated')
             </svg>
           </button>
         </div>
-
-        {/* Mobile Menu Dropdown */}
+        
+        {/* ✅ NEW: Progress Bar */}
+        {isGenerating && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-sm mb-2">
+              <span className="text-gray-600">Generating your website...</span>
+              <span className="text-purple-600 font-medium">{Math.round(generationProgress)}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+              <div
+                className="h-2 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${generationProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
+        
+        {/* Mobile Menu Dropdown - same as before but with currentCode check */}
         {showMobileMenu && (
           <div className="lg:hidden mt-4 pt-4 border-t border-gray-200 space-y-2">
             <input
@@ -642,7 +811,7 @@ ${error instanceof Error && error.message.includes('truncated')
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 mb-3"
             />
             <button
-              onClick={() => { setShowTemplates(!showTemplates); setShowMobileMenu(false); }}
+              onClick={() => { setShowTemplates(!showTemplates); setShowMobileMenu(false) }}
               className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium text-left"
             >
               📋 Templates
@@ -660,36 +829,34 @@ ${error instanceof Error && error.message.includes('truncated')
                   📋 Copy Code
                 </button>
                 <button
-                  onClick={() => { handleDownload(); setShowMobileMenu(false); }}
+                  onClick={() => { handleDownload(); setShowMobileMenu(false) }}
                   className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium text-left"
                 >
                   💾 Download
                 </button>
+                <button
+                  onClick={() => { handleGitHub(); setShowMobileMenu(false) }}
+                  className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium text-left"
+                >
+                  🐙 Export to GitHub
+                </button>
+                <button
+                  onClick={() => { handleVercel(); setShowMobileMenu(false) }}
+                  className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium text-left"
+                >
+                  ▲ Deploy to Vercel
+                </button>
                 {projectId && (
-                  <>
-                    <button
-                      onClick={() => { handleGitHub(); setShowMobileMenu(false); }}
-                      className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium text-left"
-                    >
-                      🐙 Export to GitHub
-                    </button>
-                    <button
-                      onClick={() => { handleVercel(); setShowMobileMenu(false); }}
-                      className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium text-left"
-                    >
-                      ▲ Deploy to Vercel
-                    </button>
-                    <button
-                      onClick={() => { handlePublish(); setShowMobileMenu(false); }}
-                      disabled={isPublishing}
-                      className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium text-left"
-                    >
-                      {isPublishing ? 'Publishing...' : '🚀 Publish Live'}
-                    </button>
-                  </>
+                  <button
+                    onClick={() => { handlePublish(); setShowMobileMenu(false) }}
+                    disabled={isPublishing}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium text-left"
+                  >
+                    {isPublishing ? 'Publishing...' : '🚀 Publish Live'}
+                  </button>
                 )}
                 <button
-                  onClick={() => { handleSaveProject(); setShowMobileMenu(false); }}
+                  onClick={() => { handleSaveProject(); setShowMobileMenu(false) }}
                   disabled={isSaving}
                   className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 text-sm font-medium text-left"
                 >
@@ -698,14 +865,14 @@ ${error instanceof Error && error.message.includes('truncated')
               </>
             )}
             <button
-              onClick={() => { setShowAssistant(true); setShowMobileMenu(false); }}
+              onClick={() => { setShowAssistant(true); setShowMobileMenu(false) }}
               className="w-full px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 text-sm font-medium text-left"
             >
               💡 Help & Prompt Guide
             </button>
           </div>
         )}
-
+        
         {/* Templates Panel */}
         {showTemplates && (
           <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
@@ -718,7 +885,7 @@ ${error instanceof Error && error.message.includes('truncated')
                 ✕
               </button>
             </div>
-
+            
             {/* Category Filter */}
             <div className="flex gap-2 mb-4 overflow-x-auto">
               {categories.map((cat) => (
@@ -735,7 +902,7 @@ ${error instanceof Error && error.message.includes('truncated')
                 </button>
               ))}
             </div>
-
+            
             {/* Templates Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
               {filteredTemplates.map((template) => (
@@ -768,7 +935,7 @@ ${error instanceof Error && error.message.includes('truncated')
             </div>
           </div>
         )}
-
+        
         {/* Auth Options */}
         <div className="mt-4 flex items-center gap-4">
           <label className="flex items-center gap-2">
@@ -794,7 +961,7 @@ ${error instanceof Error && error.message.includes('truncated')
           )}
         </div>
       </header>
-
+      
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left: Chat Panel */}
@@ -824,7 +991,7 @@ ${error instanceof Error && error.message.includes('truncated')
                 </div>
               </div>
             )}
-
+            
             {messages.map((msg) => (
               <div
                 key={msg.id}
@@ -844,7 +1011,7 @@ ${error instanceof Error && error.message.includes('truncated')
                 </div>
               </div>
             ))}
-
+            
             {loading && (
               <div className="flex justify-start">
                 <div className="bg-gray-100 border border-gray-200 rounded-lg p-4">
@@ -862,10 +1029,10 @@ ${error instanceof Error && error.message.includes('truncated')
                 </div>
               </div>
             )}
-
+            
             <div ref={messagesEndRef} />
           </div>
-
+          
           {/* Input Area */}
           <div className="border-t border-gray-200 p-4 bg-white">
             {uploadedFiles.length > 0 && (
@@ -886,7 +1053,7 @@ ${error instanceof Error && error.message.includes('truncated')
                 ))}
               </div>
             )}
-
+            
             <div className="flex gap-2">
               <textarea
                 ref={textareaRef}
@@ -911,7 +1078,7 @@ ${error instanceof Error && error.message.includes('truncated')
                 {loading ? '...' : '→'}
               </button>
             </div>
-
+            
             <input
               ref={fileInputRef}
               type="file"
@@ -920,7 +1087,7 @@ ${error instanceof Error && error.message.includes('truncated')
               className="hidden"
               accept=".pdf,.doc,.docx,.txt,.md,.png,.jpg,.jpeg"
             />
-
+            
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={loading}
@@ -930,7 +1097,7 @@ ${error instanceof Error && error.message.includes('truncated')
             </button>
           </div>
         </div>
-
+        
         {/* Right: Preview Panel */}
         <div className="w-1/2 bg-gray-50 flex flex-col">
           <div className="p-4 bg-white border-b border-gray-200 flex items-center justify-between">
@@ -942,15 +1109,16 @@ ${error instanceof Error && error.message.includes('truncated')
               {showPreview ? '🙈 Hide' : '👁️ Show'}
             </button>
           </div>
-
+          
           <div className="flex-1 p-6 overflow-hidden">
-            {currentCode && showPreview ? (
+            {generatedCode.html && showPreview ? (
               <div className="w-full h-full bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                <iframe
-                  srcDoc={sanitizeCode(currentCode)}
-                  className="w-full h-full"
-                  title="Preview"
-                  sandbox="allow-scripts allow-same-origin allow-forms"
+                <PreviewFrame
+                  html={generatedCode.html}
+                  css={generatedCode.css}
+                  js={generatedCode.js}
+                  validation={validation}
+                  onRegenerate={() => handleGenerate()}
                 />
               </div>
             ) : (
@@ -965,21 +1133,7 @@ ${error instanceof Error && error.message.includes('truncated')
           </div>
         </div>
       </div>
-
-      {/* Progress Indicator */}
-      <GenerationProgress
-        status={status as 'idle' | 'initializing' | 'generating' | 'validating' | 'saving' | 'complete' | 'error'}
-        progress={progress}
-        estimate={estimate || undefined}
-        elapsed={elapsed}
-        error={error || undefined}
-      />
-
-      {/* Code Preview Modal */}
-      {generatedCode && (
-        <CodePreviewModal code={generatedCode} projectId={projectId} />
-      )}
-
+      
       {/* Prompt Assistant Modal */}
       {showAssistant && (
         <PromptAssistant
@@ -992,8 +1146,74 @@ ${error instanceof Error && error.message.includes('truncated')
           }}
         />
       )}
-
-      <Toaster position="top-right" />
+      
+      {/* ✅ FIX: CSS for visibility and positioning */}
+      <style jsx>{`
+        /* Chat message visibility fixes */
+        .bg-purple-600 {
+          background: #7c3aed !important;
+          color: white !important;
+        }
+        
+        .text-white {
+          color: white !important;
+        }
+        
+        .bg-gray-50.text-gray-900 {
+          background: #f9fafb !important;
+          color: #111827 !important;
+        }
+        
+        .bg-gray-50 {
+          background: #f9fafb !important;
+        }
+        
+        .text-gray-900 {
+          color: #111827 !important;
+        }
+        
+        /* Input area - ensure visibility and proper spacing */
+        .border-t.border-gray-200.p-4.bg-white {
+          padding-bottom: 1rem !important;
+          margin-bottom: 60px; /* Space for feedback widget */
+        }
+        
+        /* Textarea styling */
+        textarea {
+          color: #1f2937 !important;
+          background: white !important;
+        }
+        
+        textarea::placeholder {
+          color: #9ca3af !important;
+        }
+        
+        /* Input styling */
+        input[type="text"],
+        input[type="number"] {
+          color: #1f2937 !important;
+          background: white !important;
+        }
+        
+        input::placeholder {
+          color: #9ca3af !important;
+        }
+        
+        /* Ensure all text is readable */
+        .text-sm {
+          color: inherit;
+        }
+        
+        /* Message text specifically */
+        .whitespace-pre-wrap {
+          color: inherit !important;
+        }
+        
+        /* Timestamp text */
+        .text-gray-400 {
+          color: #9ca3af !important;
+        }
+      `}</style>
     </div>
   )
 }

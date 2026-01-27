@@ -2,9 +2,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import type { MessageCreateParams } from '@anthropic-ai/sdk/resources/messages';
+import type { Stream } from '@anthropic-ai/sdk/streaming';
 import { prisma } from '@/lib/prisma';
-import { parseGeneratedCode, validateJavaScript, analyzeCodeQuality, checkCSPViolations } from '@/lib/code-parser';
-import { ProjectStatus, Prisma } from '@prisma/client';
+import { parseGeneratedCode, analyzeCodeQuality, checkCSPViolations } from '@/lib/code-parser';
+import { ProjectStatus } from '@prisma/client';
+import { apiQueue } from '@/lib/api-queue';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -50,6 +53,59 @@ interface StreamEvent {
     stopReason: string;
   };
   error?: string;
+}
+
+// Anthropic error type
+interface AnthropicError extends Error {
+  error?: {
+    type?: string;
+  };
+}
+
+// ============================================================================
+// RETRY LOGIC FOR API OVERLOAD ERRORS
+// ============================================================================
+
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY = 1000; // 1 second
+
+async function createMessageWithRetry(
+  anthropic: Anthropic,
+  params: MessageCreateParams,
+  retryCount = 0
+): Promise<Stream<Anthropic.Messages.MessageStreamEvent>> {
+  try {
+    const result = await anthropic.messages.create(params);
+    
+    // TypeScript check for async iterator
+    if (result && typeof (result as Stream<Anthropic.Messages.MessageStreamEvent>)[Symbol.asyncIterator] === 'function') {
+      return result as Stream<Anthropic.Messages.MessageStreamEvent>;
+    } else {
+      throw new Error('Expected a streaming response (AsyncIterable), but got a non-streaming result.');
+    }
+  } catch (error) {
+    const anthropicError = error as AnthropicError;
+    const isOverloadError =
+      anthropicError?.error?.type === 'overloaded_error' ||
+      anthropicError?.message?.includes('overloaded') ||
+      anthropicError?.message?.includes('Overloaded');
+
+    if (isOverloadError && retryCount < MAX_RETRIES) {
+      const delay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
+      console.log(`⏳ API overloaded, retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+      
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return createMessageWithRetry(anthropic, params, retryCount + 1);
+    }
+    
+    if (retryCount >= MAX_RETRIES) {
+      throw new Error(
+        `API is currently overloaded. Tried ${MAX_RETRIES} times. Please try again in a few minutes.`
+      );
+    }
+    
+    throw error;
+  }
 }
 
 // Calculate optimal token limit based on prompt and generation type
@@ -127,7 +183,6 @@ You must provide your code in exactly this format with clear markdown code block
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; script-src 'self'; img-src 'self' data:; connect-src 'self';">
     <title>App Title</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -314,25 +369,24 @@ export async function POST(req: NextRequest) {
             ? `${prompt}\n\nCONTINUATION CONTEXT: You previously generated:\n${continuationContext}\n\nPlease complete the generation, focusing on what's missing.`
             : prompt;
 
-          // Create message with streaming
-          const messageStream = await anthropic.messages.create({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: getOptimalTokenLimit(prompt, generationType),
-            messages: [
-              {
-                role: 'user',
-                content: enhancedPrompt,
-              },
-            ],
-            system: ENTERPRISE_SYSTEM_PROMPT,
-            stream: true,
-          });
+          // Create message with streaming using retry logic
+          const messageStream = await apiQueue.add(() =>
+            createMessageWithRetry(anthropic, {
+              model: 'claude-sonnet-4-20250514',
+              max_tokens: getOptimalTokenLimit(prompt, generationType),
+              messages: [{ role: 'user', content: enhancedPrompt }],
+              system: ENTERPRISE_SYSTEM_PROMPT,
+              stream: true,
+            })
+          );
 
           // Process streaming response
           for await (const event of messageStream) {
             if (event.type === 'message_start') {
               inputTokens = event.message.usage.input_tokens;
-              console.log('📝 Input tokens:', inputTokens);
+              if (process.env.NODE_ENV === 'development') {
+                console.log('📝 Input tokens:', inputTokens);
+              }
             }
 
             if (event.type === 'content_block_delta') {
@@ -351,31 +405,34 @@ export async function POST(req: NextRequest) {
             }
 
             if (event.type === 'message_delta') {
-              if (event.delta.stop_reason) {
+              if (event.delta.stop_reason && process.env.NODE_ENV === 'development') {
                 console.log('⏹️ Stop reason:', event.delta.stop_reason);
               }
             }
 
             if (event.type === 'message_stop') {
-              console.log('✅ Stream complete. Total tokens:', fullContent.length);
+              console.log('✅ Stream complete. Total characters:', fullContent.length);
             }
           }
 
           // Parse and validate generated code
-          console.log('🔍 Parsing generated code (' + fullContent.length + ' characters)...');
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔍 Parsing generated code (' + fullContent.length + ' characters)...');
+          }
           const parsed = parseGeneratedCode(fullContent);
-          
-          console.log('📦 Parsed result:', {
-            hasHtml: parsed.hasHtml,
-            hasCss: parsed.hasCss,
-            hasJavaScript: parsed.hasJavaScript,
-            isComplete: parsed.isComplete,
-            htmlLength: parsed.html?.length || 0,
-            cssLength: parsed.css?.length || 0,
-            jsLength: parsed.javascript?.length || 0,
-            jsValid: parsed.jsValid,
-            jsError: parsed.jsError
-          });
+          if (process.env.NODE_ENV === 'development') {
+            console.log('📦 Parsed result:', {
+              hasHtml: parsed.hasHtml,
+              hasCss: parsed.hasCss,
+              hasJavaScript: parsed.hasJavaScript,
+              isComplete: parsed.isComplete,
+              htmlLength: parsed.html?.length || 0,
+              cssLength: parsed.css?.length || 0,
+              jsLength: parsed.javascript?.length || 0,
+              jsValid: parsed.jsValid,
+              jsError: parsed.jsError
+            });
+          }
 
           const generationTime = Date.now() - startTime;
 
@@ -391,8 +448,6 @@ export async function POST(req: NextRequest) {
                 attempt: retryAttempt + 1,
               };
               controller.enqueue(encoder.encode(`data: ${JSON.stringify(retryEvent)}\n\n`));
-              
-              // Note: Client should handle retry by making a new request
             }
           }
 
@@ -401,15 +456,21 @@ export async function POST(req: NextRequest) {
             ? analyzeCodeQuality(parsed)
             : { score: 0, issues: [], warnings: [] };
 
-          console.log('📊 Code quality analysis:', {
-            score: quality.score,
-            issuesCount: quality.issues.length,
-            warningsCount: quality.warnings.length
-          });
+          if (process.env.NODE_ENV === 'development') {
+            console.log('📊 Code quality analysis:', {
+              score: quality.score,
+              issuesCount: quality.issues.length,
+              warningsCount: quality.warnings.length
+            });
+          }
 
-          // Save to database if projectId provided
-          if (projectId && parsed.isComplete) {
+          // Save to database if projectId provided - SAVE EVEN IF INCOMPLETE
+          if (projectId && (parsed.hasHtml || parsed.hasCss || parsed.hasJavaScript)) {
             try {
+              if (process.env.NODE_ENV === 'development') {
+                console.log('💾 Auto-saving project:', projectId);
+              }
+
               await prisma.project.update({
                 where: { id: projectId },
                 data: {
@@ -417,7 +478,7 @@ export async function POST(req: NextRequest) {
                   html: parsed.html || '',
                   css: parsed.css || '',
                   javascript: parsed.javascript || '',
-                  
+
                   // Code structure flags
                   hasHtml: parsed.hasHtml,
                   hasCss: parsed.hasCss,
@@ -425,7 +486,7 @@ export async function POST(req: NextRequest) {
                   isComplete: parsed.isComplete,
                   jsValid: parsed.jsValid,
                   jsError: parsed.jsError,
-                  
+
                   // Validation results
                   validationScore: quality.score,
                   validationPassed: quality.score >= 70,
@@ -434,18 +495,24 @@ export async function POST(req: NextRequest) {
                   cspViolations: parsed.html && parsed.javascript 
                     ? checkCSPViolations(parsed.html, parsed.javascript)
                     : [],
-                  
+
                   // Metadata
-                  status: ProjectStatus.COMPLETED,
+                  status: parsed.isComplete ? ProjectStatus.COMPLETED : ProjectStatus.GENERATING,
                   tokensUsed: inputTokens,
                   generationTime,
                   retryCount: retryAttempt,
                   lastModified: new Date(),
                 },
               });
-              console.log('💾 Project saved to database with validation results:', projectId);
+
+              if (process.env.NODE_ENV === 'development') {
+                console.log('✅ Project auto-saved successfully');
+              }
             } catch (dbError) {
-              console.error('Database save error:', dbError);
+              if (process.env.NODE_ENV === 'development') {
+                console.error('❌ Database save error:', dbError);
+              }
+              // Don't fail the request if save fails
             }
           }
 
@@ -472,9 +539,21 @@ export async function POST(req: NextRequest) {
 
         } catch (error) {
           console.error('Stream error:', error);
+
+          // Check if it's an overload error
+          let errorMessage = 'An error occurred during generation';
+          
+          if (error instanceof Error) {
+            if (error.message.includes('overloaded') || error.message.includes('Overloaded')) {
+              errorMessage = 'Anthropic API is currently experiencing high load. Please try again in a moment.';
+            } else {
+              errorMessage = error.message;
+            }
+          }
+
           const errorEvent: StreamEvent = {
             type: 'error',
-            error: error instanceof Error ? error.message : 'Unknown error occurred',
+            error: errorMessage,
           };
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorEvent)}\n\n`));
           controller.close();

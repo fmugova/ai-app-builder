@@ -25,11 +25,19 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Query user once
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    })
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     // Verify project ownership
     const project = await prisma.project.findFirst({
       where: {
         id,
-        User: { email: session.user.email }
+        userId: user.id
       },
       include: {
         EnvironmentVariable: {
@@ -69,9 +77,18 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Query user once
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    })
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -104,18 +121,13 @@ export async function POST(
     const project = await prisma.project.findFirst({
       where: {
         id,
-        User: { email: session.user.email }
+        userId: user.id
       }
     })
 
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
-
-    // Get user for logging
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    })
 
     // Check if key already exists for this environment
     const existing = await prisma.environmentVariable.findUnique({
@@ -195,6 +207,14 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Query user once
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    })
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { variableId, value, description } = await req.json()
 
     if (!variableId) {
@@ -210,7 +230,7 @@ export async function PUT(
         id: variableId,
         Project: {
           id,
-          User: { email: session.user.email }
+          userId: user.id
         }
       }
     })
@@ -218,11 +238,6 @@ export async function PUT(
     if (!variable) {
       return NextResponse.json({ error: 'Variable not found' }, { status: 404 })
     }
-
-    // Get user for logging
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    })
 
     // Validate new value if provided
     if (value) {
@@ -242,20 +257,18 @@ export async function PUT(
     })
 
     // Log security event
-    if (user) {
-      await logSecurityEvent({
-        userId: user.id,
-        type: 'env_var_updated',
-        action: 'success',
-        metadata: {
-          projectId: id,
-          key: variable.key,
-          environment: variable.environment,
-          changedValue: !!value
-        },
-        severity: 'info'
-      })
-    }
+    await logSecurityEvent({
+      userId: user.id,
+      type: 'env_var_updated',
+      action: 'success',
+      metadata: {
+        projectId: id,
+        key: variable.key,
+        environment: variable.environment,
+        changedValue: !!value
+      },
+      severity: 'info'
+    })
 
     return NextResponse.json({
       variable: {

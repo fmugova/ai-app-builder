@@ -6,26 +6,24 @@ import { prisma } from '@/lib/prisma'
 export const dynamic = 'force-dynamic'
 
 // GET - List all pages for a project
+import type { Session } from 'next-auth'
+
+async function getUserFromSession(session: Session | null) {
+  if (!session?.user?.email) return null;
+  return prisma.user.findUnique({ where: { email: session.user.email } });
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-    })
-
+    const user = await getUserFromSession(session)
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
-
     const { id: projectId } = await params
-
     // Verify user owns this project
     const project = await prisma.project.findFirst({
       where: {
@@ -33,11 +31,9 @@ export async function GET(
         ...(user.role !== 'admin' && { userId: user.id }),
       },
     })
-
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
-
     // Get all pages for this project
     const pages = await prisma.page.findMany({
       where: { projectId },
@@ -47,12 +43,13 @@ export async function GET(
         { createdAt: 'asc' },
       ],
     })
-
     return NextResponse.json(pages)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Pages fetch error:', error)
+    const message =
+      error instanceof Error ? error.message : 'Failed to fetch pages';
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch pages' },
+      { error: message },
       { status: 500 }
     )
   }
@@ -65,21 +62,12 @@ export async function POST(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-    })
-
+    const user = await getUserFromSession(session)
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
-
     const { id: projectId } = await params
     const { title, slug, content, description, isHomepage, metaTitle, metaDescription } = await request.json()
-
     // Verify user owns this project
     const project = await prisma.project.findFirst({
       where: {
@@ -87,11 +75,9 @@ export async function POST(
         ...(user.role !== 'admin' && { userId: user.id }),
       },
     })
-
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
-
     // If setting as homepage, unset other homepage
     if (isHomepage) {
       await prisma.page.updateMany({
@@ -99,7 +85,6 @@ export async function POST(
         data: { isHomepage: false },
       })
     }
-
     // Create the page
     const page = await prisma.page.create({
       data: {
@@ -113,7 +98,6 @@ export async function POST(
         projectId,
       },
     })
-
     // Log activity
     await prisma.activity.create({
       data: {
@@ -127,12 +111,13 @@ export async function POST(
         },
       },
     })
-
     return NextResponse.json(page)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Page creation error:', error)
+    const message =
+      error instanceof Error ? error.message : 'Failed to create page';
     return NextResponse.json(
-      { error: error.message || 'Failed to create page' },
+      { error: message },
       { status: 500 }
     )
   }

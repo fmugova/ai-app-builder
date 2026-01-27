@@ -14,19 +14,20 @@ export interface ParsedCode {
 
 /**
  * Parses generated code blocks from markdown-formatted text
+ * Updated with robust streaming-aware parsing
  */
 export function parseGeneratedCode(content: string): ParsedCode {
-  // Extract HTML
-  const htmlMatch = content.match(/```html\n([\s\S]*?)\n```/);
-  const html = htmlMatch ? htmlMatch[1].trim() : null;
+  content = cleanMarkdownArtifacts(content);
 
-  // Extract CSS
-  const cssMatch = content.match(/```css\n([\s\S]*?)\n```/);
-  const css = cssMatch ? cssMatch[1].trim() : null;
-
-  // Extract JavaScript
-  const jsMatch = content.match(/```(?:javascript|js)\n([\s\S]*?)\n```/);
-  const javascript = jsMatch ? jsMatch[1].trim() : null;
+  // Try strict parsing first, then fall back to flexible parsing
+  let html = extractCodeBlock(content, 'html');
+  if (!html) html = findLastCompleteBlock(content, 'html');
+  
+  let css = extractCodeBlock(content, 'css');
+  if (!css) css = findLastCompleteBlock(content, 'css');
+  
+  let javascript = extractCodeBlock(content, 'javascript') || extractCodeBlock(content, 'js');
+  if (!javascript) javascript = findLastCompleteBlock(content, 'javascript') || findLastCompleteBlock(content, 'js');
 
   // Validate JavaScript syntax if present
   let jsValid = true;
@@ -44,7 +45,10 @@ export function parseGeneratedCode(content: string): ParsedCode {
   const hasJavaScript = !!javascript && javascript.length > 0;
   
   // Consider complete if has HTML and at least one of CSS/JS
-  const isComplete = hasHtml && (hasCss || hasJavaScript);
+  // OR if the total content is substantial (likely a complete generation)
+  const isComplete = (hasHtml && (hasCss || hasJavaScript)) || 
+                     (hasHtml && html !== null && html.length > 500) || 
+                     (content.length > 5000 && (hasHtml || hasCss || hasJavaScript));
 
   return {
     html,
@@ -77,11 +81,55 @@ export function validateJavaScript(code: string): { valid: boolean; error: strin
 
 /**
  * Extracts just the code content without markdown formatting
+ * More flexible version that handles various newline patterns
  */
 export function extractCodeBlock(content: string, language: string): string | null {
-  const regex = new RegExp(`\`\`\`${language}\\n([\\s\\S]*?)\\n\`\`\``, 'i');
-  const match = content.match(regex);
-  return match ? match[1].trim() : null;
+  // Try multiple regex patterns for flexibility
+  const patterns = [
+    // Standard: ```html\n...\n```
+    new RegExp(`\`\`\`${language}\\n([\\s\\S]*?)\\n\`\`\``, 'i'),
+    // Flexible: ```html ... ``` (any whitespace)
+    new RegExp(`\`\`\`${language}\\s*([\\s\\S]*?)\`\`\``, 'i'),
+    // No newline before closing: ```html...```
+    new RegExp(`\`\`\`${language}([\\s\\S]*?)\`\`\``, 'i'),
+  ];
+
+  for (const pattern of patterns) {
+    const match = content.match(pattern);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Find the last complete code block of a given language
+ * Useful for streaming scenarios where content may be building up
+ */
+function findLastCompleteBlock(content: string, language: string): string | null {
+  const pattern = new RegExp(`\`\`\`${language}\\s*([\\s\\S]*?)\`\`\``, 'gi');
+  let lastMatch: string | null = null;
+  let match;
+  
+  while ((match = pattern.exec(content)) !== null) {
+    if (match[1] && match[1].trim().length > 0) {
+      lastMatch = match[1].trim();
+    }
+  }
+  
+  return lastMatch;
+}
+
+/**
+ * Check if the stream appears incomplete
+ * (has opening code blocks without matching closing blocks)
+ */
+export function isStreamingIncomplete(content: string): boolean {
+  const openBlocks = (content.match(/```(?:html|css|javascript|js)/g) || []).length;
+  const closeBlocks = (content.match(/```(?!\w)/g) || []).length;
+  return openBlocks > closeBlocks;
 }
 
 /**
@@ -182,5 +230,63 @@ export function analyzeCodeQuality(parsed: ParsedCode): {
     score: Math.max(0, score),
     issues,
     warnings,
+  };
+}
+
+/**
+ * Cleans markdown artifacts and extra formatting
+ */
+export function cleanMarkdownArtifacts(content: string): string {
+  // Remove markdown headers (## HTML, ## CSS, etc.)
+  content = content.replace(/##\s*(HTML|CSS|JavaScript|JS)\s*\n/gi, '');
+  
+  // Remove standalone section markers
+  content = content.replace(/\*\*HTML\*\*/gi, '');
+  content = content.replace(/\*\*CSS\*\*/gi, '');
+  content = content.replace(/\*\*JavaScript\*\*/gi, '');
+  
+  // Clean up any extra backticks outside of code blocks
+  // But preserve the code fence markers themselves
+  return content.trim();
+}
+
+/**
+ * Extracts code from streaming content even if incomplete
+ * Returns partial results that can be updated as more content arrives
+ */
+export function parseStreamingCode(content: string): ParsedCode {
+  const cleaned = cleanMarkdownArtifacts(content);
+  
+  // Look for any code blocks, complete or incomplete
+  const htmlPattern = /```html\s*([\s\S]*?)(?:```|$)/i;
+  const cssPattern = /```css\s*([\s\S]*?)(?:```|$)/i;
+  const jsPattern = /```(?:javascript|js)\s*([\s\S]*?)(?:```|$)/i;
+  
+  const htmlMatch = cleaned.match(htmlPattern);
+  const cssMatch = cleaned.match(cssPattern);
+  const jsMatch = cleaned.match(jsPattern);
+  
+  const html = htmlMatch ? htmlMatch[1].trim() : null;
+  const css = cssMatch ? cssMatch[1].trim() : null;
+  const javascript = jsMatch ? jsMatch[1].trim() : null;
+  
+  // For streaming, don't validate JavaScript syntax as it might be incomplete
+  const hasHtml = !!html && html.length > 0;
+  const hasCss = !!css && css.length > 0;
+  const hasJavaScript = !!javascript && javascript.length > 0;
+  
+  // Streaming content is considered incomplete by default
+  const isComplete = !isStreamingIncomplete(cleaned) && (hasHtml || hasCss || hasJavaScript);
+  
+  return {
+    html,
+    css,
+    javascript,
+    hasHtml,
+    hasCss,
+    hasJavaScript,
+    isComplete,
+    jsValid: true, // Skip validation during streaming
+    jsError: null,
   };
 }

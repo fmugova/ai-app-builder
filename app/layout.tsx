@@ -45,6 +45,9 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
+    other: {
+      'mobile-web-app-capable': 'yes',
+    },
   metadataBase: new URL(getBaseUrl()),
   title: {
     default: 'BuildFlow - AI-Powered App Builder',
@@ -189,8 +192,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <main className="pt-16">
           <Providers>{children}</Providers>
         </main>
-        <Analytics />
-        <SpeedInsights />
+        {/* Only load Vercel Analytics and SpeedInsights in production */}
+        {process.env.NODE_ENV === 'production' && (
+          <>
+            <Analytics />
+            <SpeedInsights />
+          </>
+        )}
         <GoogleAnalytics gaId="GTM-KNTK3Z8G" />
         <GoogleTagManager gtmId="GTM-KNTK3Z8G" />
         <SupportChat />

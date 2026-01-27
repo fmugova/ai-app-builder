@@ -10,7 +10,7 @@ datasource db {
 
 model Account {
   id                String  @id @default(cuid())
-  userId            String
+  userId            String?
   type              String
   provider          String
   providerAccountId String
@@ -21,7 +21,7 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-  User              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  User              User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
   @@schema("public")
@@ -39,8 +39,12 @@ model ActiveSession {
   lastActive   DateTime @default(now())
   expiresAt    DateTime
   createdAt    DateTime @default(now())
+  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([expiresAt])
+  @@index([sessionToken])
+  @@index([userId, lastActive])
   @@schema("public")
 }
 
@@ -75,19 +79,19 @@ model ApiEndpoint {
   id             String    @id @default(cuid())
   projectId      String
   name           String
-  description    String?
   path           String
   method         String
+  description    String?
   code           String
   requiresAuth   Boolean   @default(false)
+  rateLimit      Int?
+  responseType   String    @default("json")
+  statusCode     Int       @default(200)
   usesDatabase   Boolean   @default(false)
   databaseTable  String?
   requestSchema  Json?
   responseSchema Json?
   tags           String[]  @default([])
-  rateLimit      Int?
-  responseType   String    @default("json")
-  statusCode     Int       @default(200)
   isActive       Boolean   @default(true)
   testsPassed    Boolean   @default(false)
   lastTested     DateTime?
@@ -98,55 +102,61 @@ model ApiEndpoint {
   @@unique([projectId, path, method])
   @@index([method])
   @@index([projectId])
+  @@index([tags])
   @@schema("public")
 }
 
 model ApiTemplate {
   id             String   @id @default(cuid())
-  name           String
+  name           String   @unique
+  displayName    String
   description    String
   category       String
+  icon           String
+  tags           String[] @default([])
+  template       String
   requiresAuth   Boolean  @default(false)
   usesDatabase   Boolean  @default(false)
-  tags           String[] @default([])
+  usesSendEmail  Boolean  @default(false)
+  usesFileUpload Boolean  @default(false)
+  configSchema   Json?
+  isActive       Boolean  @default(true)
   usageCount     Int      @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @default(now()) @updatedAt
-  configSchema   Json?
-  displayName    String
-  icon           String
-  isActive       Boolean  @default(true)
-  template       String
-  usesFileUpload Boolean  @default(false)
-  usesSendEmail  Boolean  @default(false)
 
   @@index([category])
+  @@index([isActive])
   @@schema("public")
 }
 
 model CustomDomain {
   id              String    @id @default(cuid())
   projectId       String
+  user_id         String
   domain          String    @unique
   status          String    @default("pending")
   verificationKey String?
-  verifiedAt      DateTime? @db.Timestamptz(6)
+  verifiedAt      DateTime?
   sslStatus       String    @default("pending")
-  sslIssuedAt     DateTime? @db.Timestamptz(6)
+  sslIssuedAt     DateTime?
   errorMessage    String?
-  createdAt       DateTime  @default(now()) @db.Timestamptz(6)
-  updatedAt       DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
-  user_id         String?   @db.Uuid
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  Project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  User            User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@index([status])
+  @@index([domain])
+  @@index([user_id])
   @@schema("public")
 }
 
 model DatabaseConnection {
   id                 String          @id @default(cuid())
   userId             String
-  projectId          String?
+  projectId          String?         @unique
   name               String
   provider           String          @default("supabase")
   host               String?
@@ -187,15 +197,15 @@ model Deployment {
   id              String   @id @default(cuid())
   projectId       String
   userId          String
-  platform        String
+  platform        String   @default("vercel")
   deploymentUrl   String?
   deploymentId    String?
+  vercelProjectId String?
   status          String   @default("pending")
   errorMessage    String?
+  logs            String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-  vercelProjectId String?
-  logs            String?
   Project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   User            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -244,11 +254,11 @@ model DripEnrollment {
   id             String       @id @default(cuid())
   campaignId     String
   userEmail      String
+  userId         String
   enrolledAt     DateTime     @default(now())
   completedAt    DateTime?
   unsubscribedAt DateTime?
   emailsSent     Json?
-  userId         String
   DripCampaign   DripCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   User           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -310,12 +320,12 @@ model EmailSend {
 model FailedLoginAttempt {
   id          String    @id @default(cuid())
   email       String
-  ipAddress   String?
-  attempts    Int?      @default(1)
-  lockedUntil DateTime? @db.Timestamp(6)
-  createdAt   DateTime? @default(now()) @db.Timestamp(6)
-  updatedAt   DateTime? @default(now()) @updatedAt @db.Timestamp(6)
-  lastAttempt DateTime? @default(now()) @db.Timestamp(6)
+  ipAddress   String
+  attempts    Int       @default(1)
+  lockedUntil DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  lastAttempt DateTime  @default(now())
   userAgent   String?
 
   @@unique([email, ipAddress])
@@ -350,8 +360,10 @@ model FormSubmission {
   userId      String
   type        String
   data        Json
-  submittedAt DateTime @default(now()) @db.Timestamp(6)
+  submittedAt DateTime @default(now())
   read        Boolean  @default(false)
+  Project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  User        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@index([userId])
@@ -359,13 +371,16 @@ model FormSubmission {
 }
 
 model Generation {
-  id        String   @id @default(cuid())
-  userId    String
-  createdAt DateTime @default(now())
-  prompt    String
-  code      String
-  type      String
-  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  userId     String
+  createdAt  DateTime @default(now())
+  code       String
+  prompt     String
+  type       String
+  projectId  String?
+  success    Boolean  @default(true)
+  tokensUsed Int      @default(0)
+  User       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([createdAt])
   @@index([userId])
@@ -387,7 +402,8 @@ model NewsletterSubscriber {
 
   @@index([status])
   @@index([subscribedAt])
-  @@index([userId], map: "idx_newslettersubscriber_user_id")
+  @@index([email], map: "idx_newslettersubscriber_email")
+  @@index([userId], map: "idx_newslettersubscriber_userid")
   @@schema("public")
 }
 
@@ -404,8 +420,8 @@ model Page {
   updatedAt       DateTime @updatedAt
   isHomepage      Boolean  @default(false)
   isPublished     Boolean  @default(true)
-  metaTitle       String?
   metaDescription String?
+  metaTitle       String?
   Project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, slug])
@@ -418,49 +434,81 @@ model PasswordHistory {
   userId         String
   hashedPassword String
   createdAt      DateTime @default(now())
+  User           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
   @@schema("public")
 }
 
 model Project {
-  id                 String               @id @default(cuid())
-  userId             String
-  name               String
-  description        String?
-  type               String
-  code               String
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  isPublic           Boolean              @default(false)
-  shareToken         String?              @unique
-  views              Int                  @default(0)
-  downloads          Int                  @default(0)
-  tags               String[]             @default([])
-  prompt             String?
-  language           String?
-  framework          String?
-  isPublished        Boolean?             @default(false)
-  publishedAt        DateTime?
-  publicSlug         String?              @unique
-  publicUrl          String?
-  multiPage          Boolean?             @default(false)
-  html               String?
-    css                String?              // ADD THIS LINE ✅
-    javascript         String?              // ADD THIS LINE ✅
-    ApiEndpoint        ApiEndpoint[]
-  DatabaseConnection DatabaseConnection[]
-  Deployment         Deployment[]
-  Page               Page[]
-  User               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ProjectShare       ProjectShare[]
-  ProjectVersion     ProjectVersion[]
+  id                  String                @id @default(cuid())
+  userId              String
+  name                String
+  description         String?
+  type                String
+  code                String
+  hasHtml             Boolean?              @default(false)
+  hasCss              Boolean?              @default(false)
+  hasJavaScript       Boolean?              @default(false)
+  isComplete          Boolean?              @default(false)
+
+  // JavaScript validation
+  jsValid            Boolean?             @default(true)
+  jsError            String?
+
+  // Code quality validation
+  validationScore    Int?                 @default(0)
+  validationPassed   Boolean?             @default(false)
+  validationErrors   Json?
+  validationWarnings Json?
+  cspViolations      Json?
+
+  // Generation metadata
+  tokensUsed         Int?                 @default(0)
+  generationTime     Int?                 @default(0)
+  retryCount         Int?                 @default(0)
+  lastModified       DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @default(now()) @updatedAt
+  downloads           Int                   @default(0)
+  framework           String?
+  isPublic            Boolean               @default(false)
+  isPublished         Boolean               @default(false)
+  publishedAt         DateTime?
+  publicSlug          String?               @unique
+  publicUrl           String?
+  language            String?
+  prompt              String?
+  shareToken          String?               @unique
+  tags                String[]              @default([])
+  views               Int                   @default(0)
+  multiPage           Boolean               @default(false)
+  cssCode             String?
+  errorMessage        String?
+  htmlCode            String?
+  jsCode              String?
+  status              ProjectStatus         @default(DRAFT)
+  html                String?
+  css                 String?
+  javascript          String?
+  ApiEndpoint         ApiEndpoint[]
+  CustomDomain        CustomDomain[]
+  DatabaseConnection  DatabaseConnection?
+  Deployment          Deployment[]
+  EnvironmentVariable EnvironmentVariable[]
+  FormSubmission      FormSubmission[]
+  Page                Page[]
+  User                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ProjectShare        ProjectShare[]
+  ProjectVersion      ProjectVersion[]
 
   @@index([isPublic])
   @@index([isPublished])
   @@index([updatedAt])
   @@index([userId])
   @@index([userId, updatedAt])
+  @@index([publicSlug])
+  @@index([shareToken])
   @@schema("public")
 }
 
@@ -492,21 +540,22 @@ model ProjectVersion {
 
   @@index([projectId])
   @@index([userId])
+  @@index([createdAt])
   @@schema("public")
 }
 
 model SecurityEvent {
-  id        String   @id @default(dbgenerated("gen_random_uuid()"))
+  id        String   @id
   userId    String?
   type      String
   ipAddress String?
   userAgent String?
   metadata  Json?
   severity  String
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  createdAt DateTime @default(now())
   action    String   @default("success")
   location  String?
-  User      User?    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([action])
   @@index([severity, createdAt])
@@ -520,9 +569,15 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
+  createdAt    DateTime @default(now())
+  ipAddress    String?
+  lastActive   DateTime @default(now())
+  userAgent    String?
   User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId], map: "idx_session_user_id")
+  @@index([sessionToken])
+  @@index([userId])
+  @@index([userId, lastActive])
   @@schema("public")
 }
 
@@ -536,34 +591,38 @@ model Subscription {
   status               String    @default("active")
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
-  currentPeriodStart   DateTime  @default(now())
-  currentPeriodEnd     DateTime?
   cancelAtPeriodEnd    Boolean   @default(false)
+  currentPeriodEnd     DateTime?
+  currentPeriodStart   DateTime  @default(now())
   User                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([status])
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+  @@index([userId])
   @@schema("public")
 }
 
 model Template {
   id               String             @id @default(cuid())
-  creatorId        String
   name             String
   description      String
-  category         String
   tier             TemplateTier       @default(FREE)
   price            Float              @default(0)
-  thumbnail        String?
-  htmlCode         String
-  cssCode          String?
-  jsCode           String?
   status           TemplateStatus     @default(DRAFT)
+  thumbnail        String?
+  category         String
+  tags             String[]           @default([])
   downloads        Int                @default(0)
   views            Int                @default(0)
   rating           Float              @default(0)
   reviewCount      Int                @default(0)
-  tags             String[]           @default([])
+  creatorId        String
   createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  updatedAt        DateTime           @default(now()) @updatedAt
+  cssCode          String?
+  htmlCode         String
+  jsCode           String?
   User             User               @relation(fields: [creatorId], references: [id], onDelete: Cascade)
   TemplatePurchase TemplatePurchase[]
   TemplateRevenue  TemplateRevenue[]
@@ -595,13 +654,13 @@ model TemplateRevenue {
   id              String    @id @default(cuid())
   templateId      String
   creatorId       String
-  amount          Float
-  platformShare   Float
   creatorShare    Float
-  stripePaymentId String?
+  platformShare   Float
+  amount          Float
   createdAt       DateTime  @default(now())
   paidOut         Boolean   @default(false)
   paidOutAt       DateTime?
+  stripePaymentId String?
   User            User      @relation(fields: [creatorId], references: [id], onDelete: Cascade)
   Template        Template  @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
@@ -637,49 +696,54 @@ model User {
   image                 String?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
+  autoSave              Boolean                @default(true)
+  notifications         Boolean                @default(true)
+  theme                 String                 @default("dark")
+  bio                   String?
+  promoCodeUsed         String?
   discountRate          Float                  @default(0)
   subscriptionTier      String                 @default("free")
   subscriptionStatus    String                 @default("active")
   stripeCustomerId      String?                @unique
   stripeSubscriptionId  String?                @unique
+  subscriptionResetDate DateTime?
+  cancelAtPeriodEnd     Boolean                @default(false)
+  currentPeriodStart    DateTime?
+  currentPeriodEnd      DateTime?
   generationsUsed       Int                    @default(0)
   generationsLimit      Int                    @default(10)
   projectsThisMonth     Int                    @default(0)
   projectsLimit         Int                    @default(3)
-  subscriptionResetDate DateTime?
-  theme                 String                 @default("dark")
-  notifications         Boolean                @default(true)
-  autoSave              Boolean                @default(true)
   role                  String                 @default("user")
-  cancelAtPeriodEnd     Boolean                @default(false)
-  currentPeriodEnd      DateTime?
-  currentPeriodStart    DateTime?
-  promoCodeUsed         String?
-  bio                   String?
   githubAccessToken     String?
   githubUsername        String?
-  twoFactorEnabled      Boolean?               @default(false)
+  twoFactorEnabled      Boolean                @default(false)
   twoFactorSecret       String?
   resetToken            String?                @unique
   resetTokenExpiry      DateTime?
   vercelToken           String?
   vercelProjectName     String?
   vercelTeamId          String?
-  twoFactorBackupCodes  String[]               @default([])
   accountLockedUntil    DateTime?
   failedLoginAttempts   Int                    @default(0)
   lastLoginAt           DateTime?
   lastLoginIp           String?
+  twoFactorBackupCodes  String[]               @default([])
   hasSeenOnboarding     Boolean                @default(false)
   Account               Account[]
+  ActiveSession         ActiveSession[]
   Activity              Activity[]
+  CustomDomain          CustomDomain[]
   DatabaseConnection    DatabaseConnection[]
   Deployment            Deployment[]
   DripEnrollment        DripEnrollment[]
   EmailCampaign         EmailCampaign[]
   Feedback              Feedback[]
+  FormSubmission        FormSubmission[]
   Generation            Generation[]
+  GenerationHistory     GenerationHistory[]
   NewsletterSubscriber  NewsletterSubscriber[]
+  PasswordHistory       PasswordHistory[]
   Project               Project[]
   ProjectShare          ProjectShare[]
   ProjectVersion        ProjectVersion[]
@@ -700,15 +764,16 @@ model VercelConnection {
   id              String   @id @default(cuid())
   userId          String   @unique
   accessToken     String
+  refreshToken    String?
   teamId          String?
+  configurationId String?
   username        String?
   email           String?
   connectedAt     DateTime @default(now())
   updatedAt       DateTime @updatedAt
-  refreshToken    String?
-  configurationId String?
   User            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@schema("public")
 }
 
@@ -716,7 +781,6 @@ model VerificationToken {
   identifier String
   token      String   @unique
   expires    DateTime
-  id         String   @id(map: "verificationtoken_pkey") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
   @@unique([identifier, token])
   @@schema("public")
@@ -743,6 +807,9 @@ model Workspace {
   WorkspaceMember      WorkspaceMember[]
   WorkspaceProject     WorkspaceProject[]
 
+  @@index([slug])
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
   @@schema("public")
 }
 
@@ -761,6 +828,8 @@ model WorkspaceInvite {
 
   @@index([email])
   @@index([workspaceId])
+  @@index([status])
+  @@index([token])
   @@schema("public")
 }
 
@@ -777,7 +846,7 @@ model WorkspaceMember {
   @@unique([workspaceId, userId])
   @@index([userId])
   @@index([workspaceId])
-  @@index([role], map: "idx_workspace_member_role")
+  @@index([role])
   @@schema("public")
 }
 
@@ -785,14 +854,14 @@ model WorkspaceProject {
   id          String    @id @default(cuid())
   workspaceId String
   projectId   String
+  permission  String    @default("edit")
   addedAt     DateTime  @default(now())
-  addedBy     String
+  addedBy     String?
   Workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, projectId])
   @@index([projectId])
   @@index([workspaceId])
-  @@index([projectId], map: "idx_wproj_projectid")
   @@schema("public")
 }
 
@@ -1102,6 +1171,7 @@ model schema_migrations {
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model sessions {
   id                     String           @id @db.Uuid
   user_id                String           @db.Uuid
@@ -1216,38 +1286,35 @@ model users {
   @@schema("auth")
 }
 
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model form_submissions {
-  id           String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  site_id      String
-  user_id      String    @db.Uuid
-  form_type    String
-  data         Json
-  submitted_at DateTime? @default(now()) @db.Timestamp(6)
-  user_email   String?
-  user_ip      String?
-  user_agent   String?
-  status       String?   @default("new")
-  notes        String?
+model EnvironmentVariable {
+  id          String   @id @default(cuid())
+  projectId   String
+  key         String
+  value       String
+  description String?
+  environment String   @default("all")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  Project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  @@index([site_id], map: "idx_form_submissions_site_id")
-  @@index([user_id], map: "idx_form_submissions_user_id")
-  @@index([site_id, submitted_at(sort: Desc)], map: "idx_site_submissions")
-  @@index([user_id, submitted_at(sort: Desc)], map: "idx_user_submissions")
+  @@unique([projectId, key, environment])
+  @@index([key])
+  @@index([projectId])
   @@schema("public")
 }
 
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model form_submissions_audit {
-  id         String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  target_id  String?   @db.Uuid
-  action     String
-  changed_by String?   @db.Uuid
-  changed_at DateTime? @default(now()) @db.Timestamptz(6)
-  old_data   Json?
-  new_data   Json?
+model GenerationHistory {
+  id         String   @id
+  userId     String
+  projectId  String?
+  prompt     String
+  tokensUsed Int      @default(0)
+  success    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  User       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([target_id, changed_at(sort: Desc)], map: "idx_form_submissions_audit_target_time")
+  @@index([createdAt])
+  @@index([userId])
   @@schema("public")
 }
 
@@ -1335,4 +1402,15 @@ enum one_time_token_type {
   phone_change_token
 
   @@schema("auth")
+}
+
+enum ProjectStatus {
+  DRAFT
+  GENERATING
+  COMPLETED
+  INCOMPLETE
+  FAILED
+  PUBLISHED
+
+  @@schema("public")
 }
