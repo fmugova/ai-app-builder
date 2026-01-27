@@ -10,18 +10,80 @@ import prisma from '@/lib/prisma';
  * Fixes: Empty preview, failed saves, enum errors, missing fields
  */
 
-function encodeSSE(data: Record<string, unknown>): string {
+// ============================================================================
+// FIX: SSE HTML Parse Error
+// ============================================================================
+
+// Improved SSE encoding for large HTML content
+type SSEData =
+  | { type: 'html'; content: string }
+  | { type: 'progress'; length: number }
+  | { type: 'error'; message: string; errors?: unknown; validationScore?: number }
+  | { type: 'projectCreated'; projectId: string }
+  | { type: 'complete'; message: string; validation: { passed: boolean; score: number }; projectId: string }
+  | { [key: string]: unknown };
+
+function encodeSSE(data: SSEData): string {
   try {
+    // ✅ FIX 1: Properly handle large HTML content
+    if (data.type === 'html' && typeof data.content === 'string') {
+      const contentLength = data.content.length;
+      if (contentLength > 100000) {
+        console.warn('⚠️ Large HTML content:', contentLength, 'chars');
+      }
+      // Escape special characters for JSON
+      const contentStr = data.content;
+      const escaped = contentStr
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t');
+      const payload = JSON.stringify({
+        type: data.type,
+        content: escaped
+      });
+      return `data: ${payload}\n\n`;
+    }
+    // ✅ FIX 2: Standard encoding for other types
     const jsonStr = JSON.stringify(data);
-    const safe = jsonStr
-      .replace(/\n/g, '\\n')
-      .replace(/\r/g, '\\r')
-      .replace(/\t/g, '\\t');
-    return `data: ${safe}\n\n`;
+    return `data: ${jsonStr}\n\n`;
   } catch (error) {
-    console.error('Failed to encode SSE:', error);
-    return `data: ${JSON.stringify({ type: 'error', message: 'Encoding error' })}\n\n`;
+    console.error('❌ SSE encoding error:', error);
+    // Fallback: send error event instead of breaking stream
+    return `data: ${JSON.stringify({
+      type: 'error',
+      message: 'Content too large or contains invalid characters'
+    })}\n\n`;
   }
+}
+
+// Chunking for very large HTML (optional, not enabled by default)
+function encodeSSEWithChunking(data: SSEData): string[] {
+  const MAX_CHUNK_SIZE = 50000; // 50KB chunks
+  if (
+    data.type === 'html' &&
+    typeof data.content === 'string' &&
+    data.content.length > MAX_CHUNK_SIZE
+  ) {
+    const chunks: string[] = [];
+    const content = data.content;
+    const totalChunks = Math.ceil(content.length / MAX_CHUNK_SIZE);
+    for (let i = 0; i < totalChunks; i++) {
+      const start = i * MAX_CHUNK_SIZE;
+      const end = Math.min(start + MAX_CHUNK_SIZE, content.length);
+      const chunk = content.slice(start, end);
+      chunks.push(`data: ${JSON.stringify({
+        type: 'html_chunk',
+        chunk: i,
+        total: totalChunks,
+        content: chunk,
+        isLast: i === totalChunks - 1
+      })}\n\n`);
+    }
+    return chunks;
+  }
+  return [encodeSSE(data)];
 }
 
 function extractCodeBlocks(text: string): { html: string; css: string; js: string } {
@@ -262,12 +324,36 @@ Remember: COMPLETE the entire website. Include ALL closing tags.`,
                 )
               );
 
-              // Send HTML
-              controller.enqueue(
-                encoder.encode(
-                  encodeSSE({ type: 'html', content: finalCode })
-                )
-              );
+              // =====================================================================
+              // FIX: Send HTML with proper encoding and chunking if needed
+              // =====================================================================
+              try {
+                console.log('📤 Sending HTML:', finalCode.length, 'chars');
+                // Option 1: Single send with better encoding
+                const htmlEvent = encodeSSE({
+                  type: 'html',
+                  content: finalCode
+                });
+                controller.enqueue(encoder.encode(htmlEvent));
+                // Option 2: Chunked send (uncomment if needed)
+                /*
+                const chunks = encodeSSEWithChunking({
+                  type: 'html',
+                  content: finalCode
+                });
+                for (const chunk of chunks) {
+                  controller.enqueue(encoder.encode(chunk));
+                  await new Promise(resolve => setTimeout(resolve, 10));
+                }
+                */
+                console.log('✅ HTML sent successfully');
+              } catch (sendError) {
+                console.error('❌ HTML send error:', sendError);
+                controller.enqueue(encoder.encode(encodeSSE({
+                  type: 'error',
+                  message: 'Failed to send HTML content'
+                })));
+              }
 
               controller.close();
             }
@@ -292,6 +378,7 @@ Remember: COMPLETE the entire website. Include ALL closing tags.`,
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no', // ✅ NEW: Disable nginx buffering
       },
     });
   } catch (error) {
