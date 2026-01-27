@@ -14,31 +14,28 @@ import prisma from '@/lib/prisma';
 // FIX: SSE HTML Parse Error
 // ============================================================================
 
-// Improved SSE encoding for large HTML content
-type SSEData =
-  | { type: 'html'; content: string }
-  | { type: 'progress'; length: number }
-  | { type: 'error'; message: string; errors?: unknown; validationScore?: number }
-  | { type: 'projectCreated'; projectId: string }
-  | { type: 'complete'; message: string; validation: { passed: boolean; score: number }; projectId: string }
-  | { [key: string]: unknown };
+interface SSEData {
+  type: string;
+  content?: string;
+  [key: string]: unknown;
+}
 
 function encodeSSE(data: SSEData): string {
   try {
     // ✅ FIX 1: Properly handle large HTML content
-    if (data.type === 'html' && typeof data.content === 'string') {
+    if (data.type === 'html' && data.content) {
+      // Check size
       const contentLength = data.content.length;
       if (contentLength > 100000) {
         console.warn('⚠️ Large HTML content:', contentLength, 'chars');
       }
       // Escape special characters for JSON
-      const contentStr = data.content;
-      const escaped = contentStr
-        .replace(/\\/g, '\\\\')
-        .replace(/"/g, '\\"')
-        .replace(/\n/g, '\\n')
-        .replace(/\r/g, '\\r')
-        .replace(/\t/g, '\\t');
+      const escaped = data.content
+        .replace(/\\/g, '\\\\')  // Escape backslashes first
+        .replace(/"/g, '\\"')    // Escape quotes
+        .replace(/\n/g, '\\n')   // Escape newlines
+        .replace(/\r/g, '\\r')   // Escape carriage returns
+        .replace(/\t/g, '\\t');  // Escape tabs
       const payload = JSON.stringify({
         type: data.type,
         content: escaped
@@ -58,14 +55,14 @@ function encodeSSE(data: SSEData): string {
   }
 }
 
-// Chunking for very large HTML (optional, not enabled by default)
+// ============================================================================
+// ALTERNATIVE SOLUTION: Chunk Large HTML
+// ============================================================================
+
 function encodeSSEWithChunking(data: SSEData): string[] {
   const MAX_CHUNK_SIZE = 50000; // 50KB chunks
-  if (
-    data.type === 'html' &&
-    typeof data.content === 'string' &&
-    data.content.length > MAX_CHUNK_SIZE
-  ) {
+  if (data.type === 'html' && data.content && data.content.length > MAX_CHUNK_SIZE) {
+    // Split into chunks
     const chunks: string[] = [];
     const content = data.content;
     const totalChunks = Math.ceil(content.length / MAX_CHUNK_SIZE);
@@ -83,6 +80,7 @@ function encodeSSEWithChunking(data: SSEData): string[] {
     }
     return chunks;
   }
+  // Not HTML or small enough
   return [encodeSSE(data)];
 }
 
@@ -335,7 +333,7 @@ Remember: COMPLETE the entire website. Include ALL closing tags.`,
                   content: finalCode
                 });
                 controller.enqueue(encoder.encode(htmlEvent));
-                // Option 2: Chunked send (uncomment if needed)
+                // Option 2: Chunked send (use if Option 1 fails)
                 /*
                 const chunks = encodeSSEWithChunking({
                   type: 'html',
