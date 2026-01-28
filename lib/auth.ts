@@ -140,8 +140,8 @@ export const authOptions: NextAuthOptions = {
             throw new Error('Invalid credentials')
           }
 
-          // Check if email is verified
-          if (!user.emailVerified) {
+          // Check if email is verified (must be a valid date)
+          if (!user.emailVerified || isNaN(new Date(user.emailVerified).getTime())) {
             throw new Error('Please verify your email before signing in')
           }
 

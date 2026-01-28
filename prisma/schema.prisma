@@ -731,6 +731,9 @@ model User {
   lastLoginIp           String?
   twoFactorBackupCodes  String[]               @default([])
   hasSeenOnboarding     Boolean                @default(false)
+
+  emailVerificationToken String?               @unique
+  emailVerificationTokenExpiry DateTime?
   Account               Account[]
   ActiveSession         ActiveSession[]
   Activity              Activity[]

@@ -57,7 +57,11 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // Create user
+    // Generate email verification token
+    const emailVerificationToken = crypto.randomBytes(32).toString('hex')
+    const emailVerificationTokenExpiry = new Date(Date.now() + 1000 * 60 * 60 * 24) // 24 hours
+
+    // Create user with verification token
     const user = await prisma.user.create({
       data: {
         name,
@@ -67,6 +71,8 @@ export async function POST(request: NextRequest) {
         subscriptionStatus: 'active',
         projectsLimit: 3,
         generationsLimit: 10,
+        emailVerificationToken,
+        emailVerificationTokenExpiry,
       }
     })
 
@@ -90,14 +96,29 @@ export async function POST(request: NextRequest) {
       // Don't fail signup if enrollment fails
     }
 
-    // Send welcome email (don't await - send async)
+
+    // Send verification email (don't await - send async)
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://buildflow.ai'
+    const verifyUrl = `${baseUrl}/verify-email?token=${emailVerificationToken}`
+    const verificationHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Verify your email address</h2>
+        <p>Hi ${name || 'there'},</p>
+        <p>Thank you for signing up! Please verify your email address by clicking the button below:</p>
+        <p style="text-align: center; margin: 32px 0;">
+          <a href="${verifyUrl}" style="background: #6366f1; color: #fff; padding: 12px 32px; border-radius: 6px; text-decoration: none; font-size: 18px;">Verify Email</a>
+        </p>
+        <p>If you did not sign up, you can ignore this email.</p>
+        <p style="color: #888; font-size: 13px;">This link will expire in 24 hours.</p>
+      </div>
+    `
     sendEmail({
       to: email,
-      subject: 'Welcome to BuildFlow! 🚀',
-      html: getWelcomeEmailHTML(name || 'there'),
+      subject: 'Verify your email address',
+      html: verificationHtml,
       from: 'BuildFlow <noreply@buildflow-ai.app>'
     }).catch(err => 
-      console.error('Welcome email failed:', err)
+      console.error('Verification email failed:', err)
     )
 
     return NextResponse.json({
