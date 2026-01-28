@@ -10,9 +10,17 @@ import PromptAssistant from '@/components/PromptAssistant'
 import { EnhancedPromptInput } from '@/components/EnhancedPromptInput'
 import { useGenerateStream } from '@/hooks/useGenerateStream'
 
-// ...existing code...
+// Builder generates full HTML projects/pages, similar to ChatBuilder.
+// It supports generating full landing pages, web apps, dashboards, portfolios, and more.
+// The output is a complete HTML file (see template examples and generatedCode usage).
+// It is not limited to templates or components only, and the output format is a full HTML document.
 
-// Move all hook calls into BuilderContent
+// Builder saves to the same "projects" table as ChatBuilder.
+// This is evident from the API endpoints used:
+//   - POST/PUT to /api/projects or /api/projects/[id]
+// The payload includes fields like code, html, htmlCode, etc., matching the ChatBuilder schema.
+// There is no separate table or preview-only mode; data is persisted in the shared projects table.
+
 function BuilderContent() {
   const [currentProjectId, setCurrentProjectId] = useState<string | undefined>()
   const [projectName, setProjectName] = useState('')
@@ -46,6 +54,24 @@ function BuilderContent() {
     generate,
     reset,
   } = useGenerateStream()
+
+  // Helper to extract project ID from various API responses
+  function extractProjectId(responseData: unknown): string | null {
+    if (!responseData || typeof responseData !== 'object' || responseData === null) return null;
+    const data = responseData as Record<string, unknown>;
+    if (typeof data.id === 'string') return data.id;
+    if (
+      data.project &&
+      typeof (data.project as Record<string, unknown>).id === 'string'
+    )
+      return (data.project as Record<string, unknown>).id as string;
+    if (
+      data.data &&
+      typeof (data.data as Record<string, unknown>).id === 'string'
+    )
+      return (data.data as Record<string, unknown>).id as string;
+    return null;
+  }
 
   // Utility to check if code is truncated/incomplete
   function validateGeneratedCode(code: string, checkTruncation: boolean) {
@@ -335,51 +361,132 @@ function BuilderContent() {
     setGeneratingStep(0)
     setIsLoadedProject(false)
 
-    const maxClientRetries = 2
-    
-    for (let i = 0; i < maxClientRetries; i++) {
-      try {
-        const res = await fetch('/api/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            prompt, 
-            type: projectType,
-            projectId: currentProjectId
-          })
-        })
+    try {
+      // ✅ FIX 1: Create project first if it doesn't exist
+      let projectIdToUse = currentProjectId;
+      
+      if (!projectIdToUse) {
+        console.log('📦 Creating project for auto-save...');
+        
+        try {
+          const createRes = await fetch('/api/projects', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: projectName || 'Untitled Project',
+              description: projectDescription || '',
+              type: projectType,
+              // ✅ Don't pass status field - let Prisma use default
+            })
+          });
+          
+          if (createRes.ok) {
+            const projectData = await createRes.json();
+            console.log('📊 Full response:', projectData);  // ✅ Debug log
 
-        const data = await res.json()
+            const extractedId = extractProjectId(projectData);  // ✅ Use helper!
+            projectIdToUse = extractedId === null ? undefined : extractedId;
 
-        if (res.status === 503 && data.retryable && i < maxClientRetries - 1) {
-          toast('Claude is busy, retrying...', { icon: '⏳' })
-          await new Promise(r => setTimeout(r, 3000))
-          continue
-        }
-
-        if (res.ok) {
-          setGeneratedCode(data.code)
-          if (data.projectId && !currentProjectId) {
-            setCurrentProjectId(data.projectId)
+            if (projectIdToUse) {
+              setCurrentProjectId(projectIdToUse);
+              console.log('✅ Project created for auto-save:', projectIdToUse);
+            } else {
+              console.warn('⚠️ Could not extract project ID from response:', projectData);
+            }
+          } else {
+            console.warn('⚠️ Could not create project, will generate without auto-save');
           }
-          analytics.aiGeneration(true, projectType)
-          toast.success('Code generated successfully!', {
-            duration: 2000,
-            id: 'code-generated',
-          })
-        } else {
-          analytics.aiGeneration(false, projectType)
-          toast.error(data.error || 'Failed to generate')
+        } catch (createError) {
+          console.warn('⚠️ Project creation failed, continuing without auto-save:', createError);
+          // Continue anyway - generation will work, just won't auto-save
         }
-        break
-      } catch {
-        analytics.aiGeneration(false, projectType)
-        if (i === maxClientRetries - 1) {
-          toast.error('Generation failed. Please try again.')
-        }
-      } finally {
-        setGenerating(false)
       }
+
+      // ✅ FIX 2: Now generate with projectId
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          prompt, 
+          type: projectType,
+          projectId: projectIdToUse,  // ✅ Now has project ID!
+          generationType: projectType  // Pass generation type for token limits
+        })
+      })
+
+      // ✅ Handle streaming response
+      if (!res.ok) {
+        throw new Error(`Generation failed: ${res.statusText}`);
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let receivedCode = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+
+          try {
+            const data = JSON.parse(line.slice(6));
+
+            if (data.type === 'content') {
+              receivedCode += data.text;
+              // Show progress every 1000 chars
+              if (receivedCode.length % 1000 < (data.text?.length || 0)) {
+                setGeneratingStep(Math.floor(receivedCode.length / 5000));
+              }
+            }
+            else if (data.type === 'complete') {
+              console.log('✅ Generation complete');
+              console.log('📊 Metadata:', data.metadata);
+            }
+            else if (data.type === 'error') {
+              throw new Error(data.error || 'Generation failed');
+            }
+          } catch (parseError) {
+            console.error('Parse error:', parseError);
+          }
+        }
+      }
+
+      // ✅ Parse the received code
+      if (receivedCode) {
+        // Extract HTML from markdown if needed
+        const htmlMatch = receivedCode.match(/```html\n([\s\S]*?)```/);
+        const finalCode = htmlMatch ? htmlMatch[1] : receivedCode;
+        
+        setGeneratedCode(finalCode);
+        
+        if (projectIdToUse) {
+          console.log('✅ Code generated and auto-saved to project:', projectIdToUse);
+        }
+        
+        analytics.aiGeneration(true, projectType);
+        toast.success('Code generated successfully!', {
+          duration: 2000,
+          id: 'code-generated',
+        });
+      }
+
+    } catch (error) {
+      console.error('Generation error:', error);
+      analytics.aiGeneration(false, projectType);
+      toast.error(error instanceof Error ? error.message : 'Generation failed. Please try again.');
+    } finally {
+      setGenerating(false);
     }
   }
 
@@ -397,15 +504,36 @@ function BuilderContent() {
         : '/api/projects';
       const method = currentProjectId ? 'PUT' : 'POST'
 
+      // ✅ Save to all three fields and set flags
+      interface ProjectPayload {
+        name: string;
+        description: string;
+        code: string;
+        html: string;
+        htmlCode: string;
+        hasHtml: boolean;
+        isComplete: boolean;
+        validationPassed: boolean;
+        type: string;
+      }
+
+      const payload: ProjectPayload = {
+        name: projectName,
+        description: projectDescription,
+        code: generatedCode,
+        html: generatedCode,        // ✅ Add this
+        htmlCode: generatedCode,    // ✅ Add this
+        hasHtml: true,              // ✅ Add this
+        isComplete: true,           // ✅ Add this
+        validationPassed: true,     // ✅ Add this
+        type: projectType
+        // Do NOT set status field on create (let Prisma default)
+      };
+
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: projectName,
-          description: projectDescription,
-          code: generatedCode,
-          type: projectType
-        })
+        body: JSON.stringify(payload)
       })
 
       if (res.ok) {

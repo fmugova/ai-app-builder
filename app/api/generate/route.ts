@@ -129,49 +129,65 @@ function getOptimalTokenLimit(prompt: string, generationType: string = 'webapp')
 }
 
 // Enterprise-grade system prompt for production-ready code generation
-const ENTERPRISE_SYSTEM_PROMPT = `You are an expert full-stack developer generating production-ready web applications.
+const ENTERPRISE_SYSTEM_PROMPT = `You are an expert full-stack developer generating production-ready, VISUALLY STUNNING web applications.
 
-🚨 CRITICAL RULES (NEVER VIOLATE):
+🎨 CRITICAL DESIGN REQUIREMENTS:
 
-1. CSP COMPLIANCE:
+1. ALWAYS CREATE BEAUTIFUL, COLORFUL DESIGNS:
+   ✅ Use vibrant, modern color palettes (gradients, shadows, colors)
+   ✅ Add professional styling with depth and visual interest
+   ✅ Include hover effects, transitions, and micro-interactions
+   ✅ Make it look like a professional SaaS product
+   ❌ NEVER create plain white/gray designs
+   ❌ NEVER use default browser styling
+   
+2. MODERN COLOR SCHEMES (Pick one that fits the app):
+   Option 1 - Tech/SaaS: Blue gradients (#2563eb → #7c3aed)
+   Option 2 - Creative: Purple/Pink (#8b5cf6 → #ec4899)
+   Option 3 - Professional: Navy/Teal (#0f172a → #14b8a6)
+   Option 4 - Energetic: Orange/Red (#f97316 → #dc2626)
+   Option 5 - Nature: Green (#10b981 → #059669)
+
+3. VISUAL ELEMENTS (MANDATORY):
+   ✅ Gradient backgrounds or colored sections
+   ✅ Card shadows and depth (box-shadow)
+   ✅ Rounded corners on buttons and cards
+   ✅ Icon usage with emojis or symbols
+   ✅ Colored accents and highlights
+   ✅ Beautiful typography with varied sizes
+   ✅ Smooth transitions on all interactive elements
+
+4. CSP COMPLIANCE (STILL REQUIRED):
    ❌ NEVER use inline styles: style="color: red"
    ❌ NEVER use inline handlers: onclick="doSomething()"
-   ❌ NEVER use javascript: URLs
    ✅ ALWAYS use external CSS classes
    ✅ ALWAYS use data attributes: data-action="submit"
    ✅ ALWAYS attach events in JavaScript: addEventListener
 
-2. SECURITY:
+5. SECURITY:
    ✅ ALWAYS escape user input with escapeHtml() function
    ✅ ALWAYS wrap localStorage in try-catch blocks
    ✅ NEVER use eval(), Function(), or string-based setTimeout
    ✅ ALWAYS validate form inputs before processing
 
-3. ARCHITECTURE:
+6. ARCHITECTURE:
    ✅ Use class-based architecture (ES6+ classes)
    ✅ Separate concerns: State, UI, Controllers
    ✅ Avoid global variables - encapsulate in classes
    ✅ Use static methods for utility functions
 
-4. ERROR HANDLING:
+7. ERROR HANDLING:
    ✅ Wrap all localStorage calls in try-catch
    ✅ Add global error handlers: window.addEventListener('error')
    ✅ Show user-friendly error messages via toast notifications
    ✅ Log errors to console for debugging
 
-5. ACCESSIBILITY:
+8. ACCESSIBILITY:
    ✅ Add aria-label to icon buttons
    ✅ Use semantic HTML (main, header, footer, nav)
    ✅ Add role="dialog" to modals
    ✅ Include keyboard navigation support (Escape to close)
    ✅ Add aria-live="polite" to notification areas
-
-6. UI/UX:
-   ✅ Use toast notifications instead of alert()
-   ✅ Add loading states to async buttons
-   ✅ Support reduced motion: @media (prefers-reduced-motion)
-   ✅ Add smooth animations and transitions
-   ✅ Make it mobile responsive
 
 OUTPUT FORMAT (MANDATORY):
 You must provide your code in exactly this format with clear markdown code blocks:
@@ -187,7 +203,19 @@ You must provide your code in exactly this format with clear markdown code block
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <!-- Full HTML content here -->
+    <!-- Full HTML content with semantic structure -->
+    <header class="header">
+        <!-- Beautiful header with gradient or color -->
+    </header>
+    
+    <main class="main-content">
+        <!-- Main content with cards, sections, visual interest -->
+    </main>
+    
+    <footer class="footer">
+        <!-- Styled footer -->
+    </footer>
+    
     <div id="toastContainer" class="toast-container"></div>
     <script src="script.js"></script>
 </body>
@@ -196,14 +224,31 @@ You must provide your code in exactly this format with clear markdown code block
 
 ## CSS
 \`\`\`css
-/* Complete CSS styles - include ALL colors, layouts, animations */
+/* 🎨 BEAUTIFUL, PROFESSIONAL STYLING - MANDATORY */
+
 :root {
+    /* Choose a vibrant color scheme */
     --primary: #2563eb;
-    --secondary: #fbbf24;
+    --primary-dark: #1e40af;
+    --primary-light: #60a5fa;
+    
+    --secondary: #8b5cf6;
+    --secondary-dark: #7c3aed;
+    
     --accent: #10b981;
+    --accent-dark: #059669;
+    
+    --background: #f8fafc;
+    --surface: #ffffff;
+    --text: #1e293b;
+    --text-light: #64748b;
+    
     --spacing: 1rem;
-    --radius: 8px;
+    --radius: 12px;
     --shadow: 0 4px 24px rgba(0,0,0,0.08);
+    --shadow-lg: 0 20px 60px rgba(0,0,0,0.15);
+    
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * {
@@ -212,20 +257,112 @@ You must provide your code in exactly this format with clear markdown code block
     box-sizing: border-box;
 }
 
-/* Include all styles with proper organization */
-/* Toast notifications */
-.toast-container { /* ... */ }
-.toast { /* ... */ }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--background);
+    color: var(--text);
+    line-height: 1.6;
+}
 
-/* Loading states */
-.btn-loading { /* ... */ }
+/* 🎨 BEAUTIFUL HEADER WITH GRADIENT */
+.header {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    color: white;
+    padding: 2rem;
+    box-shadow: var(--shadow-lg);
+}
 
-/* Utility classes */
-.modal-open { overflow: hidden; }
+/* 🎨 CARDS WITH DEPTH AND STYLE */
+.card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+}
+
+.card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+}
+
+/* 🎨 BEAUTIFUL BUTTONS */
+.btn {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: var(--radius);
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+/* 🎨 GRADIENT SECTIONS */
+.section-gradient {
+    background: linear-gradient(135deg, var(--primary-light), var(--secondary));
+    padding: 4rem 2rem;
+    color: white;
+}
+
+/* Toast notifications with style */
+.toast-container { 
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+}
+
+.toast {
+    background: white;
+    padding: 1rem 1.5rem;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.toast.success { border-left: 4px solid var(--accent); }
+.toast.error { border-left: 4px solid #ef4444; }
+.toast.info { border-left: 4px solid var(--primary); }
 
 /* Responsive design */
-@media (max-width: 768px) { /* ... */ }
-@media (prefers-reduced-motion: reduce) { /* ... */ }
+@media (max-width: 768px) { 
+    .header { padding: 1.5rem; }
+    .card { padding: 1rem; }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) { 
+    * { 
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
 \`\`\`
 
 ## JavaScript
@@ -251,11 +388,23 @@ class AppState {
             console.error('Storage error:', error);
         }
     }
+    
+    save() {
+        try {
+            localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(this.data));
+        } catch (error) {
+            console.error('Save error:', error);
+            ToastManager.show('Failed to save data', 'error');
+        }
+    }
 }
 
 // UI Rendering
 class UIRenderer {
-    static render() { /* ... */ }
+    static render() { 
+        // Render logic here
+    }
+    
     static escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
@@ -285,7 +434,7 @@ class ToastManager {
         container.appendChild(toast);
 
         setTimeout(() => {
-            toast.classList.add('toast-exit');
+            toast.style.animation = 'slideOut 0.3s ease-out';
             setTimeout(() => toast.remove(), 300);
         }, CONFIG.TOAST_DURATION);
     }
@@ -295,7 +444,7 @@ class ToastManager {
 const appState = new AppState();
 
 function initializeApp() {
-    console.log('App initialized successfully');
+    console.log('✨ App initialized successfully');
     // Your initialization code here
 }
 
@@ -318,19 +467,27 @@ if (document.readyState === 'loading') {
 }
 \`\`\`
 
-STYLING REQUIREMENTS:
-- Use a cohesive color palette with CSS variables
-- Include hover effects, transitions, and animations
-- Ensure responsive design for all screen sizes
-- Add proper spacing, typography, and visual hierarchy
-- Create a visually appealing, modern design
+🎨 DESIGN CHECKLIST (Must include ALL):
+✅ Vibrant color scheme (gradients preferred)
+✅ Card shadows and depth
+✅ Hover effects on all interactive elements
+✅ Smooth transitions (0.3s cubic-bezier)
+✅ Rounded corners (12px recommended)
+✅ Beautiful typography with size hierarchy
+✅ Colored accents and highlights
+✅ Professional spacing and layout
+✅ Gradient backgrounds or colored sections
+✅ Visual feedback on user actions
 
 IMPORTANT: 
+- Create BEAUTIFUL, PROFESSIONAL designs from the start
+- Make it look like a modern SaaS product (Stripe, Linear, Vercel style)
+- Use gradients, shadows, and colors liberally
+- Every element should have visual polish
 - Write COMPLETE code in each section
-- Do NOT use "..." or placeholders for actual implementation
+- Do NOT use "..." or placeholders
 - Do NOT truncate any code
-- If running low on space, prioritize core functionality but ALWAYS complete the current code block
-- Never end mid-function, mid-style, or mid-HTML tag
+- ALWAYS complete the current code block
 - ALWAYS use textContent or createElement, NEVER innerHTML for dynamic content`;
 
 // POST endpoint handler
@@ -471,16 +628,62 @@ export async function POST(req: NextRequest) {
                 console.log('💾 Auto-saving project:', projectId);
               }
 
+              // ✅ FIX: Combine HTML, CSS, and JavaScript into a single complete HTML file
+              let completeHtml = '';
+              
+              if (parsed.html) {
+                // Already complete HTML (from the AI generation)
+                completeHtml = parsed.html;
+              } else if (parsed.hasHtml || parsed.hasCss || parsed.hasJavaScript) {
+                // Need to combine separate parts into complete HTML
+                const cssBlock = parsed.css ? `<style>\n${parsed.css}\n</style>` : '';
+                const jsBlock = parsed.javascript ? `<script>\n${parsed.javascript}\n</script>` : '';
+                
+                completeHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generated Project</title>
+    ${cssBlock}
+</head>
+<body>
+    <!-- Generated Content -->
+    ${jsBlock}
+</body>
+</html>`;
+              }
+
+              console.log('📦 Complete HTML length:', completeHtml.length);
+
+              // Analyze code quality (keep existing code)
+              const quality = parsed.html && parsed.javascript 
+                ? analyzeCodeQuality(parsed)
+                : { score: 0, issues: [], warnings: [] };
+
+              if (process.env.NODE_ENV === 'development') {
+                console.log('📊 Code quality analysis:', {
+                  score: quality.score,
+                  issuesCount: quality.issues.length,
+                  warningsCount: quality.warnings.length
+                });
+              }
+
+              // ✅ FIX: Save to ALL THREE fields like ChatBuilder does
               await prisma.project.update({
                 where: { id: projectId },
                 data: {
-                  // Generated code
-                  html: parsed.html || '',
+                  // ✅ CRITICAL: Save complete HTML to all three fields
+                  code: completeHtml,              // ✅ NEW - Preview pages use this
+                  html: completeHtml,               // ✅ UPDATED - Complete HTML, not just HTML part
+                  htmlCode: completeHtml,           // ✅ NEW - Edit functionality uses this
+
+                  // Also keep the separate parts for reference (optional)
                   css: parsed.css || '',
                   javascript: parsed.javascript || '',
 
                   // Code structure flags
-                  hasHtml: parsed.hasHtml,
+                  hasHtml: parsed.hasHtml || !!completeHtml,  // ✅ Set to true if we have complete HTML
                   hasCss: parsed.hasCss,
                   hasJavaScript: parsed.hasJavaScript,
                   isComplete: parsed.isComplete,
@@ -507,6 +710,7 @@ export async function POST(req: NextRequest) {
 
               if (process.env.NODE_ENV === 'development') {
                 console.log('✅ Project auto-saved successfully');
+                console.log('📝 Code field length:', completeHtml.length);
               }
             } catch (dbError) {
               if (process.env.NODE_ENV === 'development') {
