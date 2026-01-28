@@ -734,6 +734,8 @@ model User {
 
   emailVerificationToken String?               @unique
   emailVerificationTokenExpiry DateTime?
+
+  twoFactorRequired      Boolean               @default(false)
   Account               Account[]
   ActiveSession         ActiveSession[]
   Activity              Activity[]

@@ -18,7 +18,8 @@ export async function GET() {
       where: { email: session.user.email },
       select: {
         twoFactorEnabled: true,
-        twoFactorBackupCodes: true
+        twoFactorBackupCodes: true,
+        twoFactorRequired: true
       }
     })
 
@@ -28,6 +29,7 @@ export async function GET() {
 
     return NextResponse.json({
       twoFactorEnabled: user.twoFactorEnabled,
+      twoFactorRequired: user.twoFactorRequired,
       backupCodesRemaining: user.twoFactorBackupCodes?.length || 0
     })
   } catch (error) {

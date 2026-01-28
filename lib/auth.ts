@@ -141,8 +141,14 @@ export const authOptions: NextAuthOptions = {
           }
 
           // Check if email is verified (must be a valid date)
+
           if (!user.emailVerified || isNaN(new Date(user.emailVerified).getTime())) {
             throw new Error('Please verify your email before signing in')
+          }
+
+          // Enforce 2FA setup for users who require it
+          if (user.twoFactorRequired && !user.twoFactorEnabled) {
+            throw new Error('Two-factor authentication setup required. Please enable 2FA to continue.')
           }
 
           // Check if 2FA is enabled and validate token if provided

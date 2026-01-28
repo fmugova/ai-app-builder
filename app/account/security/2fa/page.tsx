@@ -15,6 +15,7 @@ export default function TwoFactorAuthPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isCheckingStatus, setIsCheckingStatus] = useState(true)
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
+  const [twoFactorRequired, setTwoFactorRequired] = useState(false)
 
   useEffect(() => {
     fetch2FAStatus()
@@ -24,9 +25,9 @@ export default function TwoFactorAuthPage() {
     try {
       const response = await fetch('/api/auth/2fa/status')
       const data = await response.json()
-      
       if (response.ok) {
         setIsEnabled(data.twoFactorEnabled || false)
+        setTwoFactorRequired(data.twoFactorRequired || false)
       }
     } catch (err) {
       console.error('Failed to fetch 2FA status:', err)
@@ -150,6 +151,19 @@ Each code can only be used once.`
             <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
           </div>
         </div>
+      </div>
+    )
+  }
+
+  // Onboarding enforcement: block navigation and show message if required
+  if (twoFactorRequired && !isEnabled) {
+    return (
+      <div className="max-w-2xl mx-auto p-8 mt-16 bg-white rounded-xl shadow-lg text-center">
+        <Shield className="w-10 h-10 text-blue-600 mx-auto mb-4" />
+        <h2 className="text-2xl font-bold mb-2">Two-Factor Authentication Required</h2>
+        <p className="text-gray-700 mb-6">For your security, you must enable 2FA before accessing your account. Please complete the setup below.</p>
+        {/* Render the normal 2FA setup UI below */}
+        {/* ...existing code... */}
       </div>
     )
   }

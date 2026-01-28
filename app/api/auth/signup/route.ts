@@ -1,12 +1,14 @@
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
+
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { sendEmail, getWelcomeEmailHTML } from '@/lib/email'
 import { checkRateLimit, rateLimits } from '@/lib/rateLimit'
 import { signupSchema, validateSchema } from '@/lib/schemas'
+import { randomBytes } from 'crypto'
 
 // Server-side analytics logging (GA tracking happens client-side)
 const logAnalyticsEvent = (event: string, properties?: Record<string, any>) => {
@@ -58,7 +60,7 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await bcrypt.hash(password, 10)
 
     // Generate email verification token
-    const emailVerificationToken = crypto.randomBytes(32).toString('hex')
+    const emailVerificationToken = randomBytes(32).toString('hex')
     const emailVerificationTokenExpiry = new Date(Date.now() + 1000 * 60 * 60 * 24) // 24 hours
 
     // Create user with verification token
@@ -73,6 +75,8 @@ export async function POST(request: NextRequest) {
         generationsLimit: 10,
         emailVerificationToken,
         emailVerificationTokenExpiry,
+        twoFactorEnabled: false,
+        twoFactorRequired: true, // Custom flag to enforce 2FA setup after signup
       }
     })
 
