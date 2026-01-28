@@ -97,7 +97,17 @@ export default function SignInClient() {
       })
 
       if (result?.error) {
-        if (result.error.includes('Invalid 2FA')) {
+        if (result.error.includes('verify your email')) {
+          toast.error('You must verify your email before signing in.')
+          setTimeout(() => {
+            router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`)
+          }, 1000)
+        } else if (result.error.includes('Two-factor authentication setup required')) {
+          toast.error('You must set up 2FA before accessing your account.')
+          setTimeout(() => {
+            router.push('/account/security/2fa?onboarding=1')
+          }, 1000)
+        } else if (result.error.includes('Invalid 2FA')) {
           toast.error('Invalid 2FA code. Please try again.')
           setFormData({ ...formData, twoFactorToken: '' })
         } else if (result.error.includes('locked')) {
