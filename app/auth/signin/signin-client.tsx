@@ -97,12 +97,21 @@ export default function SignInClient() {
       })
 
       if (result?.error) {
-        if (result.error.includes('verify your email')) {
+        // Try to parse error as JSON for custom error name
+        let errorName = ''
+        try {
+          const parsed = JSON.parse(result.error)
+          errorName = parsed.name || ''
+        } catch {
+          // fallback to string includes
+        }
+
+        if (errorName === 'EMAIL_NOT_VERIFIED' || result.error.includes('verify your email')) {
           toast.error('You must verify your email before signing in.')
           setTimeout(() => {
             router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`)
           }, 1000)
-        } else if (result.error.includes('Two-factor authentication setup required')) {
+        } else if (errorName === 'TWO_FACTOR_ONBOARDING_REQUIRED' || result.error.includes('Two-factor authentication setup required')) {
           toast.error('You must set up 2FA before accessing your account.')
           setTimeout(() => {
             router.push('/account/security/2fa?onboarding=1')
@@ -113,8 +122,11 @@ export default function SignInClient() {
         } else if (result.error.includes('locked')) {
           toast.error(result.error)
           setShow2FA(false)
-        } else {
+        } else if (errorName === 'INVALID_CREDENTIALS' || result.error.includes('Invalid credentials')) {
           toast.error('Invalid email or password')
+          setShow2FA(false)
+        } else {
+          toast.error(result.error || 'Invalid email or password')
           setShow2FA(false)
         }
       } else {
@@ -125,9 +137,25 @@ export default function SignInClient() {
         router.push(callbackUrl)
         router.refresh()
       }
-    } catch (error) {
-      console.error('Sign in error:', error)
-      toast.error('Something went wrong')
+    } catch (error: unknown) {
+      // Try to handle custom error name if available
+      if (error?.name === 'EMAIL_NOT_VERIFIED') {
+        toast.error('You must verify your email before signing in.')
+        setTimeout(() => {
+          router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`)
+        }, 1000)
+      } else if (error?.name === 'TWO_FACTOR_ONBOARDING_REQUIRED') {
+        toast.error('You must set up 2FA before accessing your account.')
+        setTimeout(() => {
+          router.push('/account/security/2fa?onboarding=1')
+        }, 1000)
+      } else if (error?.name === 'INVALID_CREDENTIALS') {
+        toast.error('Invalid email or password')
+        setShow2FA(false)
+      } else {
+        console.error('Sign in error:', error)
+        toast.error('Something went wrong')
+      }
     } finally {
       setLoading(false)
     }

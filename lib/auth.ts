@@ -114,8 +114,18 @@ export const authOptions: NextAuthOptions = {
 
           const user = await prisma.user.findUnique({
             where: { email: credentials.email },
-            include: {
-              Subscription: true,
+            select: {
+              id: true,
+              email: true,
+              password: true,
+              emailVerified: true,
+              twoFactorRequired: true,
+              twoFactorEnabled: true,
+              twoFactorSecret: true,
+              twoFactorBackupCodes: true,
+              name: true,
+              role: true,
+              image: true,
             },
           })
 
@@ -124,7 +134,9 @@ export const authOptions: NextAuthOptions = {
           if (!user || !user.password) {
             // Track failed login attempt using comprehensive function
             await trackFailedLoginAttempt(credentials.email, ipAddress, userAgent)
-            throw new Error('Invalid credentials')
+            const error = new Error('Invalid credentials')
+            error.name = 'INVALID_CREDENTIALS'
+            throw error
           }
 
           const isPasswordValid = await bcrypt.compare(
@@ -137,18 +149,24 @@ export const authOptions: NextAuthOptions = {
           if (!isPasswordValid) {
             // Track failed login attempt using comprehensive function
             await trackFailedLoginAttempt(credentials.email, ipAddress, userAgent)
-            throw new Error('Invalid credentials')
+            const error = new Error('Invalid credentials')
+            error.name = 'INVALID_CREDENTIALS'
+            throw error
           }
 
           // Check if email is verified (must be a valid date)
 
           if (!user.emailVerified || isNaN(new Date(user.emailVerified).getTime())) {
-            throw new Error('Please verify your email before signing in')
+            const error = new Error('Please verify your email before signing in')
+            error.name = 'EMAIL_NOT_VERIFIED'
+            throw error
           }
 
           // Enforce 2FA setup for users who require it
           if (user.twoFactorRequired && !user.twoFactorEnabled) {
-            throw new Error('Two-factor authentication setup required. Please enable 2FA to continue.')
+            const error = new Error('Two-factor authentication setup required. Please enable 2FA to continue.')
+            error.name = 'TWO_FACTOR_ONBOARDING_REQUIRED'
+            throw error
           }
 
           // Check if 2FA is enabled and validate token if provided

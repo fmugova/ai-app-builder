@@ -1,6 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
-  previewFeatures = ["multiSchema"]  // ✅ ADD THIS
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
@@ -448,27 +448,6 @@ model Project {
   description         String?
   type                String
   code                String
-  hasHtml             Boolean?              @default(false)
-  hasCss              Boolean?              @default(false)
-  hasJavaScript       Boolean?              @default(false)
-  isComplete          Boolean?              @default(false)
-
-  // JavaScript validation
-  jsValid            Boolean?             @default(true)
-  jsError            String?
-
-  // Code quality validation
-  validationScore    Int?                 @default(0)
-  validationPassed   Boolean?             @default(false)
-  validationErrors   Json?
-  validationWarnings Json?
-  cspViolations      Json?
-
-  // Generation metadata
-  tokensUsed         Int?                 @default(0)
-  generationTime     Int?                 @default(0)
-  retryCount         Int?                 @default(0)
-  lastModified       DateTime?
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @default(now()) @updatedAt
   downloads           Int                   @default(0)
@@ -492,6 +471,21 @@ model Project {
   html                String?
   css                 String?
   javascript          String?
+  hasCss              Boolean?              @default(false)
+  hasHtml             Boolean?              @default(false)
+  hasJavaScript       Boolean?              @default(false)
+  isComplete          Boolean?              @default(false)
+  jsError             String?
+  jsValid             Boolean?              @default(true)
+  validationPassed    Boolean?              @default(false)
+  validationScore     Int?                  @default(0)
+  validationErrors    Json?
+  validationWarnings  Json?
+  cspViolations       Json?
+  generationTime      Int?                  @default(0)
+  lastModified        DateTime?
+  retryCount          Int?                  @default(0)
+  tokensUsed          Int?                  @default(0)
   ApiEndpoint         ApiEndpoint[]
   CustomDomain        CustomDomain[]
   DatabaseConnection  DatabaseConnection?
@@ -689,79 +683,77 @@ model TemplateReview {
 }
 
 model User {
-  id                    String                 @id @default(cuid())
-  name                  String?
-  email                 String                 @unique
-  emailVerified         DateTime?
-  password              String?
-  image                 String?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  autoSave              Boolean                @default(true)
-  notifications         Boolean                @default(true)
-  theme                 String                 @default("dark")
-  bio                   String?
-  promoCodeUsed         String?
-  discountRate          Float                  @default(0)
-  subscriptionTier      String                 @default("free")
-  subscriptionStatus    String                 @default("active")
-  stripeCustomerId      String?                @unique
-  stripeSubscriptionId  String?                @unique
-  subscriptionResetDate DateTime?
-  cancelAtPeriodEnd     Boolean                @default(false)
-  currentPeriodStart    DateTime?
-  currentPeriodEnd      DateTime?
-  generationsUsed       Int                    @default(0)
-  generationsLimit      Int                    @default(10)
-  projectsThisMonth     Int                    @default(0)
-  projectsLimit         Int                    @default(3)
-  role                  String                 @default("user")
-  githubAccessToken     String?
-  githubUsername        String?
-  twoFactorEnabled      Boolean                @default(false)
-  twoFactorSecret       String?
-  resetToken            String?                @unique
-  resetTokenExpiry      DateTime?
-  vercelToken           String?
-  vercelProjectName     String?
-  vercelTeamId          String?
-  accountLockedUntil    DateTime?
-  failedLoginAttempts   Int                    @default(0)
-  lastLoginAt           DateTime?
-  lastLoginIp           String?
-  twoFactorBackupCodes  String[]               @default([])
-  hasSeenOnboarding     Boolean                @default(false)
-
-  emailVerificationToken String?               @unique
+  id                           String                 @id @default(cuid())
+  name                         String?
+  email                        String                 @unique
+  emailVerified                DateTime?
+  password                     String?
+  image                        String?
+  createdAt                    DateTime               @default(now())
+  updatedAt                    DateTime               @updatedAt
+  autoSave                     Boolean                @default(true)
+  notifications                Boolean                @default(true)
+  theme                        String                 @default("dark")
+  bio                          String?
+  promoCodeUsed                String?
+  discountRate                 Float                  @default(0)
+  subscriptionTier             String                 @default("free")
+  subscriptionStatus           String                 @default("active")
+  stripeCustomerId             String?                @unique
+  stripeSubscriptionId         String?                @unique
+  subscriptionResetDate        DateTime?
+  cancelAtPeriodEnd            Boolean                @default(false)
+  currentPeriodStart           DateTime?
+  currentPeriodEnd             DateTime?
+  generationsUsed              Int                    @default(0)
+  generationsLimit             Int                    @default(10)
+  projectsThisMonth            Int                    @default(0)
+  projectsLimit                Int                    @default(3)
+  role                         String                 @default("user")
+  githubAccessToken            String?
+  githubUsername               String?
+  twoFactorEnabled             Boolean                @default(false)
+  twoFactorSecret              String?
+  resetToken                   String?                @unique
+  resetTokenExpiry             DateTime?
+  vercelToken                  String?
+  vercelProjectName            String?
+  vercelTeamId                 String?
+  accountLockedUntil           DateTime?
+  failedLoginAttempts          Int                    @default(0)
+  lastLoginAt                  DateTime?
+  lastLoginIp                  String?
+  twoFactorBackupCodes         String[]               @default([])
+  hasSeenOnboarding            Boolean                @default(false)
+  emailVerificationToken       String?                @unique
   emailVerificationTokenExpiry DateTime?
-
-  twoFactorRequired      Boolean               @default(false)
-  Account               Account[]
-  ActiveSession         ActiveSession[]
-  Activity              Activity[]
-  CustomDomain          CustomDomain[]
-  DatabaseConnection    DatabaseConnection[]
-  Deployment            Deployment[]
-  DripEnrollment        DripEnrollment[]
-  EmailCampaign         EmailCampaign[]
-  Feedback              Feedback[]
-  FormSubmission        FormSubmission[]
-  Generation            Generation[]
-  GenerationHistory     GenerationHistory[]
-  NewsletterSubscriber  NewsletterSubscriber[]
-  PasswordHistory       PasswordHistory[]
-  Project               Project[]
-  ProjectShare          ProjectShare[]
-  ProjectVersion        ProjectVersion[]
-  SecurityEvent         SecurityEvent[]
-  Session               Session[]
-  Subscription          Subscription?
-  Template              Template[]
-  TemplatePurchase      TemplatePurchase[]
-  TemplateRevenue       TemplateRevenue[]
-  TemplateReview        TemplateReview[]
-  VercelConnection      VercelConnection?
-  WorkspaceMember       WorkspaceMember[]
+  twoFactorRequired            Boolean                @default(false)
+  Account                      Account[]
+  ActiveSession                ActiveSession[]
+  Activity                     Activity[]
+  CustomDomain                 CustomDomain[]
+  DatabaseConnection           DatabaseConnection[]
+  Deployment                   Deployment[]
+  DripEnrollment               DripEnrollment[]
+  EmailCampaign                EmailCampaign[]
+  Feedback                     Feedback[]
+  FormSubmission               FormSubmission[]
+  Generation                   Generation[]
+  GenerationHistory            GenerationHistory[]
+  NewsletterSubscriber         NewsletterSubscriber[]
+  PasswordHistory              PasswordHistory[]
+  Project                      Project[]
+  ProjectShare                 ProjectShare[]
+  ProjectVersion               ProjectVersion[]
+  SecurityEvent                SecurityEvent[]
+  Session                      Session[]
+  Subscription                 Subscription?
+  Template                     Template[]
+  TemplatePurchase             TemplatePurchase[]
+  TemplateRevenue              TemplateRevenue[]
+  TemplateReview               TemplateReview[]
+  VercelConnection             VercelConnection?
+  WorkspaceMember              WorkspaceMember[]
 
   @@schema("public")
 }
