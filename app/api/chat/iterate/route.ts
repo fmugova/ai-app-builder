@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
         conversationContext = history
           .map((msg: { role: string; content: string }) => `${msg.role}: ${msg.content}`)
           .join('\n');
-      } catch (e) {
+      } catch {
         console.warn('Failed to parse conversation history');
       }
     }

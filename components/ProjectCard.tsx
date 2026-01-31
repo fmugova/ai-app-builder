@@ -28,12 +28,12 @@ interface ProjectCardProps {
 
 export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCardProps) {
   // Debugging helper
-  console.log('Project data:', {
-    id: project.id,
-    publicUrl: project.publicUrl,
-    publicSlug: project.publicSlug,
-    isPublished: project.isPublished
-  });
+  // console.log('Project data:', {
+  //   id: project.id,
+  //   publicUrl: project.publicUrl,
+  //   publicSlug: project.publicSlug,
+  //   isPublished: project.isPublished
+  // });
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);

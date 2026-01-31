@@ -40,11 +40,15 @@ async function checkWorkspacePermission(
 }
 
 // GET /api/workspaces/[id]/projects - Get all projects in workspace
+interface IdParamContext {
+  params: Promise<{ id: string }>;
+}
+
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: IdParamContext
 ) {
-  const { id } = await params;
+  const { id } = await context.params;
   try {
     const session = await getServerSession(authOptions);
     
@@ -86,12 +90,11 @@ export async function GET(
   }
 }
 
-// POST /api/workspaces/[id]/projects - Add project to workspace
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: IdParamContext
 ) {
-  const { id } = await params;
+  const { id } = await context.params;
   try {
     const session = await getServerSession(authOptions);
     
@@ -107,6 +110,20 @@ export async function POST(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // 🟡 User-based write rate limit
+    const rateLimit = await (await import('@/lib/rate-limit')).checkRateLimit(req, 'write', user.id);
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        {
+          error: 'Too many requests',
+          message: 'Please slow down',
+          remaining: rateLimit.remaining,
+        },
+        { status: 429 }
+      );
+    }
+
+    // ...existing code...
     const { hasPermission } = await checkWorkspacePermission(id, user.id, 'admin');
 
     if (!hasPermission) {

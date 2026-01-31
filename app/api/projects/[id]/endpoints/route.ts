@@ -8,8 +8,8 @@ import { prisma } from '@/lib/prisma'
 import { generateApiEndpoint, validateGeneratedCode } from '@/lib/api-generator'
 
 // GET - List all endpoints for a project
-export async function GET(req: Request, context: { params: { id: string } }) {
-  const { id } = context.params;
+export async function GET(req: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
@@ -44,8 +44,8 @@ export async function GET(req: Request, context: { params: { id: string } }) {
 }
 
 // POST - Create new API endpoint (AI-generated or from template)
-export async function POST(req: Request, context: { params: { id: string } }) {
-  const { id } = context.params;
+export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
@@ -174,8 +174,8 @@ export async function POST(req: Request, context: { params: { id: string } }) {
 }
 
 // PUT - Update endpoint
-export async function PUT(req: Request, context: { params: { id: string } }) {
-  const { id } = context.params;
+export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {

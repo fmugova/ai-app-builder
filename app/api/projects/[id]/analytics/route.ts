@@ -55,9 +55,13 @@ function parseLocation(properties: AnalyticsEventProperties): { country: string;
   }
 }
 
+interface IdParamContext {
+  params: Promise<{ id: string }>;
+}
+
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  context: IdParamContext
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -76,7 +80,8 @@ export async function GET(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const projectId = context.params.id
+    const { id } = await context.params;
+    const projectId = id;
 
     // Verify project access
     const project = await prisma.project.findFirst({

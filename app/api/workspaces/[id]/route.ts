@@ -49,11 +49,15 @@ async function getUserFromSession(session: Session | null) {
 }
 
 // GET /api/workspaces/[id] - Get workspace details
+interface IdParamContext {
+  params: Promise<{ id: string }>;
+}
+
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: IdParamContext
 ) {
-  const { id } = await params;
+  const { id } = await context.params;
   try {
     const session = await getServerSession(authOptions);
     const user = await getUserFromSession(session);
@@ -113,15 +117,30 @@ export async function GET(
 // PATCH /api/workspaces/[id] - Update workspace
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: IdParamContext
 ) {
-  const { id } = await params;
+  const { id } = await context.params;
   try {
     const session = await getServerSession(authOptions);
     const user = await getUserFromSession(session);
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized or user not found' }, { status: 401 });
     }
+
+    // 🟡 User-based write rate limit
+    const rateLimit = await (await import('@/lib/rate-limit')).checkRateLimit(req, 'write', user.id);
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        {
+          error: 'Too many requests',
+          message: 'Please slow down',
+          remaining: rateLimit.remaining,
+        },
+        { status: 429 }
+      );
+    }
+
+    // ...existing code...
     // Only admins and owners can update workspace
     const { hasPermission } = await checkWorkspacePermission(id, user.id, 'admin');
     if (!hasPermission) {
@@ -190,9 +209,9 @@ export async function PATCH(
 // DELETE /api/workspaces/[id] - Delete workspace
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: IdParamContext
 ) {
-  const { id } = await params;
+  const { id } = await context.params;
   try {
     const session = await getServerSession(authOptions);
     const user = await getUserFromSession(session);

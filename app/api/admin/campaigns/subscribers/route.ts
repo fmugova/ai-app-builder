@@ -32,6 +32,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(subscribers)
   } catch (error) {
     console.error('Get subscribers error:', error)
+    const Sentry = (await import('@/lib/sentry')).default
+    Sentry.captureException(error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

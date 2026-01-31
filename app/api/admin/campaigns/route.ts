@@ -39,6 +39,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(campaigns)
   } catch (error) {
     console.error('Get campaigns error:', error)
+    const Sentry = (await import('@/lib/sentry')).default
+    Sentry.captureException(error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

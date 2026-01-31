@@ -9,9 +9,9 @@ import { prisma } from '@/lib/prisma'
 // DELETE - Delete endpoint
 export async function DELETE(
   req: Request,
-  { params }: { params: { id: string; endpointId: string } }
+  context: { params: Promise<{ id: string; endpointId: string }> }
 ) {
-  const { id, endpointId } = params;
+  const { id, endpointId } = await context.params;
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {

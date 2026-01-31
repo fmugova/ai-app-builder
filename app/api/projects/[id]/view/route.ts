@@ -9,10 +9,10 @@ import { isAdmin } from '@/lib/admin'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
+    const { id } = await context.params
     const session = await getServerSession(authOptions)
 
     if (!session?.user?.email) {

@@ -139,17 +139,21 @@ export default function SignInClient() {
       }
     } catch (error: unknown) {
       // Try to handle custom error name if available
-      if (error?.name === 'EMAIL_NOT_VERIFIED') {
+      const errorName =
+        typeof error === 'object' && error !== null && 'name' in error && typeof (error as { name?: string }).name === 'string'
+          ? (error as { name?: string }).name
+          : '';
+      if (errorName === 'EMAIL_NOT_VERIFIED') {
         toast.error('You must verify your email before signing in.')
         setTimeout(() => {
           router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`)
         }, 1000)
-      } else if (error?.name === 'TWO_FACTOR_ONBOARDING_REQUIRED') {
+      } else if (errorName === 'TWO_FACTOR_ONBOARDING_REQUIRED') {
         toast.error('You must set up 2FA before accessing your account.')
         setTimeout(() => {
           router.push('/account/security/2fa?onboarding=1')
         }, 1000)
-      } else if (error?.name === 'INVALID_CREDENTIALS') {
+      } else if (errorName === 'INVALID_CREDENTIALS') {
         toast.error('Invalid email or password')
         setShow2FA(false)
       } else {

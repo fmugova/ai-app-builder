@@ -16,9 +16,9 @@ import { logSecurityEvent } from '@/lib/security'
 // GET - List all environment variables for a project
 export async function GET(
   req: Request,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
+  const { id } = await context.params;
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {

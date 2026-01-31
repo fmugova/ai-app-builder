@@ -17,8 +17,18 @@ const updateConnectionSchema = z.object({
   supabaseServiceKey: z.string().optional(),
 })
 
-export const GET = withAuth(async (req, context, session) => {
+/**
+ * FIXED: Next.js 15 Async Params
+ * In Next.js 15, route params are now async and must be awaited
+ */
+interface RouteContext {
+  params: Promise<{ id: string }>
+}
+
+export const GET = withAuth(async (req: NextRequest, context: RouteContext, session) => {
   try {
+    // ✅ Await the params
+    const { id } = await context.params;
     // Check Pro subscription
     if (!['pro', 'business', 'enterprise'].includes(session.user.subscriptionTier)) {
       return NextResponse.json(
@@ -26,9 +36,6 @@ export const GET = withAuth(async (req, context, session) => {
         { status: 403 }
       )
     }
-
-    // Check ownership
-    const { id } = await context.params as { id: string };
     const connection = await prisma.databaseConnection.findFirst({
       where: {
         id,
@@ -55,7 +62,6 @@ export const GET = withAuth(async (req, context, session) => {
         { status: 404 }
       )
     }
-    
     return NextResponse.json({ success: true, connection })
   } catch (error) {
     console.error('Failed to fetch connection:', error)
@@ -66,8 +72,10 @@ export const GET = withAuth(async (req, context, session) => {
   }
 })
 
-export const PUT = withAuth(async (req, context, session) => {
+export const PUT = withAuth(async (req: NextRequest, context: RouteContext, session) => {
   try {
+    // ✅ Await the params
+    const { id } = await context.params;
     // Check Pro subscription
     if (!['pro', 'business', 'enterprise'].includes(session.user.subscriptionTier)) {
       return NextResponse.json(
@@ -75,26 +83,19 @@ export const PUT = withAuth(async (req, context, session) => {
         { status: 403 }
       )
     }
-
-    // Check ownership
-    const { id } = await context.params as { id: string };
     const existing = await prisma.databaseConnection.findFirst({
       where: {
         id,
         userId: session.user.id
       }
     })
-
     if (!existing) {
       return NextResponse.json(
         { error: 'Connection not found' },
         { status: 404 }
       )
     }
-
     const body = await req.json()
-    
-    // Validate input
     const result = updateConnectionSchema.safeParse(body)
     if (!result.success) {
       return NextResponse.json(
@@ -102,10 +103,8 @@ export const PUT = withAuth(async (req, context, session) => {
         { status: 400 }
       )
     }
-    
-    // Update database connection
     const connection = await prisma.databaseConnection.update({
-      where: { id: id as string },
+      where: { id },
       data: result.data,
       select: {
         id: true,
@@ -119,8 +118,6 @@ export const PUT = withAuth(async (req, context, session) => {
         updatedAt: true,
       },
     })
-    
-    // Log security event
     await logSecurityEvent({
       userId: session.user.id,
       type: 'database_connection_updated',
@@ -131,9 +128,7 @@ export const PUT = withAuth(async (req, context, session) => {
       },
       severity: 'info',
     })
-    
     return NextResponse.json({ success: true, connection })
-    
   } catch (error) {
     console.error('Failed to update database connection:', error)
     return NextResponse.json(
@@ -143,8 +138,10 @@ export const PUT = withAuth(async (req, context, session) => {
   }
 })
 
-export const DELETE = withAuth(async (req, context, session) => {
+export const DELETE = withAuth(async (req: NextRequest, context: RouteContext, session) => {
   try {
+    // ✅ Await the params
+    const { id } = await context.params;
     // Check Pro subscription
     if (!['pro', 'business', 'enterprise'].includes(session.user.subscriptionTier)) {
       return NextResponse.json(
@@ -152,30 +149,21 @@ export const DELETE = withAuth(async (req, context, session) => {
         { status: 403 }
       )
     }
-
-    // Await context.params if it's a Promise
-    const { id } = await context.params as { id: string };
-
-    // Check ownership
     const connection = await prisma.databaseConnection.findFirst({
       where: {
         id,
         userId: session.user.id
       }
     })
-
     if (!connection) {
       return NextResponse.json(
         { error: 'Connection not found' },
         { status: 404 }
       )
     }
-
     await prisma.databaseConnection.delete({
-      where: { id: id as string },
+      where: { id },
     })
-    
-    // Log security event
     await logSecurityEvent({
       userId: session.user.id,
       type: 'database_connection_deleted',
@@ -185,9 +173,7 @@ export const DELETE = withAuth(async (req, context, session) => {
       },
       severity: 'info',
     })
-    
     return NextResponse.json({ success: true })
-    
   } catch (error) {
     console.error('Failed to delete database connection:', error)
     return NextResponse.json(

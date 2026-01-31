@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions, checkUserPermission, verifyResourceOwnership } from './auth'
 
-export type ApiHandler<P = Record<string, unknown>> = (
+
+export type ApiHandler<P = object> = (
   req: NextRequest,
   context: { params: P }
 ) => Promise<NextResponse>
 
-export interface AuthenticatedApiHandler<P = Record<string, unknown>> {
+
+export interface AuthenticatedApiHandler<P = object> {
   (
     req: NextRequest,
     context: { params: P },
@@ -26,7 +28,7 @@ export interface AuthenticatedApiHandler<P = Record<string, unknown>> {
  * Wraps an API route with authentication
  * Returns 401 if user is not authenticated
  */
-export function withAuth<P = Record<string, unknown>>(handler: AuthenticatedApiHandler<P>): ApiHandler<P> {
+export function withAuth<P = object>(handler: AuthenticatedApiHandler<P>): ApiHandler<P> {
   return async (req, context) => {
     const session = await getServerSession(authOptions)
 
@@ -45,7 +47,7 @@ export function withAuth<P = Record<string, unknown>>(handler: AuthenticatedApiH
  * Wraps an API route with admin role check
  * Returns 403 if user is not an admin
  */
-export function withAdmin<P = Record<string, unknown>>(handler: AuthenticatedApiHandler<P>): ApiHandler<P> {
+export function withAdmin<P = object>(handler: AuthenticatedApiHandler<P>): ApiHandler<P> {
   return withAuth(async (req, context, session) => {
     if (session.user.role !== 'admin') {
       return NextResponse.json(

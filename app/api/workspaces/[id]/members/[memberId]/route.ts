@@ -39,11 +39,15 @@ async function checkWorkspacePermission(
 }
 
 // PATCH /api/workspaces/[id]/members/[memberId] - Update member role
+interface MemberParamContext {
+  params: Promise<{ id: string; memberId: string }>;
+}
+
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string; memberId: string }> }
+  context: MemberParamContext
 ) {
-  const { id, memberId } = await params;
+  const { id, memberId } = await context.params;
   try {
     const session = await getServerSession(authOptions);
     
@@ -59,6 +63,20 @@ export async function PATCH(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // 🟡 User-based write rate limit
+    const rateLimit = await (await import('@/lib/rate-limit')).checkRateLimit(req, 'write', user.id);
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        {
+          error: 'Too many requests',
+          message: 'Please slow down',
+          remaining: rateLimit.remaining,
+        },
+        { status: 429 }
+      );
+    }
+
+    // ...existing code...
     const body = await req.json();
     const validatedData = updateMemberSchema.parse(body);
 
@@ -160,9 +178,9 @@ export async function PATCH(
 // DELETE /api/workspaces/[id]/members/[memberId] - Remove member
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string; memberId: string }> }
+  context: MemberParamContext
 ) {
-  const { id, memberId } = await params;
+  const { id, memberId } = await context.params;
   try {
     const session = await getServerSession(authOptions);
     

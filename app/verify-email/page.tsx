@@ -24,7 +24,7 @@ export default function VerifyEmailPage() {
         setError(data.error || 'Verification failed.')
         setStatus('error')
       }
-    } catch (err) {
+    } catch {
       setError('Verification failed.')
       setStatus('error')
     }

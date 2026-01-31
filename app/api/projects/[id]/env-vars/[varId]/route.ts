@@ -7,8 +7,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logSecurityEvent } from '@/lib/security'
 
-export async function POST(req: Request, context: { params: { id: string; varId: string } }) {
-  const { id, varId } = context.params;
+export async function POST(req: Request, context: { params: Promise<{ id: string; varId: string }> }) {
+  const { id, varId } = await context.params;
   try {
     // Verify ownership
     const session = await getServerSession(authOptions);

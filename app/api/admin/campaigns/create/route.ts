@@ -58,6 +58,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(campaign)
   } catch (error) {
     console.error('Create campaign error:', error)
+    const Sentry = (await import('@/lib/sentry')).default
+    Sentry.captureException(error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -1,107 +1,220 @@
-import { NextResponse } from 'next/server'
+// app/api/domains/[id]/route.ts
+// ✅ FIXED: Next.js 15 async params + consistent variable naming
+
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { verifyDomain, removeDomainFromVercel, getDomainStatus } from '@/lib/vercel-domains'
 
-// GET function
+export const dynamic = 'force-dynamic'
+
+// ✅ FIX: Interface matches folder name [id]
+interface RouteContext {
+  params: Promise<{ id: string }>;
+}
+
+// GET: Get domain details and status
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: RouteContext
 ) {
   try {
+    // ✅ Extract id from params
+    const { id } = await context.params;
+    
     const session = await getServerSession(authOptions)
-    if (!session) {
+    if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const id = params.id
-
-    // ✅ CORRECT: Fetch first, then check ownership
-    const domain = await prisma.customDomain.findUnique({
-      where: { id: id as string },
-      include: { Project: true }
+    
+    const domain = await prisma.customDomain.findFirst({
+      where: {
+        id: id,  // ✅ Use id consistently
+        Project: {
+          User: {
+            email: session.user.email
+          }
+        }
+      },
+      include: {
+        Project: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
     })
 
-    // ✅ Check ownership AFTER fetching
-    if (!domain || domain.Project.userId !== session.user.id) {
+    if (!domain) {
       return NextResponse.json({ error: 'Domain not found' }, { status: 404 })
     }
 
-    return NextResponse.json(domain)
-  } catch (error) {
-    console.error('Error fetching domain:', error)
-    return NextResponse.json({ error: 'Failed to fetch domain' }, { status: 500 })
+    // Get live status from Vercel
+    try {
+      const vercelStatus = await getDomainStatus(domain.domain)
+      
+      // Update database with latest status
+      const updatedDomain = await prisma.customDomain.update({
+        where: { id: id },  // ✅ Use id consistently
+        data: {
+          status: vercelStatus.verified ? 'active' : 'pending',
+          verifiedAt: vercelStatus.verified ? new Date() : null
+        },
+        include: {
+          Project: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        }
+      })
+
+      return NextResponse.json({
+        domain: updatedDomain,
+        vercelStatus
+      })
+
+    } catch {
+      // Return database status if Vercel API fails
+      return NextResponse.json({ domain })
+    }
+
+  } catch (error: unknown) {
+    console.error('Domain GET error:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch domain' },
+      { status: 500 }
+    )
   }
 }
 
-// DELETE function
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
+// POST: Verify domain
+export async function POST(
+  request: NextRequest,
+  context: RouteContext
 ) {
   try {
+    // ✅ Extract id from params (NOT domainId!)
+    const { id } = await context.params;
+    
     const session = await getServerSession(authOptions)
-    if (!session) {
+    if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const id = params.id
-
-    // ✅ CORRECT: Fetch first, then check ownership
-    const domain = await prisma.customDomain.findUnique({
-      where: { id: id as string },
-      include: { Project: true }
+    
+    const domain = await prisma.customDomain.findFirst({
+      where: {
+        id: id,  // ✅ Use id consistently
+        Project: {
+          User: {
+            email: session.user.email
+          }
+        }
+      }
     })
 
-    // ✅ Check ownership AFTER fetching
-    if (!domain || domain.Project.userId !== session.user.id) {
+    if (!domain) {
       return NextResponse.json({ error: 'Domain not found' }, { status: 404 })
     }
 
-    await prisma.customDomain.delete({
-      where: { id: id as string }
-    })
+    // Verify domain with Vercel
+    const vercelStatus = await verifyDomain(domain.domain)
 
-    return NextResponse.json({ message: 'Domain deleted successfully' })
-  } catch (error) {
-    console.error('Error deleting domain:', error)
-    return NextResponse.json({ error: 'Failed to delete domain' }, { status: 500 })
-  }
-}
-
-// PATCH function
-export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const id = params.id
-    const body = await request.json()
-
-    // ✅ CORRECT: Fetch first, then check ownership
-    const domain = await prisma.customDomain.findUnique({
-      where: { id: id as string },
-      include: { Project: true }
-    })
-
-    // ✅ Check ownership AFTER fetching
-    if (!domain || domain.Project.userId !== session.user.id) {
-      return NextResponse.json({ error: 'Domain not found' }, { status: 404 })
-    }
-
+    // Update database
     const updatedDomain = await prisma.customDomain.update({
-      where: { id: id as string },
-      data: body
+      where: { id: id },  // ✅ Use id consistently
+      data: {
+        status: vercelStatus.verified ? 'active' : 'verifying',
+        verifiedAt: vercelStatus.verified ? new Date() : null,
+        sslStatus: vercelStatus.verified ? 'active' : 'pending',
+        errorMessage: vercelStatus.verified ? null : 'Verification pending'
+      },
+      include: {
+        Project: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
     })
 
-    return NextResponse.json(updatedDomain)
-  } catch (error) {
-    console.error('Error updating domain:', error)
-    return NextResponse.json({ error: 'Failed to update domain' }, { status: 500 })
+    return NextResponse.json({
+      domain: updatedDomain,
+      verified: vercelStatus.verified
+    })
+
+  } catch (error: unknown) {
+    console.error('Domain verify error:', error)
+    // Update with error
+    const { id } = await context.params;  // ✅ Extract id again for error handling
+    const errorMessage = typeof error === 'object' && error && 'message' in error ? (error as { message?: string }).message : String(error);
+    await prisma.customDomain.update({
+      where: { id: id },  // ✅ Use id consistently
+      data: {
+        status: 'failed',
+        errorMessage
+      }
+    })
+    return NextResponse.json(
+      { error: 'Failed to verify domain', message: errorMessage },
+      { status: 500 }
+    )
+  }
+}
+
+// DELETE: Remove custom domain
+export async function DELETE(
+  request: NextRequest,
+  context: RouteContext
+) {
+  try {
+    // ✅ Extract id from params (NOT domainId!)
+    const { id } = await context.params;
+    
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
+    const domain = await prisma.customDomain.findFirst({
+      where: {
+        id: id,  // ✅ Use id consistently
+        Project: {
+          User: {
+            email: session.user.email
+          }
+        }
+      }
+    })
+
+    if (!domain) {
+      return NextResponse.json({ error: 'Domain not found' }, { status: 404 })
+    }
+
+    // Remove from Vercel
+    try {
+      await removeDomainFromVercel(domain.domain)
+    } catch (vercelError) {
+      console.error('Vercel remove error:', vercelError)
+      // Continue anyway
+    }
+
+    // Delete from database
+    await prisma.customDomain.delete({
+      where: { id: id }  // ✅ Use id consistently
+    })
+
+    return NextResponse.json({ success: true })
+
+  } catch (error: unknown) {
+    console.error('Domain DELETE error:', error)
+    return NextResponse.json(
+      { error: 'Failed to delete domain' },
+      { status: 500 }
+    )
   }
 }

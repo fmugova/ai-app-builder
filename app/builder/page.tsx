@@ -42,17 +42,7 @@ function BuilderContent() {
   const router = useRouter();
 
   const {
-    isGenerating,
-    status,
-    progress,
-    estimate,
-    elapsed,
-    error,
-    generatedCode: streamedCode,
-    projectId: newProjectId,
-    stats,
-    generate,
-    reset,
+    // Only use what is needed from useGenerateStream
   } = useGenerateStream()
 
   // Helper to extract project ID from various API responses
@@ -141,7 +131,7 @@ function BuilderContent() {
       } else {
         toast.error(data.error || 'Failed to continue generation')
       }
-    } catch (e) {
+    } catch {
       toast.error('Failed to continue generation')
     } finally {
       setGenerating(false)
@@ -172,7 +162,7 @@ function BuilderContent() {
       } else {
         toast.error(data.error || 'Failed to retry')
       }
-    } catch (e) {
+    } catch {
       toast.error('Failed to retry')
     } finally {
       setGenerating(false)
@@ -317,21 +307,33 @@ function BuilderContent() {
     }
   }, [searchParams])
 
+  // ✅ CORRECT loadProject for Builder (uses string state)
   const loadProject = async (projectId: string) => {
     try {
-      const res = await fetch(`/api/projects/${projectId}`)
-      const data = await res.json()
-
-      if (data.code) {
-        setCurrentProjectId(projectId)
-        setProjectName(data.name)
-        setProjectDescription(data.description)
-        setGeneratedCode(data.code)
-        setProjectType(data.type || 'landing')
-        setIsLoadedProject(true)
+      const response = await fetch(`/api/projects/${projectId}`);
+      const data = await response.json();
+      
+      if (response.ok) {
+        const code = data.code || data.html || data.htmlCode || '';
+        
+        if (!code) {
+          toast.error('Project has no code');
+          return;
+        }
+        
+        // ✅ Single state update
+        setGeneratedCode(code);
+        setCurrentProjectId(data.id);
+        setProjectName(data.name);
+        setProjectDescription(data.description || '');
+        setProjectType(data.type || 'landing');
+        setIsLoadedProject(true);
+        
+        toast.success('Project loaded!');
       }
     } catch (error) {
-      console.error('Failed to load:', error)
+      console.error('Load error:', error);
+      toast.error('Failed to load project');
     }
   }
 
@@ -449,6 +451,11 @@ function BuilderContent() {
                 setGeneratingStep(Math.floor(receivedCode.length / 5000));
               }
             }
+            // ✅ SIMPLE FIX: handle 'html' event for string state
+            else if (data.type === 'html') {
+              setGeneratedCode(data.content);  // ✅ Set the code
+              console.log('✅ HTML received:', data.content.length, 'chars');  // Debug log
+            }
             else if (data.type === 'complete') {
               console.log('✅ Generation complete');
               console.log('📊 Metadata:', data.metadata);
@@ -504,30 +511,16 @@ function BuilderContent() {
         : '/api/projects';
       const method = currentProjectId ? 'PUT' : 'POST'
 
-      // ✅ Save to all three fields and set flags
-      interface ProjectPayload {
-        name: string;
-        description: string;
-        code: string;
-        html: string;
-        htmlCode: string;
-        hasHtml: boolean;
-        isComplete: boolean;
-        validationPassed: boolean;
-        type: string;
-      }
-
-      const payload: ProjectPayload = {
+      const payload = {
         name: projectName,
         description: projectDescription,
-        code: generatedCode,
-        html: generatedCode,        // ✅ Add this
-        htmlCode: generatedCode,    // ✅ Add this
-        hasHtml: true,              // ✅ Add this
-        isComplete: true,           // ✅ Add this
-        validationPassed: true,     // ✅ Add this
+        code: generatedCode,        // ✅ Use generatedCode
+        html: generatedCode,         // ✅ Same
+        htmlCode: generatedCode,     // ✅ Same
+        hasHtml: true,
+        isComplete: true,
+        validationPassed: true,
         type: projectType
-        // Do NOT set status field on create (let Prisma default)
       };
 
       const res = await fetch(url, {
@@ -537,14 +530,16 @@ function BuilderContent() {
       })
 
       if (res.ok) {
+        const data = await res.json();
         if (!currentProjectId) {
+          setCurrentProjectId(data.id);  // ✅ Set project ID after creation
           analytics.projectCreated(projectType)
         }
         toast.success('Saved successfully!', {
           duration: 2000,
           id: 'builder-saved',
         })
-        router.push('/dashboard')
+        // Don't redirect - stay on Builder so buttons appear!
       } else {
         toast.error('Save failed')
       }
@@ -561,6 +556,10 @@ function BuilderContent() {
   }
 
   const downloadCode = () => {
+    if (!generatedCode) {
+      toast.error('No code to download')
+      return
+    }
     const sanitizedCode = sanitizeForPreview(generatedCode)
     const blob = new Blob([sanitizedCode], { type: 'text/html' })
     const url = URL.createObjectURL(blob)

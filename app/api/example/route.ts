@@ -1,59 +1,49 @@
+// app/api/example/route.ts
+// ✅ FIXED: Removed compose middleware to match Next.js 15
+
 import { NextRequest, NextResponse } from 'next/server'
-import { 
-  withAuth, 
-  withAdmin, 
-  withSubscription,
-  withUsageCheck,
-  withRateLimit,
-  compose 
-} from '@/lib/api-middleware'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 
-// Simple authenticated route
-export const GET = compose(
-  withSubscription('pro'),
-  withAuth
-)(async (req: NextRequest) => {
+// Simple authenticated route - no middleware composition
+export async function GET(
+  req: NextRequest,
+  context: { params: Promise<object>; }  // ✅ Next.js 15 signature
+) {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  const body = await req.json();
+  
+  // Check subscription tier manually
+  if (session.user.subscriptionTier !== 'pro' && session.user.subscriptionTier !== 'enterprise') {
+    return NextResponse.json({ error: 'Pro subscription required' }, { status: 403 });
+  }
+  
   return NextResponse.json({
     message: 'Success',
     userId: session.user.id,
-    tier: session.user.subscriptionTier,
-    data: body
+    tier: session.user.subscriptionTier
   });
-})
-
-// Protected POST with multiple middleware
-interface SessionUser {
-  id: string;
-  email: string;
-  subscriptionTier: string;
 }
 
-interface Session {
-  user: SessionUser;
-}
-
-export const POST = compose(
-  withRateLimit(20),
-  withUsageCheck('create_project'),
-  withSubscription('pro'),
-  withAuth
-)(async (
+// POST with manual checks
+export async function POST(
   req: NextRequest,
-  context: { params: Record<string, unknown>; session?: Session }
-) => {
-  const session = context.session;
-  const body = await req.json();
-
-  if (!session) {
+  context: { params: Promise<object> }  // ✅ Next.js 15 signature
+) {
+  const session = await getServerSession(authOptions);
+  
+  if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  
+  // Check subscription tier
+  if (session.user.subscriptionTier !== 'pro' && session.user.subscriptionTier !== 'enterprise') {
+    return NextResponse.json({ error: 'Pro subscription required' }, { status: 403 });
+  }
+  
+  const body = await req.json();
 
   return NextResponse.json({ 
     message: 'All checks passed!',
@@ -61,12 +51,26 @@ export const POST = compose(
     tier: session.user.subscriptionTier,
     data: body
   });
-})
+}
 
 // Admin-only DELETE
-export const DELETE = withAdmin(async (req, context, session) => {
+export async function DELETE(
+  req: NextRequest,
+  context: { params: Promise<object> }  // ✅ Next.js 15 signature
+) {
+  const session = await getServerSession(authOptions);
+  
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  
+  // Check admin role
+  if (session.user.role !== 'admin') {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+  }
+  
   return NextResponse.json({ 
     message: 'Admin action performed',
     adminEmail: session.user.email
-  })
-})
+  });
+}

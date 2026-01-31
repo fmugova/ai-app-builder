@@ -47,6 +47,8 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('Send email error:', error)
+    const Sentry = (await import('@/lib/sentry')).default
+    Sentry.captureException(error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { checkRateLimit } from '@/lib/rateLimit';
+// Use the main rate-limit utility
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,10 +27,8 @@ function sanitizeCodeForExport(code: string): string {
   return sanitized;
 }
 
-export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-    
     if (!session?.user?.email) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -37,21 +36,23 @@ export async function POST(request: Request) {
       );
     }
 
-    // Apply rate limiting to prevent GitHub API abuse
-    const rateLimitResult = checkRateLimit(`github-export:${session.user.email}`, { maxRequests: 10, windowMs: 3600000 }) // 10 per hour
-    if (!rateLimitResult.allowed) {
-      const resetIn = Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000)
+    // 🟡 User-based external rate limit
+    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+    const rateLimit = await checkRateLimit(request, 'external', user.id);
+    if (!rateLimit.success) {
       return NextResponse.json(
-        { 
+        {
           error: 'Too many GitHub exports. Please try again later.',
-          resetIn 
+          remaining: rateLimit.remaining,
         },
         { status: 429 }
-      )
+      );
     }
-    
+
     const { projectId } = await request.json();
-    
     if (!projectId) {
       return NextResponse.json(
         { error: 'Project ID is required' },

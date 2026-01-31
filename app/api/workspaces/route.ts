@@ -68,6 +68,21 @@ export async function POST(req: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized or user not found' }, { status: 401 });
     }
+
+    // 🟡 User-based write rate limit
+    const rateLimit = await (await import('@/lib/rate-limit')).checkRateLimit(req, 'write', user.id);
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        {
+          error: 'Too many requests',
+          message: 'Please slow down',
+          remaining: rateLimit.remaining,
+        },
+        { status: 429 }
+      );
+    }
+
+    // ...existing code...
     const body = await req.json();
     const validatedData = createWorkspaceSchema.parse(body);
     // Check if slug is already taken

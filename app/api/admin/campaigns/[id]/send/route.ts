@@ -109,6 +109,8 @@ export async function POST(
       data: { status: 'draft' }
     })
     
+    const Sentry = (await import('@/lib/sentry')).default
+    Sentry.captureException(error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

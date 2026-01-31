@@ -4,11 +4,15 @@ import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 
 // GET /api/workspaces/invites/[token] - Get invite details
+interface TokenParamContext {
+  params: Promise<{ token: string }>;
+}
+
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ token: string }> }
+  context: TokenParamContext
 ) {
-  const { token } = await params;
+  const { token } = await context.params;
   try {
     const invite = await prisma.workspaceInvite.findUnique({
       where: { token },
@@ -56,9 +60,9 @@ export async function GET(
 // POST /api/workspaces/invites/[token]/accept - Accept invite
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ token: string }> }
+  context: TokenParamContext
 ) {
-  const { token } = await params;
+  const { token } = await context.params;
   try {
     const session = await getServerSession(authOptions);
     
@@ -69,6 +73,25 @@ export async function POST(
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
     });
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // 🟡 User-based write rate limit
+    const rateLimit = await (await import('@/lib/rate-limit')).checkRateLimit(req, 'write', user.id);
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        {
+          error: 'Too many requests',
+          message: 'Please slow down',
+          remaining: rateLimit.remaining,
+        },
+        { status: 429 }
+      );
+    }
+
+    // ...existing code...
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });

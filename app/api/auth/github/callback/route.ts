@@ -11,8 +11,8 @@ const { clientId: githubClientId, clientSecret: githubClientSecret } = getGithub
 // Development: use current vercel host
 const PRODUCTION_URL = 'https://buildflow-ai.app';
 
-function getBaseUrl(): string {
-  const headersList = headers();
+async function getBaseUrl(): Promise<string> {
+  const headersList = await headers();
   const host = headersList.get('host') || '';
   const xForwardedHost = headersList.get('x-forwarded-host') || '';
   const xForwardedProto = headersList.get('x-forwarded-proto') || 'https';
@@ -57,21 +57,21 @@ export async function GET(request: Request) {
   // Handle OAuth errors
   if (error) {
     console.error('GitHub OAuth error:', error);
-    const baseUrl = getBaseUrl();
+    const baseUrl = await getBaseUrl();
     return NextResponse.redirect(
       `${baseUrl}/dashboard?error=github_auth_denied`
     );
   }
   
   if (!code) {
-    const baseUrl = getBaseUrl();
+    const baseUrl = await getBaseUrl();
     return NextResponse.redirect(
       `${baseUrl}/dashboard?error=github_no_code`
     );
   }
   
   try {
-    const baseUrl = getBaseUrl();
+    const baseUrl = await getBaseUrl();
     
     // Exchange code for access token
     console.log('🔄 Exchanging code for token...');

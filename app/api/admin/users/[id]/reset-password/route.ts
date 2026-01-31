@@ -16,12 +16,9 @@ function generatePassword(length = 12): string {
   return password
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = await params;
+    const { id } = await context.params;
     const session = await getServerSession(authOptions)
     
     if (!session?.user || session.user.role !== 'admin') {

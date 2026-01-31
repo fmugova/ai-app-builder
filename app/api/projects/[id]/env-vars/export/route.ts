@@ -10,9 +10,9 @@ import { logSecurityEvent } from '@/lib/security'
 
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  const { id } = await context.params;
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {

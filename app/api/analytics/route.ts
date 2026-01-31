@@ -7,7 +7,6 @@ import { prisma } from '@/lib/prisma'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     
@@ -22,7 +21,14 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
-    
+
+    // 🟢 User-based general rate limit
+    const rateLimit = await (await import('@/lib/rate-limit')).checkRateLimit(request, 'general', user.id)
+    if (!rateLimit.success) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+    }
+
+    // ...existing code...
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type') || 'dashboard'
     const projectId = searchParams.get('projectId')

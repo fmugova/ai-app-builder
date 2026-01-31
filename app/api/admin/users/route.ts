@@ -4,24 +4,21 @@ export const runtime = 'nodejs'
 import { withAdmin } from '@/lib/api-middleware'
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 
-// Removed duplicate GET function to fix error.
 
-export const PATCH = withAdmin(async (req, context, session) => {
+
+
+export const PATCH = withAdmin(async (req: NextRequest) => {
   const body = await req.json()
   const { userId, role, subscriptionTier } = body
-  
   const user = await prisma.user.update({
     where: { id: userId },
     data: { role, subscriptionTier },
   })
-  
   return NextResponse.json({ success: true, user })
 })
 
-export const GET = withAdmin(async (req, context, session) => {
+export const GET = withAdmin(async () => {
   const users = await prisma.user.findMany({
     select: {
       id: true,
@@ -36,6 +33,5 @@ export const GET = withAdmin(async (req, context, session) => {
     },
     orderBy: { createdAt: 'desc' },
   })
-  
   return NextResponse.json({ users })
 })

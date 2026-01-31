@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
   
   async headers() {
     return [
@@ -30,13 +29,6 @@ const nextConfig = {
     ];
   },
 
-  // Suppress deprecation warnings
-  webpack: (config) => {
-    config.infrastructureLogging = {
-      level: 'error',
-    };
-    return config;
-  }
 };
 
 export default nextConfig;

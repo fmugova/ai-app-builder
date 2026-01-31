@@ -1,3 +1,4 @@
+import { checkRateLimit } from '@/lib/rate-limit'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
@@ -5,79 +6,19 @@ import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-export async function POST(req: Request) {
   try {
-    const { email } = await req.json()
-
-    if (!email) {
+    // Rate limiting - use IP address for forgot-password
+    const rateLimit = await checkRateLimit(req, 'auth')
+    if (!rateLimit.success) {
+      const resetIn = Math.ceil((rateLimit.reset - Date.now()) / 1000)
       return NextResponse.json(
-        { error: 'Email is required' },
-        { status: 400 }
+        { error: `Too many password reset requests. Please try again in ${resetIn} seconds.` },
+        { status: 429 }
       )
     }
-
-    // Find user
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-    })
-
-    // Always return success to prevent email enumeration
-    if (!user) {
-      console.log(`⚠️  Password reset requested for non-existent email: ${email}`)
-      return NextResponse.json({
-        message: 'If that email exists, a reset link has been sent',
-      })
-    }
-
-    // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString('hex')
-    const resetTokenExpiry = new Date(Date.now() + 3600000) // 1 hour
-
-    // Save token to database
-    await prisma.user.update({
-      where: { email: email.toLowerCase() },
-      data: {
-        resetToken,
-        resetTokenExpiry,
-      },
-    })
-
-    // Create reset link
-    const resetLink = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`
-
-    // In development, log to console
-    if (process.env.NODE_ENV === 'development') {
-      console.log('\n' + '='.repeat(80))
-      console.log('🔑 PASSWORD RESET LINK (DEV MODE)')
-      console.log('='.repeat(80))
-      console.log(`Email: ${email}`)
-      console.log(`Link:  ${resetLink}`)
-      console.log(`Expires: ${resetTokenExpiry.toLocaleString()}`)
-      console.log('='.repeat(80) + '\n')
-    }
-
-    // Send email via Resend
-    try {
-      const emailResult = await resend.emails.send({
-        from: 'BuildFlow <noreply@buildflow-ai.app>',
-        to: email,
-        subject: 'Reset Your Password - BuildFlow',
-        html: `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
-  <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-    <!-- Header -->
-    <div style="background: linear-gradient(135deg, #9333ea 0%, #3b82f6 100%); padding: 40px; border-radius: 12px 12px 0 0; text-align: center;">
-      <div style="width: 60px; height: 60px; background: rgba(255,255,255,0.2); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px;">
-        <span style="font-size: 32px;">🔑</span>
-      </div>
-      <h1 style="color: white; margin: 0; font-size: 28px; font-weight: bold;">Reset Your Password</h1>
-    </div>
+    // ...existing code...
+    const { email } = await req.json()
+    // ...existing code...
     
     <!-- Content -->
     <div style="background: white; padding: 40px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">

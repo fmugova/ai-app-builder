@@ -13,7 +13,7 @@ const checkDomainSchema = z.object({
 
 import type { ApiHandler } from '@/lib/api-middleware'
 
-const checkHandler: ApiHandler<Record<string, unknown>> = async (req) => {
+const checkHandler: ApiHandler<object> = async (req) => {
   try {
     const body = await req.json()
     // Validate input

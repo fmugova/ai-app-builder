@@ -1,5 +1,5 @@
 import { parseGeneratedCode } from '@/lib/code-parser';
-import CodeValidator from '@/lib/validator';
+import { CodeValidator } from '@/lib/validators';
 
 export function getValidationForProjectCode(code: string) {
   const parsed = parseGeneratedCode(code);

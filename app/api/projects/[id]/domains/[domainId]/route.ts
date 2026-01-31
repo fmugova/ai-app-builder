@@ -6,10 +6,7 @@ import { prisma } from '@/lib/prisma'
 export const dynamic = 'force-dynamic'
 
 // POST - Verify domain status
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string; domainId: string }> }
-) {
+export async function POST(request: NextRequest, context: { params: Promise<{ id: string; domainId: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
@@ -24,7 +21,7 @@ export async function POST(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const { id: projectId, domainId } = await params
+    const { id: projectId, domainId } = await context.params
 
     // Get domain
     const domain = await prisma.customDomain.findFirst({
@@ -163,6 +160,7 @@ export async function DELETE(
     await prisma.customDomain.delete({
       where: { id: domainId }
     })
+    // POST - Verify domain status
 
     // Log activity
     await prisma.activity.create({

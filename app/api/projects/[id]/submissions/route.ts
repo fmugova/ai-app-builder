@@ -8,10 +8,10 @@ export const dynamic = 'force-dynamic'
 // POST - Submit form from published site
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: projectId } = await params
+    const { id: projectId } = await context.params
     const body = await request.json()
 
     // Validate project exists
@@ -58,10 +58,10 @@ export async function POST(
       submissionId: submission.id
     })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Form submission error:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to submit form' },
+      { error: error instanceof Error ? error.message : 'Failed to submit form' },
       { status: 500 }
     )
   }
@@ -111,10 +111,10 @@ export async function GET(
       total: submissions.length
     })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Get submissions error:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to get submissions' },
+      { error: error instanceof Error ? error.message : 'Failed to get submissions' },
       { status: 500 }
     )
   }

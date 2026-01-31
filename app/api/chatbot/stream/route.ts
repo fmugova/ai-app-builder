@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import Anthropic from '@anthropic-ai/sdk';
-import { validateGeneratedCode } from '@/lib/code-validator';
+import { CodeValidator, validateHTMLStructure } from '@/lib/validators';
 import prisma from '@/lib/prisma';
+import { checkUserRateLimit, createRateLimitResponse } from '@/lib/rate-limit';
 
 /**
  * COMPLETE DATABASE SAVE FIX
@@ -61,308 +62,423 @@ function encodeSSE(data: SSEData): string {
 
 function encodeSSEWithChunking(data: SSEData): string[] {
   const MAX_CHUNK_SIZE = 50000; // 50KB chunks
-  if (data.type === 'html' && data.content && data.content.length > MAX_CHUNK_SIZE) {
-    // Split into chunks
-    const chunks: string[] = [];
-    const content = data.content;
-    const totalChunks = Math.ceil(content.length / MAX_CHUNK_SIZE);
-    for (let i = 0; i < totalChunks; i++) {
-      const start = i * MAX_CHUNK_SIZE;
-      const end = Math.min(start + MAX_CHUNK_SIZE, content.length);
-      const chunk = content.slice(start, end);
-      chunks.push(`data: ${JSON.stringify({
-        type: 'html_chunk',
-        chunk: i,
-        total: totalChunks,
-        content: chunk,
-        isLast: i === totalChunks - 1
-      })}\n\n`);
-    }
-    return chunks;
-  }
-  // Not HTML or small enough
-  return [encodeSSE(data)];
-}
+    try {
+      // ============================================================================
+      // 1. AUTHENTICATION
+      // ============================================================================
+      const session = await getServerSession(authOptions);
+      if (!session?.user?.id) {
+        return NextResponse.json(
+          { error: 'Unauthorized', message: 'Please sign in to generate websites' },
+          { status: 401 }
+        );
+      }
 
-function extractCodeBlocks(text: string): { html: string; css: string; js: string } {
-  let html = '';
-  
-  // Try complete code block
-  const htmlMatch = text.match(/```html\n([\s\S]*?)```/i);
-  if (htmlMatch) {
-    html = htmlMatch[1].trim();
-  }
-  
-  // Handle incomplete
-  if (!html) {
-    const incompleteMatch = text.match(/```html\s*\n([\s\S]*)/i);
-    if (incompleteMatch) {
-      html = incompleteMatch[1].trim();
-    }
-  }
+      // ============================================================================
+      // 2. GET USER DATA & VALIDATE SUBSCRIPTION
+      // ============================================================================
+      const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: {
+          id: true,
+          subscriptionTier: true,
+          subscriptionStatus: true,
+          generationsUsed: true,
+          generationsLimit: true,
+        },
+      });
 
-  // Find HTML without markdown
-  if (!html && text.includes('<!DOCTYPE')) {
-    const docMatch = text.match(/<!DOCTYPE html>[\s\S]*/i);
-    if (docMatch) {
-      html = docMatch[0].trim();
-    }
-  }
+      if (!user) {
+        return NextResponse.json(
+          { error: 'User not found' },
+          { status: 404 }
+        );
+      }
 
-  return { html, css: '', js: '' };
-}
+      // ✅ Check subscription status
+      if (user.subscriptionStatus !== 'active') {
+        return NextResponse.json(
+          {
+            error: 'Subscription inactive',
+            message: 'Please activate your subscription to generate websites',
+            upgradeUrl: '/pricing'
+          },
+          { status: 403 }
+        );
+      }
 
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+      // ============================================================================
+      // 3. 🔴 RATE LIMITING (Critical Protection)
+      // ============================================================================
+      const rateLimit = await checkUserRateLimit(
+        request,
+        user.id,
+        user.subscriptionTier,
+        user.subscriptionStatus
+      );
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      include: { Subscription: true },
-    });
+      // ❌ Rate limit exceeded
+      if (!rateLimit.success) {
+        // Log for monitoring
+        console.warn('⚠️ Rate limit hit:', {
+          userId: user.id,
+          tier: user.subscriptionTier,
+          timestamp: new Date().toISOString()
+        });
 
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
+        return createRateLimitResponse(rateLimit, user.subscriptionTier);
+      }
 
-    const body = await request.json();
-    const { prompt, projectId } = body;
+      // ✅ Log successful rate limit check
+      console.log('✅ Rate limit check passed:', {
+        userId: user.id,
+        tier: user.subscriptionTier,
+        remaining: rateLimit.remaining,
+        limit: rateLimit.limit
+      });
 
-    if (!prompt) {
-      return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
-    }
+      // ============================================================================
+      // 4. CHECK GENERATION LIMITS (Monthly quota)
+      // ============================================================================
+      if (user.generationsUsed >= user.generationsLimit) {
+        return NextResponse.json(
+          {
+            error: 'Generation limit reached',
+            message: `You've used all ${user.generationsLimit} generations this month. ${
+              user.subscriptionTier === 'free' 
+                ? 'Upgrade to Pro for more!' 
+                : 'Your quota will reset next month.'
+            }`,
+            used: user.generationsUsed,
+            limit: user.generationsLimit,
+            upgradeUrl: user.subscriptionTier === 'free' ? '/pricing' : undefined
+          },
+          { status: 429 }
+        );
+      }
 
-    const anthropic = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
+      // ============================================================================
+      // 5. PROCESS REQUEST
+      // ============================================================================
+      const body = await request.json();
+      const { prompt, projectId } = body;
 
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      async start(controller) {
-        try {
-          let accumulatedCode = '';
-          let savedProjectId = projectId;
+      if (!prompt) {
+        return NextResponse.json(
+          { error: 'Prompt is required' },
+          { status: 400 }
+        );
+      }
 
-          const claudeStream = await anthropic.messages.stream({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 16000,
-            messages: [
-              {
-                role: 'user',
-                content: `Create a complete, production-ready ${prompt}.
+      // ✅ Increment generation counter (do this BEFORE generation to prevent abuse)
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { generationsUsed: { increment: 1 } }
+      });
 
-CRITICAL REQUIREMENTS:
-1. Generate a COMPLETE, FULLY FUNCTIONAL website
-2. Include ALL code in ONE HTML file
-3. Embed CSS in <style> tags in <head>
-4. Embed JavaScript in <script> tags before </body>
-5. MUST include ALL closing tags
-6. Make it beautiful, modern, and fully responsive
-7. Include smooth animations and interactions
+      console.log('🚀 Starting generation:', {
+        userId: user.id,
+        tier: user.subscriptionTier,
+        promptLength: prompt.length,
+        generationsUsed: user.generationsUsed + 1,
+        generationsLimit: user.generationsLimit
+      });
 
-OUTPUT FORMAT:
-\`\`\`html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${prompt}</title>
-    <style>
-        /* ALL CSS HERE */
-    </style>
-</head>
-<body>
-    <!-- ALL HTML CONTENT HERE -->
+      // ============================================================================
+      // 6. STREAM AI GENERATION
+      // ============================================================================
+      const anthropic = new Anthropic({
+        apiKey: process.env.ANTHROPIC_API_KEY,
+      });
+
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          try {
+            let accumulatedCode = '';
+            let lastProgressUpdate = 0;
+            let finalProjectId = projectId;
+
+            const claudeStream = await anthropic.messages.stream({
+              model: 'claude-sonnet-4-20250514',
+              max_tokens: 16000,
+              messages: [
+                {
+                  role: 'user',
+                  content: `Create a complete, production-ready ${prompt}.
+
+  CRITICAL REQUIREMENTS:
+  1. Generate a COMPLETE, FULLY FUNCTIONAL website
+  2. Include ALL code in ONE HTML file
+  3. Embed CSS in <style> tags in <head>
+  4. Embed JavaScript in <script> tags before </body>
+  5. MUST include ALL closing tags
+  6. Make it beautiful, modern, and fully responsive
+  7. Include smooth animations and interactions
+
+  OUTPUT FORMAT:
+  \`\`\`html
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${prompt}</title>
+      <style>
+          /* ALL CSS HERE */
+      </style>
+  </head>
+  <body>
+      <!-- ALL HTML CONTENT HERE -->
     
-    <script>
-        // ALL JAVASCRIPT HERE
-    </script>
-</body>
-</html>
-\`\`\`
+      <script>
+          // ALL JAVASCRIPT HERE
+      </script>
+  </body>
+  </html>
+  \`\`\`
 
-Remember: COMPLETE the entire website. Include ALL closing tags.`,
-              },
-            ],
-          });
+  Remember: COMPLETE the entire website. Include ALL closing tags.`,
+                },
+              ],
+            });
 
-          for await (const event of claudeStream) {
-            if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-              const chunk = event.delta.text;
-              accumulatedCode += chunk;
-
-              if (accumulatedCode.length % 1000 < chunk.length) {
-                console.log(`📝 Progress: ${accumulatedCode.length} chars`);
-              }
-
-              controller.enqueue(
-                encoder.encode(
-                  encodeSSE({
-                    type: 'progress',
-                    length: accumulatedCode.length
-                  })
-                )
-              );
-            }
-
-            if (event.type === 'message_stop') {
-              console.log('✅ Stream complete:', accumulatedCode.length, 'chars');
-
-              const extracted = extractCodeBlocks(accumulatedCode);
+            // ✅ Stream chunks with progress updates
+            for await (const event of claudeStream) {
+              if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+                const chunk = event.delta.text;
+                accumulatedCode += chunk;
               
-              if (!extracted.html) {
-                console.error('❌ No HTML extracted!');
-                controller.enqueue(
-                  encoder.encode(
-                    encodeSSE({
-                      type: 'error',
-                      message: 'Failed to generate valid HTML. Please try again.'
-                    })
-                  )
-                );
-                controller.close();
-                return;
-              }
-
-              const validation = validateGeneratedCode(extracted);
-              console.log('🔍 Validation:', validation.validationPassed ? 'PASSED ✅' : 'FAILED ❌');
-
-              if (!validation.validationPassed) {
-                console.error('❌ Validation errors:', validation.errors);
-                controller.enqueue(
-                  encoder.encode(
-                    encodeSSE({
-                      type: 'error',
-                      message: 'Code validation failed',
-                      errors: validation.errors,
-                      validationScore: validation.validationScore,
-                    })
-                  )
-                );
-                controller.close();
-                return;
-              }
-
-              const finalCode = extracted.html;
-              console.log('📊 Final code length:', finalCode.length);
-
-              // ✅ CRITICAL FIX: Save to database with ALL required fields
-              try {
-                if (savedProjectId) {
-                  // Update existing
-                  await prisma.project.update({
-                    where: { id: savedProjectId },
-                    data: {
-                      code: finalCode,
-                      html: finalCode,        // ✅ Add this
-                      htmlCode: finalCode,    // ✅ Add this
-                      hasHtml: true,          // ✅ Add this
-                      isComplete: true,       // ✅ Add this
-                      validationPassed: true, // ✅ Add this
-                      updatedAt: new Date(),
-                    },
-                  });
-                  console.log('💾 Updated project:', savedProjectId);
-                } else {
-                  // Create new - with ONLY the fields that exist in your schema
-                  const newProject = await prisma.project.create({
-                    data: {
-                      name: prompt.slice(0, 50) || 'Generated Project',
-                      description: prompt.slice(0, 200) || null,
-                      code: finalCode,
-                      html: finalCode,        // ✅ NEW
-                      htmlCode: finalCode,    // ✅ NEW
-                      hasHtml: true,          // ✅ NEW
-                      isComplete: true,       // ✅ NEW
-                      validationPassed: true, // ✅ NEW
-                      type: 'landing-page',
-                      userId: user.id,
-                      // Status field omitted - uses default from schema
-                    },
-                  });
-                  savedProjectId = newProject.id;
-                  console.log('💾 Created project:', savedProjectId);
-                  console.log('📝 Code saved:', finalCode.length, 'chars');
-                  
+                // Send progress every 5000 chars
+                if (accumulatedCode.length - lastProgressUpdate > 5000) {
                   controller.enqueue(
                     encoder.encode(
                       encodeSSE({
-                        type: 'projectCreated',
-                        projectId: savedProjectId
+                        type: 'progress',
+                        length: accumulatedCode.length,
                       })
                     )
                   );
+                  lastProgressUpdate = accumulatedCode.length;
                 }
-              } catch (dbError: unknown) {
-                if (dbError && typeof dbError === 'object' && 'message' in dbError) {
-                  console.error('❌ Database error:', (dbError as { message: string }).message);
-                } else {
-                  console.error('❌ Database error:', dbError);
-                }
-                console.error('Full error:', dbError);
-                // Still continue - don't fail the request
               }
+            }
 
-              // Send success
+            console.log('✅ Stream complete. Total characters:', accumulatedCode.length);
+            console.log('🔍 First 500 chars:', accumulatedCode.substring(0, 500));
+
+
+            // ✅ Extract HTML from markdown code blocks
+            const { html } = extractCodeBlocks(accumulatedCode);
+            if (!html) {
+              console.error('❌ No HTML found in response');
               controller.enqueue(
                 encoder.encode(
                   encodeSSE({
-                    type: 'complete',
-                    message: 'Generation complete',
-                    validation: {
-                      passed: validation.validationPassed,
-                      score: validation.validationScore
-                    },
-                    projectId: savedProjectId,
+                    type: 'error',
+                    message: 'Failed to extract HTML from response',
                   })
                 )
               );
-
-              // =====================================================================
-              // FIX: Send HTML with proper encoding and chunking if needed
-              // =====================================================================
-              try {
-                console.log('📤 Sending HTML:', finalCode.length, 'chars');
-                // Option 1: Single send with better encoding
-                const htmlEvent = encodeSSE({
-                  type: 'html',
-                  content: finalCode
-                });
-                controller.enqueue(encoder.encode(htmlEvent));
-                // Option 2: Chunked send (use if Option 1 fails)
-                /*
-                const chunks = encodeSSEWithChunking({
-                  type: 'html',
-                  content: finalCode
-                });
-                for (const chunk of chunks) {
-                  controller.enqueue(encoder.encode(chunk));
-                  await new Promise(resolve => setTimeout(resolve, 10));
-                }
-                */
-                console.log('✅ HTML sent successfully');
-              } catch (sendError) {
-                console.error('❌ HTML send error:', sendError);
-                controller.enqueue(encoder.encode(encodeSSE({
-                  type: 'error',
-                  message: 'Failed to send HTML content'
-                })));
-              }
-
               controller.close();
+              return;
             }
+
+            console.log('✅ Extracted HTML:', html.length, 'characters');
+
+            // === VALIDATION INTEGRATION ===
+            // Quick structure check
+            const quickValidation = validateHTMLStructure(html, false);
+            if (!quickValidation.isValid) {
+              console.warn('⚠️ HTML structure issues:', quickValidation.issues);
+              controller.enqueue(
+                encoder.encode(
+                  encodeSSE({
+                    type: 'warning',
+                    message: 'Generated code has structural issues',
+                    issues: quickValidation.issues
+                  })
+                )
+              );
+            }
+
+            // Comprehensive validation
+            const validator = new CodeValidator();
+            const validationResults = validator.validateAll(html, '', ''); // Pass empty strings for CSS/JS if embedded
+
+            console.log('📊 Validation results:', {
+              score: validationResults.score,
+              passed: validationResults.passed,
+              errors: validationResults.errors.length,
+              warnings: validationResults.warnings.length
+            });
+
+            // Send validation to client
+            controller.enqueue(
+              encoder.encode(
+                encodeSSE({
+                  type: 'validation',
+                  validation: {
+                    passed: validationResults.passed,
+                    score: validationResults.score,
+                    summary: validationResults.summary,
+                    errors: validationResults.errors,
+                    warnings: validationResults.warnings.slice(0, 5) // Limit warnings sent
+                  }
+                })
+              )
+            );
+
+            // ✅ Create or update project
+            if (!finalProjectId) {
+              const newProject = await prisma.project.create({
+                data: {
+                  name: prompt.slice(0, 100) || 'New Project',
+                  description: prompt.slice(0, 200) || '',
+                  code: html,
+                  html: html,
+                  type: 'landing-page',
+                  userId: user.id,
+                },
+              });
+              finalProjectId = newProject.id;
+              console.log('✅ Created project:', finalProjectId);
+            
+              controller.enqueue(
+                encoder.encode(
+                  encodeSSE({
+                    type: 'projectCreated',
+                    projectId: finalProjectId,
+                  })
+                )
+              );
+            } else {
+              await prisma.project.update({
+                where: { id: finalProjectId },
+                data: {
+                  code: html,
+                  html: html,
+                  updatedAt: new Date(),
+                },
+              });
+              console.log('✅ Updated project:', finalProjectId);
+            }
+
+            // ✅ FIX: Send HTML with correct event type and field name
+            // Use chunking for large HTML
+            if (html.length > 50000) {
+              console.log('📦 Chunking large HTML...');
+              const chunks = encodeSSEWithChunking({ type: 'html', content: html });
+              for (const chunk of chunks) {
+                controller.enqueue(encoder.encode(chunk));
+              }
+            } else {
+              controller.enqueue(
+                encoder.encode(
+                  encodeSSE({
+                    type: 'html',
+                    content: html,  // ✅ Use 'content' not 'code'
+                  })
+                )
+              );
+            }
+
+            // ✅ Send completion event
+            controller.enqueue(
+              encoder.encode(
+                encodeSSE({
+                  type: 'complete',
+                  projectId: finalProjectId,
+                  message: 'Generation complete',
+                })
+              )
+            );
+
+            controller.close();
+          } catch (error) {
+            console.error('❌ Stream error:', error);
+            controller.enqueue(
+              encoder.encode(
+                encodeSSE({
+                  type: 'error',
+                  message: error instanceof Error ? error.message : 'Generation failed',
+                })
+              )
+            );
+            controller.close();
           }
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'X-Accel-Buffering': 'no', // ✅ NEW: Disable nginx buffering
+          'X-RateLimit-Limit': rateLimit.limit.toString(),
+          'X-RateLimit-Remaining': rateLimit.remaining.toString(),
+          'X-RateLimit-Reset': new Date(rateLimit.reset).toISOString(),
+        },
+      });
+    } catch (error) {
+      console.error('❌ API error:', error);
+      return NextResponse.json(
+        { error: 'Internal server error' },
+        { status: 500 }
+      );
+    }
+            );
+          } else {
+            await prisma.project.update({
+              where: { id: finalProjectId },
+              data: {
+                code: html,
+                html: html,
+                updatedAt: new Date(),
+              },
+            });
+            console.log('✅ Updated project:', finalProjectId);
+          }
+
+          // ✅ FIX: Send HTML with correct event type and field name
+          // Use chunking for large HTML
+          if (html.length > 50000) {
+            console.log('📦 Chunking large HTML...');
+            const chunks = encodeSSEWithChunking({ type: 'html', content: html });
+            for (const chunk of chunks) {
+              controller.enqueue(encoder.encode(chunk));
+            }
+          } else {
+            controller.enqueue(
+              encoder.encode(
+                encodeSSE({
+                  type: 'html',
+                  content: html,  // ✅ Use 'content' not 'code'
+                })
+              )
+            );
+          }
+
+          // ✅ Send completion event
+          controller.enqueue(
+            encoder.encode(
+              encodeSSE({
+                type: 'complete',
+                projectId: finalProjectId,
+                message: 'Generation complete',
+              })
+            )
+          );
+
+          controller.close();
         } catch (error) {
           console.error('❌ Stream error:', error);
           controller.enqueue(
             encoder.encode(
               encodeSSE({
                 type: 'error',
-                message: error instanceof Error ? error.message : 'Generation failed'
+                message: error instanceof Error ? error.message : 'Generation failed',
               })
             )
           );
@@ -381,6 +497,8 @@ Remember: COMPLETE the entire website. Include ALL closing tags.`,
     });
   } catch (error) {
     console.error('API error:', error);
+    const Sentry = (await import('@/lib/sentry')).default;
+    Sentry.captureException(error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

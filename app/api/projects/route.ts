@@ -16,13 +16,16 @@ const createProjectSchema = z.object({
 export const dynamic = 'force-dynamic'
 
 // GET - Fetch all projects for user
-export const GET = compose(
-  withRateLimit(100),
-  withAuth
-)(async () => {
+export const GET = async (request: NextRequest) => {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // 🟢 OPTIONAL: Light rate limiting for reads
+  const rateLimit = await (await import('@/lib/rate-limit')).checkRateLimit(request, 'general', session.user.id)
+  if (!rateLimit.success) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
   const projects = await prisma.project.findMany({
@@ -31,19 +34,29 @@ export const GET = compose(
   })
 
   return NextResponse.json({ projects })
-})
+}
 
 // POST - Create new project
-export const POST = compose(
-  withRateLimit(20),
-  withUsageCheck('create_project'),
-  withAuth
-)(async (_req: NextRequest) => {
+export const POST = async (_req: NextRequest) => {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // 🟡 CHECK RATE LIMIT (user-based)
+  const rateLimit = await (await import('@/lib/rate-limit')).checkRateLimit(_req, 'write', session.user.id)
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { 
+        error: 'Too many requests',
+        message: 'Please slow down',
+        remaining: rateLimit.remaining,
+      },
+      { status: 429 }
+    )
+  }
+
+  // ...existing code...
   const body = await _req.json()
 
   // Validate input
@@ -77,4 +90,4 @@ export const POST = compose(
   })
 
   return NextResponse.json({ project }, { status: 201 })
-})
+}

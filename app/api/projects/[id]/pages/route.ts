@@ -15,7 +15,7 @@ async function getUserFromSession(session: Session | null) {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+    context: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -23,7 +23,7 @@ export async function GET(
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
-    const { id: projectId } = await params
+      const { id: projectId } = await context.params
     // Verify user owns this project
     const project = await prisma.project.findFirst({
       where: {

@@ -6,11 +6,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-export async function POST(
-  req: Request,
-  context: { params: { id: string; endpointId: string } }
-) {
+export async function POST(req: Request, context: { params: Promise<{ id: string; endpointId: string }> }) {
   try {
+    const { id, endpointId } = await context.params;
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -19,14 +17,13 @@ export async function POST(
     // Get endpoint
     const endpoint = await prisma.apiEndpoint.findFirst({
       where: {
-        id: context.params.endpointId,
+        id: endpointId,
         Project: {
-          id: context.params.id,
+          id: id,
           User: { email: session.user.email }
         }
       }
     })
-
     if (!endpoint) {
       return NextResponse.json({ error: 'Endpoint not found' }, { status: 404 })
     }
@@ -44,7 +41,7 @@ export async function POST(
 
     // Update test status
     await prisma.apiEndpoint.update({
-      where: { id: context.params.endpointId },
+      where: { id: endpointId },
       data: {
         testsPassed: testResult.success,
         lastTested: new Date()

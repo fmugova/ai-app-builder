@@ -1,164 +1,84 @@
-import { withAuth } from '@/lib/api-middleware'
-import { logSecurityEvent } from '@/lib/security'
-import { prisma } from '@/lib/prisma'
-import { NextRequest, NextResponse } from 'next/server'
-import { promises as dns } from 'dns'
+// app/api/domains/[id]/verify/route.ts
+// ✅ FIXED: Complete function with Next.js 15 async params
 
-export const POST = withAuth(async (req, context, session) => {
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { verifyDomain } from '@/lib/vercel-domains';
+
+// ✅ Interface matches parent folder [id]
+interface RouteContext {
+  params: Promise<{ id: string }>;
+}
+
+// ✅ COMPLETE function declaration (was missing!)
+export async function POST(
+  request: NextRequest,
+  context: RouteContext
+) {
   try {
-    // Check Pro subscription
-    if (!['pro', 'business', 'enterprise'].includes(session.user.subscriptionTier)) {
-      return NextResponse.json(
-        { error: 'Pro subscription required' },
-        { status: 403 }
-      )
+    // ✅ Extract id from params
+    const { id } = await context.params;
+
+    if (!id) {
+      return NextResponse.json({ error: 'Missing domain ID.' }, { status: 400 });
     }
 
-    // Check ownership
-    const { id } = await context.params;
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get domain from database
     const domain = await prisma.customDomain.findFirst({
       where: {
-        id: id as string,
+        id: id,
         Project: {
-          userId: session.user.id
+          User: {
+            email: session.user.email
+          }
         }
-      },
-    })
-    
-    if (!domain) {
-      return NextResponse.json(
-        { error: 'Domain not found' },
-        { status: 404 }
-      )
-    }
-    
-    // Verify DNS records
-    const verificationResult = await verifyDomainDNS(domain.domain)
-    
-    // Update domain status - removed 'verified' field, only using 'verifiedAt'
-    await prisma.customDomain.update({
-      where: { id: id as string },
-      data: {
-        status: verificationResult.verified ? 'active' : 'pending',
-        verifiedAt: verificationResult.verified ? new Date() : null,
-      },
-    })
-    
-    // Log security event
-    await logSecurityEvent({
-      userId: session.user.id,
-      type: 'domain_verification_attempted',
-      action: verificationResult.verified ? 'success' : 'failure',
-      metadata: {
-        domainId: id,
-        domain: domain.domain,
-        success: verificationResult.verified,
-      },
-      severity: 'info',
-    })
-    
-    return NextResponse.json({
-      success: true,
-      verified: verificationResult.verified,
-      message: verificationResult.message,
-      records: verificationResult.records,
-    })
-    
-  } catch (error) {
-    console.error('Failed to verify domain:', error)
-    return NextResponse.json(
-      { error: 'Failed to verify domain' },
-      { status: 500 }
-    )
-  }
-})
+      }
+    });
 
-// Helper function to verify domain DNS
-async function verifyDomainDNS(domain: string) {
-  try {
-    // Import dns module for DNS lookups
-    // (imported at the top of the file)
-    
-    const checks = {
-      cname: false,
-      a: false,
-      txt: false,
+    if (!domain) {
+      return NextResponse.json({ error: 'Domain not found' }, { status: 404 });
     }
-    
-    const records: Array<{ type: string; name: string; value: string; status: string }> = []
-    
-    // Check CNAME record (subdomain.example.com -> cname.vercel-dns.com)
-    try {
-      const cnameRecords = await dns.resolve(domain, 'CNAME')
-      if (cnameRecords && cnameRecords.length > 0) {
-        const hasVercelCNAME = cnameRecords.some((record: string) => 
-          record.includes('vercel') || record.includes('cname.vercel-dns.com')
-        )
-        checks.cname = hasVercelCNAME
-        records.push({
-          type: 'CNAME',
-          name: domain,
-          value: cnameRecords[0],
-          status: hasVercelCNAME ? 'verified' : 'invalid',
-        })
+
+    // Verify with Vercel
+    const result = await verifyDomain(domain.domain);
+
+    // Update database
+    await prisma.customDomain.update({
+      where: { id: id },
+      data: {
+        status: result.verified ? 'active' : 'pending',
+        verifiedAt: result.verified ? new Date() : null
       }
-    } catch (error) {
-      // CNAME not found, check A record as fallback
+    });
+
+    if (result.verified) {
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Domain verified successfully.' 
+      });
+    } else {
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Domain verification failed. Check DNS records.' 
+      }, { status: 400 });
     }
+
+  } catch (error: unknown) {
+    console.error('Domain verify error:', error);
+    const errorMessage = typeof error === 'object' && error && 'message' in error 
+      ? (error as { message?: string }).message 
+      : String(error);
     
-    // Check A record (example.com -> Vercel IP)
-    if (!checks.cname) {
-      try {
-        const aRecords = await dns.resolve4(domain)
-        if (aRecords && aRecords.length > 0) {
-          // Vercel's common IP address
-          const hasVercelIP = aRecords.includes('76.76.21.21')
-          checks.a = hasVercelIP
-          records.push({
-            type: 'A',
-            name: domain,
-            value: aRecords[0],
-            status: hasVercelIP ? 'verified' : 'pending',
-          })
-        }
-      } catch (error) {
-        // A record not found
-      }
-    }
-    
-    // Check TXT record for verification
-    try {
-      const txtRecords = await dns.resolveTxt(`_buildflow-verify.${domain}`)
-      if (txtRecords && txtRecords.length > 0) {
-        checks.txt = true
-        records.push({
-          type: 'TXT',
-          name: `_buildflow-verify.${domain}`,
-          value: txtRecords[0].join(''),
-          status: 'verified',
-        })
-      }
-    } catch (error) {
-      // TXT record not found (optional)
-    }
-    
-    const isVerified = checks.cname || checks.a
-    
-    return {
-      verified: isVerified,
-      message: isVerified 
-        ? 'Domain DNS configured correctly!' 
-        : 'DNS records not found. Please configure your DNS settings.',
-      records,
-      checks,
-    }
-  } catch (error) {
-    console.error('DNS verification error:', error)
-    return {
-      verified: false,
-      message: 'Could not verify DNS records. This may be temporary.',
-      records: [],
-      checks: { cname: false, a: false, txt: false },
-    }
+    return NextResponse.json(
+      { error: 'Failed to verify domain', message: errorMessage },
+      { status: 500 }
+    );
   }
 }

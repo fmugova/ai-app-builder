@@ -114,6 +114,8 @@ Only respond with valid JSON, nothing else.`
 
   } catch (error) {
     console.error('AI generation error:', error)
+    const Sentry = (await import('@/lib/sentry')).default
+    Sentry.captureException(error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

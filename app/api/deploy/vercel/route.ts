@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
@@ -37,6 +37,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // 🟡 User-based external rate limit
+    const rateLimit = await checkRateLimit(request, 'external', user.id);
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        {
+          error: 'Too many Vercel deploys. Please try again later.',
+          remaining: rateLimit.remaining,
+        },
+        { status: 429 }
+      );
+    }
+
+    // ...existing code...
     // Check Vercel connection
     if (!user.VercelConnection) {
       return NextResponse.json(
@@ -61,7 +74,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('🚀 Deploying to Vercel:', {
+    console.log('\u001b[32mDeploying to Vercel:', {
       repo: `${user.githubUsername}/${githubRepoName}`,
       projectId
     });

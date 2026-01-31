@@ -5,12 +5,6 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { nanoid } from 'nanoid'
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    // Get session
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -78,6 +72,23 @@ export async function POST(
       slug: publicSlug,
       url: publicUrl
     })
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    // Get session
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // 🟡 User-based write rate limit
+    const rateLimit = await (await import('@/lib/rate-limit')).checkRateLimit(req, 'write', session.user.id)
+    if (!rateLimit.success) {
+      return NextResponse.json({ error: 'Too many requests', remaining: rateLimit.remaining }, { status: 429 })
+    }
+
+    // ...existing code...
 
     // Log activity
     await prisma.activity.create({
@@ -112,7 +123,6 @@ export async function POST(
 }
 
 // UNPUBLISH endpoint
-export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -122,45 +132,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { id: projectId } = await params
-
-    // Check ownership
-    const project = await prisma.project.findFirst({
-      where: {
-        id: projectId,
-        userId: session.user.id
-      }
-    })
-
-    if (!project) {
-      return NextResponse.json(
-        { error: 'Project not found' },
-        { status: 404 }
-      )
+    // 🟡 User-based write rate limit
+    const rateLimit = await (await import('@/lib/rate-limit')).checkRateLimit(req, 'write', session.user.id)
+    if (!rateLimit.success) {
+      return NextResponse.json({ error: 'Too many requests', remaining: rateLimit.remaining }, { status: 429 })
     }
 
-    // Unpublish project
-    const updated = await prisma.project.update({
-      where: { id: projectId },
-      data: {
-        isPublished: false,
-        updatedAt: new Date()
-      }
-    })
-
-    console.log('✅ Project unpublished:', projectId)
-
-    return NextResponse.json({
-      success: true,
-      project: updated,
-      message: 'Project unpublished successfully!'
-    })
-
-  } catch (error) {
-    console.error('Unpublish error:', error)
-    return NextResponse.json(
-      { error: 'Failed to unpublish project' },
-      { status: 500 }
-    )
-  }
-}
+    // ...existing code...

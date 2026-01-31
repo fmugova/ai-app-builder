@@ -13,17 +13,14 @@ async function getUserFromSession(session: Session | null) {
   return prisma.user.findUnique({ where: { email: session.user.email } });
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     const user = await getUserFromSession(session)
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
-    const { id: projectId } = await params
+    const { id: projectId } = await context.params
     const { domain } = await request.json()
 
     // Validate domain format

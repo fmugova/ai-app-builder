@@ -9,6 +9,7 @@ import dynamic from 'next/dynamic'
 import PromptAssistant from '@/components/PromptAssistant'
 import PreviewFrame from '@/components/PreviewFrame'
 import { HelpCircle } from 'lucide-react'
+import React from 'react'
 
 // Lazy load heavy components
 const PromptGuide = dynamic(() => import('@/components/PromptGuide'), {
@@ -27,6 +28,9 @@ interface Message {
   timestamp: Date
 }
 
+// Import the ValidationResult and ValidationError types from PreviewFrame to ensure type compatibility
+import type { ValidationResult as PreviewFrameValidationResult } from '@/components/PreviewFrame'
+
 interface ValidationMessage {
   message: string
   line?: number
@@ -34,18 +38,10 @@ interface ValidationMessage {
   type?: 'syntax' | 'structure' | 'completeness'
 }
 
-interface ValidationResult {
-  validationPassed: boolean
-  validationScore: number
-  errors: ValidationMessage[]
-  warnings: ValidationMessage[]
-  passed: boolean
-}
+// Use the imported type for validation state
+type ValidationResult = PreviewFrameValidationResult;
 
-interface GenerateResult {
-  success: boolean
-  error?: string
-}
+
 
 interface GeneratedCode {
   html: string | null
@@ -75,8 +71,38 @@ function MessageTimestamp({ timestamp }: { timestamp: Date }) {
   }
   
   return (
-    <span className="block text-xs text-gray-400 mt-1 text-right">{display}</span>
+    <span className="block text-xs text-gray-600 mt-1 text-right">{display}</span>
   )
+}
+
+// ============================================================================
+// ERROR BOUNDARY COMPONENT
+// ============================================================================
+
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error }
+  }
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // You can log error here if needed
+    // console.error('PreviewFrame error:', error, errorInfo)
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="h-full flex flex-col items-center justify-center text-red-500">
+          <div className="text-4xl mb-2">⚠️</div>
+          <div className="font-semibold mb-1">Preview failed to load</div>
+          <div className="text-xs">{this.state.error?.message || 'Unknown error'}</div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
 }
 
 // ============================================================================
@@ -118,7 +144,7 @@ export default function ChatBuilder() {
     css: null, 
     js: null 
   })
-  const [validation, setValidation] = useState<ValidationResult | null>(null)
+  const [validation, setValidation] = useState<ValidationResult | undefined>(undefined)
   
   // ✅ NEW: Progress tracking
   const [generationProgress, setGenerationProgress] = useState(0)
@@ -256,7 +282,7 @@ const handleGenerate = async (customPrompt?: string) => {
   const promptToUse = customPrompt || prompt;
 
   if (!promptToUse.trim()) {
-    toast.error('Please enter a prompt');
+    toast.error('Please enter a prompt')
     return { success: false, error: 'No prompt provided' };
   }
 
@@ -285,7 +311,7 @@ const handleGenerate = async (customPrompt?: string) => {
     const decoder = new TextDecoder();
     let buffer = '';
     let accumulatedHtml = '';
-    let localProjectId = projectId;
+
 
     while (true) {
       const { done, value } = await reader.read();
@@ -302,6 +328,8 @@ const handleGenerate = async (customPrompt?: string) => {
           if (!jsonStr) continue;
           const data = JSON.parse(jsonStr);
 
+          console.log('📨 Received event:', data.type); // ADD THIS
+
           switch (data.type) {
             case 'progress':
               if (typeof data.length === 'number') {
@@ -312,13 +340,11 @@ const handleGenerate = async (customPrompt?: string) => {
             case 'projectCreated':
               if (data.projectId) {
                 setProjectId(data.projectId);
-                localProjectId = data.projectId;
               }
               break;
             case 'complete':
               if (data.projectId && data.projectId !== projectId) {
                 setProjectId(data.projectId);
-                localProjectId = data.projectId;
               }
               setGenerationProgress(100);
               break;
@@ -362,7 +388,7 @@ const handleGenerate = async (customPrompt?: string) => {
           setGeneratedCode({ html: data.content, css: null, js: null });
           setCurrentCode(data.content);
         }
-      } catch (e) {
+      } catch {
         // ignore
       }
     }
@@ -653,7 +679,7 @@ const handleGenerate = async (customPrompt?: string) => {
   // ============================================================================
   
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col h-screen bg-gray-100">
       <Toaster position="top-right" />
       
       {/* Header */}
@@ -950,7 +976,7 @@ const handleGenerate = async (customPrompt?: string) => {
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">
                   Start Building with AI
                 </h3>
-                <p className="text-gray-600 mb-6">
+                <p className="text-gray-700 mb-6">
                   Describe what you want to build, or choose a template
                 </p>
                 <div className="max-w-md mx-auto text-left space-y-3">
@@ -1089,13 +1115,15 @@ const handleGenerate = async (customPrompt?: string) => {
           <div className="flex-1 p-6 overflow-hidden">
             {generatedCode.html && showPreview ? (
               <div className="w-full h-full bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                <PreviewFrame
-                  html={generatedCode.html}
-                  css={generatedCode.css}
-                  js={generatedCode.js}
-                  validation={validation}
-                  onRegenerate={() => handleGenerate()}
-                />
+                <ErrorBoundary>
+                  <PreviewFrame
+                    html={generatedCode.html}
+                    css={generatedCode.css}
+                    js={generatedCode.js}
+                    validation={validation}
+                    onRegenerate={() => handleGenerate()}
+                  />
+                </ErrorBoundary>
               </div>
             ) : (
               <div className="h-full flex items-center justify-center text-gray-400">
@@ -1143,9 +1171,18 @@ const handleGenerate = async (customPrompt?: string) => {
         .bg-gray-50 {
           background: #f9fafb !important;
         }
+        .bg-gray-100 {
+          background: #f3f4f6 !important;
+        }
         
         .text-gray-900 {
           color: #111827 !important;
+        }
+        .text-gray-700 {
+          color: #374151 !important;
+        }
+        .text-gray-600 {
+          color: #4b5563 !important;
         }
         
         /* Input area - ensure visibility and proper spacing */
@@ -1161,7 +1198,7 @@ const handleGenerate = async (customPrompt?: string) => {
         }
         
         textarea::placeholder {
-          color: #9ca3af !important;
+          color: #6b7280 !important; /* placeholder-gray-500 */
         }
         
         /* Input styling */
@@ -1172,7 +1209,7 @@ const handleGenerate = async (customPrompt?: string) => {
         }
         
         input::placeholder {
-          color: #9ca3af !important;
+          color: #6b7280 !important; /* placeholder-gray-500 */
         }
         
         /* Ensure all text is readable */
@@ -1186,8 +1223,8 @@ const handleGenerate = async (customPrompt?: string) => {
         }
         
         /* Timestamp text */
-        .text-gray-400 {
-          color: #9ca3af !important;
+        .text-gray-600 {
+          color: #4b5563 !important;
         }
       `}</style>
     </div>

@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 
-import type { ValidationMessage } from '@/lib/validator'
+import type { ValidationMessage } from '@/lib/validators'
 interface ValidationResult {
   isComplete: boolean
   hasHtml: boolean

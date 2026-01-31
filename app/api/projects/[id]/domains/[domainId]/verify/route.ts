@@ -5,8 +5,8 @@ import { prisma } from '@/lib/prisma'
 import { promises as dns } from 'dns'
 
 // POST /api/projects/[id]/domains/[domainId]/verify - Verify DNS configuration
-export async function POST(req: Request, context: { params: { id: string; domainId: string } }) {
-  const { id, domainId } = context.params;
+export async function POST(req: Request, context: { params: Promise<{ id: string; domainId: string }> }) {
+  const { id, domainId } = await context.params;
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {

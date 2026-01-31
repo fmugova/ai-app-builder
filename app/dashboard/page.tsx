@@ -5,11 +5,10 @@ import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import DashboardClientOptimized from './DashboardClientOptimized'
 import { DashboardSkeleton } from '@/components/LoadingSkeleton'
-import dynamicImport from 'next/dynamic'
 
 export const dynamic = 'force-dynamic'
 
-const DashboardTutorialPopUp = dynamicImport(() => import('./components/DashboardTutorialPopUp'), { ssr: false })
+import DashboardTutorialPopUp from './components/DashboardTutorialPopUpClient'
 
 async function DashboardContent() {
   // Get session

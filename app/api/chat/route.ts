@@ -127,6 +127,8 @@ Generate ONLY the complete HTML code. No explanations, no markdown, just the cod
 
   } catch (error) {
     console.error('Chat API error:', error);
+    const Sentry = (await import('@/lib/sentry')).default;
+    Sentry.captureException(error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

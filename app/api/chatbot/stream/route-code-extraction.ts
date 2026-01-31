@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const { prompt, projectId, max_tokens } = await request.json();
+    const { prompt, max_tokens } = await request.json();
 
     if (!prompt) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
@@ -46,7 +46,6 @@ export async function POST(request: NextRequest) {
       async start(controller) {
         try {
           let accumulatedCode = '';
-          const extracted: { html: string; css: string; js: string } = { html: '', css: '', js: '' };
 
           const claudeStream = await anthropic.messages.stream({
             model: 'claude-sonnet-4-20250514',
