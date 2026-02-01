@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
               })
               htmlContent = getUpgradePromptEmailContent(
                 user.name || 'there',
-                user.generationsUsed,
+                Number(user.generationsUsed),
                 userProjects
               )
               break
