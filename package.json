@@ -12,7 +12,11 @@
     "postinstall": "prisma generate",
     "analyze": "cross-env ANALYZE=true next build",
     "analyze:workspaces": "source-map-explorer .next/static/chunks/app/workspaces/[id]/page-*.js",
-    "verify-email": "tsx scripts/auto-verify-email.ts"
+    "verify-email": "tsx scripts/auto-verify-email.ts",
+    "2fa": "tsx scripts/auto-2fa.ts",
+    "check-db": "tsx scripts/check-schema.ts",
+    "check-schema": "prisma validate",
+    "v": "node -p \"require('./package.json').version\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.70.1",

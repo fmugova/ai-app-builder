@@ -1,5 +1,5 @@
 // scripts/auto-verify-email.ts
-// Automatic email verification for development/testing
+// Simplified - Only uses emailVerified field
 
 import { PrismaClient } from '@prisma/client'
 
@@ -24,12 +24,13 @@ async function autoVerifyEmail(email: string) {
     }
 
     if (user.emailVerified) {
-      console.log('✅ Email already verified')
+      console.log('✅ Email already verified at:', user.emailVerified)
       return
     }
 
-    console.log('📝 Marking email as verified...')
+    console.log('📝 Verifying email...')
 
+    // ✅ Only update emailVerified field
     await prisma.user.update({
       where: { id: user.id },
       data: {
@@ -40,6 +41,7 @@ async function autoVerifyEmail(email: string) {
     console.log('✅ Email verified successfully!')
     console.log(`   User: ${user.email}`)
     console.log(`   ID: ${user.id}`)
+    console.log(`   Verified at: ${new Date().toISOString()}`)
     
   } catch (error) {
     console.error('❌ Error:', error)
@@ -48,7 +50,6 @@ async function autoVerifyEmail(email: string) {
   }
 }
 
-// Auto-verify all unverified users
 async function verifyAllUsers() {
   try {
     console.log('🔍 Finding unverified users...')
@@ -65,6 +66,11 @@ async function verifyAllUsers() {
 
     console.log(`📊 Found ${unverified.length} unverified users`)
 
+    if (unverified.length === 0) {
+      console.log('✅ All users are already verified!')
+      return
+    }
+
     for (const user of unverified) {
       console.log(`\n📝 Verifying: ${user.email}`)
       
@@ -78,7 +84,7 @@ async function verifyAllUsers() {
       console.log('✅ Verified!')
     }
 
-    console.log(`\n🎉 Verified ${unverified.length} users!`)
+    console.log(`\n🎉 Successfully verified ${unverified.length} users!`)
     
   } catch (error) {
     console.error('❌ Error:', error)
@@ -87,22 +93,36 @@ async function verifyAllUsers() {
   }
 }
 
-// Get command line arguments
-const args = process.argv.slice(2)
-
-if (args.length === 0) {
-  console.log('📋 Usage:')
+// Show help
+function showHelp() {
+  console.log('📧 Email Verification Tool')
+  console.log('')
+  console.log('Usage:')
   console.log('  npm run verify-email <email>     - Verify specific email')
-  console.log('  npm run verify-email --all       - Verify all users')
+  console.log('  npm run verify-email --all       - Verify all unverified users')
+  console.log('  npm run verify-email --help      - Show this help')
   console.log('')
   console.log('Examples:')
   console.log('  npm run verify-email user@example.com')
   console.log('  npm run verify-email --all')
+}
+
+// Get command line arguments
+const args = process.argv.slice(2)
+
+if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
+  showHelp()
   process.exit(0)
 }
 
 if (args[0] === '--all') {
   verifyAllUsers()
 } else {
-  autoVerifyEmail(args[0])
+  const email = args[0]
+  if (!email.includes('@')) {
+    console.log('❌ Invalid email address')
+    console.log('Please provide a valid email like: user@example.com')
+    process.exit(1)
+  }
+  autoVerifyEmail(email)
 }
