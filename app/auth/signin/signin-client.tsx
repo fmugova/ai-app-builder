@@ -49,46 +49,7 @@ export default function SignInClient() {
     setLoading(true)
 
     try {
-      // First check if 2FA is required (only if not already showing 2FA)
-      if (!show2FA) {
-        const check2FAResponse = await fetch('/api/auth/check-2fa', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: formData.email,
-            password: formData.password,
-          }),
-        })
-
-        const check2FAData = await check2FAResponse.json()
-
-        if (check2FAData.error) {
-          toast.error(check2FAData.error)
-          setLoading(false)
-          return
-        }
-
-        // Check if email needs verification - let user proceed to see the error from NextAuth
-        if (check2FAData.emailVerified === false) {
-          // Continue to NextAuth which will handle the verification error
-        }
-
-        if (check2FAData.requires2FA) {
-          setShow2FA(true)
-          toast('Please enter your 2FA code', { icon: '🔐' })
-          setLoading(false)
-          return
-        }
-      }
-
-      // If 2FA is shown, validate the token
-      if (show2FA && !formData.twoFactorToken) {
-        toast.error('Please enter your 2FA code')
-        setLoading(false)
-        return
-      }
-
-      // Proceed with sign in
+      // Proceed with sign in using next-auth
       const result = await signIn('credentials', {
         email: formData.email,
         password: formData.password,
