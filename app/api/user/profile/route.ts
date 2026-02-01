@@ -36,17 +36,14 @@ export async function GET() {
       where: { userId: user.id }
     })
 
-    return NextResponse.json({ user, projectCount })
-      // Ensure type safety for generationsUsed and generationsLimit
-      // (projectCount is already a number)
-      return NextResponse.json({
-        user: {
-          ...user,
-          generationsUsed: Number(user.generationsUsed ?? 0),
-          generationsLimit: Number(user.generationsLimit ?? 0),
-        },
-        projectCount
-      })
+    return NextResponse.json({
+      user: {
+        ...user!,
+        generationsUsed: Number(user!.generationsUsed ?? 0),
+        generationsLimit: Number(user!.generationsLimit ?? 0),
+      },
+      projectCount
+    })
   } catch (error) {
     console.error('Profile fetch error:', error)
     return NextResponse.json(
