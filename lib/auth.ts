@@ -274,74 +274,25 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user, trigger, session, account }) {
-      // Log security event on sign in
-      if (trigger === 'signIn' && user) {
-        // Note: IP and User Agent should be captured at middleware/API route level
-        // and passed through session context if needed
-        await logSecurityEvent({
-          userId: user.id,
-          type: 'login',
-          action: 'success',
-          metadata: {
-            provider: account?.provider || 'credentials',
-            timestamp: new Date().toISOString(),
-          },
-          severity: 'info',
-        })
+    async signIn({ user }) {
+      // Add logging to see what's happening
+      console.log('SignIn attempt:', user.email)
+
+      const dbUser = await prisma.user.findUnique({
+        where: { email: user.email },
+      })
+
+      console.log('DB User:', {
+        emailVerified: dbUser?.emailVerified,
+        twoFactorEnabled: dbUser?.twoFactorEnabled,
+      })
+
+      // Allow if email verified
+      if (dbUser?.emailVerified) {
+        return true
       }
 
-      // Initial sign in
-      if (user) {
-        token.id = user.id
-        token.role = user.role
-        token.email = user.email
-      }
-
-      // Fetch fresh user data on each token refresh
-      if (token.email) {
-        const dbUser = await prisma.user.findUnique({
-          where: { email: token.email },
-          include: {
-            Subscription: true,
-          },
-        })
-
-        console.log('[DEBUG] User from DB:', dbUser)
-
-        if (dbUser) {
-          token.id = dbUser.id
-          token.role = dbUser.role
-          token.emailVerified = dbUser.emailVerified
-          
-          // Use subscription.plan OR user.subscriptionTier (User model has both)
-          token.subscriptionTier = dbUser.Subscription?.plan || dbUser.subscriptionTier || 'free'
-          token.subscriptionStatus = dbUser.Subscription?.status || dbUser.subscriptionStatus || 'active'
-          
-          // Use existing User fields for usage tracking (already calculated in User model)
-          token.projectsThisMonth = dbUser.projectsThisMonth || 0
-          token.generationsUsed = dbUser.generationsUsed || 0
-        }
-      }
-
-      // Handle session updates
-      if (trigger === 'update' && session) {
-        token = { ...token, ...session }
-      }
-
-      return token
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as string
-        session.user.role = token.role as string
-        session.user.subscriptionTier = token.subscriptionTier as string
-        session.user.subscriptionStatus = token.subscriptionStatus as string
-        session.user.emailVerified = token.emailVerified as Date | null
-        session.user.projectsThisMonth = token.projectsThisMonth as number
-        session.user.generationsUsed = token.generationsUsed as number
-      }
-      return session
+      return false
     },
   },
   events: {

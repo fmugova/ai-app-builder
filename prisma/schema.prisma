@@ -705,10 +705,10 @@ model User {
   cancelAtPeriodEnd            Boolean                @default(false)
   currentPeriodStart           DateTime?
   currentPeriodEnd             DateTime?
-  generationsUsed              Int                    @default(0)
-  generationsLimit             Int                    @default(10)
-  projectsThisMonth            Int                    @default(0)
-  projectsLimit                Int                    @default(3)
+  generationsUsed              BigInt                 @default(0)
+  generationsLimit             BigInt                 @default(10)
+  projectsThisMonth            BigInt                 @default(0)
+  projectsLimit                BigInt                 @default(3)
   role                         String                 @default("user")
   githubAccessToken            String?
   githubUsername               String?
