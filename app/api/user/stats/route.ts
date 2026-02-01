@@ -31,7 +31,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    return NextResponse.json(user)
+    return NextResponse.json({
+      ...user,
+      generationsUsed: Number(user.generationsUsed ?? 0),
+      generationsLimit: Number(user.generationsLimit ?? 0),
+      projectsThisMonth: Number(user.projectsThisMonth ?? 0),
+      projectsLimit: Number(user.projectsLimit ?? 0),
+    })
   } catch (error) {
     console.error('User stats error:', error)
     return NextResponse.json(

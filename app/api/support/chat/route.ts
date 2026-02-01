@@ -55,7 +55,7 @@ ${user ? `
 - Email: ${user.email}
 - Tier: ${user.subscriptionTier}
 - Projects created: ${user.Project.length}
-- Generations used: ${user.generationsUsed}/${user.generationsLimit}
+- Generations used: ${Number(user.generationsUsed ?? 0)}/${Number(user.generationsLimit ?? 0)}
 ` : 'Not logged in'}
 
 Guidelines:

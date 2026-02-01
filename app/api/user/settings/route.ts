@@ -27,7 +27,7 @@ async function getUserFromSession(
   return prisma.user.findUnique({ where: { email: session.user.email }, ...(select ? { select } : {}) });
 }
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     const select = {
@@ -50,7 +50,13 @@ export async function GET(req: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
-    return NextResponse.json(user);
+    return NextResponse.json({
+      ...user,
+      generationsUsed: Number(user.generationsUsed ?? 0),
+      generationsLimit: Number(user.generationsLimit ?? 0),
+      projectsThisMonth: Number(user.projectsThisMonth ?? 0),
+      projectsLimit: Number(user.projectsLimit ?? 0),
+    });
   } catch (error) {
     console.error('Settings GET error:', error);
     return NextResponse.json(

@@ -29,10 +29,10 @@ export async function GET() {
 
     return NextResponse.json({
       usage: {
-        used: user.generationsUsed || 0,
-        limit: user.generationsLimit || 10,
+        used: Number(user.generationsUsed ?? 0),
+        limit: Number(user.generationsLimit ?? 10),
         plan: user.subscriptionTier || 'free',
-        remaining: (user.generationsLimit || 10) - (user.generationsUsed || 0),
+        remaining: Number(user.generationsLimit ?? 10) - Number(user.generationsUsed ?? 0),
       },
     })
   } catch (error) {

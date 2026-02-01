@@ -31,8 +31,8 @@ export async function checkUsageAlerts(userId: string): Promise<UsageAlertResult
     }
 
     // Calculate usage percentages
-    const projectUsage = (user.projectsThisMonth / user.projectsLimit) * 100
-    const genUsage = (user.generationsUsed / user.generationsLimit) * 100
+    const projectUsage = (Number(user.projectsThisMonth) / Number(user.projectsLimit)) * 100
+    const genUsage = (Number(user.generationsUsed) / Number(user.generationsLimit)) * 100
 
     // Alert at 80% project usage
     if (projectUsage >= 80 && projectUsage < 100) {
@@ -41,8 +41,8 @@ export async function checkUsageAlerts(userId: string): Promise<UsageAlertResult
         subject: '⚠️ You\'re approaching your project limit',
         html: getProjectsLimitAlertHTML(
           user.name || 'there',
-          user.projectsThisMonth,
-          user.projectsLimit,
+          Number(user.projectsThisMonth),
+          Number(user.projectsLimit),
           projectUsage,
           user.subscriptionTier
         ),
@@ -58,8 +58,8 @@ export async function checkUsageAlerts(userId: string): Promise<UsageAlertResult
         subject: '⚠️ You\'re approaching your AI generation limit',
         html: getGenerationLimitAlertHTML(
           user.name || 'there',
-          user.generationsUsed,
-          user.generationsLimit,
+          Number(user.generationsUsed),
+          Number(user.generationsLimit),
           genUsage,
           user.subscriptionTier
         ),
@@ -76,7 +76,7 @@ export async function checkUsageAlerts(userId: string): Promise<UsageAlertResult
         html: getLimitReachedHTML(
           user.name || 'there',
           'project',
-          user.projectsLimit,
+          Number(user.projectsLimit),
           user.subscriptionTier
         ),
       })
@@ -90,7 +90,7 @@ export async function checkUsageAlerts(userId: string): Promise<UsageAlertResult
         html: getLimitReachedHTML(
           user.name || 'there',
           'generation',
-          user.generationsLimit,
+          Number(user.generationsLimit),
           user.subscriptionTier
         ),
       })

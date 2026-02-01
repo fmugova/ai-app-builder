@@ -35,10 +35,10 @@ export async function GET() {
     const aiLimit = user.generationsLimit || 10
 
     return NextResponse.json({
-      canGenerate: (user.generationsUsed || 0) < aiLimit,
+      canGenerate: Number(user.generationsUsed ?? 0) < Number(aiLimit),
       canCreateProject: user._count.Project < projectLimit,
       limits: {
-        aiRequests: { used: user.generationsUsed || 0, limit: aiLimit },
+        aiRequests: { used: Number(user.generationsUsed ?? 0), limit: Number(aiLimit) },
         projects: { used: user._count.Project, limit: projectLimit },
       },
       plan,
