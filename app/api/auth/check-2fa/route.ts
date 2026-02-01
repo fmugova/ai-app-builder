@@ -23,14 +23,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get request body
-    const body = await req.json()
-    const { token } = body
-
-    if (!token || token.length !== 6) {
-      return NextResponse.json({ error: 'Invalid token format' }, { status: 400 })
-    }
-
     // Get user with 2FA secret
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
@@ -41,8 +33,17 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    // If 2FA is not enabled, allow login
     if (!user || !user.twoFactorEnabled || !user.twoFactorSecret) {
-      return NextResponse.json({ error: '2FA not enabled' }, { status: 400 })
+      return NextResponse.json({ success: true })
+    }
+
+    // If 2FA is enabled, require token
+    const body = await req.json()
+    const { token } = body
+
+    if (!token || token.length !== 6) {
+      return NextResponse.json({ error: 'Invalid token format' }, { status: 400 })
     }
 
     // Verify token using speakeasy
