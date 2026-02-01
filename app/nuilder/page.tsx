@@ -19,3 +19,7 @@ export const theme = {
   },
   placeholder: 'placeholder-gray-500', // ✅ Much more visible
 }
+
+export default function NuilderPage() {
+  return <div>Nuilder Page</div>;
+}

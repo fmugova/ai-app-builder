@@ -11,10 +11,11 @@ import { signupSchema, validateSchema } from '@/lib/schemas'
 import { randomBytes } from 'crypto'
 
 // Server-side analytics logging (GA tracking happens client-side)
-const logAnalyticsEvent = (event: string, properties?: Record<string, any>) => {
+const logAnalyticsEvent = (event: string, properties?: Record<string, unknown>) => {
   console.log(`📊 Analytics [${event}]:`, properties || {})
 }
 
+export async function POST(request: NextRequest) {
   try {
     // Rate limiting - use IP address for signup
     const rateLimit = await checkRateLimit(request, 'auth')
@@ -42,21 +43,17 @@ const logAnalyticsEvent = (event: string, properties?: Record<string, any>) => {
     const existingUser = await prisma.user.findUnique({
       where: { email }
     })
-
     if (existingUser) {
       return NextResponse.json(
         { error: 'User already exists' },
         { status: 400 }
       )
     }
-
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
-
     // Generate email verification token
     const emailVerificationToken = randomBytes(32).toString('hex')
     const emailVerificationTokenExpiry = new Date(Date.now() + 1000 * 60 * 60 * 24) // 24 hours
-
     // Create user with verification token
     const user = await prisma.user.create({
       data: {
@@ -73,10 +70,8 @@ const logAnalyticsEvent = (event: string, properties?: Record<string, any>) => {
         twoFactorRequired: true, // Custom flag to enforce 2FA setup after signup
       }
     })
-
     // Log signup analytics event (server-side)
     logAnalyticsEvent('sign_up', { method: 'email', userId: user.id })
-
     // Auto-enroll in welcome drip campaign
     try {
       await prisma.dripEnrollment.create({
@@ -93,8 +88,6 @@ const logAnalyticsEvent = (event: string, properties?: Record<string, any>) => {
       console.error('Drip enrollment failed:', enrollmentError)
       // Don't fail signup if enrollment fails
     }
-
-
     // Send verification email (don't await - send async)
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://buildflow.ai'
     const verifyUrl = `${baseUrl}/verify-email?token=${emailVerificationToken}`
@@ -118,7 +111,6 @@ const logAnalyticsEvent = (event: string, properties?: Record<string, any>) => {
     }).catch(err => 
       console.error('Verification email failed:', err)
     )
-
     return NextResponse.json({
       success: true,
       user: {
@@ -127,7 +119,7 @@ const logAnalyticsEvent = (event: string, properties?: Record<string, any>) => {
         email: user.email
       }
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Signup error:', error)
     return NextResponse.json(
       { error: 'Signup failed' },

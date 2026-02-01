@@ -1,6 +1,7 @@
-import { parse } from 'node-html-parser'
+// lib/validators/code-validator.ts
+// Enterprise-grade code validation with strict rules
 
-export interface ValidationIssue {
+export interface ValidationMessage {
   type: 'error' | 'warning' | 'info'
   category: 'syntax' | 'security' | 'performance' | 'accessibility' | 'seo'
   message: string
@@ -11,336 +12,367 @@ export interface ValidationIssue {
 
 export interface ValidationResult {
   passed: boolean
-  score: number // 0-100
-  issues: ValidationIssue[]
-  metrics: {
-    htmlSize: number
-    cssSize: number
-    jsSize: number
-    totalSize: number
-    loadTime?: number
-  }
-  accessibility: {
+  score: number
+  errors: ValidationMessage[]
+  warnings: ValidationMessage[]
+  info: ValidationMessage[]
+  summary: {
+    total: number
+    errors: number
+    warnings: number
+    info: number
     score: number
-    issues: string[]
-  }
-  security: {
-    score: number
-    issues: string[]
-  }
-  performance: {
-    score: number
-    issues: string[]
-  }
-  seo: {
-    score: number
-    issues: string[]
+    grade: string
+    status: string
   }
 }
 
-export async function validateHTML(html: string): Promise<ValidationResult> {
-  const issues: ValidationIssue[] = []
-  let score = 100
+class CodeValidator {
+  public errors: ValidationMessage[] = []
+  public warnings: ValidationMessage[] = []
+  public info: ValidationMessage[] = []
+  private hasCriticalError: boolean = false
 
-  try {
-    // Parse HTML
-    const root = parse(html)
+  constructor() {
+    this.reset()
+  }
 
-    // 1. SYNTAX VALIDATION
+  private reset(): void {
+    this.errors = []
+    this.warnings = []
+    this.info = []
+    this.hasCriticalError = false
+  }
+
+  private addError(category: ValidationMessage['category'], message: string, severity: ValidationMessage['severity'] = 'high'): void {
+    this.errors.push({ type: 'error', category, message, severity })
+    if (severity === 'critical') {
+      this.hasCriticalError = true
+    }
+  }
+
+  private addWarning(category: ValidationMessage['category'], message: string, severity: ValidationMessage['severity'] = 'medium'): void {
+    this.warnings.push({ type: 'warning', category, message, severity })
+  }
+
+  private addInfo(category: ValidationMessage['category'], message: string, severity: ValidationMessage['severity'] = 'low'): void {
+    this.info.push({ type: 'info', category, message, severity })
+  }
+
+  // ==========================================================================
+  // HTML VALIDATION
+  // ==========================================================================
+  public validateHTML(html: string): void {
+    if (!html || html.trim().length === 0) {
+      this.addError('syntax', 'HTML content is empty', 'critical')
+      return
+    }
+
+    // Check for DOCTYPE - CRITICAL on minimal/incomplete HTML
     if (!html.includes('<!DOCTYPE html>')) {
-      issues.push({
-        type: 'error',
-        category: 'syntax',
-        message: 'Missing DOCTYPE declaration',
-        severity: 'high'
-      })
-      score -= 10
-    }
-
-    if (!root.querySelector('html')) {
-      issues.push({
-        type: 'error',
-        category: 'syntax',
-        message: 'Missing <html> tag',
-        severity: 'critical'
-      })
-      score -= 15
-    }
-
-    if (!root.querySelector('head')) {
-      issues.push({
-        type: 'error',
-        category: 'syntax',
-        message: 'Missing <head> tag',
-        severity: 'critical'
-      })
-      score -= 15
-    }
-
-    if (!root.querySelector('body')) {
-      issues.push({
-        type: 'error',
-        category: 'syntax',
-        message: 'Missing <body> tag',
-        severity: 'critical'
-      })
-      score -= 15
-    }
-
-    // 2. SECURITY VALIDATION
-    const securityIssues = validateSecurity(root, html)
-    issues.push(...securityIssues.issues)
-    score -= securityIssues.penalty
-
-    // 3. ACCESSIBILITY VALIDATION
-    const a11yIssues = validateAccessibility(root)
-    issues.push(...a11yIssues.issues)
-    score -= a11yIssues.penalty
-
-    // 4. PERFORMANCE VALIDATION
-    const perfIssues = validatePerformance(html)
-    issues.push(...perfIssues.issues)
-    score -= perfIssues.penalty
-
-    // 5. SEO VALIDATION
-    const seoIssues = validateSEO(root)
-    issues.push(...seoIssues.issues)
-    score -= seoIssues.penalty
-
-    // Calculate metrics
-    const metrics = {
-      htmlSize: new Blob([html]).size,
-      cssSize: extractCSS(html).length,
-      jsSize: extractJS(html).length,
-      totalSize: new Blob([html]).size,
-    }
-
-    return {
-      passed: score >= 70,
-      score: Math.max(0, score),
-      issues,
-      metrics,
-      accessibility: {
-        score: 100 - a11yIssues.penalty,
-        issues: a11yIssues.issues.map(i => i.message)
-      },
-      security: {
-        score: 100 - securityIssues.penalty,
-        issues: securityIssues.issues.map(i => i.message)
-      },
-      performance: {
-        score: 100 - perfIssues.penalty,
-        issues: perfIssues.issues.map(i => i.message)
-      },
-      seo: {
-        score: 100 - seoIssues.penalty,
-        issues: seoIssues.issues.map(i => i.message)
+      // If HTML is minimal (no proper structure), make it CRITICAL (auto-fail)
+      if (!html.includes('<html') || !html.includes('<head') || !html.includes('<body')) {
+        this.addError('syntax', 'Missing DOCTYPE declaration - required for minimal HTML', 'critical')
+      } else {
+        // Full document but missing DOCTYPE - still an error but not critical
+        this.addError('syntax', 'Missing DOCTYPE declaration', 'high')
       }
     }
 
-  } catch (error) {
-    return {
-      passed: false,
-      score: 0,
-      issues: [{
-        type: 'error',
-        category: 'syntax',
-        message: `Failed to parse HTML: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        severity: 'critical'
-      }],
-      metrics: {
-        htmlSize: 0,
-        cssSize: 0,
-        jsSize: 0,
-        totalSize: 0
-      },
-      accessibility: { score: 0, issues: [] },
-      security: { score: 0, issues: [] },
-      performance: { score: 0, issues: [] },
-      seo: { score: 0, issues: [] }
+    // Check for viewport meta tag
+    if (!html.includes('viewport')) {
+      this.addError('accessibility', 'Missing viewport meta tag for mobile responsiveness', 'high')
+    }
+
+    // Check for charset
+    if (!html.includes('charset')) {
+      this.addWarning('syntax', 'Missing charset declaration', 'medium')
+    }
+
+    // CSP Violations - inline styles
+    if (html.match(/style\s*=\s*["']/)) {
+      this.addError('security', 'CSP violation: Found inline style attributes', 'critical')
+    }
+
+    // CSP Violations - inline event handlers
+    const inlineHandlers = ['onclick', 'onload', 'onerror', 'onmouseover']
+    inlineHandlers.forEach(handler => {
+      if (html.includes(handler + '=')) {
+        this.addError('security', `CSP violation: Found inline ${handler} handler`, 'critical')
+      }
+    })
+
+    // Check for semantic HTML
+    if (!html.includes('<main')) {
+      this.addInfo('accessibility', 'Consider using <main> for main content', 'low')
+    }
+
+    // Check for h1
+    if (!html.match(/<h1[^>]*>/)) {
+      this.addError('accessibility', 'Missing h1 heading for page title', 'high')
+    }
+
+    // Check for multiple h1
+    const h1Count = (html.match(/<h1[^>]*>/g) || []).length
+    if (h1Count > 1) {
+      this.addWarning('accessibility', `Multiple h1 elements found (${h1Count}). Should have only one`, 'medium')
+    }
+
+    // Check for alt attributes on images
+    const imgTags = html.match(/<img[^>]*>/g) || []
+    imgTags.forEach(img => {
+      if (!img.includes('alt=')) {
+        this.addError('accessibility', 'Image missing alt attribute', 'high')
+      }
+    })
+
+    // Check for lang attribute
+    if (!html.match(/<html[^>]*lang=/)) {
+      this.addWarning('accessibility', 'Missing lang attribute on <html> tag', 'medium')
     }
   }
-}
 
-function validateSecurity(root: any, html: string) {
-  const issues: ValidationIssue[] = []
-  let penalty = 0
-
-  // Check for inline event handlers (XSS risk)
-  if (html.match(/on\w+\s*=\s*["']/i)) {
-    issues.push({
-      type: 'warning',
-      category: 'security',
-      message: 'Inline event handlers detected - potential XSS risk',
-      severity: 'high'
-    })
-    penalty += 10
-  }
-
-  // Check for eval() usage
-  if (html.includes('eval(')) {
-    issues.push({
-      type: 'error',
-      category: 'security',
-      message: 'eval() usage detected - major security risk',
-      severity: 'critical'
-    })
-    penalty += 20
-  }
-
-  // Check for innerHTML usage
-  if (html.includes('.innerHTML')) {
-    issues.push({
-      type: 'warning',
-      category: 'security',
-      message: 'innerHTML usage detected - potential XSS risk',
-      severity: 'medium'
-    })
-    penalty += 5
-  }
-
-  return { issues, penalty }
-}
-
-function validateAccessibility(root: any) {
-  const issues: ValidationIssue[] = []
-  let penalty = 0
-
-  // Check for alt text on images
-  const images = root.querySelectorAll('img')
-  images.forEach((img: any) => {
-    if (!img.getAttribute('alt')) {
-      issues.push({
-        type: 'warning',
-        category: 'accessibility',
-        message: 'Image missing alt attribute',
-        severity: 'medium'
-      })
-      penalty += 2
+  // ==========================================================================
+  // CSS VALIDATION
+  // ==========================================================================
+  public validateCSS(css: string): void {
+    if (!css || css.trim().length === 0) {
+      this.addInfo('performance', 'No CSS provided', 'low')
+      return
     }
-  })
 
-  // Check for form labels
-  const inputs = root.querySelectorAll('input:not([type="hidden"])')
-  inputs.forEach((input: any) => {
-    const id = input.getAttribute('id')
-    if (id) {
-      const label = root.querySelector(`label[for="${id}"]`)
-      if (!label) {
-        issues.push({
-          type: 'warning',
-          category: 'accessibility',
-          message: 'Input missing associated label',
-          severity: 'medium'
-        })
-        penalty += 2
+    // Check for CSS custom properties (variables)
+    if (!css.includes('--')) {
+      this.addWarning('performance', 'Consider using CSS custom properties (variables) for maintainability', 'low')
+    }
+
+    // Check for media queries (responsive design)
+    if (!css.includes('@media')) {
+      this.addWarning('accessibility', 'No media queries found. Consider responsive design', 'medium')
+    }
+
+    // Check for focus styles
+    if (!css.includes(':focus')) {
+      this.addWarning('accessibility', 'Missing :focus styles for keyboard navigation', 'high')
+    }
+
+    // Check for reduced motion
+    if (!css.includes('prefers-reduced-motion')) {
+      this.addInfo('accessibility', 'Consider adding @media (prefers-reduced-motion) for accessibility', 'low')
+    }
+
+    // Check for unmatched braces
+    const openBraces = (css.match(/{/g) || []).length
+    const closeBraces = (css.match(/}/g) || []).length
+    if (openBraces !== closeBraces) {
+      this.addError('syntax', `Unmatched braces in CSS (${openBraces} open, ${closeBraces} close)`, 'critical')
+    }
+  }
+
+  // ==========================================================================
+  // JAVASCRIPT VALIDATION
+  // ==========================================================================
+  public validateJavaScript(js: string): void {
+    if (!js || js.trim().length === 0) {
+      this.addInfo('performance', 'No JavaScript provided', 'low')
+      return
+    }
+
+    // Security checks
+    if (js.includes('eval(')) {
+      this.addError('security', 'Security risk: eval() usage detected', 'critical')
+    }
+
+    if (js.includes('Function(')) {
+      this.addError('security', 'Security risk: Function constructor detected', 'critical')
+    }
+
+    if (js.includes('innerHTML') && !js.includes('textContent')) {
+      this.addError('security', 'XSS risk: innerHTML usage without proper sanitization', 'high')
+    }
+
+    if (js.includes('document.write')) {
+      this.addError('security', 'Security risk: document.write() can be dangerous', 'high')
+    }
+
+    // Code quality
+    if (js.includes('var ')) {
+      this.addWarning('syntax', 'Consider using const/let instead of var keyword', 'low')
+    }
+
+    if (js.includes('console.log') && process.env.NODE_ENV === 'production') {
+      this.addWarning('performance', 'console.log statements should be removed in production', 'low')
+    }
+
+    // Check for strict mode
+    if (!js.includes('"use strict"') && !js.includes("'use strict'")) {
+      this.addInfo('syntax', 'Consider adding "use strict" for better error catching', 'low')
+    }
+
+    // Check for unmatched parentheses/brackets/braces
+    const openParen = (js.match(/\(/g) || []).length
+    const closeParen = (js.match(/\)/g) || []).length
+    const openBracket = (js.match(/\[/g) || []).length
+    const closeBracket = (js.match(/\]/g) || []).length
+    const openBrace = (js.match(/{/g) || []).length
+    const closeBrace = (js.match(/}/g) || []).length
+
+    if (openParen !== closeParen) {
+      this.addError('syntax', `Unmatched parentheses (${openParen} open, ${closeParen} close)`, 'critical')
+    }
+    if (openBracket !== closeBracket) {
+      this.addError('syntax', `Unmatched brackets (${openBracket} open, ${closeBracket} close)`, 'critical')
+    }
+    if (openBrace !== closeBrace) {
+      this.addError('syntax', `Unmatched braces (${openBrace} open, ${closeBrace} close)`, 'critical')
+    }
+  }
+
+  // ==========================================================================
+  // SECURITY VALIDATION
+  // ==========================================================================
+  public validateSecurity(html: string, js: string): void {
+    // XSS checks
+    if (js.includes('innerHTML') || js.includes('outerHTML')) {
+      if (!js.includes('DOMPurify') && !js.includes('textContent')) {
+        this.addError('security', 'XSS vulnerability: Using innerHTML without sanitization', 'critical')
       }
     }
-  })
 
-  // Check for heading structure
-  const headings = root.querySelectorAll('h1, h2, h3, h4, h5, h6')
-  if (headings.length === 0) {
-    issues.push({
-      type: 'info',
-      category: 'accessibility',
-      message: 'No heading elements found',
-      severity: 'low'
+    // SQL injection patterns (if any backend code)
+    if (js.includes('SELECT') && js.includes('WHERE')) {
+      this.addWarning('security', 'Potential SQL injection risk detected', 'high')
+    }
+
+    // Check for hardcoded credentials
+    const credentialPatterns = ['password:', 'apiKey:', 'api_key:', 'secret:', 'token:']
+    credentialPatterns.forEach(pattern => {
+      if (js.toLowerCase().includes(pattern.toLowerCase())) {
+        this.addError('security', 'Potential hardcoded credentials detected', 'critical')
+      }
     })
-    penalty += 1
   }
 
-  return { issues, penalty }
+  // ==========================================================================
+  // ACCESSIBILITY VALIDATION
+  // ==========================================================================
+  public validateAccessibility(html: string): void {
+    // ARIA checks
+    if (!html.includes('aria-')) {
+      this.addInfo('accessibility', 'Consider adding ARIA attributes for better accessibility', 'low')
+    }
+
+    // Form labels
+    const inputsWithoutLabels = html.match(/<input(?![^>]*id=).*?>/g)
+    if (inputsWithoutLabels && inputsWithoutLabels.length > 0) {
+      this.addWarning('accessibility', 'Form inputs should have associated labels', 'medium')
+    }
+
+    // Button text
+    if (html.includes('<button></button>') || html.includes('<button />')) {
+      this.addError('accessibility', 'Buttons must have text content or aria-label', 'high')
+    }
+
+    // Color contrast (basic check)
+    if (html.includes('color:') && !html.includes('background')) {
+      this.addInfo('accessibility', 'Ensure sufficient color contrast for readability', 'low')
+    }
+  }
+
+  // ==========================================================================
+  // COMPLETE VALIDATION
+  // ==========================================================================
+  public validateAll(html: string, css: string, js: string): ValidationResult {
+    // Reset state
+    this.reset()
+
+    // Run all validations
+    this.validateHTML(html)
+    this.validateCSS(css)
+    this.validateJavaScript(js)
+    this.validateSecurity(html, js)
+    this.validateAccessibility(html)
+
+    // Calculate score (start at 100, deduct points)
+    let score = 100
+
+    this.errors.forEach(error => {
+      switch (error.severity) {
+        case 'critical':
+          score -= 15
+          break
+        case 'high':
+          score -= 10
+          break
+        case 'medium':
+          score -= 5
+          break
+        case 'low':
+          score -= 2
+          break
+      }
+    })
+
+    this.warnings.forEach(warning => {
+      switch (warning.severity) {
+        case 'high':
+          score -= 3
+          break
+        case 'medium':
+          score -= 2
+          break
+        case 'low':
+          score -= 1
+          break
+      }
+    })
+
+    // Ensure score doesn't go below 0
+    score = Math.max(0, score)
+
+    // Determine grade
+    let grade = 'F'
+    if (score >= 90) grade = 'A'
+    else if (score >= 80) grade = 'B'
+    else if (score >= 70) grade = 'C'
+    else if (score >= 60) grade = 'D'
+
+    // Determine status - automatically fail if critical error OR score < 70
+    const status = (score >= 70 && !this.hasCriticalError) ? 'passed' : 'failed'
+    const passed = (score >= 70 && !this.hasCriticalError)
+
+    return {
+      passed,
+      score,
+      errors: this.errors,
+      warnings: this.warnings,
+      info: this.info,
+      summary: {
+        total: this.errors.length + this.warnings.length + this.info.length,
+        errors: this.errors.length,
+        warnings: this.warnings.length,
+        info: this.info.length,
+        score,
+        grade,
+        status,
+      },
+    }
+  }
+
+  static isCodeComplete(code: string, type: 'html' | 'css' | 'js'): boolean {
+    // Simple completeness checks (customize as needed)
+    switch (type) {
+      case 'html':
+        return /<\/html>/i.test(code) || /<\/body>/i.test(code);
+      case 'css':
+        return code.trim().length > 0 && !code.trim().endsWith('{');
+      case 'js':
+        return code.trim().length > 0 && !code.trim().endsWith('{');
+      default:
+        return false;
+    }
+  }
 }
 
-function validatePerformance(html: string) {
-  const issues: ValidationIssue[] = []
-  let penalty = 0
-
-  const size = new Blob([html]).size
-
-  // Check file size
-  if (size > 500000) { // 500KB
-    issues.push({
-      type: 'warning',
-      category: 'performance',
-      message: `Large HTML size: ${(size / 1024).toFixed(2)}KB - may affect load time`,
-      severity: 'medium'
-    })
-    penalty += 5
-  }
-
-  // Check for render-blocking resources
-  if (html.match(/<script[^>]*(?!defer|async)/gi)?.length) {
-    issues.push({
-      type: 'info',
-      category: 'performance',
-      message: 'Consider adding defer/async to script tags',
-      severity: 'low'
-    })
-    penalty += 2
-  }
-
-  return { issues, penalty }
-}
-
-function validateSEO(root: any) {
-  const issues: ValidationIssue[] = []
-  let penalty = 0
-
-  // Check for title
-  const title = root.querySelector('title')
-  if (!title) {
-    issues.push({
-      type: 'error',
-      category: 'seo',
-      message: 'Missing <title> tag',
-      severity: 'high'
-    })
-    penalty += 10
-  } else if (title.text.length < 10) {
-    issues.push({
-      type: 'warning',
-      category: 'seo',
-      message: 'Title tag too short (minimum 10 characters recommended)',
-      severity: 'medium'
-    })
-    penalty += 5
-  }
-
-  // Check for meta description
-  const metaDesc = root.querySelector('meta[name="description"]')
-  if (!metaDesc) {
-    issues.push({
-      type: 'warning',
-      category: 'seo',
-      message: 'Missing meta description',
-      severity: 'medium'
-    })
-    penalty += 5
-  }
-
-  // Check for viewport meta
-  const viewport = root.querySelector('meta[name="viewport"]')
-  if (!viewport) {
-    issues.push({
-      type: 'warning',
-      category: 'seo',
-      message: 'Missing viewport meta tag - affects mobile SEO',
-      severity: 'high'
-    })
-    penalty += 8
-  }
-
-  return { issues, penalty }
-}
-
-function extractCSS(html: string): string {
-  const match = html.match(/<style[^>]*>([\s\S]*?)<\/style>/gi)
-  return match ? match.join('') : ''
-}
-
-function extractJS(html: string): string {
-  const match = html.match(/<script[^>]*>([\s\S]*?)<\/script>/gi)
-  return match ? match.join('') : ''
-}
+// Export as default
+export default CodeValidator

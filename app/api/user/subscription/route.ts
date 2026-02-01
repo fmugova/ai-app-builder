@@ -7,7 +7,7 @@ import { prisma } from '@/lib/prisma';
 
 export const runtime = 'nodejs';
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     

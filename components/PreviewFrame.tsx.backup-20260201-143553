@@ -1,0 +1,186 @@
+// components/PreviewFrame.tsx
+// OPTIMIZED VERSION - Fixed React performance warning
+
+'use client'
+
+import { useEffect, useRef, useState } from 'react'
+import type { ValidationResult } from '@/lib/types/validation'
+
+interface PreviewFrameProps {
+  html: string | null
+  css: string | null
+  js: string | null
+  validation?: ValidationResult
+  onRegenerate: () => void
+}
+
+export default function PreviewFrame({
+  html,
+  css,
+  js,
+  validation,
+  onRegenerate,
+}: PreviewFrameProps) {
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [isReady, setIsReady] = useState(false)
+
+  useEffect(() => {
+    if (!html || !iframeRef.current) {
+      setIsReady(false)
+      return
+    }
+
+    const iframe = iframeRef.current
+
+    // ✅ FIX: Reset error state at the start of the effect
+    // This avoids the warning about calling setState in useEffect
+    let didCancel = false
+
+    const renderPreview = async () => {
+      try {
+        // Clear any previous errors
+        if (error && !didCancel) {
+          setError(null)
+        }
+
+        // Combine HTML, CSS, and JS
+        let fullHtml = html
+
+        if (css && !html.includes('<style')) {
+          const styleTag = `<style>${css}</style>`
+          if (fullHtml.includes('</head>')) {
+            fullHtml = fullHtml.replace('</head>', `${styleTag}</head>`)
+          } else {
+            fullHtml = styleTag + fullHtml
+          }
+        }
+
+        if (js && !html.includes('<script')) {
+          const scriptTag = `<script>${js}</script>`
+          if (fullHtml.includes('</body>')) {
+            fullHtml = fullHtml.replace('</body>', `${scriptTag}</body>`)
+          } else {
+            fullHtml = fullHtml + scriptTag
+          }
+        }
+
+        // Set iframe content
+        iframe.srcdoc = fullHtml
+
+        // Handle iframe load
+        const handleLoad = () => {
+          if (!didCancel) {
+            setIsReady(true)
+          }
+        }
+
+        const handleError = (err: Event) => {
+          console.error('Preview error:', err)
+          if (!didCancel) {
+            setError('Failed to render preview')
+          }
+        }
+
+        iframe.addEventListener('load', handleLoad, { once: true })
+        iframe.addEventListener('error', handleError, { once: true })
+
+      } catch (err) {
+        console.error('Preview error:', err)
+        if (!didCancel) {
+          setError(err instanceof Error ? err.message : 'Failed to render preview')
+        }
+      }
+    }
+
+    renderPreview()
+
+    return () => {
+      didCancel = true
+      setIsReady(false)
+    }
+  }, [html, css, js]) // ✅ Removed 'error' from dependencies
+
+  if (!html) {
+    return (
+      <div className="flex items-center justify-center h-full bg-gray-50 dark:bg-gray-900">
+        <div className="text-center text-gray-400 dark:text-gray-500">
+          <div className="text-5xl mb-3">🎨</div>
+          <p className="text-base font-medium">No preview available</p>
+          <p className="text-sm mt-1">Generate code to see preview</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full bg-red-50 dark:bg-red-900/20 p-6">
+        <div className="text-center max-w-md">
+          <div className="text-5xl mb-4">⚠️</div>
+          <h3 className="text-lg font-semibold text-red-900 dark:text-red-100 mb-2">
+            Preview Error
+          </h3>
+          <p className="text-sm text-red-700 dark:text-red-300 mb-4">
+            {error}
+          </p>
+          <button
+            onClick={onRegenerate}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+          >
+            🔄 Try Regenerating
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="relative h-full w-full bg-white dark:bg-gray-900">
+      {/* Validation Score Badge */}
+      {validation && (
+        <div className="absolute top-2 right-2 z-10">
+          <div
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg backdrop-blur-sm ${
+              validation.validationScore >= 80
+                ? 'bg-green-500/90 text-white'
+                : validation.validationScore >= 60
+                ? 'bg-yellow-500/90 text-white'
+                : 'bg-red-500/90 text-white'
+            }`}
+          >
+            Quality: {validation.validationScore}/100
+          </div>
+        </div>
+      )}
+
+      {/* Regenerate Button */}
+      <div className="absolute bottom-4 right-4 z-10">
+        <button
+          onClick={onRegenerate}
+          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all shadow-lg hover:shadow-xl text-sm font-medium flex items-center gap-2"
+        >
+          🔄 Regenerate
+        </button>
+      </div>
+
+      {/* Loading Overlay */}
+      {!isReady && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white/90 dark:bg-gray-900/90 z-20 backdrop-blur-sm">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-4 border-purple-200 border-t-purple-600 mx-auto mb-3"></div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">Loading preview...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Preview iframe */}
+      <iframe
+        ref={iframeRef}
+        className="w-full h-full border-0"
+        title="Preview"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+      />
+    </div>
+  )
+}

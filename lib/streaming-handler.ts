@@ -3,7 +3,8 @@
  * Integration for BuildFlow AI API Route
  */
 
-import { validateGeneratedCode, isCodeComplete, ValidationResult } from './code-validator';
+import CodeValidator from './validators/code-validator';
+import type { ValidationResult } from './types/validation';
 import Anthropic from '@anthropic-ai/sdk';
 
 interface StreamingState {
@@ -60,11 +61,37 @@ export async function processStreamingResponse(
         state.js = extracted.js;
 
         // CRITICAL: Validate before returning
-        state.validation = validateGeneratedCode({
-          html: state.html,
-          css: state.css,
-          js: state.js,
-        });
+        const validator = new CodeValidator();
+        const rawValidation = validator.validateAll(state.html, state.css, state.js);
+
+        // Map severities to expected values
+        function mapSeverity(severity: string): "error" | "warning" | "info" | undefined {
+          switch (severity) {
+            case "critical":
+            case "high":
+              return "error";
+            case "medium":
+              return "warning";
+            case "low":
+              return "info";
+            default:
+              return undefined;
+          }
+        }
+
+        // Convert all validation arrays to expected type
+        function mapValidationArray<T extends { severity: string }>(arr: T[]) {
+          return arr.map(e => ({
+            ...e,
+            severity: mapSeverity(e.severity)
+          }));
+        }
+
+        state.validation = {
+          ...rawValidation,
+          errors: mapValidationArray(rawValidation.errors),
+          warnings: mapValidationArray(rawValidation.warnings),
+        };
 
         // Log validation results
         if (!state.validation.validationPassed) {
@@ -137,17 +164,17 @@ export function shouldSaveCode(state: StreamingState): boolean {
   }
 
   // Check if each code type is complete
-  if (state.html && !isCodeComplete(state.html, 'html')) {
+  if (state.html && !CodeValidator.isCodeComplete(state.html, 'html')) {
     console.warn('⚠️ HTML appears incomplete');
     return false;
   }
 
-  if (state.css && !isCodeComplete(state.css, 'css')) {
+  if (state.css && !CodeValidator.isCodeComplete(state.css, 'css')) {
     console.warn('⚠️ CSS appears incomplete');
     return false;
   }
 
-  if (state.js && !isCodeComplete(state.js, 'js')) {
+  if (state.js && !CodeValidator.isCodeComplete(state.js, 'js')) {
     console.warn('⚠️ JavaScript appears incomplete');
     return false;
   }
@@ -163,11 +190,11 @@ export function getValidationErrorMessage(validation: ValidationResult): string 
     return '';
   }
 
-  const errorMessages = validation.errors.map(e => e.message);
+  const errorMessages = (validation.errors ?? []).map(e => e.message);
 
   // Categorize errors
-  const hasSyntaxErrors = validation.errors.some(e => e.type === 'syntax');
-  const hasCompletenessErrors = validation.errors.some(e => e.type === 'completeness');
+  const hasSyntaxErrors = (validation.errors ?? []).some(e => e.type === 'syntax');
+  const hasCompletenessErrors = (validation.errors ?? []).some(e => e.type === 'completeness');
 
   if (hasSyntaxErrors && hasCompletenessErrors) {
     return "This app's JavaScript failed to generate correctly and is not running. Please try regenerating or contact support.";

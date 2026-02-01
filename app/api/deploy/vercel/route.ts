@@ -7,6 +7,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
+export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
@@ -49,7 +50,6 @@ export const dynamic = 'force-dynamic';
       );
     }
 
-    // ...existing code...
     // Check Vercel connection
     if (!user.VercelConnection) {
       return NextResponse.json(

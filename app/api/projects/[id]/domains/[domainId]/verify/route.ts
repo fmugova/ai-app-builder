@@ -1,11 +1,11 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { promises as dns } from 'dns'
 
 // POST /api/projects/[id]/domains/[domainId]/verify - Verify DNS configuration
-export async function POST(req: Request, context: { params: Promise<{ id: string; domainId: string }> }) {
+export async function POST(req: NextRequest, context: { params: Promise<{ id: string; domainId: string }> }) {
   const { id, domainId } = await context.params;
   try {
     const session = await getServerSession(authOptions)

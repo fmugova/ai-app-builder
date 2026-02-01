@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -27,6 +27,7 @@ function sanitizeCodeForExport(code: string): string {
   return sanitized;
 }
 
+export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
@@ -61,7 +62,7 @@ function sanitizeCodeForExport(code: string): string {
     }
     
     // Get user with GitHub credentials
-    const user = await prisma.user.findUnique({
+    const userWithGithub = await prisma.user.findUnique({
       where: { email: session.user.email },
       select: {
         id: true,
@@ -70,7 +71,7 @@ function sanitizeCodeForExport(code: string): string {
       },
     });
     
-    if (!user?.githubAccessToken || !user?.githubUsername) {
+    if (!userWithGithub?.githubAccessToken || !userWithGithub?.githubUsername) {
       return NextResponse.json(
         { error: 'GitHub not connected. Please connect your GitHub account first.' },
         { status: 400 }
@@ -96,7 +97,7 @@ function sanitizeCodeForExport(code: string): string {
     }
     
     // Verify ownership
-    if (project.userId !== user.id) {
+    if (project.userId !== userWithGithub.id) {
       return NextResponse.json(
         { error: 'You do not own this project' },
         { status: 403 }
@@ -115,10 +116,10 @@ function sanitizeCodeForExport(code: string): string {
     
     // Check if repo already exists
     const checkRepoResponse = await fetch(
-      `https://api.github.com/repos/${user.githubUsername}/${repoName}`,
+      `https://api.github.com/repos/${userWithGithub.githubUsername}/${repoName}`,
       {
         headers: {
-          'Authorization': `Bearer ${user.githubAccessToken}`,
+          'Authorization': `Bearer ${userWithGithub.githubAccessToken}`,
           'Accept': 'application/vnd.github.v3+json',
         },
       }
@@ -128,7 +129,7 @@ function sanitizeCodeForExport(code: string): string {
     
     if (checkRepoResponse.status === 200) {
       // Repo exists, we'll update it
-      repoUrl = `https://github.com/${user.githubUsername}/${repoName}`;
+      repoUrl = `https://github.com/${userWithGithub.githubUsername}/${repoName}`;
       console.log('📦 Repository already exists:', repoUrl);
     } else {
       // Create new repository
@@ -137,7 +138,7 @@ function sanitizeCodeForExport(code: string): string {
       const createRepoResponse = await fetch('https://api.github.com/user/repos', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${user.githubAccessToken}`,
+          'Authorization': `Bearer ${userWithGithub.githubAccessToken}`,
           'Accept': 'application/vnd.github.v3+json',
           'Content-Type': 'application/json',
         },
@@ -164,7 +165,7 @@ function sanitizeCodeForExport(code: string): string {
         data: {
           id: crypto.randomUUID(),
           projectId,
-          userId: user.id,
+          userId: userWithGithub.id,
           platform: 'github',
           deploymentId: repoData.id.toString(),
           deploymentUrl: repoData.html_url,
@@ -185,8 +186,8 @@ function sanitizeCodeForExport(code: string): string {
     // Create/update files in the repository
     for (const file of files) {
       await createOrUpdateFile(
-        user.githubAccessToken,
-        user.githubUsername,
+        userWithGithub.githubAccessToken,
+        userWithGithub.githubUsername,
         repoName,
         file.path,
         file.content

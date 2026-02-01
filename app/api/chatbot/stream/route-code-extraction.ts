@@ -8,8 +8,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import Anthropic from '@anthropic-ai/sdk';
-import { validateGeneratedCode } from '@/lib/code-validator';
-import prisma from '@/lib/prisma';
+import { CodeValidator } from '@/lib/validators';
+import { prisma } from '@/lib/prisma';
 import * as cheerio from 'cheerio';
 
 // Import robust extractor
@@ -187,24 +187,37 @@ Format your response like this:
                 return;
               }
               
-              // Validate
-              const validation = validateGeneratedCode(extracted);
-              console.log('🔍 Validation:', validation.validationPassed ? 'PASSED' : 'FAILED');
+              // Validate the extracted code
+              const validator = new CodeValidator();
+              const validation = validator.validateAll(extracted.html, extracted.css, extracted.js);
+              console.log('🔍 Validation:', validation.passed ? 'PASSED' : 'FAILED');
+              console.log('🔍 Validation score:', validation.score);
+              console.log('🔍 Validation errors:', validation.errors.length);
               
-              if (!validation.validationPassed) {
-                // Check for incomplete/truncated HTML
-                // Use the correct type for validation.errors elements
-                const isTruncated = validation.errors.some(
-                  (err) => err.type === 'completeness'
-                );
+              if (!validation.passed) {
+                // ✅ FIXED: Check for incomplete/truncated HTML properly
+                const isTruncated = 
+                  !extracted.html ||
+                  extracted.html.trim().length === 0 ||
+                  validation.errors.some(err => 
+                    err.severity === 'critical' ||
+                    (err.category === 'syntax' && 
+                     (err.message.includes('empty') || 
+                      err.message.includes('Missing DOCTYPE')))
+                  );
+                
+                console.log('🔍 Is truncated?', isTruncated);
+                
                 controller.enqueue(
                   encoder.encode(
                     `data: ${JSON.stringify({ 
                       type: 'error',
                       message: isTruncated
                         ? 'The generated HTML was incomplete or truncated. Try reducing your prompt or increasing the token limit.'
-                        : 'Code validation failed',
-                      errors: validation.errors
+                        : 'Code validation failed: ' + validation.errors.map(e => e.message).join(', '),
+                      errors: validation.errors,
+                      warnings: validation.warnings,
+                      score: validation.score
                     })}\n\n`
                   )
                 );
@@ -216,6 +229,7 @@ Format your response like this:
               const combinedCode = extracted.html || 
                 `<!DOCTYPE html><html><head><style>${extracted.css}</style></head><body>${extracted.html}<script>${extracted.js}</script></body></html>`;
               
+              // Send complete data
               controller.enqueue(
                 encoder.encode(
                   `data: ${JSON.stringify({ 
@@ -224,22 +238,9 @@ Format your response like this:
                     css: extracted.css,
                     js: extracted.js,
                     code: combinedCode,
-                    validation
+                    validation,
+                    score: validation.score
                   })}\n\n`
-                )
-              );
-
-              // Send HTML FIRST
-              controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({ type: 'html', content: extracted.html })}\n\n`
-                )
-              );
-
-              // THEN send complete
-              controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({ type: 'complete', message: 'Success!' })}\n\n`
                 )
               );
 

@@ -72,3 +72,5 @@ yarn-error.log*
 # Package Lock Files (optional - uncomment if needed)
 # package-lock.json
 # yarn.lock
+# Sentry Config File
+.env.sentry-build-plugin

@@ -1,10 +1,10 @@
 // app/api/projects/[id]/endpoints/templates/route.ts
 // Get available templates
 
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const category = searchParams.get('category')

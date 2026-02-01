@@ -1,7 +1,7 @@
 // BuildFlow AI Integration Handler Example
 import Anthropic from '@anthropic-ai/sdk';
 import { parseGeneratedCode } from './code-parser';
-import CodeValidator from './validator';
+import CodeValidator from './validators/code-validator';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,

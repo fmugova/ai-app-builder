@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     if (!rateLimit.success) {
       // Log suspicious activity
       console.warn('⚠️ Rate limit hit on signin:', {
-        ip: request.ip,
+        ip: request.headers.get('x-forwarded-for') || 'unknown',
         reset: new Date(rateLimit.reset).toISOString()
       })
 
@@ -24,7 +24,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Continue with authentication...
-    const body = await request.json()
     // ... rest of your code
     
   } catch (error) {

@@ -1,13 +1,13 @@
 // app/api/projects/[id]/env-vars/[varId]/route.ts
 // Delete individual environment variable
 
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logSecurityEvent } from '@/lib/security'
 
-export async function POST(req: Request, context: { params: Promise<{ id: string; varId: string }> }) {
+export async function POST(req: NextRequest, context: { params: Promise<{ id: string; varId: string }> }) {
   const { id, varId } = await context.params;
   try {
     // Verify ownership

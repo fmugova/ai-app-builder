@@ -1,19 +1,69 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rate-limit'
-import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import bcrypt from 'bcryptjs'
+import speakeasy from 'speakeasy'  // ✅ More reliable alternative
 
+export async function POST(req: NextRequest) {
   try {
     // Rate limiting - use IP address for 2FA check
     const rateLimit = await checkRateLimit(req, 'auth')
     if (!rateLimit.success) {
       const resetIn = Math.ceil((rateLimit.reset - Date.now()) / 1000)
       return NextResponse.json(
-        { error: `Too many 2FA attempts. Please try again in ${resetIn} seconds.` },
+        { error: `Too many attempts. Try again in ${resetIn} seconds` },
         { status: 429 }
       )
     }
-    // ...existing code...
-    const { email, password } = await req.json()
-    // ...existing code...
+
+    // Get session
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get request body
+    const body = await req.json()
+    const { token } = body
+
+    if (!token || token.length !== 6) {
+      return NextResponse.json({ error: 'Invalid token format' }, { status: 400 })
+    }
+
+    // Get user with 2FA secret
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: {
+        id: true,
+        twoFactorSecret: true,
+        twoFactorEnabled: true,
+      },
+    })
+
+    if (!user || !user.twoFactorEnabled || !user.twoFactorSecret) {
+      return NextResponse.json({ error: '2FA not enabled' }, { status: 400 })
+    }
+
+    // Verify token using speakeasy
+    const isValid = speakeasy.totp.verify({
+      secret: user.twoFactorSecret,
+      encoding: 'base32',
+      token,
+      window: 1, // Allow 1 time step before/after for clock skew
+    })
+
+    if (!isValid) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+    }
+
+    // Token is valid
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('2FA verification error:', error)
+    return NextResponse.json(
+      { error: 'Failed to verify 2FA token' },
+      { status: 500 }
+    )
+  }
 }

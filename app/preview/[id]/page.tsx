@@ -1,79 +1,95 @@
-import { notFound, redirect } from 'next/navigation';
-import prisma from '@/lib/prisma';
+// app/preview/[id]/page.tsx
+// FIXED VERSION - Prevents hydration mismatch
 
-interface PreviewPageProps {
-  params: Promise<{ id: string }>;
-}
+'use client'
 
-export default async function PreviewPage({ params }: PreviewPageProps) {
-  const { id } = await params;
+import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
+import { toast, Toaster } from 'react-hot-toast'
 
-  const project = await prisma.project.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      name: true,
-      code: true,
-      html: true,
-      htmlCode: true,
-      publicSlug: true,
-    },
-  });
-
-  if (!project) {
-    notFound();
-  }
-
-  // Try multiple fields to find the code
-  const code = project.code || project.html || project.htmlCode || '';
-
-  if (!code) {
-    return (
-      <html lang="en">
-        <head>
-          <title>No Preview Available</title>
-        </head>
-        <body className="flex items-center justify-center min-h-screen bg-gray-50">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">No Preview Available</h1>
-            <p className="text-gray-600">This project has no code to display.</p>
-          </div>
-        </body>
-      </html>
-    );
-  }
-
-  // ✅ FIX: Create a proper HTML structure without dangerouslySetInnerHTML
-  // Remove DOCTYPE, html, head, body tags from user code since we're providing them
-  const cleanCode = code
-    .replace(/<!DOCTYPE[^>]*>/i, '')
-    .replace(/<html[^>]*>/i, '')
-    .replace(/<\/html>/i, '')
-    .replace(/<head[^>]*>/i, '')
-    .replace(/<\/head>/i, '')
-    .replace(/<body[^>]*>/i, '')
-    .replace(/<\/body>/i, '');
-
-  // Extract title, meta tags, and styles from user code
-  const titleMatch = code.match(/<title[^>]*>(.*?)<\/title>/i);
-  const title = titleMatch ? titleMatch[1] : project.name;
+export default function PreviewPage() {
+  const params = useParams()
+  const id = params?.id as string
   
-  const styleMatches = code.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi);
-  const styles = Array.from(styleMatches).map(match => match[1]).join('\n');
+  const [html, setHtml] = useState<string>('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
+  useEffect(() => {
+    const fetchProject = async () => {
+      try {
+        const response = await fetch(`/api/projects/${id}`)
+        const data = await response.json()
+
+        if (response.ok) {
+          const code = data.code || data.html || data.htmlCode || ''
+          if (code) {
+            setHtml(code)
+          } else {
+            setError('No code found in this project')
+          }
+        } else {
+          setError(data.error || 'Failed to load project')
+        }
+      } catch (err) {
+        console.error('Preview error:', err)
+        setError('Failed to load preview')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (id) {
+      fetchProject()
+    }
+  }, [id])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading preview...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <Toaster position="top-right" />
+        <div className="text-center">
+          <div className="text-4xl mb-4">⚠️</div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Preview Error</h2>
+          <p className="text-gray-600">{error}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!html) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center">
+          <div className="text-4xl mb-4">📄</div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">No Preview Available</h2>
+          <p className="text-gray-600">This project doesn't have any code yet</p>
+        </div>
+      </div>
+    )
+  }
+
+  // ✅ FIX: Render HTML in iframe to avoid hydration issues
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <meta charSet="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>{title}</title>
-        {styles && (
-          <style dangerouslySetInnerHTML={{ __html: styles }} />
-        )}
-      </head>
-      <body suppressHydrationWarning>
-        <div dangerouslySetInnerHTML={{ __html: cleanCode }} suppressHydrationWarning />
-      </body>
-    </html>
-  );
+    <>
+      <Toaster position="top-right" />
+      <iframe
+        srcDoc={html}
+        className="w-full h-screen border-0"
+        title="Project Preview"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+      />
+    </>
+  )
 }

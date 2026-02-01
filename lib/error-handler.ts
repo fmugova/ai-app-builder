@@ -1,3 +1,5 @@
+import { NextResponse } from 'next/server'
+
 export class AppError extends Error {
   constructor(
     message: string,
@@ -16,3 +18,4 @@ export function handleAPIError(error: unknown) {
       { status: error.statusCode }
     )
   }
+}

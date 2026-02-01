@@ -1,11 +1,11 @@
 import { checkRateLimit } from '@/lib/rate-limit'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
-
+export async function POST(req: NextRequest) {
   try {
     // Rate limiting - use IP address for forgot-password
     const rateLimit = await checkRateLimit(req, 'auth')
@@ -16,75 +16,54 @@ const resend = new Resend(process.env.RESEND_API_KEY)
         { status: 429 }
       )
     }
-    // ...existing code...
-    const { email } = await req.json()
-    // ...existing code...
-    
-    <!-- Content -->
-    <div style="background: white; padding: 40px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-      <p style="color: #374151; font-size: 16px; line-height: 24px; margin: 0 0 20px 0;">
-        Hi ${user.name || 'there'},
-      </p>
-      
-      <p style="color: #374151; font-size: 16px; line-height: 24px; margin: 0 0 20px 0;">
-        We received a request to reset your password for your BuildFlow account. Click the button below to create a new password:
-      </p>
-      
-      <div style="text-align: center; margin: 30px 0;">
-        <a href="${resetLink}" style="display: inline-block; background: linear-gradient(135deg, #9333ea 0%, #3b82f6 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">
-          Reset Password
-        </a>
-      </div>
-      
-      <p style="color: #6b7280; font-size: 14px; line-height: 20px; margin: 20px 0 0 0;">
-        Or copy and paste this link into your browser:
-      </p>
-      
-      <p style="background: #f3f4f6; padding: 12px; border-radius: 6px; word-break: break-all; font-size: 13px; color: #4b5563; margin: 8px 0 20px 0;">
-        ${resetLink}
-      </p>
-      
-      <div style="border-top: 1px solid #e5e7eb; padding-top: 20px; margin-top: 30px;">
-        <p style="color: #6b7280; font-size: 14px; line-height: 20px; margin: 0 0 10px 0;">
-          ⏱️ This link will expire in 1 hour for security reasons.
-        </p>
-        
-        <p style="color: #6b7280; font-size: 14px; line-height: 20px; margin: 0;">
-          If you didn't request this password reset, you can safely ignore this email.
-        </p>
-      </div>
-    </div>
-    
-    <!-- Footer -->
-    <div style="text-align: center; padding: 20px 0;">
-      <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-        © 2026 BuildFlow. All rights reserved.
-      </p>
-    </div>
-  </div>
-</body>
-</html>
-        `,
-      })
-
-      console.log(`✅ Password reset email sent successfully to ${email}`)
-      console.log(`📧 Resend Email ID: ${emailResult.data?.id}`)
-    } catch (emailError) {
-      console.error('❌ Failed to send email via Resend:', emailError)
-      // Don't fail the request if email fails - user can still use console link in dev
-      if (process.env.NODE_ENV === 'production') {
-        throw emailError
-      }
+    const { email } = await req.json();
+    if (!email) {
+      return NextResponse.json(
+        { error: 'Missing email' },
+        { status: 400 }
+      )
     }
-
-    return NextResponse.json({
-      message: 'If that email exists, a reset link has been sent',
-    })
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
+    const token = crypto.randomBytes(32).toString('hex');
+    const resetLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://buildflow.ai'}/reset-password?token=${token}`;
+    // Save token to user (or a passwordResetTokens table)
+    await prisma.user.update({
+      where: { email },
+      data: { resetToken: token, resetTokenExpiry: new Date(Date.now() + 1000 * 60 * 60) }
+    });
+    // Send email (simplified)
+    await resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL || 'BuildFlow <noreply@buildflow.ai>',
+      to: email,
+      subject: 'Reset your password',
+      html: `<p>Hi ${user.name || 'there'},</p><p>Click <a href="${resetLink}">here</a> to reset your password.</p>`,
+      text: `Hi ${user.name || 'there'},\n\nClick the following link to reset your password: ${resetLink}`
+    });
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Forgot password error:', error)
+    console.error('Forgot password error:', error);
     return NextResponse.json(
-      { error: 'Failed to process request' },
+      { error: 'Forgot password failed' },
       { status: 500 }
-    )
+    );
   }
 }
+
+// This is the code block that represents the suggested code change:
+// import { NextRequest, NextResponse } from 'next/server';
+
+// export async function POST(request: NextRequest) {
+//   try {
+//     // All logic here
+//     const body = await request.json();
+//     return NextResponse.json({ success: true });
+//   } catch (error) {
+//     return NextResponse.json({ error: 'Failed' }, { status: 500 });
+//   }
+// }

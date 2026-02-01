@@ -1,12 +1,12 @@
 // app/api/projects/[id]/endpoints/[endpointId]/test/route.ts
 // Test endpoint
 
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-export async function POST(req: Request, context: { params: Promise<{ id: string; endpointId: string }> }) {
+export async function POST(req: NextRequest, context: { params: Promise<{ id: string; endpointId: string }> }) {
   try {
     const { id, endpointId } = await context.params;
     const session = await getServerSession(authOptions)

@@ -5,7 +5,7 @@ export const runtime = 'nodejs'
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
-
+export async function POST(request: NextRequest) {
   try {
     // Rate limiting - use IP address for register
     const rateLimit = await checkRateLimit(request, 'auth')
@@ -16,7 +16,45 @@ import { prisma } from '@/lib/prisma'
         { status: 429 }
       )
     }
-    // ...existing code...
     const body = await request.json();
-    // ...existing code...
+    const { name, email, password } = body;
+    if (!name || !email || !password) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      )
+    }
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return NextResponse.json(
+        { error: 'Email already exists' },
+        { status: 400 }
+      )
+    }
+    const hashedPassword = await bcrypt.hash(password, 12);
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        subscriptionTier: 'free',
+        subscriptionStatus: 'active',
+        generationsLimit: 10,
+      }
+    });
+    return NextResponse.json({
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email
+      }
+    });
+  } catch (error) {
+    console.error('Register error:', error);
+    return NextResponse.json(
+      { error: 'Registration failed' },
+      { status: 500 }
+    );
+  }
 }

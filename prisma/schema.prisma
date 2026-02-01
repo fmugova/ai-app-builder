@@ -607,10 +607,10 @@ model Template {
   status           TemplateStatus     @default(DRAFT)
   thumbnail        String?
   category         String
-  tags             String[]           @default([])
-  downloads        Int                @default(0)
-  views            Int                @default(0)
-  rating           Float              @default(0)
+    validationScore     BigInt?               @default(0)
+    generationTime      BigInt?               @default(0)
+    retryCount          BigInt?               @default(0)
+    tokensUsed          BigInt?               @default(0)
   reviewCount      Int                @default(0)
   creatorId        String
   createdAt        DateTime           @default(now())

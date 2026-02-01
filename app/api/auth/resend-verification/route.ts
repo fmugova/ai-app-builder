@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendEmail } from '@/lib/email'
 import crypto from 'crypto'
-
+export async function POST(request: NextRequest) {
   try {
     // Rate limiting - use IP address for resend-verification
     const rateLimit = await checkRateLimit(request, 'auth')
@@ -14,7 +14,45 @@ import crypto from 'crypto'
         { status: 429 }
       )
     }
-    // ...existing code...
-    const { email } = await request.json()
-    // ...existing code...
+    const { email } = await request.json();
+    if (!email) {
+      return NextResponse.json(
+        { error: 'Missing email' },
+        { status: 400 }
+      )
+    }
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
+    if (user.emailVerified) {
+      return NextResponse.json(
+        { error: 'Email already verified' },
+        { status: 400 }
+      )
+    }
+    const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+    await prisma.user.update({
+      where: { email },
+      data: { emailVerificationToken, emailVerificationTokenExpiry: new Date(Date.now() + 1000 * 60 * 60 * 24) }
+    });
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://buildflow.ai';
+    const verifyUrl = `${baseUrl}/verify-email?token=${emailVerificationToken}`;
+    await sendEmail({
+      to: email,
+      subject: 'Verify your email address',
+      html: `<p>Click <a href="${verifyUrl}">here</a> to verify your email.</p>`,
+      from: 'BuildFlow <noreply@buildflow-ai.app>'
+    });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Resend verification error:', error);
+    return NextResponse.json(
+      { error: 'Resend verification failed' },
+      { status: 500 }
+    );
+  }
 }

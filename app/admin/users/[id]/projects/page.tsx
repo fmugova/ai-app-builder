@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
+import dynamic from 'next/dynamic'
+const AutoVerifyEmailUI = dynamic(() => import('@/components/AutoVerifyEmailUI'), { ssr: false })
 import { useRouter, useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 
@@ -36,7 +38,7 @@ export default function UserProjectsPage() {
         const res = await fetch('/api/admin/check')
         const data = await res.json()
         setIsAdmin(data.isAdmin)
-      } catch (error) {
+      } catch {
         setIsAdmin(false)
       }
     }
@@ -45,18 +47,9 @@ export default function UserProjectsPage() {
     }
   }, [session?.user?.email])
 
-  useEffect(() => {
-    if (status === 'loading' || isAdmin === null) return
+  // import { useCallback } from 'react' // moved to top-level imports
 
-    if (!session || !isAdmin) {
-      router.push('/dashboard')
-      return
-    }
-
-    loadUserProjects()
-  }, [session, status, isAdmin, userId])
-
-  const loadUserProjects = async () => {
+  const loadUserProjects = useCallback(async () => {
     try {
       // Get user details
       const userRes = await fetch(`/api/admin/users/${userId}/details`)
@@ -75,7 +68,18 @@ export default function UserProjectsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [userId])
+
+  useEffect(() => {
+    if (status === 'loading' || isAdmin === null) return
+
+    if (!session || !isAdmin) {
+      router.push('/dashboard')
+      return
+    }
+
+    loadUserProjects()
+  }, [session, status, isAdmin, userId, loadUserProjects, router])
 
   if (status === 'loading' || loading) {
     return (
@@ -210,6 +214,9 @@ export default function UserProjectsPage() {
               <p className="text-gray-400">This user hasn&apos;t created any projects yet.</p>
             </div>
           )}
+        </div>
+        <div className="mb-8">
+          <AutoVerifyEmailUI />
         </div>
       </div>
     </div>
