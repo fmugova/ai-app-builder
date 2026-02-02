@@ -43,8 +43,12 @@ export default function BillingClient({ userEmail }: BillingClientProps) {
       if (!res.ok) throw new Error('Failed to fetch billing data')
       const data = await res.json()
       setBillingData(data)
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message)
+      } else {
+        setError('An unknown error occurred')
+      }
     } finally {
       setIsLoading(false)
     }
@@ -328,7 +332,7 @@ export default function BillingClient({ userEmail }: BillingClientProps) {
         </div>
 
         {/* Invoices */}
-        {billingData.invoices.length > 0 && (
+        {(billingData.invoices?.length ?? 0) > 0 && (
           <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6">
             <h3 className="text-xl font-bold text-white mb-6">Billing History</h3>
             <div className="space-y-3">

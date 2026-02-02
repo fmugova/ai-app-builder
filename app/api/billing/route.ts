@@ -1,5 +1,5 @@
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
+// app/api/billing/route.ts
+// FIXED: Convert BigInt to Number for JSON serialization
 
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -9,7 +9,7 @@ import { prisma } from '@/lib/prisma'
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -17,67 +17,59 @@ export async function GET() {
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       select: {
+        id: true,
         subscriptionTier: true,
         subscriptionStatus: true,
         projectsThisMonth: true,
         projectsLimit: true,
         generationsUsed: true,
         generationsLimit: true,
-        Subscription: {
-          select: {
-            currentPeriodStart: true,
-            currentPeriodEnd: true,
-            cancelAtPeriodEnd: true
-          }
-        }
-      }
+      },
     })
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Use subscription data if exists, otherwise use calculated values
-    const currentPeriodEnd = user.Subscription?.currentPeriodEnd 
-      || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-    
-    const currentPeriodStart = user.Subscription?.currentPeriodStart
-      || new Date()
+    const subscription = await prisma.subscription.findFirst({
+      where: { userId: user.id },
+      select: {
+        id: true,
+        currentPeriodStart: true,
+        currentPeriodEnd: true,
+        cancelAtPeriodEnd: true,
+      },
+    })
 
-    // Mock invoices (replace with actual Stripe invoices later)
-    const invoices = user.subscriptionTier !== 'free' ? [
-      {
-        id: '1',
-        amount: getTierPrice(user.subscriptionTier),
-        status: 'paid',
-        date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-        period: 'Dec 2024'
-      }
-    ] : []
+    const currentPeriodStart = subscription?.currentPeriodStart || new Date()
+    const currentPeriodEnd = subscription?.currentPeriodEnd || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
 
+    // ✅ Convert BigInt to Number for JSON serialization
     return NextResponse.json({
       tier: user.subscriptionTier,
       status: user.subscriptionStatus,
       currentPeriodStart: currentPeriodStart.toISOString(),
       currentPeriodEnd: currentPeriodEnd.toISOString(),
-      cancelAtPeriodEnd: user.Subscription?.cancelAtPeriodEnd || false,
-      projectsUsed: user.projectsThisMonth,
-      projectsLimit: user.projectsLimit,
-      generationsUsed: user.generationsUsed,
-      generationsLimit: user.generationsLimit,
-      invoices
+      cancelAtPeriodEnd: subscription?.cancelAtPeriodEnd || false,
+      usage: {
+        projects: {
+          used: Number(user.projectsThisMonth),      // BigInt → Number
+          limit: Number(user.projectsLimit),         // BigInt → Number
+          percentage: Math.round((Number(user.projectsThisMonth) / Number(user.projectsLimit)) * 100),
+        },
+        generations: {
+          used: Number(user.generationsUsed),        // BigInt → Number
+          limit: Number(user.generationsLimit),      // BigInt → Number
+          percentage: Math.round((Number(user.generationsUsed) / Number(user.generationsLimit)) * 100),
+        },
+      },
     })
+
   } catch (error) {
     console.error('Billing error:', error)
-    return NextResponse.json({ error: 'Failed to fetch billing info' }, { status: 500 })
-  }
-}
-
-function getTierPrice(tier: string): number {
-  switch(tier) {
-    case 'enterprise': return 99
-    case 'business': return 49
-    case 'pro': return 19
-    default: return 0
+    return NextResponse.json(
+      { error: 'Failed to fetch billing information' },
+      { status: 500 }
+    )
   }
 }

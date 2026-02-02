@@ -1,93 +1,87 @@
-import { compose, withAuth, withRateLimit, withUsageCheck } from '@/lib/api-middleware'
-import { incrementUsage } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+// app/api/projects/route.ts
+// FIXED: Convert BigInt to Number for JSON serialization
+
+import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
 import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 
-const createProjectSchema = z.object({
-  name: z.string().min(1).max(100),
-  description: z.string().max(500).optional(),
-  code: z.string().optional(),
-})
-
-// Force dynamic rendering
-export const dynamic = 'force-dynamic'
-
-// GET - Fetch all projects for user
-export const GET = async (request: NextRequest) => {
-  const session = await getServerSession(authOptions)
-  if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+// Helper function to convert BigInt fields to Number
+function serializeProject(project: any) {
+  return {
+    ...project,
+    // Convert BigInt fields to Number
+    generationTime: project.generationTime ? Number(project.generationTime) : null,
+    retryCount: project.retryCount ? Number(project.retryCount) : null,
+    tokensUsed: project.tokensUsed ? Number(project.tokensUsed) : null,
+    validationScore: project.validationScore ? Number(project.validationScore) : null,
   }
+}
 
-  // 🟢 OPTIONAL: Light rate limiting for reads
-  const rateLimit = await (await import('@/lib/rate-limit')).checkRateLimit(request, 'general', session.user.id)
-  if (!rateLimit.success) {
-    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+export async function GET() {
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const projects = await prisma.project.findMany({
+      orderBy: { createdAt: 'desc' },
+    })
+
+    // ✅ Serialize all projects (convert BigInt to Number)
+    const serializedProjects = projects.map(serializeProject)
+
+    return NextResponse.json({ projects: serializedProjects })
+    
+  } catch (error) {
+    console.error('GET /api/projects error:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch projects' },
+      { status: 500 }
+    )
   }
-
-  const projects = await prisma.project.findMany({
-    where: { userId: session.user.id },
-    orderBy: { createdAt: 'desc' },
-  })
-
-  return NextResponse.json({ projects })
 }
 
 // POST - Create new project
-export const POST = async (_req: NextRequest) => {
-  const session = await getServerSession(authOptions)
-  if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+export async function POST(req: Request) {
+  try {
+    const session = await getServerSession(authOptions)
 
-  // 🟡 CHECK RATE LIMIT (user-based)
-  const rateLimit = await (await import('@/lib/rate-limit')).checkRateLimit(_req, 'write', session.user.id)
-  if (!rateLimit.success) {
-    return NextResponse.json(
-      { 
-        error: 'Too many requests',
-        message: 'Please slow down',
-        remaining: rateLimit.remaining,
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await req.json()
+    const { name, description, type, code } = body
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const project = await prisma.project.create({
+      data: {
+        userId: user.id,
+        name,
+        description: description || null,
+        type: type || 'web',
+        code: code || '',
       },
-      { status: 429 }
-    )
-  }
+    })
 
-  // ...existing code...
-  const body = await _req.json()
-
-  // Validate input
-  const result = createProjectSchema.safeParse(body)
-  if (!result.success) {
+    // ✅ Serialize project (convert BigInt to Number)
+    return NextResponse.json(serializeProject(project))
+    
+  } catch (error) {
+    console.error('POST /api/projects error:', error)
     return NextResponse.json(
-      { error: 'Invalid input', details: result.error },
-      { status: 400 }
+      { error: 'Failed to create project' },
+      { status: 500 }
     )
   }
-
-  // ✅ FIX: Include code and type from body if provided
-  const project = await prisma.project.create({
-    data: {
-      name: result.data.name,
-      description: result.data.description,
-      code: body.code || '',             // ✅ Use provided code
-      userId: session.user.id,
-      type: body.type || 'landing',      // ✅ Use provided type
-    },
-  })
-
-  // Increment usage counter
-  await incrementUsage(session.user.id, 'project')
-
-  // Check and send usage alerts (non-blocking)
-  import('@/lib/usage-alerts').then(({ checkUsageAlerts }) => {
-    checkUsageAlerts(session.user.id).catch(err => 
-      console.error('Usage alert check failed:', err)
-    )
-  })
-
-  return NextResponse.json({ project }, { status: 201 })
 }

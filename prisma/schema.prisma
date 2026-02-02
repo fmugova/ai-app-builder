@@ -478,14 +478,14 @@ model Project {
   jsError             String?
   jsValid             Boolean?              @default(true)
   validationPassed    Boolean?              @default(false)
-  validationScore     Int?                  @default(0)
+  validationScore     BigInt?               @default(0)
   validationErrors    Json?
   validationWarnings  Json?
   cspViolations       Json?
-  generationTime      Int?                  @default(0)
+  generationTime      BigInt?               @default(0)
   lastModified        DateTime?
-  retryCount          Int?                  @default(0)
-  tokensUsed          Int?                  @default(0)
+  retryCount          BigInt?               @default(0)
+  tokensUsed          BigInt?               @default(0)
   ApiEndpoint         ApiEndpoint[]
   CustomDomain        CustomDomain[]
   DatabaseConnection  DatabaseConnection?

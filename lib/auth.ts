@@ -294,6 +294,13 @@ export const authOptions: NextAuthOptions = {
 
       return false
     },
+    async session({ session, token }) {
+      console.log('Session callback:', {
+        email: session.user?.email,
+        role: token.role,
+      })
+      return session
+    }
   },
   events: {
     async signIn({ user, isNewUser, account }) {
