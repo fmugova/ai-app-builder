@@ -1,5 +1,5 @@
 // app/api/admin/stats/route.ts
-// ⚠️ This file makes your admin dashboard show REAL numbers instead of zeros
+// ✅ FIXED: Converts BigInt to Number before JSON serialization
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -14,7 +14,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Verify admin
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       select: { role: true }
@@ -24,26 +23,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
     }
 
-    // ✅ Fetch real counts from database
-    const [totalUsers, totalProjects, totalGenerations, activeUsersToday] = await Promise.all([
-      // Total users
+    const [totalUsers, totalProjects, generationsResult, activeUsersToday] = await Promise.all([
       prisma.user.count(),
 
-      // Total projects
       prisma.project.count(),
 
-      // Total AI generations (sum of all users' generationsUsed)
+      // ✅ FIX: Get the aggregate result
       prisma.user.aggregate({
         _sum: {
           generationsUsed: true
         }
-      }).then(result => result._sum.generationsUsed || 0),
+      }),
 
-      // Active users today (users who have activities today)
       prisma.activity.findMany({
         where: {
           createdAt: {
-            gte: new Date(new Date().setHours(0, 0, 0, 0)) // Start of today
+            gte: new Date(new Date().setHours(0, 0, 0, 0))
           }
         },
         select: {
@@ -53,11 +48,13 @@ export async function GET(request: NextRequest) {
       }).then(results => results.length)
     ])
 
-    // Return stats object
+    // ✅ FIX: Convert BigInt to Number before returning
+    const totalGenerations = Number(generationsResult._sum.generationsUsed || 0)
+
     return NextResponse.json({
       totalUsers,
       totalProjects,
-      totalGenerations,
+      totalGenerations,  // Now it's a regular number, not BigInt
       activeUsers: activeUsersToday
     })
 

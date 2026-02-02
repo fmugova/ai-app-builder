@@ -35,7 +35,13 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' }
     })
 
-    return NextResponse.json({ connections })
+    // Map DatabaseTable to tables for frontend compatibility
+    const connectionsWithTables = connections.map(conn => ({
+      ...conn,
+      tables: conn.DatabaseTable,
+    }))
+
+    return NextResponse.json({ connections: connectionsWithTables })
 
   } catch (error) {
     console.error('Get connections error:', error)
@@ -76,7 +82,6 @@ export async function POST(request: NextRequest) {
       data: {
         name,
         provider,
-        connectionString: connectionString || null,
         config: config || {},
         userId: user.id
       },
