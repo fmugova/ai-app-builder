@@ -9,9 +9,8 @@ import { prisma } from '@/lib/prisma'
 // GET - Fetch single project
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }  // ← Changed to "id"
 ) {
-  const { id } = await params;
   try {
     const session = await getServerSession(authOptions)
     
@@ -28,7 +27,7 @@ export async function GET(
     }
 
     const project = await prisma.project.findUnique({
-      where: { id }
+      where: { id: params.id }  // ← Changed to params.id
     })
 
     if (!project) {
@@ -53,9 +52,8 @@ export async function GET(
 // PATCH - Update project (partial)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }  // ← Changed to "id"
 ) {
-  const { id } = await params;
   try {
     const session = await getServerSession(authOptions)
     
@@ -72,7 +70,7 @@ export async function PATCH(
     }
 
     const project = await prisma.project.findUnique({
-      where: { id }
+      where: { id: params.id }  // ← Changed to params.id
     })
 
     if (!project) {
@@ -87,7 +85,7 @@ export async function PATCH(
     const { name, description, html, css, js, status } = body
 
     const updatedProject = await prisma.project.update({
-      where: { id },
+      where: { id: params.id },  // ← Changed to params.id
       data: {
         ...(name !== undefined && { name }),
         ...(description !== undefined && { description }),
@@ -129,7 +127,7 @@ export async function PATCH(
 // PUT - Full update (alias for PATCH)
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }  // ← Changed to "id"
 ) {
   return PATCH(request, { params })
 }
@@ -137,9 +135,8 @@ export async function PUT(
 // DELETE - Delete project
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }  // ← Changed to "id"
 ) {
-  const { id } = await params;
   try {
     const session = await getServerSession(authOptions)
     
@@ -156,7 +153,7 @@ export async function DELETE(
     }
 
     const project = await prisma.project.findUnique({
-      where: { id }
+      where: { id: params.id }  // ← Changed to params.id
     })
 
     if (!project) {
@@ -168,7 +165,7 @@ export async function DELETE(
     }
 
     await prisma.project.delete({
-      where: { id }
+      where: { id: params.id }  // ← Changed to params.id
     })
 
     // Log activity
