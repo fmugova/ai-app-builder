@@ -156,6 +156,7 @@ model CustomDomain {
 
 model DatabaseConnection {
   id                 String          @id @default(cuid())
+  connectionString   String?
   userId             String
   projectId          String?         @unique
   name               String
@@ -174,6 +175,7 @@ model DatabaseConnection {
   Project            Project?        @relation(fields: [projectId], references: [id], onDelete: Cascade)
   User               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   DatabaseTable      DatabaseTable[]
+  config            Json?
 
   @@index([projectId])
   @@index([userId])

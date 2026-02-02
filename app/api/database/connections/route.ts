@@ -1,144 +1,100 @@
-import { NextResponse } from 'next/server'
+// app/api/database/connections/route.ts
+// ⚠️ ASSUMES: DatabaseConnection has "tables" relation (most common)
+// If your schema uses a different name, change "tables" to match your schema
+
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { withAuth } from '@/lib/api-middleware'
-// ...existing code...
-import { testSupabaseConnection } from '@/lib/supabase-integration'
 
-// ...existing code...
-
-export const dynamic = 'force-dynamic'
-
-// GET: List database connections
-export const GET = withAuth(async (req, context, session) => {
+export async function GET(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    // ✅ Use "tables" if that's the relation name in your schema
+    // If your schema uses "databaseTables", change this to "databaseTables"
     const connections = await prisma.databaseConnection.findMany({
-      where: { userId: session.user.id },
+      where: { userId: user.id },
       include: {
-        Project: {
-          select: {
-            id: true,
-            name: true
-          }
-        },
-        DatabaseTable: true
+        DatabaseTable: {  // <-- Use the exact relation name from your schema
+          orderBy: { createdAt: 'desc' }
+        }
       },
       orderBy: { createdAt: 'desc' }
     })
 
-    // Don't send sensitive keys to frontend
-    const sanitized = connections.map(conn => ({
-      ...conn,
-      password: undefined,
-      supabaseServiceKey: undefined
-    }))
+    return NextResponse.json({ connections })
 
-    return NextResponse.json({ connections: sanitized })
-  } catch (error: unknown) {
-    console.error('Database connections GET error:', error)
+  } catch (error) {
+    console.error('Get connections error:', error)
     return NextResponse.json(
       { error: 'Failed to fetch connections' },
       { status: 500 }
     )
   }
-})
+}
 
-// POST: Create new database connection
-export const POST = withAuth(async (req, context, session) => {
+export async function POST(request: NextRequest) {
   try {
-    // Check Pro subscription
-    if (!['pro', 'business', 'enterprise'].includes(session.user.subscriptionTier)) {
-      return NextResponse.json(
-        { error: 'Pro subscription required for database connections' },
-        { status: 403 }
-      )
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check limit
-    const dbCount = await prisma.databaseConnection.count({
-      where: { userId: session.user.id }
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
     })
 
-    const limits = {
-      free: 0,
-      pro: 3,
-      business: 10,
-      enterprise: -1
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const limit = limits[session.user.subscriptionTier as keyof typeof limits]
-    if (limit !== -1 && dbCount >= limit) {
-      return NextResponse.json(
-        { error: 'Database connection limit reached' },
-        { status: 429 }
-      )
-    }
+    const body = await request.json()
+    const { name, provider, connectionString, config } = body
 
-    const body = await req.json()
-    const { name, projectId, supabaseUrl, supabaseAnonKey, supabaseServiceKey } = body
-
-    if (!name || !supabaseUrl || !supabaseAnonKey) {
+    if (!name || !provider) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Name and provider are required' },
         { status: 400 }
       )
     }
 
-    // Debug logging
-    console.log('=== TESTING SUPABASE CONNECTION ===')
-    console.log('URL:', supabaseUrl)
-    console.log('Anon Key Length:', supabaseAnonKey?.length)
-    console.log('Service Key Length:', supabaseServiceKey?.length)
-
-    const isValid = await testSupabaseConnection({
-      url: supabaseUrl,
-      anonKey: supabaseAnonKey,
-      serviceKey: supabaseServiceKey
-    })
-
-    console.log('Connection test result:', isValid)
-    console.log('=== END TEST ===')
-
-    if (!isValid) {
-      return NextResponse.json(
-        { error: 'Failed to connect to Supabase. Check your credentials.' },
-        { status: 400 }
-      )
-    }
-
-    // Create connection
     const connection = await prisma.databaseConnection.create({
       data: {
-        userId: session.user.id,
-        projectId: projectId || null,
         name,
-        provider: 'supabase',
-        supabaseUrl,
-        supabaseAnonKey,
-        supabaseServiceKey: supabaseServiceKey || null,
-        status: 'connected'
+        provider,
+        connectionString: connectionString || null,
+        config: config || {},
+        userId: user.id
       },
       include: {
-        Project: {
-          select: {
-            id: true,
-            name: true
-          }
-        }
+        DatabaseTable: true  // <-- Use the exact relation name
       }
     })
 
-    return NextResponse.json({
-      success: true,
-      connection: {
-        ...connection,
-        supabaseServiceKey: undefined
-      }
+    return NextResponse.json({ 
+      connection,
+      message: 'Connection created successfully' 
     })
-  } catch (error: unknown) {
-    console.error('Database connection POST error:', error)
+
+  } catch (error) {
+    console.error('Create connection error:', error)
     return NextResponse.json(
-      { error: 'Failed to create connection', message: error instanceof Error ? error.message : String(error) },
+      { error: 'Failed to create connection' },
       { status: 500 }
     )
   }
-})
+}

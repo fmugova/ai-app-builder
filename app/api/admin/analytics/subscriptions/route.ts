@@ -224,7 +224,7 @@ export async function GET(request: NextRequest) {
       trends: {
         upgrades,
         downgrades,
-        newSubscriptions,
+        newSubscription: newSubscriptions,
         cancellations
       },
       revenueByPlan,

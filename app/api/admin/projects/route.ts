@@ -32,8 +32,8 @@ export async function GET() {
         createdAt: 'desc',
       },
     })
-
-    return NextResponse.json(projects)
+    const projectCount = await prisma.project.count();
+    return NextResponse.json({ projects, dashboardProjectCount: projectCount });
   } catch (error) {
     console.error('Error fetching all projects:', error)
     return NextResponse.json(

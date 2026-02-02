@@ -7,10 +7,13 @@ import { useEffect, useRef } from 'react'
 
 interface PreviewFrameProps {
   html: string
+  css?: string | null
+  js?: string | null
   projectId?: string
+  onRegenerate?: () => void
 }
 
-export default function PreviewFrame({ html }: PreviewFrameProps) {
+export default function PreviewFrame({ html, css, js, projectId, onRegenerate }: PreviewFrameProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
   useEffect(() => {

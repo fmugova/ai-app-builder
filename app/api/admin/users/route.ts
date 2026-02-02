@@ -19,19 +19,20 @@ export const PATCH = withAdmin(async (req: NextRequest) => {
 })
 
 export const GET = withAdmin(async () => {
-  const users = await prisma.user.findMany({
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-      subscriptionTier: true,
-      subscriptionStatus: true,
-      projectsThisMonth: true,
-      generationsUsed: true,
-      createdAt: true,
-    },
-    orderBy: { createdAt: 'desc' },
-  })
-  return NextResponse.json({ users })
-})
+  // Count users in both public.User and auth.users
+  const [publicUserCount, authUserCount] = await Promise.all([
+    prisma.user.count(),
+    prisma.$queryRaw<{ count: number }[]>`SELECT COUNT(*)::int AS count FROM auth.users WHERE deleted_at IS NULL`
+  ]);
+  // Query the auth.users table for details
+  const users = await prisma.$queryRaw`\
+    SELECT id, email, role, created_at as "createdAt"
+    FROM auth.users
+    WHERE deleted_at IS NULL
+    ORDER BY created_at DESC
+  `;
+  return NextResponse.json({
+    users,
+    dashboardUserCount: Math.max(publicUserCount, authUserCount[0]?.count || 0)
+  });
+});

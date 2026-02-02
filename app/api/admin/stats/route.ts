@@ -1,48 +1,66 @@
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
+// app/api/admin/stats/route.ts
+// ⚠️ This file makes your admin dashboard show REAL numbers instead of zeros
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-const ADMIN_EMAILS = process.env.ADMIN_EMAILS?.split(',').map(e => e.trim()) || []
-
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-
-    // Check if user is admin
-    if (!session?.user || session.user.role !== 'admin') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get stats
-    const [totalUsers, totalProjects, totalGenerations] = await Promise.all([
+    // Verify admin
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { role: true }
+    })
+
+    if (user?.role !== 'admin') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+    }
+
+    // ✅ Fetch real counts from database
+    const [totalUsers, totalProjects, totalGenerations, activeUsersToday] = await Promise.all([
+      // Total users
       prisma.user.count(),
+
+      // Total projects
       prisma.project.count(),
+
+      // Total AI generations (sum of all users' generationsUsed)
       prisma.user.aggregate({
         _sum: {
           generationsUsed: true
         }
-      })
+      }).then(result => result._sum.generationsUsed || 0),
+
+      // Active users today (users who have activities today)
+      prisma.activity.findMany({
+        where: {
+          createdAt: {
+            gte: new Date(new Date().setHours(0, 0, 0, 0)) // Start of today
+          }
+        },
+        select: {
+          userId: true
+        },
+        distinct: ['userId']
+      }).then(results => results.length)
     ])
 
-    // Get active users (logged in within last 24 hours)
-    const activeUsers = await prisma.user.count({
-      where: {
-        updatedAt: {
-          gte: new Date(Date.now() - 24 * 60 * 60 * 1000)
-        }
-      }
-    })
-
+    // Return stats object
     return NextResponse.json({
       totalUsers,
       totalProjects,
-      totalGenerations: totalGenerations._sum.generationsUsed || 0,
-      activeUsers
+      totalGenerations,
+      activeUsers: activeUsersToday
     })
+
   } catch (error) {
     console.error('Admin stats error:', error)
     return NextResponse.json(

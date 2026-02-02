@@ -274,32 +274,19 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async signIn({ user }) {
-      // Add logging to see what's happening
-      console.log('SignIn attempt:', user.email)
-
-      const dbUser = await prisma.user.findUnique({
-        where: { email: user.email },
-      })
-
-      console.log('DB User:', {
-        emailVerified: dbUser?.emailVerified,
-        twoFactorEnabled: dbUser?.twoFactorEnabled,
-      })
-
-      // Allow if email verified
-      if (dbUser?.emailVerified) {
-        return true
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.role = user.role;
       }
-
-      return false
+      return token;
     },
     async session({ session, token }) {
-      console.log('Session callback:', {
-        email: session.user?.email,
-        role: token.role,
-      })
-      return session
+      if (session?.user) {
+        session.user.id = token.id as string;
+        session.user.role = token.role as string;
+      }
+      return session;
     }
   },
   events: {

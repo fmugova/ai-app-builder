@@ -1,67 +1,48 @@
 // app/api/projects/[id]/route.ts
-// FIXED: Convert BigInt to Number for JSON serialization
+// ✅ This version uses [id] to match your existing folder structure
 
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-// Helper function to convert BigInt fields to Number
-interface Project {
-  [key: string]: unknown;
-  generationTime?: bigint | number | null;
-  retryCount?: bigint | number | null;
-  tokensUsed?: bigint | number | null;
-  validationScore?: bigint | number | null;
-}
-
-function serializeProject(project: Project) {
-  return {
-    ...project,
-    // Convert BigInt fields to Number
-    generationTime: project.generationTime ? Number(project.generationTime) : null,
-    retryCount: project.retryCount ? Number(project.retryCount) : null,
-    tokensUsed: project.tokensUsed ? Number(project.tokensUsed) : null,
-    validationScore: project.validationScore ? Number(project.validationScore) : null,
-  }
-}
-
 // GET - Fetch single project
 export async function GET(
-  req: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const session = await getServerSession(authOptions)
-
+    
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
     const project = await prisma.project.findUnique({
-      where: { id: params.id },
-      include: {
-        Page: true,
-      },
+      where: { id }
     })
 
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
 
-    console.log('📦 Fetched project:', {
-      id: project.id,
-      name: project.name,
-      codeLength: project.code?.length,
-      htmlLength: project.html?.length,
-      htmlCodeLength: project.htmlCode?.length,
-    })
+    if (project.userId !== user.id) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+    }
 
-    // ✅ Serialize project (convert BigInt to Number)
-    return NextResponse.json(serializeProject(project))
-    
+    return NextResponse.json({ project })
+
   } catch (error) {
-    console.error('GET /api/projects/[id] error:', error)
+    console.error('Get project error:', error)
     return NextResponse.json(
       { error: 'Failed to fetch project' },
       { status: 500 }
@@ -69,30 +50,75 @@ export async function GET(
   }
 }
 
-// PATCH - Update project
+// PATCH - Update project (partial)
 export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const session = await getServerSession(authOptions)
-
+    
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await req.json()
-
-    const project = await prisma.project.update({
-      where: { id: params.id },
-      data: body,
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
     })
 
-    // ✅ Serialize project (convert BigInt to Number)
-    return NextResponse.json(serializeProject(project))
-    
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const project = await prisma.project.findUnique({
+      where: { id }
+    })
+
+    if (!project) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    }
+
+    if (project.userId !== user.id) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+    }
+
+    const body = await request.json()
+    const { name, description, html, css, js, status } = body
+
+    const updatedProject = await prisma.project.update({
+      where: { id },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(description !== undefined && { description }),
+        ...(html !== undefined && { html }),
+        ...(css !== undefined && { css }),
+        ...(js !== undefined && { js }),
+        ...(status !== undefined && { status }),
+        updatedAt: new Date()
+      }
+    })
+
+    // Log activity
+    await prisma.activity.create({
+      data: {
+        userId: user.id,
+        type: 'project',
+        action: 'Project updated',
+        metadata: {
+          projectId: updatedProject.id,
+          projectName: updatedProject.name
+        }
+      }
+    })
+
+    return NextResponse.json({ 
+      project: updatedProject,
+      message: 'Project updated successfully' 
+    })
+
   } catch (error) {
-    console.error('PATCH /api/projects/[id] error:', error)
+    console.error('Update project error:', error)
     return NextResponse.json(
       { error: 'Failed to update project' },
       { status: 500 }
@@ -100,26 +126,70 @@ export async function PATCH(
   }
 }
 
+// PUT - Full update (alias for PATCH)
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  return PATCH(request, { params })
+}
+
 // DELETE - Delete project
 export async function DELETE(
-  req: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const session = await getServerSession(authOptions)
-
+    
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    await prisma.project.delete({
-      where: { id: params.id },
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
     })
 
-    return NextResponse.json({ success: true })
-    
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const project = await prisma.project.findUnique({
+      where: { id }
+    })
+
+    if (!project) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    }
+
+    if (project.userId !== user.id) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+    }
+
+    await prisma.project.delete({
+      where: { id }
+    })
+
+    // Log activity
+    await prisma.activity.create({
+      data: {
+        userId: user.id,
+        type: 'project',
+        action: 'Project deleted',
+        metadata: {
+          projectId: project.id,
+          projectName: project.name
+        }
+      }
+    })
+
+    return NextResponse.json({ 
+      message: 'Project deleted successfully' 
+    })
+
   } catch (error) {
-    console.error('DELETE /api/projects/[id] error:', error)
+    console.error('Delete project error:', error)
     return NextResponse.json(
       { error: 'Failed to delete project' },
       { status: 500 }
