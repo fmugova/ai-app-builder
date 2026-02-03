@@ -115,7 +115,7 @@ export async function PATCH(
     })
 
     return NextResponse.json({ 
-      project: updatedProject,
+      project: convertBigInt(updatedProject),
       message: 'Project updated successfully' 
     })
 
@@ -198,4 +198,15 @@ export async function DELETE(
       { status: 500 }
     )
   }
+}
+
+function convertBigInt(obj: unknown): unknown {
+  if (Array.isArray(obj)) {
+    return obj.map(convertBigInt)
+  } else if (obj && typeof obj === 'object') {
+    return Object.fromEntries(
+      Object.entries(obj as Record<string, unknown>).map(([k, v]) => [k, typeof v === 'bigint' ? Number(v) : convertBigInt(v)])
+    )
+  }
+  return obj
 }
