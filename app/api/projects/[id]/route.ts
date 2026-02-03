@@ -1,5 +1,5 @@
 // app/api/projects/[id]/route.ts
-// ✅ This version uses [id] to match your existing folder structure
+// ✅ FIXED: Handles async params in Next.js 15+
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -9,9 +9,11 @@ import { prisma } from '@/lib/prisma'
 // GET - Fetch single project
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }  // ← Changed to "id"
+  { params }: { params: Promise<{ id: string }> }  // ✅ params is a Promise in Next.js 15+
 ) {
   try {
+    const { id } = await params  // ✅ Await params first
+    
     const session = await getServerSession(authOptions)
     
     if (!session?.user?.email) {
@@ -27,7 +29,7 @@ export async function GET(
     }
 
     const project = await prisma.project.findUnique({
-      where: { id: params.id }  // ← Changed to params.id
+      where: { id }  // ✅ Use id, not params.id
     })
 
     if (!project) {
@@ -52,9 +54,11 @@ export async function GET(
 // PATCH - Update project (partial)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }  // ← Changed to "id"
+  { params }: { params: Promise<{ id: string }> }  // ✅ params is a Promise
 ) {
   try {
+    const { id } = await params  // ✅ Await params first
+    
     const session = await getServerSession(authOptions)
     
     if (!session?.user?.email) {
@@ -70,7 +74,7 @@ export async function PATCH(
     }
 
     const project = await prisma.project.findUnique({
-      where: { id: params.id }  // ← Changed to params.id
+      where: { id }  // ✅ Use id, not params.id
     })
 
     if (!project) {
@@ -85,7 +89,7 @@ export async function PATCH(
     const { name, description, html, css, js, status } = body
 
     const updatedProject = await prisma.project.update({
-      where: { id: params.id },  // ← Changed to params.id
+      where: { id },  // ✅ Use id, not params.id
       data: {
         ...(name !== undefined && { name }),
         ...(description !== undefined && { description }),
@@ -127,7 +131,7 @@ export async function PATCH(
 // PUT - Full update (alias for PATCH)
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }  // ← Changed to "id"
+  { params }: { params: Promise<{ id: string }> }  // ✅ params is a Promise
 ) {
   return PATCH(request, { params })
 }
@@ -135,9 +139,11 @@ export async function PUT(
 // DELETE - Delete project
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }  // ← Changed to "id"
+  { params }: { params: Promise<{ id: string }> }  // ✅ params is a Promise
 ) {
   try {
+    const { id } = await params  // ✅ Await params first
+    
     const session = await getServerSession(authOptions)
     
     if (!session?.user?.email) {
@@ -153,7 +159,7 @@ export async function DELETE(
     }
 
     const project = await prisma.project.findUnique({
-      where: { id: params.id }  // ← Changed to params.id
+      where: { id }  // ✅ Use id, not params.id
     })
 
     if (!project) {
@@ -165,7 +171,7 @@ export async function DELETE(
     }
 
     await prisma.project.delete({
-      where: { id: params.id }  // ← Changed to params.id
+      where: { id }  // ✅ Use id, not params.id
     })
 
     // Log activity
