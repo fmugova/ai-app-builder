@@ -626,6 +626,21 @@ export default function AdminDashboard() {
               </button>
             </div>
 
+            {/* Email Verification */}
+            <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+              <div className="text-4xl mb-3">✉️</div>
+              <h3 className="text-xl font-bold mb-2">Verification</h3>
+              <p className="text-gray-400 text-sm mb-4">
+                Email status
+              </p>
+              <button 
+                onClick={() => router.push('/admin/users/verification')}
+                className="w-full bg-yellow-600 hover:bg-yellow-700 text-white py-2 rounded-lg transition text-sm"
+              >
+                View Users
+              </button>
+            </div>
+
             {/* Export Data */}
             <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
               <div className="text-4xl mb-3">📥</div>

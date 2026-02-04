@@ -1,7 +1,5 @@
-// utils/extractInlineStyles.server.ts
-// Server-side version using jsdom for Node.js
-
-import { JSDOM } from 'jsdom'
+﻿// utils/extractInlineStyles.server.ts
+// Server-side version using regex for better compatibility
 
 interface ExtractResult {
   html: string
@@ -14,28 +12,15 @@ export function extractInlineStyles(html: string): ExtractResult {
   }
 
   try {
-    // Preserve DOCTYPE and structure
-    const hasDoctype = html.toLowerCase().includes('<!doctype')
-    
-    // Create DOM from HTML
-    const dom = new JSDOM(html)
-    const document = dom.window.document
-    
-    // Track unique style combinations
     const styleMap = new Map<string, string>()
     let classCounter = 0
+    let modifiedHtml = html
 
-    // Find all elements with style attribute
-    const elementsWithStyle = document.querySelectorAll('[style]')
+    const styleRegex = /<([a-z][a-z0-9]*)\s+([^>]*?)\s*style\s*=\s*["']([^"']+)["']([^>]*?)>/gi
     
-    elementsWithStyle.forEach((element: Element) => {
-      const inlineStyle = element.getAttribute('style')
-      if (!inlineStyle) return
-
-      // Normalize style string
-      const normalizedStyle = normalizeStyleString(inlineStyle)
+    modifiedHtml = modifiedHtml.replace(styleRegex, (match, tagName, beforeStyle, styleContent, afterStyle) => {
+      const normalizedStyle = normalizeStyleString(styleContent)
       
-      // Check if we've seen this style before
       let className = styleMap.get(normalizedStyle)
       
       if (!className) {
@@ -43,31 +28,32 @@ export function extractInlineStyles(html: string): ExtractResult {
         styleMap.set(normalizedStyle, className)
       }
 
-      // Add class to element
-      const existingClasses = element.getAttribute('class') || ''
-      element.setAttribute('class', `${existingClasses} ${className}`.trim())
+      const classMatch = beforeStyle.match(/class\s*=\s*["']([^"']+)["']/i) || 
+                         afterStyle.match(/class\s*=\s*["']([^"']+)["']/i)
       
-      // Remove inline style
-      element.removeAttribute('style')
+      let newClass = className
+      if (classMatch) {
+        newClass = `${classMatch[1]} ${className}`
+        beforeStyle = beforeStyle.replace(/class\s*=\s*["'][^"']*["']/i, '')
+        afterStyle = afterStyle.replace(/class\s*=\s*["'][^"']*["']/i, '')
+      }
+
+      const attrs = [beforeStyle, afterStyle]
+        .map(s => s.trim())
+        .filter(s => s)
+        .join(' ')
+      
+      return `<${tagName} ${attrs ? attrs + ' ' : ''}class="${newClass}">`
     })
 
-    // Generate CSS
-    let css = ''
+    let cssContent = ''
     styleMap.forEach((className, styleString) => {
-      css += `.${className} { ${styleString} }\n`
+      cssContent += `.${className} { ${styleString} }\n`
     })
-
-    // Get the full HTML with structure preserved
-    let processedHtml = dom.serialize()
-    
-    // Ensure DOCTYPE is present
-    if (!processedHtml.toLowerCase().includes('<!doctype')) {
-      processedHtml = '<!DOCTYPE html>\n' + processedHtml
-    }
 
     return {
-      html: processedHtml,
-      css: css.trim()
+      html: modifiedHtml,
+      css: cssContent.trim()
     }
   } catch (error) {
     console.error('Error extracting inline styles:', error)
@@ -90,27 +76,24 @@ function normalizeStyleString(style: string): string {
   return declarations + ';'
 }
 
-// Use this in your API route to process AI-generated code
 export function processGeneratedCode(html: string, css: string = ''): {
   html: string
   css: string
   hasInlineStyles: boolean
   hasInlineHandlers: boolean
 } {
-  const { html: cleanHtml, css: extractedCss } = extractInlineStyles(html)
+  const extracted = extractInlineStyles(html)
   
-  // Combine existing CSS with extracted CSS
-  const combinedCss = [css, extractedCss]
-    .filter(Boolean)
-    .join('\n\n/* Extracted from inline styles */\n')
-
-  // Check for inline event handlers
-  const hasInlineHandlers = /(on\w+)=["']/.test(html)
-
+  const combinedCss = [css, extracted.css].filter(Boolean).join('\n\n')
+  
+  let cleanHtml = extracted.html
+  const hasInlineHandlers = /on\w+\s*=\s*["'][^"']*["']/i.test(cleanHtml)
+  
   return {
     html: cleanHtml,
     css: combinedCss,
-    hasInlineStyles: extractedCss.length > 0,
+    hasInlineStyles: extracted.css.length > 0,
     hasInlineHandlers,
   }
 }
+
