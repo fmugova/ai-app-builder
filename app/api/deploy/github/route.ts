@@ -30,10 +30,12 @@ export async function POST(req: NextRequest) {
     // 3. Push code
     // 4. Set up GitHub Pages
 
+    // For now, return a message indicating feature is coming soon
     return NextResponse.json({
-      url: 'https://github.com/username/repo',
-      success: true,
-    });
+      url: '#',
+      success: false,
+      message: 'GitHub deployment coming soon! Please use BuildFlow Publish for now.',
+    }, { status: 501 });
   } catch (error) {
     console.error('GitHub deploy error:', error);
     return NextResponse.json(

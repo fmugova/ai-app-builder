@@ -9,12 +9,25 @@ import { PrismaClient } from '@prisma/client'
 import { CodeValidator } from '@/lib/validators'
 import { processGeneratedCode } from '@/utils/extractInlineStyles.server'
 import { BUILDFLOW_SYSTEM_PROMPT } from '@/lib/system-prompt'
+import { completeIncompleteHTML } from '@/lib/code-parser'
 
 const prisma = new PrismaClient()
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
+
+function getOptimalTokenLimit(prompt: string): number {
+  const baseTokens = 15000
+  const isComplexPrompt = prompt.length > 500 || 
+                          prompt.includes('dashboard') || 
+                          prompt.includes('multiple') ||
+                          prompt.includes('pages') ||
+                          prompt.includes('CRM') ||
+                          prompt.includes('admin')
+  
+  return isComplexPrompt ? 40000 : 30000
+}
 
 interface ValidationError {
   severity: string
@@ -57,10 +70,12 @@ export async function POST(req: NextRequest) {
       return new Response('Invalid prompt', { status: 400 })
     }
 
+    const maxTokens = getOptimalTokenLimit(prompt)
+    
     console.log('🚀 Starting generation:', {
       projectId: projectId || 'new',
       promptLength: prompt.length,
-      maxTokens: 8000,
+      maxTokens,
     })
 
     const stream = new ReadableStream({
@@ -73,7 +88,7 @@ export async function POST(req: NextRequest) {
 
           const response = await anthropic.messages.create({
             model: 'claude-sonnet-4-20250514',
-            max_tokens: 8000,
+            max_tokens: maxTokens,
             temperature: 1,
             messages: [
               {
@@ -107,6 +122,9 @@ export async function POST(req: NextRequest) {
           if (!html.toLowerCase().includes('<!doctype html>')) {
             html = '<!DOCTYPE html>\n' + html
           }
+          
+          // Auto-complete any missing closing tags
+          html = completeIncompleteHTML(html)
           
           // Ensure lang attribute on html tag
           if (!html.includes('<html lang=')) {
@@ -252,20 +270,27 @@ export async function POST(req: NextRequest) {
           }
 
           // Send validation result to client
-          send(controller, {
-            validation: {
-              isComplete: true,
-              hasHtml,
-              hasCss,
-              hasJs: hasJavaScript,
-              validationScore: safeValidation.score,
-              validationPassed: safeValidation.passed,
-              errors: safeValidation.errors,
-              warnings: safeValidation.warnings,
-              cspViolations: [],
-              passed: safeValidation.passed,
-            },
-          })
+          const validationData = {
+            isComplete: true,
+            hasHtml,
+            hasCss,
+            hasJs: hasJavaScript,
+            validationScore: safeValidation.score,
+            validationPassed: safeValidation.passed,
+            errors: safeValidation.errors,
+            warnings: safeValidation.warnings,
+            cspViolations: [],
+            passed: safeValidation.passed,
+          };
+          
+          console.log('📤 Sending validation to client:', {
+            score: validationData.validationScore,
+            passed: validationData.validationPassed,
+            errorsCount: validationData.errors.length,
+            warningsCount: validationData.warnings.length,
+          });
+          
+          send(controller, { validation: validationData })
 
           // Send project ID
           send(controller, { projectId: savedProjectId })

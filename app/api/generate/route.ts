@@ -6,7 +6,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { MessageCreateParams } from '@anthropic-ai/sdk/resources/messages'
 import type { Stream } from '@anthropic-ai/sdk/streaming'
 import prisma from '@/lib/prisma'
-import { parseGeneratedCode, analyzeCodeQuality, checkCSPViolations } from '@/lib/code-parser'
+import { parseGeneratedCode, analyzeCodeQuality, checkCSPViolations, completeIncompleteHTML } from '@/lib/code-parser'
 import { ProjectStatus } from '@prisma/client'
 import { apiQueue } from '@/lib/api-queue'
 
@@ -160,13 +160,23 @@ REMEMBER:
 
 function getOptimalTokenLimit(prompt: string, generationType: string): number {
   // Estimate tokens needed based on prompt length and type
-  const baseTokens = 8000
+  const baseTokens = 15000 // Increased base for more complete generations
   const promptTokenEstimate = Math.ceil(prompt.length / 4)
   
+  // Detect complex prompts (longer descriptions, multiple features)
+  const isComplexPrompt = prompt.length > 500 || 
+                          prompt.includes('dashboard') || 
+                          prompt.includes('multiple') ||
+                          prompt.includes('pages') ||
+                          prompt.includes('CRM') ||
+                          prompt.includes('admin')
+  
   if (generationType === 'landing-page') {
-    return Math.min(12000, baseTokens + promptTokenEstimate)
+    const limit = isComplexPrompt ? 25000 : 18000
+    return Math.min(limit, baseTokens + promptTokenEstimate * 2)
   } else if (generationType === 'webapp') {
-    return Math.min(16000, baseTokens + promptTokenEstimate * 2)
+    const limit = isComplexPrompt ? 40000 : 30000
+    return Math.min(limit, baseTokens + promptTokenEstimate * 3)
   }
   
   return baseTokens
@@ -390,7 +400,8 @@ export async function POST(req: NextRequest) {
           
           if (parsed.html) {
             // Already complete HTML (from the AI generation)
-            completeHtml = parsed.html
+            // Auto-complete any missing closing tags if truncated
+            completeHtml = completeIncompleteHTML(parsed.html)
           } else if (parsed.hasHtml || parsed.hasCss || parsed.hasJavaScript) {
             // Need to combine separate parts into complete HTML
             const cssBlock = parsed.css ? `<style>\n${parsed.css}\n</style>` : ''

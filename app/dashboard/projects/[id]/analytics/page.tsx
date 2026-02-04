@@ -68,7 +68,7 @@ interface ProjectAnalytics {
     linkClicks: number
     totalConversions: number
   }
-  topPage: {
+  topPages: {
     page: string
     views: number
     avgTime: number
@@ -512,8 +512,8 @@ export default function ProjectAnalyticsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-700">
-                {analytics.topPage.length > 0 ? (
-                  analytics.topPage.map((page, index) => (
+                {analytics.topPages && analytics.topPages.length > 0 ? (
+                  analytics.topPages.map((page, index) => (
                     <tr key={index} className="hover:bg-gray-700/50 transition">
                       <td className="py-4 text-white">{page.page || '/'}</td>
                       <td className="py-4 text-white font-bold text-right">{formatNumber(page.views)}</td>

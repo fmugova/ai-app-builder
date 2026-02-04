@@ -3,7 +3,7 @@
 import React from 'react';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import PreviewFrame from '@/components/PreviewFrame';
 import { AlertTriangle, CheckCircle, XCircle, Download, Copy, Github, ExternalLink, Save, Sparkles, RefreshCw, Upload, Link as LinkIcon, Code2, Lightbulb, Menu, X } from 'lucide-react';
@@ -88,11 +88,13 @@ class ErrorBoundary extends React.Component<
 export default function ChatBuilder() {
   const { status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // State
   const [prompt, setPrompt] = useState('');
   const [projectName, setProjectName] = useState('');
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [isLoadingProject, setIsLoadingProject] = useState(false);
   const [showPromptGuide, setShowPromptGuide] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -120,6 +122,54 @@ export default function ChatBuilder() {
       router.push('/auth/signin');
     }
   }, [status, router]);
+
+  // Load project data
+  const loadProject = useCallback(async (projectId: string) => {
+    setIsLoadingProject(true);
+    try {
+      const response = await fetch(`/api/projects/${projectId}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || 'Failed to load project');
+      }
+
+      const data = await response.json();
+      const project = data.project;
+      
+      setCurrentProjectId(project.id);
+      setProjectName(project.name || '');
+      
+      if (project.code) {
+        const { html, css, js } = parseCode(project.code);
+        setState(prev => ({
+          ...prev,
+          html,
+          css,
+          js,
+          fullCode: project.code,
+          validation: project.validation || null,
+        }));
+        toast.success(`Loaded project: ${project.name}`);
+      } else {
+        toast.success(`Loaded project: ${project.name} (no code yet)`);
+      }
+    } catch (error) {
+      console.error('Error loading project:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load project';
+      toast.error(errorMessage);
+    } finally {
+      setIsLoadingProject(false);
+    }
+  }, []);
+
+  // Load project from URL parameter
+  useEffect(() => {
+    const projectId = searchParams.get('project');
+    if (projectId && status === 'authenticated') {
+      loadProject(projectId);
+    }
+  }, [searchParams, status, loadProject]);
 
   // Generation function with progress tracking
   const handleGenerate = useCallback(async () => {
@@ -191,6 +241,7 @@ export default function ChatBuilder() {
               }
 
               if (data.validation) {
+                console.log('📊 Received validation data:', data.validation);
                 setState(prev => ({
                   ...prev,
                   validation: ensureValidValidation(data.validation),
@@ -424,6 +475,34 @@ Ensure:
     }
   }, [currentProjectId]);
 
+  const handlePublishBuildFlow = useCallback(async () => {
+    if (!currentProjectId) {
+      toast.error('Please save the project first');
+      return;
+    }
+
+    toast.loading('Publishing to BuildFlow...');
+    
+    try {
+      const response = await fetch('/api/deploy/buildflow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: currentProjectId }),
+      });
+
+      if (!response.ok) throw new Error('BuildFlow deploy failed');
+
+      const data = await response.json();
+      toast.dismiss();
+      toast.success(`Published to BuildFlow! URL: ${data.slug}`);
+      window.open(data.url, '_blank');
+    } catch (error) {
+      toast.dismiss();
+      console.error('BuildFlow deploy error:', error);
+      toast.error('Failed to publish to BuildFlow');
+    }
+  }, [currentProjectId]);
+
   const handleOpenPreview = useCallback(() => {
     if (!currentProjectId) {
       toast.error('Please save the project first');
@@ -433,12 +512,12 @@ Ensure:
     window.open(`/preview/${currentProjectId}`, '_blank');
   }, [currentProjectId]);
 
-  if (status === 'loading') {
+  if (status === 'loading' || isLoadingProject) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-purple-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600">{isLoadingProject ? 'Loading project...' : 'Loading...'}</p>
         </div>
       </div>
     );
@@ -812,7 +891,16 @@ Ensure:
 
                 <div className="mt-4 pt-4 border-t border-gray-200">
                   <h3 className="text-sm font-medium text-gray-900 mb-3">Publish</h3>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <button
+                      onClick={handlePublishBuildFlow}
+                      disabled={!currentProjectId}
+                      className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium transition-colors disabled:opacity-50 text-sm sm:text-base"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      BuildFlow
+                    </button>
+
                     <button
                       onClick={handlePublishGitHub}
                       disabled={!currentProjectId}

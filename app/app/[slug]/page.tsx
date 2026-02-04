@@ -1,0 +1,73 @@
+import { NextRequest } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { notFound } from 'next/navigation';
+
+interface PageProps {
+  params: {
+    slug: string;
+  };
+}
+
+export async function generateMetadata({ params }: PageProps) {
+  const { slug } = params;
+
+  const project = await prisma.project.findUnique({
+    where: { publicSlug: slug },
+    select: {
+      name: true,
+      description: true,
+    },
+  });
+
+  if (!project) {
+    return {
+      title: 'App Not Found',
+    };
+  }
+
+  return {
+    title: project.name,
+    description: project.description || `${project.name} - Built with BuildFlow AI`,
+  };
+}
+
+export default async function PublishedAppPage({ params }: PageProps) {
+  const { slug } = params;
+
+  const project = await prisma.project.findUnique({
+    where: { publicSlug: slug },
+    select: {
+      name: true,
+      code: true,
+      html: true,
+      htmlCode: true,
+      isPublished: true,
+    },
+  });
+
+  if (!project || !project.isPublished) {
+    notFound();
+  }
+
+  // Use the most complete HTML available
+  const htmlContent = project.htmlCode || project.html || project.code;
+
+  if (!htmlContent) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">No Content Available</h1>
+          <p className="text-gray-600">This app has no content to display.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Render the HTML directly
+  return (
+    <div 
+      className="min-h-screen"
+      dangerouslySetInnerHTML={{ __html: htmlContent }}
+    />
+  );
+}

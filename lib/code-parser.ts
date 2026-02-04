@@ -29,6 +29,37 @@ export function parseGeneratedCode(content: string): ParsedCode {
   let javascript = extractCodeBlock(content, 'javascript') || extractCodeBlock(content, 'js');
   if (!javascript) javascript = findLastCompleteBlock(content, 'javascript') || findLastCompleteBlock(content, 'js');
 
+  // FALLBACK: If no code blocks found, check if content is already complete HTML
+  if (!html && !css && !javascript) {
+    // Check if the content looks like complete HTML
+    const hasDoctype = /<!DOCTYPE html>/i.test(content);
+    const hasHtmlTag = /<html[^>]*>/i.test(content);
+    const hasBodyTag = /<body[^>]*>/i.test(content);
+    
+    if (hasDoctype || (hasHtmlTag && hasBodyTag)) {
+      // This is already complete HTML without markdown wrappers
+      html = content;
+      
+      // Extract CSS from <style> tags
+      const styleMatch = content.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+      if (styleMatch && styleMatch[1]) {
+        css = styleMatch[1].trim();
+      }
+      
+      // Extract JavaScript from <script> tags
+      const scriptMatches = content.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi);
+      const scripts: string[] = [];
+      for (const match of scriptMatches) {
+        if (match[1] && match[1].trim()) {
+          scripts.push(match[1].trim());
+        }
+      }
+      if (scripts.length > 0) {
+        javascript = scripts.join('\n\n');
+      }
+    }
+  }
+
   // Validate JavaScript syntax if present
   let jsValid = true;
   let jsError: string | null = null;
@@ -248,6 +279,60 @@ export function cleanMarkdownArtifacts(content: string): string {
   // Clean up any extra backticks outside of code blocks
   // But preserve the code fence markers themselves
   return content.trim();
+}
+
+/**
+ * Auto-completes incomplete HTML by adding missing closing tags
+ */
+export function completeIncompleteHTML(html: string): string {
+  if (!html) return html;
+  
+  // Track which tags need closing
+  const missingClosingTags: string[] = [];
+  
+  // Check for missing </script> tags
+  const openScripts = (html.match(/<script[^>]*>/gi) || []).length;
+  const closeScripts = (html.match(/<\/script>/gi) || []).length;
+  if (openScripts > closeScripts) {
+    for (let i = 0; i < openScripts - closeScripts; i++) {
+      missingClosingTags.push('</script>');
+    }
+  }
+  
+  // Check for missing </style> tags
+  const openStyles = (html.match(/<style[^>]*>/gi) || []).length;
+  const closeStyles = (html.match(/<\/style>/gi) || []).length;
+  if (openStyles > closeStyles) {
+    for (let i = 0; i < openStyles - closeStyles; i++) {
+      missingClosingTags.push('</style>');
+    }
+  }
+  
+  // Check for missing </div> tags
+  const openDivs = (html.match(/<div[^>]*>/gi) || []).length;
+  const closeDivs = (html.match(/<\/div>/gi) || []).length;
+  if (openDivs > closeDivs) {
+    for (let i = 0; i < openDivs - closeDivs; i++) {
+      missingClosingTags.push('</div>');
+    }
+  }
+  
+  // Check for missing </body> tag
+  if (/<body[^>]*>/i.test(html) && !/<\/body>/i.test(html)) {
+    missingClosingTags.push('</body>');
+  }
+  
+  // Check for missing </html> tag
+  if (/<html[^>]*>/i.test(html) && !/<\/html>/i.test(html)) {
+    missingClosingTags.push('</html>');
+  }
+  
+  // Append all missing closing tags
+  if (missingClosingTags.length > 0) {
+    html = html.trimEnd() + '\n' + missingClosingTags.join('\n');
+  }
+  
+  return html;
 }
 
 /**

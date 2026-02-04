@@ -25,6 +25,7 @@ export default function ProjectOverviewClient({ project }: ProjectOverviewClient
   const router = useRouter()
   const [isDeleting, setIsDeleting] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
+  const [isUnpublishing, setIsUnpublishing] = useState(false)
 
   const handlePublish = async () => {
     setIsPublishing(true)
@@ -44,6 +45,33 @@ export default function ProjectOverviewClient({ project }: ProjectOverviewClient
       alert('❌ Failed to publish project')
     } finally {
       setIsPublishing(false)
+    }
+  }
+
+  const handleUnpublish = async () => {
+    if (!confirm(`Unpublish "${project.name}"?\n\nYour app will no longer be publicly accessible.`)) {
+      return
+    }
+
+    setIsUnpublishing(true)
+    try {
+      const res = await fetch('/api/deploy/unpublish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: project.id })
+      })
+
+      if (res.ok) {
+        alert('✅ Project unpublished successfully!')
+        router.refresh()
+      } else {
+        const error = await res.json()
+        alert(`❌ Failed to unpublish: ${error.error}`)
+      }
+    } catch {
+      alert('❌ Failed to unpublish project')
+    } finally {
+      setIsUnpublishing(false)
     }
   }
 
@@ -196,17 +224,33 @@ export default function ProjectOverviewClient({ project }: ProjectOverviewClient
             <p className="text-sm text-purple-100">Backend logic</p>
           </Link>
 
-          <button
-            onClick={handlePublish}
-            disabled={isPublishing}
-            className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl p-6 hover:shadow-lg transition text-left"
-          >
-            <div className="text-3xl mb-3">🚀</div>
-            <h3 className="font-semibold mb-1">
-              {isPublishing ? 'Publishing...' : 'Publish'}
-            </h3>
-            <p className="text-sm text-green-100">Make it live</p>
-          </button>
+          {!project.published && (
+            <button
+              onClick={handlePublish}
+              disabled={isPublishing}
+              className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl p-6 hover:shadow-lg transition text-left"
+            >
+              <div className="text-3xl mb-3">🚀</div>
+              <h3 className="font-semibold mb-1">
+                {isPublishing ? 'Publishing...' : 'Publish'}
+              </h3>
+              <p className="text-sm text-green-100">Make it live</p>
+            </button>
+          )}
+
+          {project.published && (
+            <button
+              onClick={handleUnpublish}
+              disabled={isUnpublishing}
+              className="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl p-6 hover:shadow-lg transition text-left"
+            >
+              <div className="text-3xl mb-3">📴</div>
+              <h3 className="font-semibold mb-1">
+                {isUnpublishing ? 'Unpublishing...' : 'Unpublish'}
+              </h3>
+              <p className="text-sm text-orange-100">Take offline</p>
+            </button>
+          )}
 
           <button
             onClick={handleDelete}
