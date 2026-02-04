@@ -20,10 +20,19 @@ export async function proxy(request: NextRequest) {
     '/p/', // Public published apps
     '/_next',
     '/favicon.ico',
+    '/about',
+    '/contact',
+    '/privacy',
+    '/terms',
+    '/pricing',
+    '/features',
+    '/examples',
+    '/templates',
+    '/',
   ];
 
   // Check if path is public
-  const isPublicPath = publicPaths.some(path => pathname.startsWith(path));
+  const isPublicPath = publicPaths.some(path => pathname.startsWith(path)) || pathname === '/';
 
   // If accessing public path, allow
   if (isPublicPath) {
@@ -37,11 +46,16 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Check if email is verified
+  // TEMPORARILY DISABLED: Email verification requirement
+  // TODO: Re-enable once email service is configured in production
+  /*
+  // Check if email is verified (only enforce for new credential signups)
   const emailVerified = token.emailVerified;
+  const isCredentialsUser = !token.sub?.includes('google'); // Basic check for OAuth users
 
-  // If email not verified and not already on verification notice page
-  if (!emailVerified && pathname !== '/verify-email-notice') {
+  // Only redirect if explicitly not verified (false or specific unverified state)
+  // Allow null to pass through (existing users, OAuth users)
+  if (emailVerified === false && isCredentialsUser && pathname !== '/verify-email-notice') {
     return NextResponse.redirect(new URL('/verify-email-notice', request.url));
   }
 
@@ -49,6 +63,7 @@ export async function proxy(request: NextRequest) {
   if (emailVerified && pathname === '/verify-email-notice') {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
+  */
 
   return NextResponse.next();
 }
