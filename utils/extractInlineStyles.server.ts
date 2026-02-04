@@ -14,6 +14,9 @@ export function extractInlineStyles(html: string): ExtractResult {
   }
 
   try {
+    // Preserve DOCTYPE and structure
+    const hasDoctype = html.toLowerCase().includes('<!doctype')
+    
     // Create DOM from HTML
     const dom = new JSDOM(html)
     const document = dom.window.document
@@ -54,8 +57,16 @@ export function extractInlineStyles(html: string): ExtractResult {
       css += `.${className} { ${styleString} }\n`
     })
 
+    // Get the full HTML with structure preserved
+    let processedHtml = dom.serialize()
+    
+    // Ensure DOCTYPE is present
+    if (!processedHtml.toLowerCase().includes('<!doctype')) {
+      processedHtml = '<!DOCTYPE html>\n' + processedHtml
+    }
+
     return {
-      html: document.body.innerHTML,
+      html: processedHtml,
       css: css.trim()
     }
   } catch (error) {
@@ -84,6 +95,7 @@ export function processGeneratedCode(html: string, css: string = ''): {
   html: string
   css: string
   hasInlineStyles: boolean
+  hasInlineHandlers: boolean
 } {
   const { html: cleanHtml, css: extractedCss } = extractInlineStyles(html)
   
@@ -92,9 +104,13 @@ export function processGeneratedCode(html: string, css: string = ''): {
     .filter(Boolean)
     .join('\n\n/* Extracted from inline styles */\n')
 
+  // Check for inline event handlers
+  const hasInlineHandlers = /(on\w+)=["']/.test(html)
+
   return {
     html: cleanHtml,
     css: combinedCss,
-    hasInlineStyles: extractedCss.length > 0
+    hasInlineStyles: extractedCss.length > 0,
+    hasInlineHandlers,
   }
 }

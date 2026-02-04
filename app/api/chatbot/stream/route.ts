@@ -16,10 +16,39 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 export const runtime = 'nodejs'
 export const maxDuration = 300
 
+interface ValidationError {
+  severity: string
+  message: string
+  line?: number
+  column?: number
+}
+
+interface ValidationWarning {
+  severity: string
+  message: string
+  line?: number
+  column?: number
+}
+
+interface ValidationResult {
+  score: number
+  passed: boolean
+  errors: ValidationError[]
+  warnings: ValidationWarning[]
+}
+
 export async function POST(req: NextRequest) {
+  const encoder = new TextEncoder()
+  const send = (controller: ReadableStreamDefaultController, data: unknown) => {
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
+  }
+
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.email) return new Response('Unauthorized', { status: 401 })
+    
+    if (!session?.user?.email) {
+      return new Response('Unauthorized', { status: 401 })
+    }
 
     const body = await req.json()
     const { prompt, projectId } = body
@@ -29,21 +58,14 @@ export async function POST(req: NextRequest) {
     }
 
     console.log('🚀 Starting generation:', {
-      projectId,
+      projectId: projectId || 'new',
       promptLength: prompt.length,
       maxTokens: 8000,
     })
 
     const stream = new ReadableStream({
       async start(controller) {
-        const encoder = new TextEncoder()
-        const send = (data: unknown) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
-
         try {
-          // ✅ ENHANCED SYSTEM PROMPT - Avoid inline styles
-          // Use the improved system prompt from lib/system-prompt
-          const systemPrompt = BUILDFLOW_SYSTEM_PROMPT;
-
           let generatedHtml = ''
           let tokenCount = 0
 
@@ -64,73 +86,121 @@ export async function POST(req: NextRequest) {
 
           for await (const event of response) {
             if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-              generatedHtml += event.delta.text
+              const text = event.delta.text
+              generatedHtml += text
               tokenCount++
-              if (tokenCount % 50 === 0) send({ type: 'progress', length: generatedHtml.length })
+              
+              // Send code chunks as they arrive
+              send(controller, { code: text })
             }
           }
 
           console.log('✅ Stream complete:', generatedHtml.length, 'chars')
 
-          // Clean code
-          let html = generatedHtml.trim().replace(/^```html?\n?/i, '').replace(/\n?```$/i, '')
-          if (!html.toLowerCase().includes('<!doctype html>')) html = '<!DOCTYPE html>\n' + html
+          // Clean and process code
+          let html = generatedHtml.trim()
+            .replace(/^```html?\n?/i, '')
+            .replace(/\n?```$/i, '')
+            .trim()
 
-          // --- INLINE STYLE EXTRACTION ---
-          // Extract CSS from HTML and combine with any generated CSS (if you have it)
-          // For this route, assume only HTML is generated, so pass empty string for CSS
-          const { html: cleanHtml, css: combinedCss, hasInlineStyles } = processGeneratedCode(html, '')
+          // Ensure DOCTYPE
+          if (!html.toLowerCase().includes('<!doctype html>')) {
+            html = '<!DOCTYPE html>\n' + html
+          }
+          
+          // Ensure lang attribute on html tag
+          if (!html.includes('<html lang=')) {
+            html = html.replace(/<html([^>]*)>/i, '<html lang="en"$1>')
+          }
+
+          // Extract inline styles AND inline handlers
+          const { 
+            html: cleanHtml, 
+            css: combinedCss, 
+            hasInlineStyles, 
+            hasInlineHandlers 
+          } = processGeneratedCode(html, '')
 
           if (hasInlineStyles) {
             console.log('✅ Extracted inline styles to CSS')
           }
+          
+          if (hasInlineHandlers) {
+            console.log('✅ Converted inline handlers to addEventListener')
+          }
 
           const hasHtml = html.length > 0
-          const hasCss = html.includes('<style')
+          const hasCss = html.includes('<style') || combinedCss.length > 0
           const hasJavaScript = html.includes('<script')
 
           console.log('📊 Running validation...')
 
           const validator = new CodeValidator()
-          const validationResult = validator.validateAll(html, '', '')
+          const validationResult = validator.validateAll(cleanHtml, combinedCss, '') as ValidationResult
+
+          // Ensure validation result has proper structure
+          const safeValidation: ValidationResult = {
+            score: validationResult?.score ?? 0,
+            passed: validationResult?.passed ?? false,
+            errors: Array.isArray(validationResult?.errors) ? validationResult.errors : [],
+            warnings: Array.isArray(validationResult?.warnings) ? validationResult.warnings : [],
+          }
 
           console.log('📊 Quality:', {
-            score: validationResult.score || 0,
-            passed: validationResult.passed || false,
-            errors: validationResult.errors.length,
-            warnings: validationResult.warnings.length,
+            score: safeValidation.score,
+            passed: safeValidation.passed,
+            errors: safeValidation.errors.length,
+            warnings: safeValidation.warnings.length,
           })
 
-          // Log each validation error
-          if (validationResult.errors.length > 0) {
+          // Log validation errors if any
+          if (safeValidation.errors.length > 0) {
             console.log('⚠️  Validation errors:')
-            validationResult.errors.forEach((err, i) => {
-              console.log(`  ${i + 1}. [${err.severity}] ${err.message}`)
+            safeValidation.errors.forEach((err, i) => {
+              console.log(`  ${i + 1}. [${err.severity || 'error'}] ${err.message}`)
             })
           }
 
           let savedProjectId = projectId
 
+          // Get user
+          const user = await prisma.user.findUnique({
+            where: { email: session.user.email },
+            select: { id: true },
+          })
+
+          if (!user) {
+            throw new Error('User not found')
+          }
+
+          // Prepare validation data for database
+          const validationErrors = safeValidation.errors.map(e => ({
+            severity: e.severity || 'error',
+            message: e.message,
+            line: e.line,
+            column: e.column,
+          }))
+
+          const validationWarnings = safeValidation.warnings.map(w => ({
+            severity: w.severity || 'warning',
+            message: w.message,
+            line: w.line,
+            column: w.column,
+          }))
+
           if (!savedProjectId) {
             console.log('💾 Auto-saving project...')
             
-            const user = await prisma.user.findUnique({
-              where: { email: session.user.email },
-              select: { id: true },
-            })
-
-            if (!user) throw new Error('User not found')
-
-            console.log('📦 Complete HTML length:', html.length)
-
             const project = await prisma.project.create({
               data: {
                 userId: user.id,
                 name: prompt.slice(0, 50) || 'New Project',
-                description: prompt.slice(0, 200),
-                code: html,
-                html,
-                htmlCode: html,
+                description: prompt.slice(0, 200) || '',
+                code: cleanHtml,
+                html: cleanHtml,
+                htmlCode: cleanHtml,
+                css: combinedCss,
+                cssCode: combinedCss,
                 type: 'landing-page',
                 hasHtml,
                 hasCss,
@@ -138,46 +208,42 @@ export async function POST(req: NextRequest) {
                 isComplete: true,
                 jsValid: true,
                 jsError: null,
-                validationScore: validationResult.score || 0,
-                validationPassed: validationResult.passed || false,
-                validationErrors: JSON.stringify(validationResult.errors || []),
-                validationWarnings: JSON.stringify(validationResult.warnings || []),
-                cspViolations: [],
+                validationScore: BigInt(Math.round(safeValidation.score)),
+                validationPassed: safeValidation.passed,
+                validationErrors: JSON.stringify(validationErrors),
+                validationWarnings: JSON.stringify(validationWarnings),
+                cspViolations: JSON.stringify([]),
                 status: 'COMPLETED',
-                tokensUsed: tokenCount,
-                generationTime: Date.now(),
-                retryCount: 0,
+                tokensUsed: BigInt(tokenCount),
+                generationTime: BigInt(Date.now()),
+                retryCount: BigInt(0),
               },
             })
 
             savedProjectId = project.id
-            
-            console.log('✅ Project auto-saved successfully')
-            console.log('📝 Code field length:', html.length)
-            console.log('🆔 Project ID:', savedProjectId)
-            
-            send({ type: 'projectCreated', projectId: savedProjectId })
+            console.log('✅ Project auto-saved:', savedProjectId)
           } else {
             console.log('🔄 Updating project:', savedProjectId)
             
             await prisma.project.update({
-              where: { id: savedProjectId },
+              where: { id: savedProjectId, userId: user.id },
               data: {
                 code: cleanHtml,
                 html: cleanHtml,
                 htmlCode: cleanHtml,
                 css: combinedCss,
+                cssCode: combinedCss,
                 hasHtml,
-                hasCss: combinedCss.length > 0,
+                hasCss,
                 hasJavaScript,
                 isComplete: true,
                 jsValid: true,
-                validationScore: validationResult.score || 0,
-                validationPassed: validationResult.passed || false,
-                validationErrors: JSON.stringify(validationResult.errors || []),
-                validationWarnings: JSON.stringify(validationResult.warnings || []),
+                validationScore: BigInt(Math.round(safeValidation.score)),
+                validationPassed: safeValidation.passed,
+                validationErrors: JSON.stringify(validationErrors),
+                validationWarnings: JSON.stringify(validationWarnings),
                 status: 'COMPLETED',
-                tokensUsed: tokenCount,
+                tokensUsed: BigInt(tokenCount),
                 updatedAt: new Date(),
               },
             })
@@ -185,28 +251,35 @@ export async function POST(req: NextRequest) {
             console.log('✅ Project updated successfully')
           }
 
-          send({ type: 'html', content: cleanHtml })
-          send({
-            type: 'complete',
-            projectId: savedProjectId,
+          // Send validation result to client
+          send(controller, {
             validation: {
-              validationScore: validationResult.score || 0,
-              validationPassed: validationResult.passed || false,
-              errors: validationResult.errors || [],
-              warnings: validationResult.warnings || [],
-              passed: validationResult.passed || false,
+              isComplete: true,
+              hasHtml,
+              hasCss,
+              hasJs: hasJavaScript,
+              validationScore: safeValidation.score,
+              validationPassed: safeValidation.passed,
+              errors: safeValidation.errors,
+              warnings: safeValidation.warnings,
+              cspViolations: [],
+              passed: safeValidation.passed,
             },
           })
 
-          console.log('⏱️  Generation completed')
+          // Send project ID
+          send(controller, { projectId: savedProjectId })
+
+          // Send completion
+          send(controller, { done: true })
+
+          console.log('⏱️  Generation completed successfully')
           controller.close()
           
         } catch (error) {
           console.error('❌ Generation error:', error)
-          send({
-            type: 'error',
-            message: error instanceof Error ? error.message : 'Generation failed',
-          })
+          const errorMessage = error instanceof Error ? error.message : 'Generation failed'
+          send(controller, { error: errorMessage })
           controller.close()
         }
       },
@@ -221,6 +294,14 @@ export async function POST(req: NextRequest) {
     })
   } catch (error) {
     console.error('❌ Route error:', error)
-    return new Response('Internal Server Error', { status: 500 })
+    return new Response(
+      JSON.stringify({ 
+        error: error instanceof Error ? error.message : 'Internal Server Error' 
+      }),
+      { 
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    )
   }
 }
