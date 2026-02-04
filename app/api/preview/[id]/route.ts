@@ -1,82 +1,57 @@
-// app/api/preview/[id]/route.ts
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+
+export const dynamic = 'force-dynamic';
+
+// Next.js 15: params is now a Promise
+interface RouteContext {
+  params: Promise<{ id: string }>;
+}
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: RouteContext
 ) {
-  const { id } = await params;
   try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // Await params (Next.js 15 requirement)
+    const { id } = await context.params;
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
+    // Fetch project from database
     const project = await prisma.project.findUnique({
       where: { id },
       select: {
         id: true,
         name: true,
-        html: true,
-        css: true,
-        userId: true,
-        code: true
-      }
-    })
+        code: true,
+      },
+    });
 
+    // Project not found
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Project not found' },
+        { status: 404 }
+      );
     }
 
-    if (project.userId !== user.id) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+    // Project has no code
+    if (!project.code) {
+      return NextResponse.json(
+        { error: 'Project has no generated code' },
+        { status: 404 }
+      );
     }
 
-    // Construct complete HTML
-    const fullHtml = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${project.name || 'Preview'}</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: system-ui, -apple-system, sans-serif; }
-    ${project.css || ''}
-  </style>
-</head>
-<body>
-  ${project.html || '<p style="padding: 20px; color: #666;">No content yet</p>'}
-  <script>
-    ${project.code || ''}
-  </script>
-</body>
-</html>`
-
-    return new NextResponse(fullHtml, {
-      headers: {
-        'Content-Type': 'text/html',
-        'Cache-Control': 'no-store, max-age=0'
-      }
-    })
-
+    // Return project data
+    return NextResponse.json({
+      code: project.code,
+      projectName: project.name,
+    });
   } catch (error) {
-    console.error('Preview error:', error)
+    console.error('Error fetching preview:', error);
     return NextResponse.json(
-      { error: 'Failed to load preview', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Internal server error' },
       { status: 500 }
-    )
+    );
   }
 }

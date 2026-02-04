@@ -70,17 +70,76 @@ export async function GET(
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
+    // Helper to serialize BigInt fields in project
     const projects = await prisma.workspaceProject.findMany({
       where: { workspaceId: id },
       include: {
-        // Note: We'll need to add a relation to the Project model later
+        project: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            html: true,
+            css: true,
+            code: true,
+            jsCode: true,
+            javascript: true,
+            status: true,
+            userId: true,
+            validationScore: true,
+            generationTime: true,
+            retryCount: true,
+            tokensUsed: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
       },
       orderBy: {
         addedAt: 'desc',
       },
     });
 
-    return NextResponse.json({ projects });
+    function serializeProject(workspaceProject: {
+      id: string;
+      workspaceId: string;
+      projectId: string;
+      permission: string;
+      addedBy: string | null;
+      addedAt: Date;
+      project?: {
+        id: string;
+        name: string;
+        description: string | null;
+        html: string | null;
+        css: string | null;
+        code: string | null;
+        jsCode: string | null;
+        javascript: string | null;
+        status: string;
+        userId: string;
+        validationScore: number | bigint | null;
+        generationTime: number | bigint | null;
+        retryCount: number | bigint | null;
+        tokensUsed: number | bigint | null;
+        createdAt: Date;
+        updatedAt: Date;
+      } | null;
+    }) {
+      if (!workspaceProject.project) return workspaceProject;
+      return {
+        ...workspaceProject,
+        project: {
+          ...workspaceProject.project,
+          generationTime: workspaceProject.project.generationTime ? Number(workspaceProject.project.generationTime) : null,
+          retryCount: workspaceProject.project.retryCount ? Number(workspaceProject.project.retryCount) : null,
+          tokensUsed: workspaceProject.project.tokensUsed ? Number(workspaceProject.project.tokensUsed) : null,
+          validationScore: workspaceProject.project.validationScore ? Number(workspaceProject.project.validationScore) : null,
+        }
+      };
+    }
+    const serializedProjects = projects.map(serializeProject);
+    return NextResponse.json({ projects: serializedProjects });
   } catch (error) {
     console.error('Error fetching workspace projects:', error);
     return NextResponse.json(

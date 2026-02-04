@@ -175,7 +175,7 @@ model DatabaseConnection {
   Project            Project?        @relation(fields: [projectId], references: [id], onDelete: Cascade)
   User               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   DatabaseTable      DatabaseTable[]
-  config            Json?
+  config             Json?
 
   @@index([projectId])
   @@index([userId])
@@ -444,60 +444,61 @@ model PasswordHistory {
 }
 
 model Project {
-  id                  String                @id @default(cuid())
-  userId              String
-  name                String
-  description         String?
-  type                String
-  code                String
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @default(now()) @updatedAt
-  downloads           Int                   @default(0)
-  framework           String?
-  isPublic            Boolean               @default(false)
-  isPublished         Boolean               @default(false)
-  publishedAt         DateTime?
-  publicSlug          String?               @unique
-  publicUrl           String?
-  language            String?
-  prompt              String?
-  shareToken          String?               @unique
-  tags                String[]              @default([])
-  views               Int                   @default(0)
-  multiPage           Boolean               @default(false)
-  cssCode             String?
-  errorMessage        String?
-  htmlCode            String?
-  jsCode              String?
-  status              ProjectStatus         @default(DRAFT)
-  html                String?
-  css                 String?
-  javascript          String?
-  hasCss              Boolean?              @default(false)
-  hasHtml             Boolean?              @default(false)
-  hasJavaScript       Boolean?              @default(false)
-  isComplete          Boolean?              @default(false)
-  jsError             String?
-  jsValid             Boolean?              @default(true)
-  validationPassed    Boolean?              @default(false)
-  validationScore     BigInt?               @default(0)
-  validationErrors    Json?
-  validationWarnings  Json?
-  cspViolations       Json?
-  generationTime      BigInt?               @default(0)
-  lastModified        DateTime?
-  retryCount          BigInt?               @default(0)
-  tokensUsed          BigInt?               @default(0)
-  ApiEndpoint         ApiEndpoint[]
-  CustomDomain        CustomDomain[]
-  DatabaseConnection  DatabaseConnection?
-  Deployment          Deployment[]
+  id         String   @id @default(uuid())
+  userId     String
+  name       String
+  code       String
+  description String?
+  type        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  downloads   Int      @default(0)
+  framework   String?
+  isPublic    Boolean  @default(false)
+  isPublished Boolean  @default(false)
+  publishedAt  DateTime?
+  publicSlug   String?  @unique
+  publicUrl    String?
+  language    String?
+  prompt      String?
+  shareToken  String?  @unique
+  tags         String[] @default([])
+  views        Int      @default(0)
+  multiPage    Boolean  @default(false)
+  cssCode      String?
+  errorMessage String?
+  htmlCode     String?
+  jsCode       String?
+  status        ProjectStatus @default(DRAFT)
+  html          String?
+  css           String?
+  javascript    String?
+  hasCss         Boolean?  @default(false)
+  hasHtml        Boolean?  @default(false)
+  hasJavaScript  Boolean?  @default(false)
+  isComplete     Boolean?  @default(false)
+  jsError         String?
+  jsValid         Boolean?  @default(true)
+  validationPassed Boolean?  @default(false)
+  validationScore  BigInt?  @default(0)
+  validationErrors Json?
+  validationWarnings Json?
+  cspViolations    Json?
+  generationTime   BigInt?  @default(0)
+  lastModified     DateTime?
+  retryCount       BigInt?  @default(0)
+  tokensUsed       BigInt?  @default(0)
+  ApiEndpoint      ApiEndpoint[]
+  CustomDomain      CustomDomain[]
+  DatabaseConnection DatabaseConnection?
+  Deployment        Deployment[]
   EnvironmentVariable EnvironmentVariable[]
-  FormSubmission      FormSubmission[]
-  Page                Page[]
-  User                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ProjectShare        ProjectShare[]
+  FormSubmission    FormSubmission[]
+  Page              Page[]
+  User              User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ProjectShare       ProjectShare[]
   ProjectVersion      ProjectVersion[]
+  WorkspaceProject    WorkspaceProject[]
 
   @@index([isPublic])
   @@index([isPublished])
@@ -609,10 +610,10 @@ model Template {
   status           TemplateStatus     @default(DRAFT)
   thumbnail        String?
   category         String
-    validationScore     BigInt?               @default(0)
-    generationTime      BigInt?               @default(0)
-    retryCount          BigInt?               @default(0)
-    tokensUsed          BigInt?               @default(0)
+  validationScore  BigInt?            @default(0)
+  generationTime   BigInt?            @default(0)
+  retryCount       BigInt?            @default(0)
+  tokensUsed       BigInt?            @default(0)
   reviewCount      Int                @default(0)
   creatorId        String
   createdAt        DateTime           @default(now())
@@ -858,6 +859,7 @@ model WorkspaceProject {
   addedAt     DateTime  @default(now())
   addedBy     String?
   Workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, projectId])
   @@index([projectId])
@@ -1081,7 +1083,6 @@ model oauth_consents {
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model one_time_tokens {
   id         String              @id @db.Uuid
   user_id    String              @db.Uuid
@@ -1121,8 +1122,6 @@ model refresh_tokens {
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model saml_providers {
   id                String        @id @db.Uuid
   sso_provider_id   String        @db.Uuid
@@ -1140,8 +1139,6 @@ model saml_providers {
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model saml_relay_states {
   id              String        @id @db.Uuid
   sso_provider_id String        @db.Uuid
@@ -1169,9 +1166,6 @@ model schema_migrations {
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model sessions {
   id                     String           @id @db.Uuid
   user_id                String           @db.Uuid
@@ -1201,9 +1195,6 @@ model sessions {
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model sso_domains {
   id              String        @id @db.Uuid
   sso_provider_id String        @db.Uuid
@@ -1217,9 +1208,6 @@ model sso_domains {
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model sso_providers {
   id                String              @id @db.Uuid
   resource_id       String?
@@ -1235,9 +1223,6 @@ model sso_providers {
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model users {
   instance_id                 String?                @db.Uuid
   id                          String                 @id @db.Uuid

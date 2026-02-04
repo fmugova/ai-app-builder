@@ -1,150 +1,114 @@
-'use client'
+'use client';
 
-import { useEffect, useState, useRef } from 'react'
-import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
+import React, { useMemo } from 'react';
 
-import type { ValidationMessage } from '@/lib/validators'
-interface ValidationResult {
-  isComplete: boolean
-  hasHtml: boolean
-  hasCss: boolean
-  hasJs: boolean
-  validationScore: number
-  validationPassed: boolean
-  errors: ValidationMessage[]
-  warnings: ValidationMessage[]
-  cspViolations: string[]
-  passed: boolean
+interface PreviewClientProps {
+  code: string;
+  projectName: string;
 }
 
-interface PreviewFrameProps {
-  html: string
-  css: string
-  js: string
-  validation: ValidationResult
-}
+export default function PreviewClient({ code, projectName }: PreviewClientProps) {
+  // Sanitize and prepare code for iframe
+  const sanitizedCode = useMemo(() => {
+    let sanitized = code.trim();
 
-export default function PreviewFrame({ html, css, js, validation }: PreviewFrameProps) {
-  const [iframeError, setIframeError] = useState(false)
-  const iframeRef = useRef<HTMLIFrameElement>(null)
-
-  useEffect(() => {
-    if (!iframeRef.current) return
-
-    try {
-      const iframe = iframeRef.current
-      const doc = iframe.contentDocument || iframe.contentWindow?.document
-
-      if (!doc) {
-        setTimeout(() => setIframeError(true), 0)
-        return
-      }
-
-      // Build complete HTML document
-      const fullHTML = `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <style>${css}</style>
-        </head>
-        <body>
-          ${html}
-          <script>${js}</script>
-        </body>
-        </html>
-      `
-
-      doc.open()
-      doc.write(fullHTML)
-      doc.close()
-
-      setTimeout(() => setIframeError(false), 0)
-    } catch (error) {
-      console.error('Preview error:', error)
-      setTimeout(() => setIframeError(true), 0)
+    // Ensure DOCTYPE exists
+    if (!sanitized.startsWith('<!DOCTYPE')) {
+      sanitized = `<!DOCTYPE html>\n${sanitized}`;
     }
-  }, [html, css, js])
+
+    // Check if Tailwind CDN is needed and missing
+    const hasTailwindClasses = /class="[^"]*(?:flex|grid|p-|m-|text-|bg-|border|rounded|shadow|w-|h-)/i.test(sanitized);
+    const hasTailwindCDN = sanitized.includes('tailwindcss.com') || sanitized.includes('tailwind.min.js');
+    
+    if (hasTailwindClasses && !hasTailwindCDN) {
+      const headEndIndex = sanitized.indexOf('</head>');
+      if (headEndIndex !== -1) {
+        const tailwindScript = '  <script src="https://cdn.tailwindcss.com"></script>\n';
+        sanitized = 
+          sanitized.substring(0, headEndIndex) + 
+          tailwindScript + 
+          sanitized.substring(headEndIndex);
+        console.log('✅ Injected Tailwind CDN');
+      }
+    }
+
+    // Check if Babel is needed for React/JSX
+    const needsBabel = sanitized.includes('type="text/babel"');
+    const hasBabel = sanitized.includes('babel.min.js') || sanitized.includes('@babel/standalone');
+    
+    if (needsBabel && !hasBabel) {
+      const headEndIndex = sanitized.indexOf('</head>');
+      if (headEndIndex !== -1) {
+        const babelScript = '  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>\n';
+        sanitized = 
+          sanitized.substring(0, headEndIndex) + 
+          babelScript + 
+          sanitized.substring(headEndIndex);
+        console.log('✅ Injected Babel standalone');
+      }
+    }
+
+    // Ensure React and ReactDOM for React apps
+    if (needsBabel && !sanitized.includes('react.development.js')) {
+      const headEndIndex = sanitized.indexOf('</head>');
+      if (headEndIndex !== -1) {
+        const reactScripts = `  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>\n`;
+        sanitized = 
+          sanitized.substring(0, headEndIndex) + 
+          reactScripts + 
+          sanitized.substring(headEndIndex);
+        console.log('✅ Injected React libraries');
+      }
+    }
+
+    return sanitized;
+  }, [code]);
 
   return (
-    <div className="absolute inset-0 flex flex-col bg-white">
-      {/* Validation Status Bar */}
-      {(!validation.validationPassed || validation.errors.length > 0) && (
-        <div className="bg-yellow-50 border-b border-yellow-200 p-3">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-yellow-800">
-                Code Quality Issues Detected
-              </p>
-              {validation.errors.length > 0 && (
-                <ul className="mt-2 space-y-1">
-                  {validation.errors.slice(0, 3).map((error, i) => (
-                    <li key={i} className="text-xs text-yellow-700 flex items-start gap-2">
-                      <XCircle className="w-3 h-3 flex-shrink-0 mt-0.5" />
-                      <span>{error.message}</span>
-                    </li>
-                  ))}
-                  {validation.errors.length > 3 && (
-                    <li className="text-xs text-yellow-600">
-                      + {validation.errors.length - 3} more errors
-                    </li>
-                  )}
-                </ul>
-              )}
-              {validation.warnings.length > 0 && (
-                <ul className="mt-2 space-y-1">
-                  {validation.warnings.slice(0, 2).map((warning, i) => (
-                    <li key={i} className="text-xs text-yellow-600 flex items-start gap-2">
-                      <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />
-                      <span>{warning.message}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+    <div className="w-full h-screen bg-gray-100 flex flex-col">
+      {/* Header */}
+      <div className="bg-white border-b shadow-sm px-6 py-4 flex items-center justify-between z-10">
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">{projectName}</h1>
+            <p className="text-sm text-gray-500">Live Preview</p>
           </div>
         </div>
-      )}
-
-      {validation.validationPassed && validation.errors.length === 0 && (
-        <div className="bg-green-50 border-b border-green-200 p-2">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="w-4 h-4 text-green-600" />
-            <span className="text-sm text-green-800 font-medium">
-              Code validated successfully
-            </span>
-            <span className="text-xs text-green-600 ml-auto">
-              Score: {validation.validationScore}/100
-            </span>
-          </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              const blob = new Blob([sanitizedCode], { type: 'text/html' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `${projectName.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.html`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          >
+            Download HTML
+          </button>
+          <button
+            onClick={() => window.close()}
+            className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+          >
+            Close
+          </button>
         </div>
-      )}
+      </div>
 
-      {/* Preview Frame */}
-      <div className="flex-1 relative overflow-hidden">
-        {iframeError ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-            <div className="text-center">
-              <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                Preview Error
-              </h3>
-              <p className="text-gray-600 text-sm">
-                Unable to render preview. Please check the console for errors.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <iframe
-            ref={iframeRef}
-            title="Preview"
-            className="w-full h-full border-0"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"
-          />
-        )}
+      {/* Preview iframe */}
+      <div className="flex-1 overflow-hidden">
+        <iframe
+          srcDoc={sanitizedCode}
+          className="w-full h-full border-0"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox"
+          title={`Preview: ${projectName}`}
+        />
       </div>
     </div>
-  )
+  );
 }

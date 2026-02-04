@@ -7,6 +7,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { PrismaClient } from '@prisma/client'
 import { CodeValidator } from '@/lib/validators'
+import { processGeneratedCode } from '@/utils/extractInlineStyles.server'
+import { BUILDFLOW_SYSTEM_PROMPT } from '@/lib/system-prompt'
 
 const prisma = new PrismaClient()
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
@@ -39,21 +41,8 @@ export async function POST(req: NextRequest) {
 
         try {
           // ✅ ENHANCED SYSTEM PROMPT - Avoid inline styles
-          const systemPrompt = `You are an expert web developer. Generate complete, production-ready HTML code.
-
-CRITICAL REQUIREMENTS:
-1. Generate ONLY complete, valid HTML with <!DOCTYPE html>
-2. Include ALL necessary CSS in <style> tags in <head> - NO inline style attributes
-3. Include ALL JavaScript in <script> tags at end of <body>
-4. Make it responsive and beautiful with modern design
-5. Include proper meta tags (viewport, charset, description)
-6. Use CSS classes instead of inline styles (style="...")
-7. NO placeholders - everything must be complete and functional
-8. Ensure good accessibility (alt text, ARIA labels, semantic HTML)
-
-IMPORTANT: Avoid inline style attributes to prevent CSP violations. Put all styles in <style> tags.
-
-Output ONLY the HTML code, no explanations.`
+          // Use the improved system prompt from lib/system-prompt
+          const systemPrompt = BUILDFLOW_SYSTEM_PROMPT;
 
           let generatedHtml = ''
           let tokenCount = 0
@@ -64,8 +53,12 @@ Output ONLY the HTML code, no explanations.`
             model: 'claude-sonnet-4-20250514',
             max_tokens: 8000,
             temperature: 1,
-            system: systemPrompt,
-            messages: [{ role: 'user', content: prompt }],
+            messages: [
+              {
+                role: 'user',
+                content: BUILDFLOW_SYSTEM_PROMPT + '\n\n' + prompt
+              }
+            ],
             stream: true,
           })
 
@@ -82,6 +75,15 @@ Output ONLY the HTML code, no explanations.`
           // Clean code
           let html = generatedHtml.trim().replace(/^```html?\n?/i, '').replace(/\n?```$/i, '')
           if (!html.toLowerCase().includes('<!doctype html>')) html = '<!DOCTYPE html>\n' + html
+
+          // --- INLINE STYLE EXTRACTION ---
+          // Extract CSS from HTML and combine with any generated CSS (if you have it)
+          // For this route, assume only HTML is generated, so pass empty string for CSS
+          const { html: cleanHtml, css: combinedCss, hasInlineStyles } = processGeneratedCode(html, '')
+
+          if (hasInlineStyles) {
+            console.log('✅ Extracted inline styles to CSS')
+          }
 
           const hasHtml = html.length > 0
           const hasCss = html.includes('<style')
@@ -161,11 +163,12 @@ Output ONLY the HTML code, no explanations.`
             await prisma.project.update({
               where: { id: savedProjectId },
               data: {
-                code: html,
-                html,
-                htmlCode: html,
+                code: cleanHtml,
+                html: cleanHtml,
+                htmlCode: cleanHtml,
+                css: combinedCss,
                 hasHtml,
-                hasCss,
+                hasCss: combinedCss.length > 0,
                 hasJavaScript,
                 isComplete: true,
                 jsValid: true,
@@ -182,7 +185,7 @@ Output ONLY the HTML code, no explanations.`
             console.log('✅ Project updated successfully')
           }
 
-          send({ type: 'html', content: html })
+          send({ type: 'html', content: cleanHtml })
           send({
             type: 'complete',
             projectId: savedProjectId,

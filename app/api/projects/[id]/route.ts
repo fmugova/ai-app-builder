@@ -1,18 +1,47 @@
 // app/api/projects/[id]/route.ts
-// ✅ FIXED: Handles async params in Next.js 15+
+// ✅ FIXED: Handles async params + BigInt serialization
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+// Helper to convert BigInt to Number
+type ProjectType = {
+  id: string
+  name: string
+  description?: string | null
+  html?: string | null
+  css?: string | null
+  javascript?: string | null
+  status?: string | null
+  userId: string
+  validationScore?: bigint | number | null
+  generationTime?: bigint | number | null
+  retryCount?: bigint | number | null
+  tokensUsed?: bigint | number | null
+  createdAt?: Date
+  updatedAt?: Date
+  // Add any other fields your Project model has
+}
+
+function serializeProject(project: ProjectType) {
+  return {
+    ...project,
+    validationScore: project.validationScore ? Number(project.validationScore) : null,
+    generationTime: project.generationTime ? Number(project.generationTime) : null,
+    retryCount: project.retryCount ? Number(project.retryCount) : null,
+    tokensUsed: project.tokensUsed ? Number(project.tokensUsed) : null,
+  }
+}
+
 // GET - Fetch single project
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }  // ✅ params is a Promise in Next.js 15+
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params  // ✅ Await params first
+    const { id } = await params  // ✅ Await params for Next.js 15
     
     const session = await getServerSession(authOptions)
     
@@ -29,7 +58,7 @@ export async function GET(
     }
 
     const project = await prisma.project.findUnique({
-      where: { id }  // ✅ Use id, not params.id
+      where: { id }
     })
 
     if (!project) {
@@ -40,7 +69,10 @@ export async function GET(
       return NextResponse.json({ error: 'Access denied' }, { status: 403 })
     }
 
-    return NextResponse.json({ project })
+    // ✅ Convert BigInt to Number before returning
+    const serializedProject = serializeProject(project)
+
+    return NextResponse.json({ project: serializedProject })
 
   } catch (error) {
     console.error('Get project error:', error)
@@ -54,10 +86,10 @@ export async function GET(
 // PATCH - Update project (partial)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }  // ✅ params is a Promise
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params  // ✅ Await params first
+    const { id } = await params  // ✅ Await params
     
     const session = await getServerSession(authOptions)
     
@@ -74,7 +106,7 @@ export async function PATCH(
     }
 
     const project = await prisma.project.findUnique({
-      where: { id }  // ✅ Use id, not params.id
+      where: { id }
     })
 
     if (!project) {
@@ -86,36 +118,45 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const { name, description, html, css, js, status } = body
+    const { name, description, html, css, js, javascript, status } = body
 
     const updatedProject = await prisma.project.update({
-      where: { id },  // ✅ Use id, not params.id
+      where: { id },
       data: {
         ...(name !== undefined && { name }),
         ...(description !== undefined && { description }),
         ...(html !== undefined && { html }),
         ...(css !== undefined && { css }),
-        ...(js !== undefined && { js }),
+        ...(js !== undefined && { javascript: js }),
+        ...(javascript !== undefined && { javascript }),
         ...(status !== undefined && { status }),
         updatedAt: new Date()
       }
     })
 
     // Log activity
-    await prisma.activity.create({
-      data: {
-        userId: user.id,
-        type: 'project',
-        action: 'Project updated',
-        metadata: {
-          projectId: updatedProject.id,
-          projectName: updatedProject.name
+    try {
+      await prisma.activity.create({
+        data: {
+          userId: user.id,
+          type: 'project',
+          action: 'Project updated',
+          metadata: {
+            projectId: updatedProject.id,
+            projectName: updatedProject.name
+          }
         }
-      }
-    })
+      })
+    } catch (activityError) {
+      // Activity logging is optional, don't fail the request
+      console.warn('Failed to log activity:', activityError)
+    }
+
+    // ✅ Convert BigInt before returning
+    const serializedProject = serializeProject(updatedProject)
 
     return NextResponse.json({ 
-      project: convertBigInt(updatedProject),
+      project: serializedProject,
       message: 'Project updated successfully' 
     })
 
@@ -131,7 +172,7 @@ export async function PATCH(
 // PUT - Full update (alias for PATCH)
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }  // ✅ params is a Promise
+  { params }: { params: Promise<{ id: string }> }
 ) {
   return PATCH(request, { params })
 }
@@ -139,10 +180,10 @@ export async function PUT(
 // DELETE - Delete project
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }  // ✅ params is a Promise
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params  // ✅ Await params first
+    const { id } = await params  // ✅ Await params
     
     const session = await getServerSession(authOptions)
     
@@ -159,7 +200,7 @@ export async function DELETE(
     }
 
     const project = await prisma.project.findUnique({
-      where: { id }  // ✅ Use id, not params.id
+      where: { id }
     })
 
     if (!project) {
@@ -171,21 +212,25 @@ export async function DELETE(
     }
 
     await prisma.project.delete({
-      where: { id }  // ✅ Use id, not params.id
+      where: { id }
     })
 
     // Log activity
-    await prisma.activity.create({
-      data: {
-        userId: user.id,
-        type: 'project',
-        action: 'Project deleted',
-        metadata: {
-          projectId: project.id,
-          projectName: project.name
+    try {
+      await prisma.activity.create({
+        data: {
+          userId: user.id,
+          type: 'project',
+          action: 'Project deleted',
+          metadata: {
+            projectId: project.id,
+            projectName: project.name
+          }
         }
-      }
-    })
+      })
+    } catch (activityError) {
+      console.warn('Failed to log activity:', activityError)
+    }
 
     return NextResponse.json({ 
       message: 'Project deleted successfully' 
@@ -198,15 +243,4 @@ export async function DELETE(
       { status: 500 }
     )
   }
-}
-
-function convertBigInt(obj: unknown): unknown {
-  if (Array.isArray(obj)) {
-    return obj.map(convertBigInt)
-  } else if (obj && typeof obj === 'object') {
-    return Object.fromEntries(
-      Object.entries(obj as Record<string, unknown>).map(([k, v]) => [k, typeof v === 'bigint' ? Number(v) : convertBigInt(v)])
-    )
-  }
-  return obj
 }

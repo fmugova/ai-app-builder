@@ -1,7 +1,7 @@
 // lib/validators/code-validator.test.ts
 // Clean test suite for CodeValidator class
 
-import { CodeValidator } from '@/lib/validators'
+import CodeValidator from '@/lib/validators/code-validator'
 
 describe('CodeValidator', () => {
   // ============================================================================

@@ -1,95 +1,76 @@
-// app/preview/[id]/page.tsx
-// FIXED VERSION - Prevents hydration mismatch
+import { notFound } from 'next/navigation';
+import { prisma } from '@/lib/prisma';
+import PreviewClient from './PreviewClient';
 
-'use client'
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
 
-import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
-import { toast, Toaster } from 'react-hot-toast'
+interface PreviewPageProps {
+  params: Promise<{ id: string }>;
+}
 
-export default function PreviewPage() {
-  const params = useParams()
-  const id = params?.id as string
-  
-  const [html, setHtml] = useState<string>('')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+export default async function PreviewPage({ params }: PreviewPageProps) {
+  // Await params (Next.js 15 requirement)
+  const { id } = await params;
 
-  useEffect(() => {
-    const fetchProject = async () => {
-      try {
-        const response = await fetch(`/api/projects/${id}`)
-        const data = await response.json()
+  let project = null;
+  let dbError = false;
 
-        if (response.ok) {
-          const code = data.code || data.html || data.htmlCode || ''
-          if (code) {
-            setHtml(code)
-          } else {
-            setError('No code found in this project')
-          }
-        } else {
-          setError(data.error || 'Failed to load project')
-        }
-      } catch (err) {
-        console.error('Preview error:', err)
-        setError('Failed to load preview')
-      } finally {
-        setLoading(false)
-      }
+  try {
+    // Fetch project from database
+    project = await prisma.project.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        userId: true,
+        createdAt: true,
+      },
+    });
+  } catch (error) {
+    console.error('Error loading preview:', error);
+    if (error instanceof Error && error.message.includes('Prisma')) {
+      dbError = true;
+    } else {
+      notFound();
     }
-
-    if (id) {
-      fetchProject()
-    }
-  }, [id])
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading preview...</p>
-        </div>
-      </div>
-    )
   }
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <Toaster position="top-right" />
-        <div className="text-center">
-          <div className="text-4xl mb-4">⚠️</div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Preview Error</h2>
-          <p className="text-gray-600">{error}</p>
-        </div>
-      </div>
-    )
+  // Project not found
+  if (!project && !dbError) {
+    notFound();
   }
 
-  if (!html) {
+  // Database error
+  if (dbError) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+      <div className="w-full h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="text-4xl mb-4">📄</div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">No Preview Available</h2>
-          <p className="text-gray-600">This project doesn't have any code yet</p>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Database Error</h2>
+          <p className="text-gray-600">Unable to load project. Please try again later.</p>
         </div>
       </div>
-    )
+    );
   }
 
-  // ✅ FIX: Render HTML in iframe to avoid hydration issues
-  return (
-    <>
-      <Toaster position="top-right" />
-      <iframe
-        srcDoc={html}
-        className="w-full h-screen border-0"
-        title="Project Preview"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
-      />
-    </>
-  )
+  // Project has no code
+  if (project && !project.code) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">No Code Available</h2>
+          <p className="text-gray-600">This project doesn&apos;t have any generated code yet.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Render preview
+  if (project && project.code) {
+    return <PreviewClient code={project.code} projectName={project.name} />;
+  }
+
+  // Fallback
+  notFound();
 }
