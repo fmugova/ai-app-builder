@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     // Find the project
     const project = await prisma.project.findUnique({
       where: { id: projectId },
-      include: { user: true },
+      include: { User: true },
     });
 
     if (!project) {
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify ownership
-    if (project.user.email !== session.user.email) {
+    if (project.User.email !== session.user.email) {
       return NextResponse.json(
         { error: 'Unauthorized - you do not own this project' },
         { status: 403 }
