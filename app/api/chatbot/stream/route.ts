@@ -10,6 +10,7 @@ import { CodeValidator } from '@/lib/validators'
 import { processGeneratedCode } from '@/utils/extractInlineStyles.server'
 import { BUILDFLOW_SYSTEM_PROMPT } from '@/lib/system-prompt'
 import { completeIncompleteHTML } from '@/lib/code-parser'
+import { enhanceGeneratedCode } from '@/lib/code-enhancer'
 
 const prisma = new PrismaClient()
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
@@ -147,14 +148,37 @@ export async function POST(req: NextRequest) {
             console.log('✅ Converted inline handlers to addEventListener')
           }
 
+          // Auto-enhance code with quality improvements
+          const enhanced = enhanceGeneratedCode(
+            cleanHtml,
+            combinedCss,
+            '',
+            {
+              addMediaQueries: true,
+              addFocusStyles: true,
+              addCSSVariables: false,
+              addFormLabels: true,
+              addARIA: true,
+              addReducedMotion: true,
+            }
+          )
+
+          if (enhanced.enhancements.length > 0) {
+            console.log('✨ Code enhancements applied:', enhanced.enhancements)
+          }
+
+          // Use enhanced code for validation
+          const finalHtml = enhanced.html
+          const finalCss = enhanced.css
+
           const hasHtml = html.length > 0
-          const hasCss = html.includes('<style') || combinedCss.length > 0
+          const hasCss = html.includes('<style') || finalCss.length > 0
           const hasJavaScript = html.includes('<script')
 
           console.log('📊 Running validation...')
 
           const validator = new CodeValidator()
-          const validationResult = validator.validateAll(cleanHtml, combinedCss, '') as ValidationResult
+          const validationResult = validator.validateAll(finalHtml, finalCss, '') as ValidationResult
 
           // Ensure validation result has proper structure
           const safeValidation: ValidationResult = {
@@ -214,11 +238,11 @@ export async function POST(req: NextRequest) {
                 userId: user.id,
                 name: prompt.slice(0, 50) || 'New Project',
                 description: prompt.slice(0, 200) || '',
-                code: cleanHtml,
-                html: cleanHtml,
-                htmlCode: cleanHtml,
-                css: combinedCss,
-                cssCode: combinedCss,
+                code: finalHtml,
+                html: finalHtml,
+                htmlCode: finalHtml,
+                css: finalCss,
+                cssCode: finalCss,
                 type: 'landing-page',
                 hasHtml,
                 hasCss,
@@ -246,11 +270,11 @@ export async function POST(req: NextRequest) {
             await prisma.project.update({
               where: { id: savedProjectId, userId: user.id },
               data: {
-                code: cleanHtml,
-                html: cleanHtml,
-                htmlCode: cleanHtml,
-                css: combinedCss,
-                cssCode: combinedCss,
+                code: finalHtml,
+                html: finalHtml,
+                htmlCode: finalHtml,
+                css: finalCss,
+                cssCode: finalCss,
                 hasHtml,
                 hasCss,
                 hasJavaScript,

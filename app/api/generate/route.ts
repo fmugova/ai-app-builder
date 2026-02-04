@@ -7,6 +7,7 @@ import type { MessageCreateParams } from '@anthropic-ai/sdk/resources/messages'
 import type { Stream } from '@anthropic-ai/sdk/streaming'
 import prisma from '@/lib/prisma'
 import { parseGeneratedCode, analyzeCodeQuality, checkCSPViolations, completeIncompleteHTML } from '@/lib/code-parser'
+import { enhanceGeneratedCode } from '@/lib/code-enhancer'
 import { ProjectStatus } from '@prisma/client'
 import { apiQueue } from '@/lib/api-queue'
 
@@ -394,6 +395,30 @@ export async function POST(req: NextRequest) {
               warningsCount: quality.warnings.length
             })
           }
+
+          // Auto-enhance code with quality improvements
+          const enhanced = enhanceGeneratedCode(
+            parsed.html || '',
+            parsed.css || '',
+            parsed.javascript || '',
+            {
+              addMediaQueries: true,
+              addFocusStyles: true,
+              addCSSVariables: false, // Keep disabled for now
+              addFormLabels: true,
+              addARIA: true,
+              addReducedMotion: true,
+            }
+          )
+
+          if (enhanced.enhancements.length > 0 && process.env.NODE_ENV === 'development') {
+            console.log('✨ Code enhancements applied:', enhanced.enhancements)
+          }
+
+          // Update parsed with enhanced code
+          parsed.html = enhanced.html
+          parsed.css = enhanced.css
+          parsed.javascript = enhanced.js
 
           // Combine HTML, CSS, and JavaScript into a single complete HTML file
           let completeHtml = ''
