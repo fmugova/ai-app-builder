@@ -540,7 +540,7 @@ Ensure:
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="Example: Create a modern CRM dashboard with contacts, deals, and analytics pages..."
-                className="w-full h-40 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                className="w-full h-40 p-4 text-gray-900 placeholder-gray-500 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
                 disabled={state.isGenerating}
               />
               
@@ -605,7 +605,7 @@ Ensure:
                 </div>
 
                 <div className="mt-4 pt-4 border-t border-gray-200">
-                  <h3 className="text-sm font-medium text-gray-700 mb-3">Publish</h3>
+                  <h3 className="text-sm font-medium text-gray-900 mb-3">Publish</h3>
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       onClick={handlePublishGitHub}

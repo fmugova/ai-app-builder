@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useEffect } from 'react'
 import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 
 // ============================================
@@ -56,18 +56,27 @@ const DEFAULT_VALIDATION: ValidationResult = {
 // ============================================
 
 export default function PreviewFrame({ html, css, js, validation }: PreviewFrameProps) {
-  // Provide default validation object if undefined
   const safeValidation = validation || DEFAULT_VALIDATION;
 
-  // Build complete HTML document using useMemo to avoid unnecessary rebuilds
+  // Debug: Log what we're receiving
+  useEffect(() => {
+    console.log('🖼️ PreviewFrame received:', {
+      htmlLength: html?.length || 0,
+      cssLength: css?.length || 0,
+      jsLength: js?.length || 0,
+      htmlPreview: html?.substring(0, 100),
+      validation: safeValidation
+    });
+  }, [html, css, js, safeValidation]);
+
   const fullHTML = useMemo(() => {
-    // Skip if no HTML content
     if (!html?.trim()) {
+      console.warn('⚠️ No HTML content to preview');
       return '';
     }
 
     try {
-      return `<!DOCTYPE html>
+      const result = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -78,12 +87,10 @@ export default function PreviewFrame({ html, css, js, validation }: PreviewFrame
 <body>
   ${html}
   <script>
-    // Global error handler for preview
     window.addEventListener('error', (e) => {
       console.warn('[Preview Error]:', e.message);
     });
 
-    // User's JavaScript
     try {
       ${js || ''}
     } catch (error) {
@@ -92,8 +99,10 @@ export default function PreviewFrame({ html, css, js, validation }: PreviewFrame
   </script>
 </body>
 </html>`;
+      console.log('✅ Preview HTML built successfully');
+      return result;
     } catch (error) {
-      console.error('Error building preview HTML:', error);
+      console.error('❌ Error building preview HTML:', error);
       return '';
     }
   }, [html, css, js]);
