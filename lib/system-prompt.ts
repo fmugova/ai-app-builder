@@ -1093,6 +1093,14 @@ Create a COMPLETE, PRODUCTION-READY, ENTERPRISE-GRADE, MULTI-PAGE application as
 12. Works immediately when opened in a browser
 13. Handles edge cases gracefully
 14. Provides user feedback for all actions
+15. Includes a simple footer with "© BuildFlow 2025" copyright
+
+IMPORTANT OUTPUT RULES:
+- Generate ONLY the clean HTML code
+- DO NOT include technical descriptions, explanations, or feature lists
+- DO NOT include comments about the implementation details
+- DO NOT describe the folder structure, database schema, or architecture
+- Just output the complete, working HTML file - nothing else
 
 Remember: You are building a COMPLETE, ENTERPRISE-GRADE APPLICATION, not a landing page or static website. Think like a senior full-stack developer creating a production SaaS product that real businesses would pay for.`;
 

@@ -8,6 +8,8 @@ export interface EnhancementOptions {
   addFormLabels?: boolean
   addARIA?: boolean
   addReducedMotion?: boolean
+  addCopyrightFooter?: boolean
+  removeTechnicalDescriptions?: boolean
 }
 
 export interface EnhancedCode {
@@ -25,6 +27,16 @@ export class CodeEnhancer {
    */
   enhanceHTML(html: string, options: EnhancementOptions): string {
     let enhanced = html
+
+    // Remove technical descriptions if present
+    if (options.removeTechnicalDescriptions) {
+      enhanced = this.removeTechnicalDescriptions(enhanced)
+    }
+
+    // Add BuildFlow copyright footer
+    if (options.addCopyrightFooter) {
+      enhanced = this.addCopyrightFooter(enhanced)
+    }
 
     // Add form labels for inputs without them
     if (options.addFormLabels) {
@@ -142,6 +154,68 @@ export class CodeEnhancer {
     }
 
     return enhanced
+  }
+
+  /**
+   * Add BuildFlow copyright footer
+   */
+  private addCopyrightFooter(html: string): string {
+    // Check if copyright already exists
+    if (html.includes('BuildFlow 2025') || html.includes('© BuildFlow')) {
+      return html
+    }
+
+    // Add footer before closing body tag
+    const footerHTML = `
+  <!-- Copyright Footer -->
+  <footer class="mt-auto py-4 text-center text-sm text-gray-500 border-t border-gray-200">
+    <p>© BuildFlow 2025. All rights reserved.</p>
+  </footer>`
+
+    const bodyCloseIndex = html.lastIndexOf('</body>')
+    if (bodyCloseIndex !== -1) {
+      const enhanced = html.slice(0, bodyCloseIndex) + footerHTML + '\n' + html.slice(bodyCloseIndex)
+      this.enhancements.push('Added copyright footer')
+      return enhanced
+    }
+
+    return html
+  }
+
+  /**
+   * Remove technical descriptions and feature lists
+   */
+  private removeTechnicalDescriptions(html: string): string {
+    let cleaned = html
+
+    // Remove technical description sections that often appear at the end
+    // Pattern 1: Descriptions starting with "This is a complete" or similar
+    const descriptionPatterns = [
+      /<!--\s*This is a complete.*?-->/gis,
+      /<!--\s*\*\*.*?-->/gis,
+      /<!\[CDATA\[.*?\]\]>/gis,
+      /```.*?```/gis, // Remove any code fence blocks that snuck through
+    ]
+
+    descriptionPatterns.forEach(pattern => {
+      cleaned = cleaned.replace(pattern, '')
+    })
+
+    // Remove long comment blocks with technical details (like in the image)
+    // Look for very long HTML comments (> 500 chars)
+    cleaned = cleaned.replace(/<!--[\s\S]{500,}?-->/g, '')
+
+    // Remove trailing text after </html> that might contain descriptions
+    const htmlEndIndex = cleaned.lastIndexOf('</html>')
+    if (htmlEndIndex !== -1) {
+      cleaned = cleaned.slice(0, htmlEndIndex + 7) // Keep </html> but trim after
+    }
+
+    if (cleaned.length < html.length) {
+      this.enhancements.push('Removed technical descriptions')
+    }
+
+    return cleaned
   }
 
   /**
@@ -325,6 +399,8 @@ select:focus-visible {
       addFormLabels: true,
       addARIA: true,
       addReducedMotion: true,
+      addCopyrightFooter: true,
+      removeTechnicalDescriptions: true,
       ...options,
     }
 
