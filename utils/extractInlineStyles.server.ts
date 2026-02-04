@@ -86,7 +86,7 @@ export function processGeneratedCode(html: string, css: string = ''): {
   
   const combinedCss = [css, extracted.css].filter(Boolean).join('\n\n')
   
-  let cleanHtml = extracted.html
+  const cleanHtml = extracted.html
   const hasInlineHandlers = /on\w+\s*=\s*["'][^"']*["']/i.test(cleanHtml)
   
   return {
