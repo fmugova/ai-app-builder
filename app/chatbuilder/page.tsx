@@ -261,6 +261,13 @@ export default function ChatBuilder() {
               if (data.done) {
                 setState(prev => ({ ...prev, progress: 100, currentStep: 'Complete!' }));
                 toast.success('Generation complete!');
+                
+                // Auto-save if projectId was returned from backend
+                if (data.projectId && !currentProjectId) {
+                  setCurrentProjectId(data.projectId);
+                  console.log('✅ Project auto-saved with ID:', data.projectId);
+                }
+                
                 setTimeout(() => {
                   setState(prev => ({ ...prev, progress: 0, currentStep: '' }));
                 }, 2000);
@@ -361,9 +368,10 @@ Ensure:
       return;
     }
 
+    // Auto-generate project name if empty
+    const finalProjectName = projectName.trim() || prompt.slice(0, 50) || 'Untitled Project';
     if (!projectName.trim()) {
-      toast.error('Please enter a project name');
-      return;
+      setProjectName(finalProjectName);
     }
 
     setSaving(true);
@@ -373,8 +381,8 @@ Ensure:
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: currentProjectId,
-          name: projectName,
+          id: currentProjectId || undefined, // Allow creating new project
+          name: finalProjectName,
           code: state.fullCode,
           validation: state.validation,
         }),
@@ -391,7 +399,7 @@ Ensure:
     } finally {
       setSaving(false);
     }
-  }, [state.fullCode, state.validation, projectName, currentProjectId]);
+  }, [state.fullCode, state.validation, projectName, currentProjectId, prompt]);
 
   const handleDownload = useCallback(() => {
     if (!state.fullCode) {
@@ -503,14 +511,28 @@ Ensure:
     }
   }, [currentProjectId]);
 
-  const handleOpenPreview = useCallback(() => {
+  const handleOpenPreview = useCallback(async () => {
+    // If no projectId, save first
+    if (!currentProjectId && state.fullCode) {
+      toast.loading('Saving project...');
+      await handleSave();
+      toast.dismiss();
+      // Wait a moment for state to update
+      setTimeout(() => {
+        if (currentProjectId) {
+          window.open(`/preview/${currentProjectId}`, '_blank');
+        }
+      }, 500);
+      return;
+    }
+
     if (!currentProjectId) {
-      toast.error('Please save the project first');
+      toast.error('No project to preview');
       return;
     }
 
     window.open(`/preview/${currentProjectId}`, '_blank');
-  }, [currentProjectId]);
+  }, [currentProjectId, state.fullCode, handleSave]);
 
   if (status === 'loading' || isLoadingProject) {
     return (
@@ -881,11 +903,11 @@ Ensure:
 
                   <button
                     onClick={handleOpenPreview}
-                    disabled={!currentProjectId}
+                    disabled={!state.fullCode}
                     className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium transition-colors disabled:opacity-50 text-sm sm:text-base"
                   >
                     <ExternalLink className="w-4 h-4" />
-                    Preview
+                    {!currentProjectId ? 'Save & Preview' : 'Preview'}
                   </button>
                 </div>
 
