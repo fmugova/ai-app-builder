@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { encrypt } from '@/lib/encryption';
 
 export async function GET(request: NextRequest) {
   try {
@@ -67,11 +68,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect('/integrations/github?error=user_fetch');
     }
 
-    // Update user with GitHub credentials
+    // Update user with GitHub credentials (encrypt token for security)
     await prisma.user.update({
       where: { email: session.user.email },
       data: {
-        githubAccessToken: tokenData.access_token,
+        githubAccessToken: encrypt(tokenData.access_token),
         githubUsername: userData.login,
       },
     });

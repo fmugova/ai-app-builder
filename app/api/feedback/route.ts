@@ -2,9 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { z } from 'zod';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
+
+// Validation schema
+const feedbackSchema = z.object({
+  type: z.enum(['bug', 'feature', 'general', 'improvement', 'other']),
+  subject: z.string().min(1, 'Subject is required').max(255),
+  message: z.string().min(1, 'Message is required').max(5000, 'Message too long'),
+  priority: z.enum(['low', 'medium', 'high']).optional()
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,16 +26,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate input
     const body = await request.json();
-    const { type, subject, message, priority } = body;
-
-    // Validate required fields
-    if (!type || !subject || !message) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
+    const { type, subject, message, priority } = feedbackSchema.parse(body);
 
     // Create feedback in database
     const feedback = await prisma.feedback.create({
@@ -55,6 +57,15 @@ export async function POST(request: NextRequest) {
     );
 
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { 
+          error: 'Validation failed', 
+          details: error.errors.map(e => e.message)
+        },
+        { status: 400 }
+      );
+    }
     console.error('Feedback API error:', error);
     return NextResponse.json(
       { error: 'Failed to submit feedback' },
@@ -63,7 +74,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     

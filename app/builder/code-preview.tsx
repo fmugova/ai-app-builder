@@ -81,7 +81,7 @@ export default function CodePreview({
         <iframe
           srcDoc={sanitizeForPreview(code)}
           className="w-full h-full border-0"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
+          sandbox="allow-scripts allow-forms allow-modals"
           title="Live Preview"
         />
       </div>

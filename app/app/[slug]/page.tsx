@@ -1,6 +1,6 @@
-import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
+import DOMPurify from 'isomorphic-dompurify';
 
 interface PageProps {
   params: {
@@ -63,11 +63,19 @@ export default async function PublishedAppPage({ params }: PageProps) {
     );
   }
 
-  // Render the HTML directly
+  // Sanitize user-generated HTML to prevent XSS attacks
+  const sanitizedHtml = DOMPurify.sanitize(htmlContent, {
+    ADD_TAGS: ['script', 'style', 'link'],
+    ADD_ATTR: ['class', 'id', 'style', 'href', 'src', 'alt', 'title', 'data-*'],
+    FORBID_TAGS: ['iframe', 'object', 'embed', 'base'],
+    FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur']
+  });
+
+  // Render the sanitized HTML
   return (
     <div 
       className="min-h-screen"
-      dangerouslySetInnerHTML={{ __html: htmlContent }}
+      dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
     />
   );
 }

@@ -105,7 +105,7 @@ export default function PreviewClient({ code, projectName }: PreviewClientProps)
         <iframe
           srcDoc={sanitizedCode}
           className="w-full h-full border-0"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox"
+          sandbox="allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox"
           title={`Preview: ${projectName}`}
         />
       </div>

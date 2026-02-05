@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
 
     // Construct the published URL
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const publishedUrl = `${baseUrl}/app/${publishSlug}`;
+    const publishedUrl = `${baseUrl}/p/${publishSlug}`;
 
     console.log('✅ Project published to BuildFlow:', publishSlug);
 

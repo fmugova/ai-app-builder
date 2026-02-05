@@ -31,7 +31,7 @@ export default function CodePreviewModal({
       setCopied(true)
       toast.success('Code copied to clipboard!')
       setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
+    } catch {
       toast.error('Failed to copy code')
     }
   }
@@ -114,7 +114,7 @@ export default function CodePreviewModal({
               srcDoc={code}
               className="w-full h-full border-0"
               title="Preview"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
+              sandbox="allow-scripts allow-forms allow-modals"
             />
           )}
         </div>

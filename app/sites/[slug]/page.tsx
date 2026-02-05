@@ -170,7 +170,7 @@ export default function SitePage() {
         srcDoc={site.code}
         className="w-full h-full border-0"
         style={{ marginTop: '40px', height: 'calc(100vh - 40px)' }}
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+        sandbox="allow-scripts allow-forms allow-popups"
         title={site.name}
       />
     </div>

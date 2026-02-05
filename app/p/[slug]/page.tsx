@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import DOMPurify from 'isomorphic-dompurify';
 
 interface SiteData {
   id: string;
@@ -65,6 +66,14 @@ export default function SitePage() {
     );
   }
 
+  // Sanitize user-generated HTML to prevent XSS attacks
+  const sanitizedCode = DOMPurify.sanitize(site.code, {
+    ADD_TAGS: ['script', 'style', 'link'],
+    ADD_ATTR: ['class', 'id', 'style', 'href', 'src', 'alt', 'title', 'data-*'],
+    FORBID_TAGS: ['iframe', 'object', 'embed', 'base'],
+    FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur']
+  });
+
   return (
     <div className="relative h-screen w-full overflow-hidden">
       {/* BuildFlow Banner */}
@@ -85,12 +94,12 @@ export default function SitePage() {
         </div>
       </div>
 
-      {/* Site Content */}
+      {/* Site Content - Sanitized for security */}
       <iframe
-        srcDoc={site.code}
+        srcDoc={sanitizedCode}
         className="w-full h-full border-0"
         style={{ marginTop: "40px", height: "calc(100vh - 40px)" }}
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+        sandbox="allow-scripts allow-forms allow-popups"
         title={site.name}
       />
     </div>

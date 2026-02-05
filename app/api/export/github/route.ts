@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { decrypt } from '@/lib/encryption';
 // Use the main rate-limit utility
 import { checkRateLimit } from '@/lib/rate-limit';
 
@@ -77,6 +78,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Decrypt the GitHub token for API use
+    const githubToken = decrypt(userWithGithub.githubAccessToken);
     
     // Get the project
     const project = await prisma.project.findUnique({
@@ -119,7 +123,7 @@ export async function POST(request: NextRequest) {
       `https://api.github.com/repos/${userWithGithub.githubUsername}/${repoName}`,
       {
         headers: {
-          'Authorization': `Bearer ${userWithGithub.githubAccessToken}`,
+          'Authorization': `Bearer ${githubToken}`,
           'Accept': 'application/vnd.github.v3+json',
         },
       }
@@ -138,7 +142,7 @@ export async function POST(request: NextRequest) {
       const createRepoResponse = await fetch('https://api.github.com/user/repos', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${userWithGithub.githubAccessToken}`,
+          'Authorization': `Bearer ${githubToken}`,
           'Accept': 'application/vnd.github.v3+json',
           'Content-Type': 'application/json',
         },

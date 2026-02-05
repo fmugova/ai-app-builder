@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { decrypt } from '@/lib/encryption'
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,10 +25,8 @@ export async function POST(request: NextRequest) {
       select: { githubAccessToken: true, githubUsername: true }
     })
 
-    const githubToken = user?.githubAccessToken
-    
     // Require user to have connected their own GitHub account
-    if (!githubToken) {
+    if (!user?.githubAccessToken) {
       return NextResponse.json(
         {
           error: 'GitHub not connected. Please connect your GitHub account to export projects to your own repositories.',
@@ -36,6 +35,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Decrypt the GitHub token for use
+    const githubToken = decrypt(user.githubAccessToken)
 
     // Parse request body
     const body = await request.json()

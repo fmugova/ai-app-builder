@@ -1,16 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { sendEmail, getWelcomeEmailHTML } from '@/lib/email'
+import { z } from 'zod'
 
 export const dynamic = 'force-dynamic';
 
+// Validation schema
+const subscribeSchema = z.object({
+  email: z.string().email('Invalid email address').max(255),
+  name: z.string().max(255).optional(),
+  source: z.string().max(100).optional()
+});
+
 export async function POST(request: NextRequest) {
   try {
-    const { email, name, source } = await request.json()
-
-    if (!email) {
-      return NextResponse.json({ error: 'Email is required' }, { status: 400 })
-    }
+    // Validate input
+    const body = await request.json();
+    const { email, name, source } = subscribeSchema.parse(body);
 
     // Check if already subscribed
     const existing = await prisma.newsletterSubscriber.findUnique({
@@ -43,7 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new subscriber
-    const subscriber = await prisma.newsletterSubscriber.create({
+    await prisma.newsletterSubscriber.create({
       data: {
         id: crypto.randomUUID(),
         email,
@@ -95,6 +100,15 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { 
+          error: 'Validation failed', 
+          details: error.errors.map(e => e.message)
+        },
+        { status: 400 }
+      );
+    }
     console.error('Newsletter subscribe error:', error)
     return NextResponse.json({ error: 'Subscription failed' }, { status: 500 })
   }
