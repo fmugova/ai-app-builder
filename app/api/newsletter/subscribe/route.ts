@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { checkRateLimit } from '@/lib/rate-limit'
+import { sendEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +15,22 @@ const subscribeSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting
+    const identifier = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                      request.headers.get('x-real-ip') || 
+                      'anonymous';
+    const rateLimit = await checkRateLimit(request, 'newsletter', identifier);
+    
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { 
+          error: 'Too many subscription attempts. Please try again later.',
+          resetAt: new Date(rateLimit.reset).toISOString()
+        },
+        { status: 429 }
+      );
+    }
+
     // Validate input
     const body = await request.json();
     const { email, name, source } = subscribeSchema.parse(body);
@@ -101,10 +119,11 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     if (error instanceof z.ZodError) {
+      const zodError = error as z.ZodError;
       return NextResponse.json(
         { 
           error: 'Validation failed', 
-          details: error.errors.map(e => e.message)
+          details: zodError.issues.map(e => e.message)
         },
         { status: 400 }
       );

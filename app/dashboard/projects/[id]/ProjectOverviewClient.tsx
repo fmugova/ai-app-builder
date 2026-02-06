@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import PreviewFrameMultiPage from '@/components/PreviewFrameMultiPage'
+import PreviewFrame from '@/components/PreviewFrame'
 
 interface Project {
   id: string
@@ -17,11 +19,25 @@ interface Project {
   updatedAt: string
 }
 
-interface ProjectOverviewClientProps {
-  project: Project
+interface Page {
+  id: string
+  slug: string
+  title: string
+  content: string
+  description: string | null
+  metaTitle: string | null
+  metaDescription: string | null
+  isHomepage: boolean
+  order: number
+  isPublished: boolean
 }
 
-export default function ProjectOverviewClient({ project }: ProjectOverviewClientProps) {
+interface ProjectOverviewClientProps {
+  project: Project
+  pages?: Page[]
+}
+
+export default function ProjectOverviewClient({ project, pages = [] }: ProjectOverviewClientProps) {
   const router = useRouter()
   const [isDeleting, setIsDeleting] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
@@ -309,6 +325,21 @@ export default function ProjectOverviewClient({ project }: ProjectOverviewClient
                   </a>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Live Preview */}
+        {pages.length > 0 && (
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Live Preview</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Multi-page application with {pages.length} page{pages.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+            <div className="h-[600px] bg-gray-50 dark:bg-gray-900">
+              <PreviewFrameMultiPage pages={pages} />
             </div>
           </div>
         )}

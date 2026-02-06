@@ -109,7 +109,19 @@ class CodeValidator {
 
     // Check for h1
     if (!html.match(/<h1[^>]*>/)) {
+      // Log a sample of the HTML to debug
+      const htmlSample = html.slice(0, 2000)
+      console.log('⚠️ NO H1 FOUND - HTML Sample (first 2000 chars):')
+      console.log(htmlSample)
+      console.log('...')
       this.addError('accessibility', 'Missing h1 heading for page title', 'high')
+    } else {
+      // Log success for debugging
+      const h1Matches = html.match(/<h1[^>]*>.*?<\/h1>/g)
+      console.log('✅ H1 tags found:', h1Matches?.length || 0)
+      if (h1Matches && h1Matches.length > 0) {
+        console.log('First h1:', h1Matches[0].slice(0, 100))
+      }
     }
 
     // Check for multiple h1

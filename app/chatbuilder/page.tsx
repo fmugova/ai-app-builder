@@ -190,17 +190,27 @@ export default function ChatBuilder() {
     }));
     
     try {
+      const requestBody: { prompt: string; projectId?: string } = { prompt };
+      
+      // Only include projectId if it's a valid UUID string
+      if (currentProjectId && currentProjectId.trim()) {
+        requestBody.projectId = currentProjectId;
+      }
+      
       const response = await fetch('/api/chatbot/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          prompt,
-          projectId: currentProjectId,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
-        throw new Error('Generation failed');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Generation API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
+        throw new Error(errorData.error || errorData.details || `Generation failed: ${response.status}`);
       }
 
       setState(prev => ({ ...prev, progress: 10, currentStep: 'Connected to AI...' }));
@@ -284,7 +294,9 @@ export default function ChatBuilder() {
       }
     } catch (error) {
       console.error('Generation error:', error);
-      toast.error('Failed to generate. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate. Please try again.';
+      toast.error(errorMessage);
+      setState(prev => ({ ...prev, progress: 0, currentStep: '' }));
     } finally {
       setState(prev => ({ ...prev, isGenerating: false }));
     }
@@ -388,14 +400,23 @@ Ensure:
         }),
       });
 
-      if (!response.ok) throw new Error('Save failed');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Save failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
+        throw new Error(errorData.error || errorData.details?.[0] || 'Save failed');
+      }
 
       const data = await response.json();
       setCurrentProjectId(data.id);
       toast.success('Project saved successfully!');
     } catch (error) {
       console.error('Save error:', error);
-      toast.error('Failed to save project');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save project';
+      toast.error(errorMessage);
     } finally {
       setSaving(false);
     }

@@ -51,6 +51,16 @@ export default async function ProjectOverviewPage({ params }: ProjectPageProps) 
     redirect('/dashboard?error=Project+not+found')
   }
 
+  // Fetch pages for multi-page preview
+  const pages = await prisma.page.findMany({
+    where: { projectId: id },
+    orderBy: [
+      { isHomepage: 'desc' },
+      { order: 'asc' },
+      { createdAt: 'asc' },
+    ],
+  })
+
   return (
     <>
       {/* Mobile Navigation with project context */}
@@ -75,6 +85,18 @@ export default async function ProjectOverviewPage({ params }: ProjectPageProps) 
             createdAt: project.createdAt.toISOString(),
             updatedAt: project.updatedAt.toISOString(),
           }}
+          pages={pages.map(p => ({
+            id: p.id,
+            slug: p.slug,
+            title: p.title,
+            content: p.content,
+            description: p.description,
+            metaTitle: p.metaTitle,
+            metaDescription: p.metaDescription,
+            isHomepage: p.isHomepage,
+            order: p.order,
+            isPublished: p.isPublished,
+          }))}
         />
       </div>
     </>

@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { createAuditLog, getIpAddress, getUserAgent } from '@/lib/audit-log'
 
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -27,6 +28,17 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         role
       }
     })
+
+    // Audit log
+    await createAuditLog({
+      userId: session.user.id,
+      action: 'admin.user_action',
+      resourceType: 'user',
+      resourceId: id,
+      details: { action: 'update', changes: body },
+      ipAddress: getIpAddress(request.headers),
+      userAgent: getUserAgent(request.headers),
+    });
 
     return NextResponse.json(updatedUser)
   } catch (error) {

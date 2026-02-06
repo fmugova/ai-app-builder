@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkUserRateLimit, createRateLimitResponse } from '@/lib/rate-limit'
+import { z } from 'zod'
+import type { ZodError } from 'zod'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import Anthropic from '@anthropic-ai/sdk'
 import type { MessageCreateParams } from '@anthropic-ai/sdk/resources/messages'
-import type { Stream } from '@anthropic-ai/sdk/streaming'
 import prisma from '@/lib/prisma'
 import { parseGeneratedCode, analyzeCodeQuality, checkCSPViolations, completeIncompleteHTML } from '@/lib/code-parser'
 import { enhanceGeneratedCode } from '@/lib/code-enhancer'
@@ -12,16 +13,20 @@ import { ProjectStatus } from '@prisma/client'
 import { apiQueue } from '@/lib/api-queue'
 
 // ============================================================================
-// TYPES
+// VALIDATION
 // ============================================================================
 
-interface GenerateRequest {
-  prompt: string
-  projectId?: string
-  generationType?: string
-  retryAttempt?: number
-  continuationContext?: string
-}
+const generateRequestSchema = z.object({
+  prompt: z.string().min(1, 'Prompt is required').max(10000, 'Prompt too long'),
+  projectId: z.string().uuid().optional(),
+  generationType: z.string().max(50).optional(),
+  retryAttempt: z.number().int().min(0).max(5).optional(),
+  continuationContext: z.string().max(50000).optional()
+});
+
+// ============================================================================
+// TYPES
+// ============================================================================
 
 interface StreamEvent {
   type: 'content' | 'html' | 'complete' | 'error' | 'retry'
@@ -261,17 +266,11 @@ export async function POST(req: NextRequest) {
     }
 
     // ============================================================================
-    // 4. PROCESS REQUEST
+    // 4. PROCESS REQUEST & VALIDATE INPUT
     // ============================================================================
-    const body: GenerateRequest = await req.json()
-    const { prompt, projectId, generationType = 'webapp', retryAttempt = 0, continuationContext } = body
-
-    if (!prompt) {
-      return NextResponse.json(
-        { error: 'Prompt is required' },
-        { status: 400 }
-      )
-    }
+    const body = await req.json()
+    const validatedData = generateRequestSchema.parse(body);
+    const { prompt, projectId, generationType = 'webapp', retryAttempt = 0, continuationContext } = validatedData;
 
     console.log('🚀 Starting generation:', {
       projectId,
@@ -573,6 +572,18 @@ export async function POST(req: NextRequest) {
     })
 
   } catch (error) {
+    // Handle Zod validation errors
+    if (error instanceof z.ZodError) {
+      const zodError = error as z.ZodError;
+      return NextResponse.json(
+        { 
+          error: 'Validation failed', 
+          details: zodError.issues.map(e => `${e.path.join('.')}: ${e.message}`) 
+        },
+        { status: 400 }
+      );
+    }
+    
     console.error('Generation error:', error)
     return NextResponse.json(
       {

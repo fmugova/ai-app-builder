@@ -6,7 +6,7 @@ export default async function TutorialPage() {
   // Read the tutorial markdown file from the project root
   const tutorialPath = path.join(process.cwd(), 'TUTORIAL_DOCUMENTATION.md')
   const markdown = fs.readFileSync(tutorialPath, 'utf-8')
-  const html = marked.parse(markdown)
+  const html = await marked.parse(markdown)
 
   return (
     <div className="max-w-3xl mx-auto py-8 px-4">

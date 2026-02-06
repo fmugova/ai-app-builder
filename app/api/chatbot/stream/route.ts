@@ -11,6 +11,8 @@ import { processGeneratedCode } from '@/utils/extractInlineStyles.server'
 import { BUILDFLOW_SYSTEM_PROMPT } from '@/lib/system-prompt'
 import { completeIncompleteHTML } from '@/lib/code-parser'
 import { enhanceGeneratedCode } from '@/lib/code-enhancer'
+import { z } from 'zod'
+import type { ZodError } from 'zod'
 
 const prisma = new PrismaClient()
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
@@ -18,8 +20,17 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 export const runtime = 'nodejs'
 export const maxDuration = 300
 
+// Validation schema
+const chatbotRequestSchema = z.object({
+  prompt: z.string().min(1, 'Prompt is required').max(10000, 'Prompt too long'),
+  projectId: z.string().uuid().optional(),
+  conversationHistory: z.array(z.object({
+    role: z.enum(['user', 'assistant']),
+    content: z.string()
+  })).optional()
+});
+
 function getOptimalTokenLimit(prompt: string): number {
-  const baseTokens = 15000
   const isComplexPrompt = prompt.length > 500 || 
                           prompt.includes('dashboard') || 
                           prompt.includes('multiple') ||
@@ -65,11 +76,10 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { prompt, projectId } = body
-
-    if (!prompt || typeof prompt !== 'string') {
-      return new Response('Invalid prompt', { status: 400 })
-    }
+    
+    // Validate input
+    const validatedData = chatbotRequestSchema.parse(body);
+    const { prompt, projectId } = validatedData;
 
     const maxTokens = getOptimalTokenLimit(prompt)
     
@@ -87,6 +97,9 @@ export async function POST(req: NextRequest) {
 
           console.log('📝 Streaming from Claude...')
 
+          // Prepend h1 requirement to user prompt
+          const enhancedPrompt = `⚠️ CRITICAL: Every page in your app MUST have exactly ONE <h1> tag for the main page title. This is mandatory for validation.\n\n${prompt}`
+
           const response = await anthropic.messages.create({
             model: 'claude-sonnet-4-20250514',
             max_tokens: maxTokens,
@@ -94,7 +107,7 @@ export async function POST(req: NextRequest) {
             messages: [
               {
                 role: 'user',
-                content: BUILDFLOW_SYSTEM_PROMPT + '\n\n' + prompt
+                content: BUILDFLOW_SYSTEM_PROMPT + '\n\n' + enhancedPrompt
               }
             ],
             stream: true,
@@ -342,6 +355,18 @@ export async function POST(req: NextRequest) {
       },
     })
   } catch (error) {
+    // Handle Zod validation errors
+    if (error instanceof z.ZodError) {
+      const zodError = error as z.ZodError;
+      return new Response(
+        JSON.stringify({ 
+          error: 'Validation failed', 
+          details: zodError.issues.map(e => e.message) 
+        }), 
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    
     console.error('❌ Route error:', error)
     return new Response(
       JSON.stringify({ 

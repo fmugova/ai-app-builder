@@ -8669,7 +8669,7 @@ yoga-layout@^3.2.1:
   resolved "https://registry.npmjs.org/zod-validation-error/-/zod-validation-error-4.0.2.tgz"
   integrity sha512-Q6/nZLe6jxuU80qb/4uJ4t5v2VEZ44lzQjPDhYJNztRQ4wyWc6VF3D3Kb/fAuPetZQnhS3hnajCf9CsWesghLQ==
 
-"zod@^3.25.0 || ^4.0.0":
-  version "4.3.5"
-  resolved "https://registry.npmjs.org/zod/-/zod-4.3.5.tgz"
-  integrity sha512-k7Nwx6vuWx1IJ9Bjuf4Zt1PEllcwe7cls3VNzm4CQ1/hgtFUK2bRNG3rvnpPUhFjmqJKAKtjV576KnUkHocg/g==
+"zod@^3.25.0 || ^4.0.0", zod@^4.3.6:
+  version "4.3.6"
+  resolved "https://registry.npmjs.org/zod/-/zod-4.3.6.tgz"
+  integrity sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==

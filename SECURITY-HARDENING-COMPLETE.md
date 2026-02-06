@@ -194,23 +194,82 @@ try {
 
 From [SECURITY-UX-AUDIT-REPORT.md](SECURITY-UX-AUDIT-REPORT.md):
 
-### Priority 2 (High)
-- [ ] Add rate limiting to newsletter/feedback endpoints
-- [ ] Add CSRF protection to state-changing operations
-- [ ] Content Security Policy (CSP) headers
+### Priority 2 (High) - ✅ COMPLETE
+- [x] **Add rate limiting to newsletter/feedback endpoints** - Implemented with dedicated rate limiters (3/hour newsletter, 5/hour feedback)
+- [x] **Add CSRF protection to state-changing operations** - Middleware validates origin/referer for all authenticated POST/PUT/DELETE requests
+- [x] **Content Security Policy (CSP) headers** - Comprehensive CSP with whitelisted domains for scripts, styles, and connections
 
-### Priority 3 (Medium)
-- [ ] Add Zod validation to remaining API endpoints:
-  - `app/api/chatbot/stream/route.ts`
-  - `app/api/generate/route.ts`
-  - `app/api/forms/submit/route.ts`
-- [ ] Session token masking in user/sessions endpoint
-- [ ] Audit logging for admin actions
+### Priority 3 (Medium) - ✅ COMPLETE
+- [x] **Add Zod validation to remaining API endpoints:**
+  - [x] `app/api/chatbot/stream/route.ts` - Validates prompt length, projectId, conversation history
+  - [x] `app/api/generate/route.ts` - Validates prompt, retry attempts, continuation context  
+  - [x] `app/api/forms/submit/route.ts` - Validates siteId (UUID), formType, formData size
+- [x] **Session token masking in user/sessions endpoint** - Tokens masked to show only last 8 characters (****xxxx1234)
+- [x] **Audit logging for admin actions** - Audit log utility created, integrated with admin user updates
 
-### Priority 4 (Low)
-- [ ] HTTP Strict Transport Security (HSTS)
-- [ ] X-Content-Type-Options header
-- [ ] Referrer-Policy header
+### Priority 4 (Low) - ✅ COMPLETE
+- [x] **HTTP Strict Transport Security (HSTS)** - max-age=31536000 with includeSubDomains and preload
+- [x] **X-Content-Type-Options header** - nosniff enabled
+- [x] **Referrer-Policy header** - strict-origin-when-cross-origin
+
+---
+
+## 🎉 All Security Priorities COMPLETE!
+
+### Summary of Implementations
+
+#### Rate Limiting
+- **Newsletter**: 3 requests per hour (prevents spam)
+- **Feedback**: 5 requests per hour (prevents abuse)
+- **Infrastructure**: Added to lib/rate-limit.ts with Redis-backed Upstash
+
+#### CSRF Protection
+- **Middleware**: Validates origin/referer headers for all state-changing requests
+- **Location**: Integrated into proxy.ts (Next.js 16+ requirement)
+- **Scope**: Applies to all /api/* routes (except public endpoints like auth, form submissions)
+- **Mode**: Logs warnings in development, blocks in production
+
+#### Content Security Policy
+- **Script sources**: Self, unsafe-eval (for previews), CDN (jsDelivr), Stripe
+- **Style sources**: Self, unsafe-inline (for dynamic styles)
+- **Connect sources**: Whitelisted APIs (Anthropic, GitHub, Vercel)
+- **Frame sources**: Self, Stripe only
+- **Default**: Deny all non-whitelisted sources
+
+#### Security Headers
+- **HSTS**: 1-year max-age with subdomain and preload support
+- **X-Content-Type-Options**: nosniff (prevents MIME sniffing)
+- **Referrer-Policy**: strict-origin-when-cross-origin (privacy-preserving)
+- **X-Frame-Options**: SAMEORIGIN (clickjacking protection)
+- **Permissions-Policy**: Denies camera, microphone, geolocation
+
+#### Input Validation (Zod)
+- **Projects Save**: UUID, name length, 500KB code limit
+- **Newsletter**: Email format, name/source length limits
+- **Feedback**: Enum validation, subject/message length limits
+- **Chatbot Stream**: Prompt validation (1-10,000 chars), optional projectId
+- **Generate**: Prompt validation, retry attempts (max 5), continuation context limits
+- **Forms Submit**: UUID validation, form data size limit (10KB)
+
+#### Session Security
+- **Token Masking**: Session tokens show only last 8 characters in API responses
+- **Format**: `****abcd1234` instead of full token
+- **Scope**: All user session listing endpoints
+
+#### Audit Logging
+- **Utility**: lib/audit-log.ts with typed action enums
+- **Integration**: Admin user updates logged with IP, user agent, changes
+- **Future**: Database storage ready (commented AuditLog model integration)
+- **Development**: Console logging for debugging
+
+---
+
+## Files Created
+
+### Security Infrastructure (2 files)
+1. **(Updated)** **proxy.ts** - CSRF protection integrated into existing Next.js proxy middleware
+2. **lib/audit-log.ts** - Audit logging utility with typed actions
+3. **(Updated)** lib/rate-limit.ts - Added newsletter/feedback rate limiters
 
 ---
 

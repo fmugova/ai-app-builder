@@ -58,6 +58,20 @@ export const rateLimiters = {
     analytics: true,
     prefix: 'ratelimit:general',
   }),
+
+  newsletter: new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(3, '1 h'),
+    analytics: true,
+    prefix: 'ratelimit:newsletter',
+  }),
+
+  feedback: new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(5, '1 h'),
+    analytics: true,
+    prefix: 'ratelimit:feedback',
+  }),
 }
 
 export type RateLimitType = keyof typeof rateLimiters

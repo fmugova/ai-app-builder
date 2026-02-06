@@ -180,7 +180,7 @@ export function CreateEndpointModal({
                   onChange={e => setDescription(e.target.value)}
                   placeholder="Example: Create an endpoint that accepts user registration with name, email, and password. Validate the email format, hash the password with bcrypt, save to database, and send a welcome email."
                   rows={6}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900 placeholder-gray-400"
                 />
               </div>
 
@@ -194,7 +194,7 @@ export function CreateEndpointModal({
                     value={name}
                     onChange={e => setName(e.target.value)}
                     placeholder="User Registration"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-gray-900 placeholder-gray-400"
                   />
                 </div>
 
@@ -205,7 +205,7 @@ export function CreateEndpointModal({
                   <select
                     value={method}
                     onChange={e => setMethod(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-gray-900"
                   >
                     <option value="GET">GET</option>
                     <option value="POST">POST</option>
@@ -225,7 +225,7 @@ export function CreateEndpointModal({
                   value={path}
                   onChange={e => setPath(e.target.value)}
                   placeholder="/api/users/register"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 font-mono"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 font-mono text-gray-900 placeholder-gray-400"
                 />
               </div>
 

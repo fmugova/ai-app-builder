@@ -14,10 +14,16 @@ export async function GET() {
 
     const activeSessions = await getActiveSessions(session.user.id)
 
+    // Mask session tokens for security (show only last 8 characters)
+    const maskToken = (token: string) => {
+      if (!token || token.length < 12) return '****';
+      return `****${token.slice(-8)}`;
+    };
+
     // Format sessions for client
     const formattedSessions = activeSessions.map(s => ({
       id: s.id,
-      sessionToken: s.sessionToken,
+      sessionToken: maskToken(s.sessionToken), // Masked for security
       deviceType: s.deviceType || 'desktop',
       deviceName: s.deviceName || 'Unknown Device',
       ipAddress: s.ipAddress || 'Unknown',

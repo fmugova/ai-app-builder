@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
+      );
+    }
+
+    // Rate limiting
+    const rateLimit = await checkRateLimit(request, 'feedback', session.user.id);
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { 
+          error: 'Too many feedback submissions. Please try again later.',
+          resetAt: new Date(rateLimit.reset).toISOString()
+        },
+        { status: 429 }
       );
     }
 
@@ -58,10 +71,11 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     if (error instanceof z.ZodError) {
+      const zodError = error as z.ZodError;
       return NextResponse.json(
         { 
           error: 'Validation failed', 
-          details: error.errors.map(e => e.message)
+          details: zodError.issues.map(e => e.message)
         },
         { status: 400 }
       );

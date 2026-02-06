@@ -9,6 +9,66 @@ export async function proxy(request: NextRequest) {
   
   const { pathname } = request.nextUrl;
 
+  // ============================================================================
+  // CSRF PROTECTION FOR STATE-CHANGING OPERATIONS
+  // ============================================================================
+  
+  // Skip CSRF check for GET, HEAD, OPTIONS requests
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
+    // Skip CSRF check for specific public endpoints
+    const csrfExemptPaths = [
+      '/api/auth',
+      '/api/forms/submit', // Public form submissions
+    ];
+    
+    const needsCsrfCheck = !csrfExemptPaths.some(path => pathname.startsWith(path));
+    
+    // For state-changing operations on authenticated routes, verify origin
+    if (needsCsrfCheck && token) {
+      const origin = request.headers.get('origin');
+      const host = request.headers.get('host');
+      const referer = request.headers.get('referer');
+      
+      // Check if request is from same origin
+      const expectedOrigins: string[] = [
+        process.env.NEXT_PUBLIC_APP_URL,
+        `https://${host}`,
+        `http://${host}`,
+      ].filter((x): x is string => Boolean(x));
+
+      const isValidOrigin = origin && expectedOrigins.some(expected => 
+        origin === expected || origin.startsWith(expected + '/')
+      );
+      
+      // Type-safe referer check
+      const isValidReferer = referer ? expectedOrigins.some(expected =>
+        (referer as string).startsWith(expected)
+      ) : false;
+
+      // Allow requests from same origin or with valid referer
+      if (!isValidOrigin && !isValidReferer) {
+        console.warn('⚠️ CSRF protection: Invalid origin/referer', {
+          path: pathname,
+          origin,
+          referer,
+          method: request.method,
+        });
+        
+        // In production, block the request
+        if (process.env.NODE_ENV === 'production') {
+          return NextResponse.json(
+            { error: 'Invalid request origin' },
+            { status: 403 }
+          );
+        }
+      }
+    }
+  }
+
+  // ============================================================================
+  // AUTHENTICATION & AUTHORIZATION
+  // ============================================================================
+
   // Public paths that don't require authentication or verification
   const publicPaths = [
     '/auth/signin',
