@@ -1,16 +1,18 @@
 // app/api/chatbot/stream/route.ts
-// ENHANCED - Avoid inline styles in system prompt
+// ENHANCED - Support multi-file Next.js generation
 
 import { NextRequest } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { PrismaClient } from '@prisma/client'
-import { CodeValidator } from '@/lib/validators'
+import CodeValidator from '@/lib/validators/code-validator'
 import { processGeneratedCode } from '@/utils/extractInlineStyles.server'
 import { BUILDFLOW_SYSTEM_PROMPT } from '@/lib/system-prompt'
+import { ENHANCED_GENERATION_SYSTEM_PROMPT } from '@/lib/enhanced-system-prompt'
 import { completeIncompleteHTML } from '@/lib/code-parser'
 import { enhanceGeneratedCode } from '@/lib/code-enhancer'
+import { parseMultiFileProject, convertToSingleHTML } from '@/lib/multi-file-parser'
 import { z } from 'zod'
 import type { ZodError } from 'zod'
 
@@ -24,6 +26,7 @@ export const maxDuration = 300
 const chatbotRequestSchema = z.object({
   prompt: z.string().min(1, 'Prompt is required').max(10000, 'Prompt too long'),
   projectId: z.string().uuid().optional(),
+  generationType: z.enum(['single-html', 'multi-file']).optional().default('single-html'),
   conversationHistory: z.array(z.object({
     role: z.enum(['user', 'assistant']),
     content: z.string()
@@ -79,26 +82,41 @@ export async function POST(req: NextRequest) {
     
     // Validate input
     const validatedData = chatbotRequestSchema.parse(body);
-    const { prompt, projectId } = validatedData;
+    const { prompt, projectId, generationType } = validatedData;
+
+    // Auto-detect generation type based on prompt keywords
+    const isMultiFileRequest = generationType === 'multi-file' || 
+      prompt.toLowerCase().includes('next.js') ||
+      prompt.toLowerCase().includes('nextjs') ||
+      prompt.toLowerCase().includes('full stack') ||
+      prompt.toLowerCase().includes('fullstack') ||
+      prompt.toLowerCase().includes('database') ||
+      prompt.toLowerCase().includes('supabase') ||
+      prompt.toLowerCase().includes('auth') ||
+      prompt.toLowerCase().includes('api route');
+
+    const systemPrompt = isMultiFileRequest ? ENHANCED_GENERATION_SYSTEM_PROMPT : BUILDFLOW_SYSTEM_PROMPT;
 
     const maxTokens = getOptimalTokenLimit(prompt)
     
     console.log('🚀 Starting generation:', {
       projectId: projectId || 'new',
       promptLength: prompt.length,
-      maxTokens,
-    })
+      isMultiFile: isMultiFileRequest
+    });
 
     const stream = new ReadableStream({
       async start(controller) {
         try {
           let generatedHtml = ''
           let tokenCount = 0
+          let savedProjectId: string | null = projectId || null;
 
-          console.log('📝 Streaming from Claude...')
+          const enhancedPrompt = isMultiFileRequest 
+            ? prompt 
+            : `⚠️ CRITICAL: Every page in your app MUST have exactly ONE <h1> tag for the main page title. This is mandatory for validation.\n\n${prompt}`;
 
-          // Prepend h1 requirement to user prompt
-          const enhancedPrompt = `⚠️ CRITICAL: Every page in your app MUST have exactly ONE <h1> tag for the main page title. This is mandatory for validation.\n\n${prompt}`
+          console.log('📝 Streaming from Claude...');
 
           const response = await anthropic.messages.create({
             model: 'claude-sonnet-4-20250514',
@@ -107,33 +125,239 @@ export async function POST(req: NextRequest) {
             messages: [
               {
                 role: 'user',
-                content: BUILDFLOW_SYSTEM_PROMPT + '\n\n' + enhancedPrompt
+                content: systemPrompt + '\n\n' + enhancedPrompt
               }
             ],
             stream: true,
           })
 
           for await (const event of response) {
-            if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-              const text = event.delta.text
-              generatedHtml += text
-              tokenCount++
-              
-              // Send code chunks as they arrive
-              send(controller, { code: text })
+      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+        const text = event.delta.text
+        generatedHtml += text
+        tokenCount++
+        
+        // Send code chunks as they arrive
+        send(controller, { code: text })
+      }
+    }
+
+    console.log('✅ Stream complete:', generatedHtml.length, 'chars')
+
+    // Check if this is a multi-file project response
+    if (isMultiFileRequest) {
+      console.log('🔍 Parsing multi-file project...');
+      const parseResult = parseMultiFileProject(generatedHtml);
+
+      if (parseResult.success && parseResult.project) {
+        console.log('✅ Multi-file project parsed:', {
+          name: parseResult.project.projectName,
+          filesCount: parseResult.project.files.length,
+          type: parseResult.project.projectType,
+        });
+
+        // Get user
+        const user = await prisma.user.findUnique({
+          where: { email: session.user.email },
+          select: { id: true },
+        });
+
+        if (!user) {
+          throw new Error('User not found');
+        }
+
+        // Create or update project
+        if (!savedProjectId) {
+          console.log('💾 Creating multi-file project...');
+          
+          // Quick validation check for initial score
+          const mainFile = parseResult.project.files.find(f => 
+            f.path === 'index.html' || f.path === 'app/page.tsx'
+          );
+          let initialScore = 100;
+          let initialPassed = true;
+
+          if (mainFile) {
+            const validator = new CodeValidator();
+            let content = mainFile.content;
+            if (mainFile.path.endsWith('.tsx')) {
+              const jsxMatch = content.match(/return\s*\(([\s\S]*?)\);?\s*}/);
+              if (jsxMatch) {
+                content = `<!DOCTYPE html><html><body>${jsxMatch[1]}</body></html>`;
+              }
+            }
+            const quickValidation = validator.validateAll(content, '', '');
+            initialScore = quickValidation.summary.score;
+            initialPassed = quickValidation.passed;
+          }
+
+          const project = await prisma.project.create({
+            data: {
+              userId: user.id,
+              name: parseResult.project.projectName,
+              description: parseResult.project.description,
+              code: convertToSingleHTML(parseResult.project), // Preview HTML
+              html: convertToSingleHTML(parseResult.project),
+              type: parseResult.project.projectType,
+              projectType: parseResult.project.projectType,
+            isMultiFile: true,
+            dependencies: JSON.stringify(parseResult.project.dependencies),
+            devDependencies: JSON.stringify(parseResult.project.devDependencies),
+            envVars: JSON.stringify(parseResult.project.envVars),
+            setupInstructions: JSON.stringify(parseResult.project.setupInstructions),
+            isComplete: true,
+            status: 'COMPLETED',
+            tokensUsed: BigInt(tokenCount),
+            validationScore: BigInt(initialScore),
+            validationPassed: initialPassed,
+          },
+          });
+
+          savedProjectId = project.id;
+
+          // Save all files
+          await prisma.projectFile.createMany({
+            data: parseResult.project.files.map((file, index) => ({
+              projectId: project.id,
+              path: file.path,
+              content: file.content,
+              language: file.language || 'text',
+              order: index,
+            })),
+          });
+
+          console.log('✅ Multi-file project created:', savedProjectId);
+        } else {
+          console.log('🔄 Updating multi-file project:', savedProjectId);
+          
+          // Delete old files
+          await prisma.projectFile.deleteMany({
+            where: { projectId: savedProjectId },
+          });
+
+          // Update project
+          await prisma.project.update({
+            where: { id: savedProjectId, userId: user.id },
+            data: {
+              name: parseResult.project.projectName,
+              description: parseResult.project.description,
+              code: convertToSingleHTML(parseResult.project),
+              html: convertToSingleHTML(parseResult.project),
+              projectType: parseResult.project.projectType,
+              isMultiFile: true,
+              dependencies: JSON.stringify(parseResult.project.dependencies),
+              devDependencies: JSON.stringify(parseResult.project.devDependencies),
+              envVars: JSON.stringify(parseResult.project.envVars),
+              setupInstructions: JSON.stringify(parseResult.project.setupInstructions),
+              updatedAt: new Date(),
+            },
+          });
+
+          // Save new files
+          await prisma.projectFile.createMany({
+            data: parseResult.project.files.map((file, index) => ({
+              projectId: savedProjectId!,
+              path: file.path,
+              content: file.content,
+              language: file.language || 'text',
+              order: index,
+            })),
+          });
+
+          console.log('✅ Multi-file project updated');
+        }
+
+        // Run validation on the main HTML file or index.html
+        const mainHtmlFile = parseResult.project.files.find(f => 
+          f.path === 'index.html' || 
+          f.path === 'app/page.tsx' ||
+          f.path.includes('index.html')
+        );
+
+        let validationData: any = {
+          hasHtml: true,
+          hasCss: true,
+          hasJs: true,
+          validationScore: 100,
+          validationPassed: true,
+          errors: [],
+          warnings: [],
+          cspViolations: [],
+          passed: true,
+          autoFix: null,
+        };
+
+        if (mainHtmlFile && (mainHtmlFile.path.endsWith('.html') || mainHtmlFile.path === 'app/page.tsx')) {
+          console.log('📊 Running validation on:', mainHtmlFile.path);
+          
+          // For React/Next.js files, extract JSX to validate
+          let htmlContent = mainHtmlFile.content;
+          if (mainHtmlFile.path.endsWith('.tsx') || mainHtmlFile.path.endsWith('.jsx')) {
+            // Simple extraction of JSX return statement for validation
+            const jsxMatch = htmlContent.match(/return\s*\(([\s\S]*?)\);?\s*}/);
+            if (jsxMatch) {
+              htmlContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>App</title></head><body>${jsxMatch[1]}</body></html>`;
             }
           }
 
-          console.log('✅ Stream complete:', generatedHtml.length, 'chars')
+          const validator = new CodeValidator();
+          const result = validator.validateAll(htmlContent, '', '');
+          
+          validationData = {
+            hasHtml: true,
+            hasCss: true,
+            hasJs: true,
+            validationScore: result.summary.score,
+            validationPassed: result.passed,
+            errors: result.errors,
+            warnings: result.warnings,
+            cspViolations: [],
+            passed: result.passed,
+            autoFix: null,
+          };
 
-          // Clean and process code
-          let html = generatedHtml.trim()
-            .replace(/^```html?\n?/i, '')
-            .replace(/\n?```$/i, '')
-            .trim()
+          console.log('📊 Multi-file validation:', {
+            score: result.summary.score,
+            passed: result.passed,
+            errors: result.errors.length,
+            warnings: result.warnings.length,
+          });
+        }
 
-          // Ensure DOCTYPE
-          if (!html.toLowerCase().includes('<!doctype html>')) {
+        // Send success to client with validation
+        send(controller, { 
+          projectId: savedProjectId,
+          isMultiFile: true,
+          filesCount: parseResult.project.files.length,
+          validation: validationData,
+        });
+        send(controller, { done: true });
+        controller.close();
+        return;
+      } else {
+        console.error('❌ Multi-file parsing failed:', parseResult.error);
+        
+        // Return error to client instead of generating invalid fallback
+        send(controller, { 
+          error: 'Failed to generate valid project structure. The AI response had formatting errors. Please try regenerating.',
+          canRetry: true,
+          parseError: parseResult.error
+        });
+        send(controller, { done: true });
+        controller.close();
+        return;
+      }
+    }
+
+    // SINGLE HTML PROCESSING (existing code)
+    // Clean and process code
+    let html = generatedHtml.trim()
+      .replace(/^```html?\n?/i, '')
+      .replace(/\n?```$/i, '')
+      .trim()
+
+    // Ensure DOCTYPE
+    if (!html.toLowerCase().includes('<!doctype html>')) {
             html = '<!DOCTYPE html>\n' + html
           }
           
@@ -181,7 +405,7 @@ export async function POST(req: NextRequest) {
           }
 
           // Use enhanced code for validation
-          const finalHtml = enhanced.html
+          let finalHtml = enhanced.html
           const finalCss = enhanced.css
 
           const hasHtml = html.length > 0
@@ -194,7 +418,7 @@ export async function POST(req: NextRequest) {
           const validationResult = validator.validateAll(finalHtml, finalCss, '') as ValidationResult
 
           // Ensure validation result has proper structure
-          const safeValidation: ValidationResult = {
+          let safeValidation: ValidationResult = {
             score: validationResult?.score ?? 0,
             passed: validationResult?.passed ?? false,
             errors: Array.isArray(validationResult?.errors) ? validationResult.errors : [],
@@ -208,6 +432,70 @@ export async function POST(req: NextRequest) {
             warnings: safeValidation.warnings.length,
           })
 
+          // Auto-fix common issues if validation failed
+          let autoFixResult: { fixed: string; appliedFixes: string[]; remainingIssues: number } | null = null
+          if (!safeValidation.passed && safeValidation.errors.length > 0) {
+            try {
+              const { autoFixCode } = await import('@/lib/validators/auto-fixer')
+              
+              console.log('🔧 Attempting auto-fix...')
+              autoFixResult = autoFixCode(finalHtml, {
+                summary: {
+                  total: safeValidation.errors.length + safeValidation.warnings.length,
+                  errors: safeValidation.errors.length,
+                  warnings: safeValidation.warnings.length,
+                  info: 0,
+                  score: safeValidation.score,
+                  grade: 'F',
+                  status: 'failed'
+                },
+                passed: false,
+                score: safeValidation.score,
+                errors: safeValidation.errors.map(e => ({
+                  type: 'error' as const,
+                  category: 'syntax' as const,
+                  message: e.message,
+                  severity: (e.severity || 'high') as any,
+                  fix: undefined
+                })),
+                warnings: safeValidation.warnings.map(w => ({
+                  type: 'warning' as const,
+                  category: 'best-practices' as const,
+                  message: w.message,
+                  severity: (w.severity || 'medium') as any,
+                  fix: undefined
+                })),
+                info: []
+              })
+
+              if (autoFixResult.appliedFixes.length > 0) {
+                console.log('✅ Auto-fixes applied:', autoFixResult.appliedFixes)
+                
+                // Update the HTML with auto-fixed version
+                finalHtml = autoFixResult.fixed
+
+                // Re-validate after auto-fix
+                const revalidationResult = validator.validateAll(finalHtml, finalCss, '') as ValidationResult
+                safeValidation = {
+                  score: revalidationResult?.score ?? 0,
+                  passed: revalidationResult?.passed ?? false,
+                  errors: Array.isArray(revalidationResult?.errors) ? revalidationResult.errors : [],
+                  warnings: Array.isArray(revalidationResult?.warnings) ? revalidationResult.warnings : [],
+                }
+
+                console.log('📊 Quality after auto-fix:', {
+                  score: safeValidation.score,
+                  passed: safeValidation.passed,
+                  errors: safeValidation.errors.length,
+                  warnings: safeValidation.warnings.length,
+                })
+              }
+            } catch (autoFixError) {
+              console.error('❌ Auto-fix failed:', autoFixError)
+              // Continue without auto-fix
+            }
+          }
+
           // Log validation errors if any
           if (safeValidation.errors.length > 0) {
             console.log('⚠️  Validation errors:')
@@ -215,8 +503,6 @@ export async function POST(req: NextRequest) {
               console.log(`  ${i + 1}. [${err.severity || 'error'}] ${err.message}`)
             })
           }
-
-          let savedProjectId = projectId
 
           // Get user
           const user = await prisma.user.findUnique({
@@ -318,6 +604,10 @@ export async function POST(req: NextRequest) {
             warnings: safeValidation.warnings,
             cspViolations: [],
             passed: safeValidation.passed,
+            autoFix: autoFixResult ? {
+              appliedFixes: autoFixResult.appliedFixes,
+              remainingIssues: autoFixResult.remainingIssues
+            } : null,
           };
           
           console.log('📤 Sending validation to client:', {
@@ -325,6 +615,7 @@ export async function POST(req: NextRequest) {
             passed: validationData.validationPassed,
             errorsCount: validationData.errors.length,
             warningsCount: validationData.warnings.length,
+            autoFixApplied: autoFixResult?.appliedFixes.length ?? 0,
           });
           
           send(controller, { validation: validationData })

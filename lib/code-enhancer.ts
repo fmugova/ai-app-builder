@@ -31,6 +31,12 @@ export class CodeEnhancer {
     // Remove History API calls that break in iframes
     enhanced = this.removeHistoryAPI(enhanced)
 
+    // Security check: Warn about innerHTML usage
+    const innerHTMLCheck = this.checkInnerHTML(enhanced);
+    if (innerHTMLCheck.hasIssues) {
+      console.warn(`⚠️ SECURITY WARNING: Found ${innerHTMLCheck.count} potential innerHTML security issue(s)`);
+    }
+
     // Remove technical descriptions if present
     if (options.removeTechnicalDescriptions) {
       enhanced = this.removeTechnicalDescriptions(enhanced)
@@ -185,8 +191,7 @@ export class CodeEnhancer {
     return html
   }
 
-  /**
-   * Remove technical descriptions and feature lists
+  /**   * Remove technical descriptions and feature lists
    */
   private removeTechnicalDescriptions(html: string): string {
     let cleaned = html
@@ -219,6 +224,30 @@ export class CodeEnhancer {
     }
 
     return cleaned
+  }
+
+  /**
+   * Check for innerHTML usage that might be unsafe with user input
+   */
+  private checkInnerHTML(html: string): { hasIssues: boolean; count: number } {
+    const scriptMatch = html.match(/<script[^>]*>([\s\S]*?)<\/script>/gi);
+    if (!scriptMatch) return { hasIssues: false, count: 0 };
+
+    let count = 0;
+    const dangerousPatterns = [
+      /\.innerHTML\s*=\s*[^'"]*\$\{/g, // Template literals with variables
+      /\.innerHTML\s*=\s*.*\+/g, // String concatenation
+      /\.innerHTML\s*\+=/g, // Append operations
+    ];
+
+    scriptMatch.forEach(script => {
+      dangerousPatterns.forEach(pattern => {
+        const matches = script.match(pattern);
+        if (matches) count += matches.length;
+      });
+    });
+
+    return { hasIssues: count > 0, count };
   }
 
   /**

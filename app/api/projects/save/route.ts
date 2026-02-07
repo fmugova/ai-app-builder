@@ -21,7 +21,11 @@ const projectSaveSchema = z.object({
       z.string(),
       z.object({ message: z.string() })
     ])).optional()
-  }).optional()
+  }).optional().nullable(),
+  // Multi-file project fields (optional)
+  projectType: z.string().optional().nullable(),
+  isMultiFile: z.boolean().optional().nullable(),
+  filesCount: z.number().optional().nullable(),
 });
 
 export async function POST(req: NextRequest) {
@@ -34,7 +38,28 @@ export async function POST(req: NextRequest) {
 
     // Validate input
     const body = await req.json();
-    const { id, name, code, validation } = projectSaveSchema.parse(body);
+    
+    // Log the incoming body for debugging
+    console.log('📥 Save request body:', JSON.stringify(body, null, 2));
+    
+    let validatedData;
+    try {
+      validatedData = projectSaveSchema.parse(body);
+    } catch (zodError) {
+      if (zodError instanceof z.ZodError) {
+        console.error('❌ Zod Validation Error:', {
+          issues: zodError.issues,
+          details: zodError.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+        });
+        return NextResponse.json({
+          error: 'Validation failed',
+          details: zodError.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+        }, { status: 400 });
+      }
+      throw zodError;
+    }
+    
+    const { id, name, code, validation } = validatedData;
 
     // Parse multi-page HTML if present
     console.log('🔍 Checking for multi-page format in code...');

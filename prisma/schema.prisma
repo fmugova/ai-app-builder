@@ -488,6 +488,13 @@ model Project {
   lastModified     DateTime?
   retryCount       BigInt?  @default(0)
   tokensUsed       BigInt?  @default(0)
+  // Multi-file project fields
+  projectType      String?  @default("single-html") // "single-html" | "website" | "fullstack"
+  isMultiFile      Boolean  @default(false)
+  setupInstructions Json?   // Array of setup commands
+  dependencies     Json?    // NPM dependencies object
+  devDependencies  Json?    // NPM dev dependencies object
+  envVars          Json?    // Array of required environment variables
   ApiEndpoint      ApiEndpoint[]
   CustomDomain      CustomDomain[]
   DatabaseConnection DatabaseConnection?
@@ -495,6 +502,7 @@ model Project {
   EnvironmentVariable EnvironmentVariable[]
   FormSubmission    FormSubmission[]
   Page              Page[]
+  ProjectFile       ProjectFile[]
   User              User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   ProjectShare       ProjectShare[]
   ProjectVersion      ProjectVersion[]
@@ -507,6 +515,23 @@ model Project {
   @@index([userId, updatedAt])
   @@index([publicSlug])
   @@index([shareToken])
+  @@schema("public")
+}
+
+model ProjectFile {
+  id        String   @id @default(cuid())
+  projectId String
+  path      String   // e.g., "app/page.tsx", "components/Header.tsx"
+  content   String   @db.Text
+  language  String   @default("typescript") // typescript, javascript, json, css, etc.
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, path])
+  @@index([projectId])
+  @@index([language])
   @@schema("public")
 }
 

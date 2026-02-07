@@ -78,6 +78,8 @@ export const authOptions: NextAuthOptions = {
   },
   // Add custom error pages configuration
   useSecureCookies: process.env.NODE_ENV === 'production',
+  secret: process.env.NEXTAUTH_SECRET,
+  debug: process.env.NODE_ENV === 'development',
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -337,7 +339,6 @@ export const authOptions: NextAuthOptions = {
       console.log(`User signed out: ${token.email}`)
     },
   },
-  debug: process.env.NODE_ENV === 'development',
 }
 
 // Helper function to check if user has permission

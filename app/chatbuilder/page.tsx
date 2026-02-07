@@ -6,6 +6,8 @@ import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import PreviewFrame from '@/components/PreviewFrame';
+import MultiFileProjectSetup from '@/components/MultiFileProjectSetup';
+import CodeFileViewer from '@/components/CodeFileViewer';
 import { AlertTriangle, CheckCircle, XCircle, Download, Copy, Github, ExternalLink, Save, Sparkles, RefreshCw, Upload, Link as LinkIcon, Code2, Lightbulb, Menu, X } from 'lucide-react';
 
 // Types remain the same as before...
@@ -45,6 +47,121 @@ const PROMPT_TEMPLATES = {
   simple: "Create a simple task manager app with a task list and add/delete functionality",
   complex: "Create a comprehensive CRM dashboard with contacts management, deal pipeline with drag-and-drop, analytics charts showing sales metrics, activity timeline, and settings page. Include search, filters, and data tables with pagination. Use modern design with sidebar navigation."
 };
+
+// Generate README.md content
+function generateReadme(projectName: string, projectType: string, dependencies: Record<string, string>): string {
+  const depsList = Object.entries(dependencies).map(([name, version]) => `- ${name}@${version}`).join('\n');
+  
+  return `# ${projectName}
+
+A ${projectType} application built with Next.js, React, and TypeScript.
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+ installed
+- npm or yarn package manager
+
+### Installation
+
+1. **Extract the project**
+   \`\`\`bash
+   unzip ${projectName.toLowerCase().replace(/\s+/g, '-')}.zip
+   cd ${projectName.toLowerCase().replace(/\s+/g, '-')}
+   \`\`\`
+
+2. **Install dependencies**
+   \`\`\`bash
+   npm install
+   # or
+   yarn install
+   \`\`\`
+
+3. **Set up environment variables**
+   
+   Create a \`.env.local\` file in the root directory:
+   \`\`\`env
+   DATABASE_URL="your-database-url"
+   NEXTAUTH_SECRET="your-secret-key"
+   NEXTAUTH_URL="http://localhost:3000"
+   \`\`\`
+
+4. **Run the development server**
+   \`\`\`bash
+   npm run dev
+   # or
+   yarn dev
+   \`\`\`
+
+5. **Open in browser**
+   
+   Navigate to [http://localhost:3000](http://localhost:3000)
+
+## Project Structure
+
+\`\`\`
+${projectName}/
+├── app/              # Next.js app directory
+├── components/       # React components
+├── lib/             # Utility functions
+├── public/          # Static assets
+├── prisma/          # Database schema
+└── package.json     # Dependencies
+\`\`\`
+
+## Key Dependencies
+
+${depsList}
+
+## Deploy to Production
+
+### Deploy to Vercel (Recommended)
+
+1. **Sign up for Vercel**
+   Visit [vercel.com](https://vercel.com) and create an account
+
+2. **Install Vercel CLI**
+   \`\`\`bash
+   npm i -g vercel
+   \`\`\`
+
+3. **Deploy**
+   \`\`\`bash
+   vercel
+   \`\`\`
+
+4. **Set environment variables**
+   Go to your Vercel dashboard → Project Settings → Environment Variables
+
+### Alternative: Deploy to Netlify
+
+1. Install Netlify CLI: \`npm i -g netlify-cli\`
+2. Run: \`netlify deploy\`
+3. Follow the prompts
+
+## Scripts
+
+- \`npm run dev\` - Start development server
+- \`npm run build\` - Build for production
+- \`npm run start\` - Start production server
+- \`npm run lint\` - Run ESLint
+
+## Learn More
+
+- [Next.js Documentation](https://nextjs.org/docs)
+- [React Documentation](https://react.dev)
+- [TypeScript Documentation](https://www.typescriptlang.org/docs)
+
+## Support
+
+For issues or questions, visit the [BuildFlow AI support page](https://buildflow.ai/support).
+
+---
+
+**Built with ❤️ using BuildFlow AI**
+`;
+}
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component<
@@ -100,7 +217,14 @@ export default function ChatBuilder() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [showViewCode, setShowViewCode] = useState(false);
+  const [showCodeViewer, setShowCodeViewer] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Multi-file project data
+  const [projectFiles, setProjectFiles] = useState<Array<{path: string, content: string, language: string}>>([]);
+  const [filesCount, setFilesCount] = useState(0);
+  const [projectType, setProjectType] = useState('');
+  const [projectDependencies, setProjectDependencies] = useState<Record<string, string>>({});
   
   const [state, setState] = useState<GenerationState>({
     html: '',
@@ -115,6 +239,7 @@ export default function ChatBuilder() {
 
   const [showCodeQuality, setShowCodeQuality] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [isMultiFileProject, setIsMultiFileProject] = useState(false);
 
   // Auth check
   useEffect(() => {
@@ -266,6 +391,45 @@ export default function ChatBuilder() {
                 if (!projectName) {
                   setProjectName(prompt.slice(0, 50));
                 }
+                // Check if this is a multi-file project
+                if (data.isMultiFile) {
+                  setIsMultiFileProject(true);
+                  setFilesCount(data.filesCount || 0);
+                  console.log('📦 Multi-file project detected:', data.filesCount, 'files');
+                  
+                  // Fetch full project data to get files
+                  if (data.projectId) {
+                    fetch(`/api/projects/${data.projectId}`)
+                      .then(res => res.json())
+                      .then(projectData => {
+                        if (projectData.project?.files) {
+                          setProjectFiles(projectData.project.files);
+                          setProjectType(projectData.project.projectType || 'fullstack');
+                          setProjectDependencies(projectData.project.dependencies || {});
+                        }
+                      })
+                      .catch(err => console.error('Failed to fetch project files:', err));
+                  }
+                }
+              }
+
+              if (data.error) {
+                console.error('❌ Generation error:', data.error);
+                toast.error(data.error);
+                setState(prev => ({ 
+                  ...prev, 
+                  isGenerating: false, 
+                  progress: 0, 
+                  currentStep: data.canRetry ? 'Click "Fix & Regenerate" to try again' : 'Error occurred'
+                }));
+                
+                // If it's a retry-able error, show regenerate option
+                if (data.canRetry) {
+                  setTimeout(() => {
+                    toast('Tip: Try simplifying your prompt or click "Fix & Regenerate"');
+                  }, 1000);
+                }
+                return;
               }
 
               if (data.done) {
@@ -352,27 +516,54 @@ export default function ChatBuilder() {
 
   // Other handlers remain the same...
   const handleRegenerateWithFixes = useCallback(() => {
-    if (!state.validation) return;
+    if (!state.validation) {
+      toast.error('No validation errors to fix');
+      return;
+    }
 
-    const issues = [
-      ...state.validation.errors.map(e => e.message),
-      ...state.validation.cspViolations
-    ].join(', ');
+    // Build a comprehensive list of issues
+    const errors = state.validation.errors.map(e => 
+      typeof e === 'string' ? e : e.message
+    );
+    const warnings = state.validation.warnings.map(w => 
+      typeof w === 'string' ? w : w.message
+    );
+    const cspIssues = state.validation.cspViolations || [];
+
+    const allIssues = [...errors, ...warnings, ...cspIssues];
+    
+    if (allIssues.length === 0) {
+      toast('No issues detected');
+      return;
+    }
+
+    // Create detailed fix instructions
+    const issuesList = allIssues.map((issue, i) => `${i + 1}. ${issue}`).join('\n');
 
     const improvedPrompt = `${prompt}
 
-IMPORTANT: Fix these issues from the previous generation:
-${issues}
+CRITICAL FIXES REQUIRED from previous generation:
+${issuesList}
 
-Ensure:
-- NO inline styles (use Tailwind classes only)
-- NO inline event handlers (use addEventListener)
-- Proper semantic HTML
-- Complete, functional code`;
+MANDATORY REQUIREMENTS:
+- Add exactly ONE <h1> tag with the main page title
+- Add viewport meta tag: <meta name="viewport" content="width=device-width, initial-scale=1.0">
+- Use ONLY Tailwind CSS classes (NO inline styles)
+- Use addEventListener for events (NO inline event handlers like onclick)
+- Use textContent instead of innerHTML for dynamic content
+- Add charset meta tag: <meta charset="UTF-8">
+- Use proper semantic HTML5 elements
+- All CSS must use CSS variables for maintainability
+
+Generate complete, production-ready code that fixes ALL issues above.`;
 
     setPrompt(improvedPrompt);
-    toast.success('Prompt updated with fixes. Click Generate to try again.');
-  }, [prompt, state.validation]);
+    
+    // Small delay to ensure prompt is updated, then trigger generation
+    setTimeout(() => {
+      handleGenerate();
+    }, 100);
+  }, [state.validation, prompt, handleGenerate]);
 
   const handleSave = useCallback(async () => {
     if (!state.fullCode) {
@@ -422,12 +613,65 @@ Ensure:
     }
   }, [state.fullCode, state.validation, projectName, currentProjectId, prompt]);
 
-  const handleDownload = useCallback(() => {
-    if (!state.fullCode) {
+  const handleDownload = useCallback(async () => {
+    if (!state.fullCode && !isMultiFileProject) {
       toast.error('No code to download');
       return;
     }
 
+    // Handle multi-file project downloads
+    if (isMultiFileProject && currentProjectId) {
+      try {
+        toast.loading('Preparing download...');
+        
+        // Fetch project data if not already loaded
+        let files = projectFiles;
+        if (files.length === 0) {
+          const response = await fetch(`/api/projects/${currentProjectId}`);
+          const data = await response.json();
+          files = data.project.files || [];
+        }
+
+        // Generate README content
+        const readmeContent = generateReadme(
+          projectName || 'My Project',
+          projectType,
+          projectDependencies
+        );
+
+        // Add README to files
+        const allFiles = [
+          ...files,
+          { path: 'README.md', content: readmeContent, language: 'markdown' }
+        ];
+
+        // Create zip file
+        const JSZip = (await import('jszip')).default;
+        const zip = new JSZip();
+
+        allFiles.forEach(file => {
+          zip.file(file.path, file.content);
+        });
+
+        const blob = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${projectName || 'project'}.zip`;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        toast.dismiss();
+        toast.success('Project downloaded with README!');
+      } catch (error) {
+        toast.dismiss();
+        console.error('Download error:', error);
+        toast.error('Failed to download project');
+      }
+      return;
+    }
+
+    // Handle single HTML file download
     const blob = new Blob([state.fullCode], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -436,7 +680,7 @@ Ensure:
     a.click();
     URL.revokeObjectURL(url);
     toast.success('Downloaded!');
-  }, [state.fullCode, projectName]);
+  }, [state.fullCode, projectName, isMultiFileProject, currentProjectId, projectFiles, projectType, projectDependencies]);
 
   const handleCopy = useCallback(() => {
     if (!state.fullCode) {
@@ -896,14 +1140,23 @@ Ensure:
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
                 <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4">Actions</h2>
                 
+                {isMultiFileProject && (
+                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      <strong>Multi-file project detected!</strong> This project was automatically saved with {currentProjectId ? 'all files stored in the database' : 'multiple files'}.
+                    </p>
+                  </div>
+                )}
+                
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={handleSave}
-                    disabled={saving}
-                    className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium transition-colors disabled:opacity-50 text-sm sm:text-base"
+                    disabled={saving || isMultiFileProject}
+                    title={isMultiFileProject ? 'Multi-file projects are auto-saved' : 'Save project'}
+                    className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                   >
                     <Save className="w-4 h-4" />
-                    {saving ? 'Saving...' : 'Save'}
+                    {isMultiFileProject ? 'Auto-saved' : saving ? 'Saving...' : 'Save'}
                   </button>
 
                   <button
@@ -977,6 +1230,19 @@ Ensure:
               </div>
             )}
 
+            {/* Multi-File Project Setup Instructions */}
+            {isMultiFileProject && state.fullCode && (
+              <MultiFileProjectSetup
+                projectName={projectName || 'My Project'}
+                filesCount={filesCount}
+                projectType={projectType || 'fullstack'}
+                dependencies={projectDependencies}
+                onDownload={handleDownload}
+                onViewCode={() => setShowCodeViewer(true)}
+                onDeploy={handlePublishVercel}
+              />
+            )}
+
             {/* View Code Modal */}
             {showViewCode && state.fullCode && (
               <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -1024,6 +1290,28 @@ Ensure:
           </div>
         </div>
       </main>
+
+      {/* Code File Viewer Modal */}
+      {showCodeViewer && projectFiles.length > 0 && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-xl font-semibold text-gray-900">Project Files</h3>
+              <button
+                onClick={() => setShowCodeViewer(false)}
+                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <CodeFileViewer
+                files={projectFiles}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

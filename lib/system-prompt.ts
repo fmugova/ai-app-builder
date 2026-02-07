@@ -1135,6 +1135,9 @@ Examples based on app type:
 
 Before generating, ensure the app has:
 - [ ] **EVERY PAGE HAS EXACTLY ONE <h1> TAG (CRITICAL - VALIDATION WILL FAIL WITHOUT THIS)**
+- [ ] **SECURITY: All user input sanitized (use textContent, not innerHTML)**
+- [ ] **SECURITY: No hardcoded credentials or API keys**
+- [ ] **SECURITY: All external URLs validated before use**
 - [ ] 3-5+ distinct pages/sections
 - [ ] Sidebar or navbar navigation
 - [ ] Client-side routing (show/hide pages)
@@ -1163,16 +1166,121 @@ Before generating, ensure the app has:
 - [ ] Semantic HTML
 - [ ] Accessible labels and ARIA attributes
 
+## 14. SECURITY REQUIREMENTS (CRITICAL FOR PRODUCTION)
+
+### XSS Prevention
+**NEVER use innerHTML with user-generated content:**
+❌ BAD:
+\`\`\`javascript
+element.innerHTML = userInput; // DANGEROUS!
+messageDiv.innerHTML = \`<p>\${message}</p>\`; // DANGEROUS!
+\`\`\`
+
+✅ GOOD:
+\`\`\`javascript
+element.textContent = userInput; // Safe
+messageDiv.textContent = message; // Safe
+
+// If HTML is needed, create elements safely:
+const p = document.createElement('p');
+p.textContent = message;
+messageDiv.appendChild(p);
+\`\`\`
+
+### Input Validation
+Always validate and sanitize user input:
+\`\`\`javascript
+function sanitizeInput(input) {
+  // Remove dangerous characters
+  return input
+    .trim()
+    .replace(/[<>]/g, '') // Remove HTML brackets
+    .slice(0, 1000); // Limit length
+}
+
+// Validate URLs
+function isValidUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return ['http:', 'https:'].includes(parsed.protocol);
+  } catch {
+    return false;
+  }
+}
+\`\`\`
+
+### No Hardcoded Credentials
+**NEVER include real API keys, passwords, or credentials:**
+❌ BAD:
+\`\`\`javascript
+const API_KEY = 'sk-1234567890abcdef'; // NEVER!
+const SUPABASE_KEY = 'eyJ...real.key...'; // NEVER!
+\`\`\`
+
+✅ GOOD:
+\`\`\`javascript
+// Use placeholder comments instead
+const API_KEY = 'your-api-key-here'; // Replace with your actual key
+const SUPABASE_KEY = 'your-supabase-key'; // Get from Supabase dashboard
+
+// Or show configuration instructions
+console.warn('⚠️ Please configure API keys before using this app');
+console.warn('Instructions: https://docs.example.com/setup');
+\`\`\`
+
+### Error Handling
+Never expose sensitive error details to users:
+\`\`\`javascript
+try {
+  await apiCall();
+} catch (error) {
+  console.error('API Error:', error); // Log full error
+  showToast('An error occurred. Please try again.', 'error'); // Generic user message
+}
+\`\`\`
+
+### Rate Limiting
+Add basic client-side rate limiting:
+\`\`\`javascript
+const RateLimiter = {
+  calls: {},
+  canCall(key, maxCalls = 10, windowMs = 60000) {
+    const now = Date.now();
+    if (!this.calls[key]) this.calls[key] = [];
+    
+    // Remove old calls
+    this.calls[key] = this.calls[key].filter(time => now - time < windowMs);
+    
+    if (this.calls[key].length >= maxCalls) {
+      return false;
+    }
+    
+    this.calls[key].push(now);
+    return true;
+  }
+};
+
+// Usage
+if (!RateLimiter.canCall('search', 5, 10000)) {
+  showToast('Too many requests. Please wait.', 'warning');
+  return;
+}
+\`\`\`
+
 # FINAL INSTRUCTIONS
 
 Create a COMPLETE, PRODUCTION-READY, ENTERPRISE-GRADE, MULTI-PAGE application as a SINGLE HTML file that:
 1. **EVERY PAGE MUST HAVE EXACTLY ONE <h1> TAG - THIS IS MANDATORY AND NON-NEGOTIABLE**
-2. Includes Tailwind CDN
-3. Has proper structure and semantics
-4. Contains 3-5+ pages with navigation (each with ONE <h1>)
-5. Uses ONLY Tailwind classes (no inline styles)
-6. Uses ONLY addEventListener (no inline handlers)
-7. Includes state management
+2. **SECURITY: Uses textContent for user input (NEVER innerHTML)**
+3. **SECURITY: Contains NO hardcoded API keys or credentials**
+4. **SECURITY: Validates all user input and URLs**
+5. Includes Tailwind CDN
+6. Has proper structure and semantics
+7. Contains 3-5+ pages with navigation (each with ONE <h1>)
+8. Uses ONLY Tailwind classes (no inline styles)
+9. Uses ONLY addEventListener (no inline handlers)
+10. Includes state management
+11. Has error handling throughout
 8. Has error handling throughout
 9. Includes performance optimizations
 10. Has realistic data and content
