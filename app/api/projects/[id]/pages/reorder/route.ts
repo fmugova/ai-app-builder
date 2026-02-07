@@ -25,7 +25,13 @@ export async function POST(
     }
 
     const { id: projectId } = await params
-    const { pages } = await request.json()
+    const body = await request.json()
+    const { pages } = body
+
+    // Validate request body
+    if (!pages || !Array.isArray(pages) || pages.length === 0) {
+      return NextResponse.json({ error: 'Invalid pages array' }, { status: 400 })
+    }
 
     // Verify user owns this project
     const project = await prisma.project.findFirst({
@@ -63,10 +69,14 @@ export async function POST(
     })
 
     return NextResponse.json({ message: 'Navigation order updated successfully' })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Reorder error:', error)
+    let errorMessage = 'Failed to reorder pages'
+    if (error instanceof Error) {
+      errorMessage = error.message
+    }
     return NextResponse.json(
-      { error: error.message || 'Failed to reorder pages' },
+      { error: errorMessage },
       { status: 500 }
     )
   }

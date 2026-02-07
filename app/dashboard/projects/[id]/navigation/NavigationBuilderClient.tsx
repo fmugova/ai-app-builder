@@ -84,7 +84,7 @@ export default function NavigationBuilderClient({ projectId, initialPage }: Navi
       const response = await fetch(`/api/projects/${projectId}/pages/reorder`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ Page: updates })
+        body: JSON.stringify({ pages: updates })
       })
 
       if (response.ok) {

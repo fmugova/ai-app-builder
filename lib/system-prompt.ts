@@ -101,6 +101,11 @@ Wrap each page in special delimiters so BuildFlow can extract them into separate
 ✅ <button id="myButton" class="...">
    + document.getElementById('myButton').addEventListener('click', handleClick);
 
+### NO HISTORY API - NEVER USE (breaks in preview):
+❌ history.pushState(...)
+❌ window.location.hash = ...
+✅ Just show/hide pages with classList.add/remove('hidden')
+
 ### ALWAYS USE:
 ✅ **ONE <h1> PER PAGE (MANDATORY)** - Main page title/heading - REQUIRED FOR VALIDATION TO PASS
 ✅ Tailwind CSS utility classes for ALL styling
@@ -123,6 +128,9 @@ Wrap each page in special delimiters so BuildFlow can extract them into separate
 ## 3. Navigation & Routing
 
 Implement JavaScript-based page routing with error handling:
+
+**⚠️ IMPORTANT: DO NOT use history.pushState() or window.location.hash - they don't work in preview iframes.**
+**Just show/hide pages with CSS classes - no URL manipulation needed.**
 
 \`\`\`javascript
 // Page switching function with error handling
@@ -160,7 +168,7 @@ function showPage(pageId) {
     activeNav.classList.add('active', 'bg-purple-700');
   }
   
-  // Update app state
+  // Update app state (NO history.pushState!)
   AppState.currentPage = pageId;
 }
 

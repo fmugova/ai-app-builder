@@ -28,6 +28,9 @@ export class CodeEnhancer {
   enhanceHTML(html: string, options: EnhancementOptions): string {
     let enhanced = html
 
+    // Remove History API calls that break in iframes
+    enhanced = this.removeHistoryAPI(enhanced)
+
     // Remove technical descriptions if present
     if (options.removeTechnicalDescriptions) {
       enhanced = this.removeTechnicalDescriptions(enhanced)
@@ -213,6 +216,38 @@ export class CodeEnhancer {
 
     if (cleaned.length < html.length) {
       this.enhancements.push('Removed technical descriptions')
+    }
+
+    return cleaned
+  }
+
+  /**
+   * Remove History API calls that don't work in iframes
+   */
+  private removeHistoryAPI(html: string): string {
+    let cleaned = html
+    let modified = false
+
+    // Remove history.pushState() calls
+    if (cleaned.includes('history.pushState')) {
+      cleaned = cleaned.replace(/history\.pushState\([^)]*\);?/g, '// history.pushState removed (not supported in iframe)')
+      modified = true
+    }
+
+    // Remove history.replaceState() calls
+    if (cleaned.includes('history.replaceState')) {
+      cleaned = cleaned.replace(/history\.replaceState\([^)]*\);?/g, '// history.replaceState removed (not supported in iframe)')
+      modified = true
+    }
+
+    // Remove window.location.hash assignments
+    if (cleaned.match(/window\.location\.hash\s*=/)) {
+      cleaned = cleaned.replace(/window\.location\.hash\s*=\s*[^;]+;?/g, '// window.location.hash removed (not supported in iframe)')
+      modified = true
+    }
+
+    if (modified) {
+      this.enhancements.push('Removed History API calls (not supported in iframe)')
     }
 
     return cleaned
