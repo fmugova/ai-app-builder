@@ -32,6 +32,7 @@ export async function GET() {
         createdAt: 'desc',
       },
     })
+    
     // Helper to serialize BigInt fields
     function serializeProject(project: any) {
       return {
@@ -40,11 +41,15 @@ export async function GET() {
         retryCount: project.retryCount ? Number(project.retryCount) : null,
         tokensUsed: project.tokensUsed ? Number(project.tokensUsed) : null,
         validationScore: project.validationScore ? Number(project.validationScore) : null,
+        createdAt: project.createdAt.toISOString(),
+        updatedAt: project.updatedAt.toISOString(),
       };
     }
+    
     const serializedProjects = projects.map(serializeProject);
-    const projectCount = await prisma.project.count();
-    return NextResponse.json({ projects: serializedProjects, dashboardProjectCount: projectCount });
+    
+    // Return projects directly as an array (not nested in an object)
+    return NextResponse.json(serializedProjects);
   } catch (error) {
     console.error('Error fetching all projects:', error)
     return NextResponse.json(

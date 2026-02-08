@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Update project with slug and publish status
-    const updatedProject = await prisma.project.update({
+    const _updatedProject = await prisma.project.update({
       where: { id: projectId, userId: user.id },
       data: {
         publicSlug: publishSlug,

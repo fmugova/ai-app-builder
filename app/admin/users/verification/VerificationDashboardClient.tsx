@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { CheckCircle, XCircle, Clock, Mail, Search, Filter } from 'lucide-react'
+import { CheckCircle, XCircle, Clock, Mail, Search } from 'lucide-react'
 
 interface User {
   id: string
@@ -60,7 +60,7 @@ export default function VerificationDashboardClient({ users, stats }: Verificati
         const data = await res.json()
         alert(data.error || 'Failed to send verification email')
       }
-    } catch (error) {
+    } catch (_error) {
       alert('Failed to send verification email')
     } finally {
       setSendingEmail(null)

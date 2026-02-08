@@ -8,13 +8,13 @@ import { authOptions } from '@/lib/auth'
 import { PrismaClient } from '@prisma/client'
 import CodeValidator from '@/lib/validators/code-validator'
 import { processGeneratedCode } from '@/utils/extractInlineStyles.server'
-import { BUILDFLOW_SYSTEM_PROMPT } from '@/lib/system-prompt'
 import { ENHANCED_GENERATION_SYSTEM_PROMPT } from '@/lib/enhanced-system-prompt'
+import { STRICT_HTML_GENERATION_PROMPT } from '@/lib/generation/systemPrompt'
+import { ensureValidHTML } from '@/lib/templates/htmlTemplate'
 import { completeIncompleteHTML } from '@/lib/code-parser'
 import { enhanceGeneratedCode } from '@/lib/code-enhancer'
 import { parseMultiFileProject, convertToSingleHTML } from '@/lib/multi-file-parser'
 import { z } from 'zod'
-import type { ZodError } from 'zod'
 
 const prisma = new PrismaClient()
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
@@ -27,6 +27,7 @@ const chatbotRequestSchema = z.object({
   prompt: z.string().min(1, 'Prompt is required').max(10000, 'Prompt too long'),
   projectId: z.string().uuid().optional(),
   generationType: z.enum(['single-html', 'multi-file']).optional().default('single-html'),
+  previousErrors: z.array(z.string()).optional(), // For validation feedback loop
   conversationHistory: z.array(z.object({
     role: z.enum(['user', 'assistant']),
     content: z.string()
@@ -82,27 +83,31 @@ export async function POST(req: NextRequest) {
     
     // Validate input
     const validatedData = chatbotRequestSchema.parse(body);
-    const { prompt, projectId, generationType } = validatedData;
+    const { prompt, projectId, generationType, previousErrors } = validatedData;
 
     // Auto-detect generation type based on prompt keywords
+    // Only trigger multi-file for EXPLICIT multi-page/framework requests
     const isMultiFileRequest = generationType === 'multi-file' || 
-      prompt.toLowerCase().includes('next.js') ||
-      prompt.toLowerCase().includes('nextjs') ||
-      prompt.toLowerCase().includes('full stack') ||
-      prompt.toLowerCase().includes('fullstack') ||
-      prompt.toLowerCase().includes('database') ||
-      prompt.toLowerCase().includes('supabase') ||
-      prompt.toLowerCase().includes('auth') ||
-      prompt.toLowerCase().includes('api route');
+      prompt.toLowerCase().includes('next.js project') ||
+      prompt.toLowerCase().includes('nextjs project') ||
+      prompt.toLowerCase().includes('multi-page') ||
+      prompt.toLowerCase().includes('full stack app') ||
+      prompt.toLowerCase().includes('fullstack app') ||
+      (prompt.toLowerCase().includes('next.js') && prompt.toLowerCase().includes('pages')) ||
+      (prompt.toLowerCase().includes('nextjs') && prompt.toLowerCase().includes('pages'));
 
-    const systemPrompt = isMultiFileRequest ? ENHANCED_GENERATION_SYSTEM_PROMPT : BUILDFLOW_SYSTEM_PROMPT;
+    // Use STRICT system prompt for single HTML files to enforce validation
+    const systemPrompt = isMultiFileRequest 
+      ? ENHANCED_GENERATION_SYSTEM_PROMPT 
+      : STRICT_HTML_GENERATION_PROMPT;
 
     const maxTokens = getOptimalTokenLimit(prompt)
     
     console.log('🚀 Starting generation:', {
       projectId: projectId || 'new',
       promptLength: prompt.length,
-      isMultiFile: isMultiFileRequest
+      isMultiFile: isMultiFileRequest,
+      usingStrictPrompt: !isMultiFileRequest
     });
 
     const stream = new ReadableStream({
@@ -112,11 +117,24 @@ export async function POST(req: NextRequest) {
           let tokenCount = 0
           let savedProjectId: string | null = projectId || null;
 
-          const enhancedPrompt = isMultiFileRequest 
-            ? prompt 
-            : `⚠️ CRITICAL: Every page in your app MUST have exactly ONE <h1> tag for the main page title. This is mandatory for validation.\n\n${prompt}`;
+          // Build enhanced prompt if there were previous validation errors
+          let enhancedPrompt = prompt;
+          if (previousErrors && previousErrors.length > 0) {
+            console.log('🔄 Regenerating with error feedback:', previousErrors.length, 'issues');
+            enhancedPrompt = `${prompt}
 
-          console.log('📝 Streaming from Claude...');
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ PREVIOUS GENERATION HAD VALIDATION ERRORS - FIX THEM NOW ⚠️
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${previousErrors.map(err => `❌ ${err}`).join('\n')}
+
+MANDATORY FIXES YOU MUST APPLY:
+${previousErrors.some(e => e.includes('h1')) ? '✅ Add exactly ONE <h1>Page Title</h1> in the page\n' : ''}${previousErrors.some(e => e.includes('description')) ? '✅ Add <meta name="description" content="..."> in <head>\n' : ''}${previousErrors.some(e => e.includes('CSS') || e.includes('variable')) ? '✅ Define CSS variables in :root { --primary: ...; --text: ...; }\n' : ''}${previousErrors.some(e => e.includes('script')) ? '✅ Keep inline scripts under 50 lines or extract to external file\n' : ''}${previousErrors.some(e => e.includes('charset')) ? '✅ Add <meta charset="UTF-8"> in <head>\n' : ''}${previousErrors.some(e => e.includes('viewport')) ? '✅ Add <meta name="viewport" content="width=device-width, initial-scale=1.0">\n' : ''}
+DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
+          }
+
+          console.log('📝 Streaming from Claude with strict validation requirements...');
 
           const response = await anthropic.messages.create({
             model: 'claude-sonnet-4-20250514',
@@ -125,7 +143,7 @@ export async function POST(req: NextRequest) {
             messages: [
               {
                 role: 'user',
-                content: systemPrompt + '\n\n' + enhancedPrompt
+                content: systemPrompt + '\n\nUser Request:\n' + enhancedPrompt
               }
             ],
             stream: true,
@@ -274,7 +292,18 @@ export async function POST(req: NextRequest) {
           f.path.includes('index.html')
         );
 
-        let validationData: any = {
+        let validationData: {
+          hasHtml: boolean;
+          hasCss: boolean;
+          hasJs: boolean;
+          validationScore: number;
+          validationPassed: boolean;
+          errors: Array<{ message: string; line?: number; severity?: string }>;
+          warnings: Array<{ message: string; line?: number; severity?: string }>;
+          cspViolations: string[];
+          passed: boolean;
+          autoFix: null | object;
+        } = {
           hasHtml: true,
           hasCss: true,
           hasJs: true,
@@ -335,21 +364,13 @@ export async function POST(req: NextRequest) {
         controller.close();
         return;
       } else {
-        console.error('❌ Multi-file parsing failed:', parseResult.error);
-        
-        // Return error to client instead of generating invalid fallback
-        send(controller, { 
-          error: 'Failed to generate valid project structure. The AI response had formatting errors. Please try regenerating.',
-          canRetry: true,
-          parseError: parseResult.error
-        });
-        send(controller, { done: true });
-        controller.close();
-        return;
+        console.warn('⚠️ Multi-file parsing failed, falling back to single HTML:', parseResult.error);
+        console.log('🔄 Processing as single HTML file...');
+        // Continue to single HTML processing below (don't return)
       }
     }
 
-    // SINGLE HTML PROCESSING (existing code)
+    // SINGLE HTML PROCESSING - runs if not multi-file OR if multi-file parsing failed
     // Clean and process code
     let html = generatedHtml.trim()
       .replace(/^```html?\n?/i, '')
@@ -432,9 +453,9 @@ export async function POST(req: NextRequest) {
             warnings: safeValidation.warnings.length,
           })
 
-          // Auto-fix common issues if validation failed
+          // Auto-fix common issues - ALWAYS run to catch h1, meta tags, etc.
           let autoFixResult: { fixed: string; appliedFixes: string[]; remainingIssues: number } | null = null
-          if (!safeValidation.passed && safeValidation.errors.length > 0) {
+          if (safeValidation.errors.length > 0 || safeValidation.warnings.length > 0) {
             try {
               const { autoFixCode } = await import('@/lib/validators/auto-fixer')
               
@@ -455,14 +476,14 @@ export async function POST(req: NextRequest) {
                   type: 'error' as const,
                   category: 'syntax' as const,
                   message: e.message,
-                  severity: (e.severity || 'high') as any,
+                  severity: (e.severity || 'high') as 'high' | 'medium' | 'low',
                   fix: undefined
                 })),
                 warnings: safeValidation.warnings.map(w => ({
                   type: 'warning' as const,
                   category: 'best-practices' as const,
                   message: w.message,
-                  severity: (w.severity || 'medium') as any,
+                  severity: (w.severity || 'medium') as 'high' | 'medium' | 'low',
                   fix: undefined
                 })),
                 info: []
@@ -502,6 +523,38 @@ export async function POST(req: NextRequest) {
             safeValidation.errors.forEach((err, i) => {
               console.log(`  ${i + 1}. [${err.severity || 'error'}] ${err.message}`)
             })
+          }
+
+          // LAYER 5: Template-based HTML wrapper (final safety net)
+          // Extract title from prompt for template
+          const projectTitle = prompt.split('\n')[0].slice(0, 50) || 'Generated Project'
+          
+          // Only wrap if score is too low (< 90)
+          if (safeValidation.score < 90) {
+            console.log('⚠️ Score too low (' + safeValidation.score + '), applying template wrapper')
+            
+            // Apply template wrapper to guarantee all critical elements
+            finalHtml = ensureValidHTML(finalHtml, projectTitle)
+            
+            console.log('🛡️ Template wrapper applied')
+            
+            // CRITICAL: Re-validate after template wrapper to get accurate results
+            const finalValidationResult = validator.validateAll(finalHtml, finalCss, '') as ValidationResult
+            safeValidation = {
+              score: finalValidationResult?.score ?? 0,
+              passed: finalValidationResult?.passed ?? false,
+              errors: Array.isArray(finalValidationResult?.errors) ? finalValidationResult.errors : [],
+              warnings: Array.isArray(finalValidationResult?.warnings) ? finalValidationResult.warnings : [],
+            }
+            
+            console.log('📊 Final quality after template wrapper:', {
+              score: safeValidation.score,
+              passed: safeValidation.passed,
+              errors: safeValidation.errors.length,
+              warnings: safeValidation.warnings.length,
+            })
+          } else {
+            console.log('✅ Score acceptable (' + safeValidation.score + '), skipping template wrapper')
           }
 
           // Get user

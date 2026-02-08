@@ -2,6 +2,7 @@
 
 import { useMemo, useEffect } from 'react'
 import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
+import { stripMarkdownCodeFences } from '@/lib/utils'
 
 // ============================================
 // TYPES
@@ -58,41 +59,56 @@ const DEFAULT_VALIDATION: ValidationResult = {
 export default function PreviewFrame({ html, css, js, validation }: PreviewFrameProps) {
   const safeValidation = validation || DEFAULT_VALIDATION;
 
-  // Debug: Log what we're receiving
-  useEffect(() => {
-    console.log('🖼️ PreviewFrame received:', {
-      htmlLength: html?.length || 0,
-      cssLength: css?.length || 0,
-      jsLength: js?.length || 0,
-      htmlPreview: html?.substring(0, 100),
-      validation: safeValidation
-    });
-  }, [html, css, js, safeValidation]);
-
   const fullHTML = useMemo(() => {
     if (!html?.trim()) {
       console.warn('⚠️ No HTML content to preview');
       return '';
     }
 
+    // CRITICAL: Check if content is actually HTML
+    const trimmedHtml = html.trim();
+    
+    // Detect if content is JSON instead of HTML
+    if (trimmedHtml.startsWith('{') || trimmedHtml.startsWith('[')) {
+      console.error('❌ Received JSON instead of HTML:', trimmedHtml.substring(0, 200));
+      return '';
+    }
+    
+    // Detect if content contains markdown code fences
+    if (trimmedHtml.includes('```')) {
+      console.warn('⚠️ Markdown fences detected - stripping as safety measure');
+    }
+
     try {
+      // SAFETY NET: Strip markdown fences as last resort
+      // This should already be done in code-parser and chatbuilder, but adding as safety
+      let cleanHtml = stripMarkdownCodeFences(html);
+      let cleanCss = css ? stripMarkdownCodeFences(css) : '';
+      let cleanJs = js ? stripMarkdownCodeFences(js) : '';
+      
+      // Verify we have actual HTML after cleaning
+      if (!cleanHtml.includes('<') && !cleanHtml.includes('>')) {
+        console.error('❌ No HTML tags found after cleaning:', cleanHtml.substring(0, 200));
+        return '';
+      }
+
       const result = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Preview</title>
-  <style>${css || ''}</style>
+  <style>${cleanCss}</style>
 </head>
 <body>
-  ${html}
+  ${cleanHtml}
   <script>
     window.addEventListener('error', (e) => {
       console.warn('[Preview Error]:', e.message);
     });
 
     try {
-      ${js || ''}
+      ${cleanJs}
     } catch (error) {
       console.error('[Preview JS Error]:', error);
     }
@@ -173,11 +189,10 @@ export default function PreviewFrame({ html, css, js, validation }: PreviewFrame
           </div>
         ) : (
           <iframe
-            key={fullHTML.substring(0, 100)} // Force remount on significant changes
-            srcDoc={fullHTML}
             title="Preview"
             className="w-full h-full border-0"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"
+            sandbox="allow-scripts"
+            srcDoc={fullHTML}
           />
         )}
       </div>

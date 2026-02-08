@@ -4,3 +4,34 @@ import { twMerge } from "tailwind-merge"
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
+
+/**
+ * Strip markdown code fences from generated code
+ * This is critical because AI often wraps code in ```html, ```javascript, etc.
+ */
+export function stripMarkdownCodeFences(code: string): string {
+  console.log('🧹 Cleaning markdown code fences...');
+  
+  // Remove markdown code fences (```html, ```javascript, etc.)
+  let cleaned = code
+    .replace(/^```html\s*\n?/gm, '')
+    .replace(/^```javascript\s*\n?/gm, '')
+    .replace(/^```js\s*\n?/gm, '')
+    .replace(/^```css\s*\n?/gm, '')
+    .replace(/^```typescript\s*\n?/gm, '')
+    .replace(/^```ts\s*\n?/gm, '')
+    .replace(/^```\s*\n?/gm, '')
+    .replace(/\n?```\s*$/gm, '');
+  
+  const hadFences = code.length !== cleaned.length;
+  
+  if (hadFences) {
+    console.log('✅ Code cleaned:', {
+      originalLength: code.length,
+      cleanedLength: cleaned.length,
+      removed: code.length - cleaned.length,
+    });
+  }
+  
+  return cleaned.trim();
+}

@@ -31,7 +31,7 @@ export default function VerifyEmailNoticeClient({ email, name }: VerifyEmailNoti
         const data = await res.json()
         setError(data.error || 'Failed to send email')
       }
-    } catch (err) {
+    } catch (_err) {
       setError('Failed to send verification email')
     } finally {
       setSending(false)

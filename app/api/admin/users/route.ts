@@ -19,20 +19,56 @@ export const PATCH = withAdmin(async (req: NextRequest) => {
 })
 
 export const GET = withAdmin(async () => {
-  // Count users in both public.User and auth.users
-  const [publicUserCount, authUserCount] = await Promise.all([
-    prisma.user.count(),
-    prisma.$queryRaw<{ count: number }[]>`SELECT COUNT(*)::int AS count FROM auth.users WHERE deleted_at IS NULL`
-  ]);
-  // Query the auth.users table for details
-  const users = await prisma.$queryRaw`\
-    SELECT id, email, role, created_at as "createdAt"
-    FROM auth.users
-    WHERE deleted_at IS NULL
-    ORDER BY created_at DESC
-  `;
-  return NextResponse.json({
-    users,
-    dashboardUserCount: Math.max(publicUserCount, authUserCount[0]?.count || 0)
-  });
+  try {
+    // Fetch users from the public User table with all their data
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        subscriptionTier: true,
+        subscriptionStatus: true,
+        generationsUsed: true,
+        generationsLimit: true,
+        projectsLimit: true,
+        createdAt: true,
+        _count: {
+          select: {
+            Project: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    // Transform the data to match the expected format
+    const transformedUsers = users.map((user) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role || 'user',
+      subscriptionTier: user.subscriptionTier || 'free',
+      subscriptionStatus: user.subscriptionStatus || 'active',
+      generationsUsed: user.generationsUsed || 0,
+      generationsLimit: user.generationsLimit || 10,
+      projectsLimit: user.projectsLimit || 3,
+      projectCount: user._count.Project || 0,
+      projectsThisMonth: 0, // TODO: Calculate from Project.createdAt
+      createdAt: user.createdAt.toISOString(),
+    }));
+
+    return NextResponse.json({
+      users: transformedUsers,
+      dashboardUserCount: users.length,
+    });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch users', users: [] },
+      { status: 500 }
+    );
+  }
 });

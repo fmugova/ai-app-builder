@@ -149,7 +149,7 @@ export function parseMultiFileProject(aiResponse: string): ParseResult {
     }
 
     // Ensure all files have path and content
-    const validFiles = parsed.files.every((f: any) => f.path && f.content);
+    const validFiles = parsed.files.every((f: { path?: string; content?: string }) => f.path && f.content);
     if (!validFiles) {
       return {
         success: false,

@@ -5,28 +5,15 @@ import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import PromptGuide from '@/components/PromptGuide';
 import toast from 'react-hot-toast';
 import { Loader2, Sparkles, Wand2 } from 'lucide-react';
 
 // Dynamically import to avoid SSR issues
 const CodeQualityReport = dynamic(() => import('@/components/CodeQualityReport'), { ssr: false });
 
-interface ValidationResult {
-  passed: boolean;
-  score: number;
-  errors: any[];
-  warnings: any[];
-  info: any[];
-  summary: {
-    total: number;
-    errors: number;
-    warnings: number;
-    info: number;
-    score: number;
-    grade: string;
-    status: string;
-  };
-}
+// Import official ValidationResult type
+import type { ValidationResult } from '@/lib/validators/code-validator';
 
 interface AutoFixResult {
   fixed: string;
@@ -175,11 +162,14 @@ export default function ChatPage() {
     <div className="container mx-auto py-8 px-4 max-w-6xl">
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold mb-2">AI Code Generator</h1>
-          <p className="text-muted-foreground">
-            Generate production-ready code with automatic quality validation and fixing
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">AI Code Generator</h1>
+            <p className="text-muted-foreground">
+              Generate production-ready code with automatic quality validation and fixing
+            </p>
+          </div>
+          <PromptGuide onSelectExample={setPrompt} />
         </div>
 
         {/* Input Section */}
@@ -190,15 +180,15 @@ export default function ChatPage() {
               Describe Your Application
             </CardTitle>
             <CardDescription>
-              Tell us what you want to build and we'll generate the code with quality checks
+              Tell us what you want to build and we&apos;ll generate the code with quality checks
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Textarea
-              placeholder="Example: Create a todo app with add, edit, delete functionality and local storage..."
+              placeholder="Describe your application... (Click 'Prompt Guide' for examples and best practices)"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              rows={4}
+              rows={6}
               className="resize-none"
               disabled={isGenerating}
             />
@@ -269,11 +259,11 @@ export default function ChatPage() {
             <CardContent className="pt-6">
               <h3 className="font-semibold mb-2">💡 Tips for better results:</h3>
               <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                <li>Click &quot;Prompt Guide&quot; above for detailed examples and best practices</li>
                 <li>Be specific about features and functionality</li>
                 <li>Mention the type of application (todo app, landing page, dashboard, etc.)</li>
                 <li>Include any specific styling or design preferences</li>
                 <li>Our AI automatically validates and fixes common issues</li>
-                <li>You can manually trigger auto-fix if needed</li>
               </ul>
             </CardContent>
           </Card>

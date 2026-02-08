@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { z } from 'zod'
-import type { ZodError } from 'zod'
 
 export const dynamic = 'force-dynamic'
 

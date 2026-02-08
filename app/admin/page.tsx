@@ -104,7 +104,7 @@ export default function AdminDashboard() {
         const res = await fetch('/api/admin/check')
         const data = await res.json()
         setIsAdmin(data.isAdmin)
-      } catch (error) {
+      } catch (_error) {
         setIsAdmin(false)
       } finally {
         setCheckingAdmin(false) // Add this
@@ -129,7 +129,7 @@ export default function AdminDashboard() {
     }
 
     loadData()
-  }, [session, status, isAdmin, checkingAdmin]) // Add checkingAdmin to dependencies
+  }, [session, status, isAdmin, checkingAdmin, router])
 
   const loadData = async () => {
     try {
@@ -363,7 +363,7 @@ export default function AdminDashboard() {
       } else {
         toast.error('❌ Failed to send response', { id: 'respond-feedback' })
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('❌ Error sending response', { id: 'respond-feedback' })
     }
   }
@@ -409,7 +409,7 @@ export default function AdminDashboard() {
       } else {
         toast.error('❌ Bulk update failed', { id: 'bulk-update' })
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('❌ Error during bulk update', { id: 'bulk-update' })
     }
   }

@@ -519,3 +519,9 @@ class CodeValidator {
 
 // Export as default
 export default CodeValidator
+
+// Named export for convenience
+export function validateCode(html: string, css: string = '', js: string = ''): ValidationResult {
+  const validator = new CodeValidator()
+  return validator.validateAll(html, css, js)
+}

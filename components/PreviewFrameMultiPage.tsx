@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { AlertTriangle, CheckCircle, XCircle, Eye, Home } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { AlertTriangle, Eye, Home } from 'lucide-react'
 
 interface Page {
   id: string

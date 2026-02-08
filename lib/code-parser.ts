@@ -17,7 +17,25 @@ export interface ParsedCode {
  * Updated with robust streaming-aware parsing
  */
 export function parseGeneratedCode(content: string): ParsedCode {
+  // CRITICAL: Clean markdown artifacts AND code fences first
   content = cleanMarkdownArtifacts(content);
+  
+  // Also strip code fences that AI often adds
+  const originalLength = content.length;
+  content = content
+    .replace(/^```html\s*\n?/gm, '')
+    .replace(/^```javascript\s*\n?/gm, '')
+    .replace(/^```js\s*\n?/gm, '')
+    .replace(/^```css\s*\n?/gm, '')
+    .replace(/^```typescript\s*\n?/gm, '')
+    .replace(/^```ts\s*\n?/gm, '')
+    .replace(/^```\s*\n?/gm, '')
+    .replace(/\n?```\s*$/gm, '')
+    .trim();
+  
+  if (originalLength !== content.length) {
+    console.log('🧹 Stripped markdown fences:', originalLength - content.length, 'chars removed');
+  }
 
   // Try strict parsing first, then fall back to flexible parsing
   let html = extractCodeBlock(content, 'html');
@@ -51,7 +69,17 @@ export function parseGeneratedCode(content: string): ParsedCode {
       const scripts: string[] = [];
       for (const match of scriptMatches) {
         if (match[1] && match[1].trim()) {
-          scripts.push(match[1].trim());
+          const scriptContent = match[1].trim();
+          
+          // Skip malformed script blocks containing HTML tags (but allow < > in legitimate JS like comparisons, template literals)
+          // Check for actual HTML tags like <div>, <p>, etc. but allow mathematical comparisons and template strings
+          const hasHTMLTags = /<[a-zA-Z][a-zA-Z0-9]*[^>]*>/g.test(scriptContent.replace(/`[\s\S]*?`/g, '')); // Remove template literals first
+          if (hasHTMLTags) {
+            console.warn('⚠️ Skipping malformed script block containing HTML tags');
+            continue;
+          }
+          
+          scripts.push(scriptContent);
         }
       }
       if (scripts.length > 0) {
@@ -275,6 +303,24 @@ export function cleanMarkdownArtifacts(content: string): string {
   content = content.replace(/\*\*HTML\*\*/gi, '');
   content = content.replace(/\*\*CSS\*\*/gi, '');
   content = content.replace(/\*\*JavaScript\*\*/gi, '');
+  
+  // Remove AI's explanatory text at the beginning (e.g., "I'll create...", "Here's a...", etc.)
+  content = content.replace(/^(?:I'll|I will|Here's|Here is|This is|Let me|This will|I've|I have created?|I created?)\s+.+?\n+(?=<!DOCTYPE|<html)/is, '');
+  
+  // Remove validation checklist sections at the end (multiple patterns)
+  content = content.replace(/\n*##\s*Validation\s*Checklist[\s\S]*?(?=\n*$|$)/gi, '');
+  content = content.replace(/\n*\*\*VALIDATION CHECKLIST.*?\*\*[\s\S]*?(?=\n*$|$)/gi, '');
+  content = content.replace(/\n*VALIDATION CHECKLIST.*?(?:\n.*?)*?(?=\n*$|$)/gi, '');
+  content = content.replace(/\n*✅.*?VERIFICATION.*?[\s\S]*?(?=\n*$|$)/gi, '');
+  content = content.replace(/\n*##\s*Features[\s\S]*?(?=\n*$|$)/gi, '');
+  content = content.replace(/\n*The\s+(?:portfolio|app|application)\s+includes:[\s\S]*?(?=\n*$|$)/gi, '');
+  
+  // Remove any markdown lists or explanations after </html>
+  content = content.replace(/(<\/html>)\s*\n+[-*]\s+.*?[\s\S]*$/i, '$1');
+  content = content.replace(/(<\/html>)\s*\n+##\s+.*?[\s\S]*$/i, '$1');
+  
+  // Remove any trailing explanatory text after </html>
+  content = content.replace(/(<\/html>)[\s\S]*$/i, '$1');
   
   // Clean up any extra backticks outside of code blocks
   // But preserve the code fence markers themselves

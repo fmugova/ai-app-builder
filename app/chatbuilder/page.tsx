@@ -5,10 +5,12 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'react-hot-toast';
+import { stripMarkdownCodeFences } from '@/lib/utils';
 import PreviewFrame from '@/components/PreviewFrame';
 import MultiFileProjectSetup from '@/components/MultiFileProjectSetup';
 import CodeFileViewer from '@/components/CodeFileViewer';
-import { AlertTriangle, CheckCircle, XCircle, Download, Copy, Github, ExternalLink, Save, Sparkles, RefreshCw, Upload, Link as LinkIcon, Code2, Lightbulb, Menu, X } from 'lucide-react';
+import PromptTemplates from '@/components/PromptTemplates';
+import { AlertTriangle, CheckCircle, XCircle, Download, Copy, Github, ExternalLink, Save, Sparkles, RefreshCw, Upload, Link as LinkIcon, Code2, Lightbulb, Menu, X, Wand2 } from 'lucide-react';
 
 // Types remain the same as before...
 interface ValidationMessage {
@@ -383,7 +385,7 @@ export default function ChatBuilder() {
                   progress: 90,
                   currentStep: 'Validating code...',
                 }));
-                setShowCodeQuality(true);
+                // Don't auto-show code quality panel - user can toggle manually if needed
               }
 
               if (data.projectId) {
@@ -466,6 +468,133 @@ export default function ChatBuilder() {
     }
   }, [prompt, currentProjectId, projectName]);
 
+  // Regenerate & Fix function - Uses validation feedback loop with API
+  const handleRegenerateFix = useCallback(async () => {
+    if (!state.validation) {
+      toast.error('No validation data available');
+      return;
+    }
+
+    // Extract error messages for API feedback loop
+    const errorMessages = [
+      ...state.validation.errors.map(e => e.message),
+      ...state.validation.warnings.map(w => w.message)
+    ];
+
+    if (errorMessages.length === 0) {
+      toast('No issues to fix');
+      return;
+    }
+
+    setState(prev => ({ 
+      ...prev, 
+      isGenerating: true, 
+      html: '', 
+      css: '', 
+      js: '', 
+      fullCode: '', 
+      progress: 0, 
+      currentStep: 'Regenerating with validation feedback...' 
+    }));
+
+    toast.loading('Regenerating with auto-fix for validation errors...');
+
+    try {
+      const requestBody: { 
+        prompt: string; 
+        projectId?: string;
+        previousErrors: string[];
+      } = { 
+        prompt,
+        previousErrors: errorMessages
+      };
+      
+      if (currentProjectId && currentProjectId.trim()) {
+        requestBody.projectId = currentProjectId;
+      }
+      
+      const response = await fetch('/api/chatbot/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        throw new Error('Regeneration failed');
+      }
+
+      setState(prev => ({ ...prev, progress: 10, currentStep: 'Connected to AI...' }));
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedCode = '';
+      let chunkCount = 0;
+
+      while (true) {
+        const { done, value } = await reader!.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.code) {
+                accumulatedCode += data.code;
+                chunkCount++;
+                
+                const progress = Math.min(80, 10 + (chunkCount * 0.5));
+                setState(prev => ({ ...prev, progress, currentStep: 'Fixing issues...' }));
+                
+                const { html, css, js } = parseCode(accumulatedCode);
+                
+                setState(prev => ({
+                  ...prev,
+                  html,
+                  css,
+                  js,
+                  fullCode: accumulatedCode,
+                }));
+              }
+
+              if (data.validation) {
+                setState(prev => ({
+                  ...prev,
+                  validation: ensureValidValidation(data.validation),
+                  progress: 90,
+                  currentStep: 'Validating fixes...',
+                }));
+                // Don't auto-show code quality panel - user can toggle manually if needed
+              }
+
+              if (data.done) {
+                setState(prev => ({ ...prev, progress: 100, currentStep: 'Complete!' }));
+                toast.dismiss();
+                toast.success('Code regenerated with validation fixes!');
+                
+                setTimeout(() => {
+                  setState(prev => ({ ...prev, progress: 0, currentStep: '' }));
+                }, 2000);
+              }
+            } catch (e) {
+              console.error('Parse error:', e);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Regeneration error:', error);
+      toast.dismiss();
+      toast.error('Failed to regenerate with fixes');
+      setState(prev => ({ ...prev, progress: 0, currentStep: '' }));
+    } finally {
+      setState(prev => ({ ...prev, isGenerating: false }));
+    }
+  }, [prompt, state.validation, currentProjectId]);
+
   // File upload handler
   const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -512,6 +641,12 @@ export default function ChatBuilder() {
     setPrompt(template);
     setShowPromptGuide(false);
     toast.success('Template applied!');
+  }, []);
+
+  // Template selection handler for PromptTemplates component
+  const handleTemplateSelect = useCallback((templatePrompt: string, _type: string) => {
+    setPrompt(templatePrompt);
+    toast.success('Template loaded! Click Generate to create your app.');
   }, []);
 
   // Other handlers remain the same...
@@ -799,6 +934,46 @@ Generate complete, production-ready code that fixes ALL issues above.`;
     window.open(`/preview/${currentProjectId}`, '_blank');
   }, [currentProjectId, state.fullCode, handleSave]);
 
+  // Test markdown stripping (development only)
+  const testMarkdownStripping = useCallback(() => {
+    const testCode = `\`\`\`html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Test</title>
+</head>
+<body>
+  <h1>Test with markdown fences</h1>
+</body>
+</html>
+\`\`\``;
+
+    console.log('🧪 MARKDOWN STRIPPING TEST');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📝 Original code (with fences):');
+    console.log(testCode);
+    console.log('');
+    
+    const cleaned = stripMarkdownCodeFences(testCode);
+    
+    console.log('✨ Cleaned code (fences removed):');
+    console.log(cleaned);
+    console.log('');
+    console.log('📊 Results:');
+    console.log(`  Original length: ${testCode.length}`);
+    console.log(`  Cleaned length: ${cleaned.length}`);
+    console.log(`  Characters removed: ${testCode.length - cleaned.length}`);
+    console.log(`  Still has markdown: ${cleaned.includes('\`\`\`') ? '❌ YES (FAILED)' : '✅ NO (PASSED)'}`);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    if (cleaned.includes('\`\`\`')) {
+      toast.error('❌ Markdown stripping test FAILED - fences still present!');
+    } else {
+      toast.success('✅ Markdown stripping test PASSED!');
+    }
+  }, []);
+
   if (status === 'loading' || isLoadingProject) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
@@ -861,6 +1036,17 @@ Generate complete, production-ready code that fixes ALL issues above.`;
                 <span className="text-xs sm:text-sm font-medium">
                   Quality: {state.validation.validationScore}/100
                 </span>
+              </button>
+            )}
+
+            {/* Test Button (Development Only) */}
+            {process.env.NODE_ENV === 'development' && (
+              <button
+                onClick={testMarkdownStripping}
+                className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors text-xs font-medium"
+                title="Test markdown fence stripping (check console)"
+              >
+                🧪 Test Fences
               </button>
             )}
           </div>
@@ -1026,6 +1212,11 @@ Generate complete, production-ready code that fixes ALL issues above.`;
                 </button>
               </div>
 
+              {/* Quick Start Templates */}
+              <div className="mb-4">
+                <PromptTemplates onSelect={handleTemplateSelect} />
+              </div>
+
               {/* Prompt Guide */}
               {showPromptGuide && (
                 <div className="mb-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
@@ -1066,6 +1257,18 @@ Generate complete, production-ready code that fixes ALL issues above.`;
                 className="w-full h-32 sm:h-40 p-3 sm:p-4 text-sm sm:text-base text-gray-900 placeholder-gray-500 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
                 disabled={state.isGenerating}
               />
+
+              {/* Iteration Mode Indicator */}
+              {state.fullCode && !state.isGenerating && (
+                <div className="mt-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                  <p className="text-xs sm:text-sm text-purple-800 flex items-center gap-2">
+                    <RefreshCw className="w-4 h-4" />
+                    <span>
+                      <strong>Iteration Mode:</strong> Modify your prompt above to add features, change design, or refine functionality, then click &quot;Generate App&quot; again.
+                    </span>
+                  </p>
+                </div>
+              )}
 
               {/* Upload & Parse Section */}
               <div className="mt-4 pt-4 border-t border-gray-200">
@@ -1125,6 +1328,11 @@ Generate complete, production-ready code that fixes ALL issues above.`;
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                     <span className="text-sm sm:text-base">Generating...</span>
+                  </>
+                ) : state.fullCode ? (
+                  <>
+                    <RefreshCw className="w-5 h-5" />
+                    <span className="text-sm sm:text-base">Regenerate with Changes</span>
                   </>
                 ) : (
                   <>
@@ -1223,10 +1431,28 @@ Generate complete, production-ready code that fixes ALL issues above.`;
                   onClick={handleGenerate}
                   disabled={state.isGenerating}
                   className="mt-4 w-full bg-purple-100 hover:bg-purple-200 text-purple-700 px-4 py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 text-sm sm:text-base"
+                  title="Regenerate using the current prompt text (modify prompt above to add changes)"
                 >
                   <RefreshCw className="w-4 h-4" />
-                  Regenerate
+                  Regenerate from Prompt
                 </button>
+                
+                {/* Iteration Helper Text */}
+                <p className="mt-2 text-xs text-gray-600 text-center">
+                  💡 Tip: Edit your prompt above to add features or make changes, then regenerate
+                </p>
+
+                {/* Regenerate & Fix Button - Only show if there are validation issues */}
+                {state.validation && !state.validation.validationPassed && (
+                  <button
+                    onClick={handleRegenerateFix}
+                    disabled={state.isGenerating}
+                    className="mt-3 w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-4 py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 text-sm sm:text-base shadow-md"
+                  >
+                    <Wand2 className="w-4 h-4" />
+                    Regenerate & Fix Issues
+                  </button>
+                )}
               </div>
             )}
 
@@ -1242,6 +1468,7 @@ Generate complete, production-ready code that fixes ALL issues above.`;
                 onDeploy={handlePublishVercel}
               />
             )}
+
 
             {/* View Code Modal */}
             {showViewCode && state.fullCode && (
@@ -1318,11 +1545,47 @@ Generate complete, production-ready code that fixes ALL issues above.`;
 
 // Helper Functions
 function parseCode(fullCode: string): { html: string; css: string; js: string } {
-  const html = fullCode;
-  const cssMatch = fullCode.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
-  const css = cssMatch ? cssMatch[1] : '';
-  const jsMatches = fullCode.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi);
-  const js = Array.from(jsMatches).map(match => match[1]).join('\n\n');
+  console.log('📝 Starting code parse...');
+  
+  // CRITICAL: Strip markdown code fences first using utility function
+  const cleanedCode = stripMarkdownCodeFences(fullCode);
+  
+  const html = cleanedCode;
+  
+  // Extract CSS
+  const cssMatch = cleanedCode.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+  const css = cssMatch ? cssMatch[1].trim() : '';
+  
+  // Extract JavaScript - IMPROVED to skip malformed blocks
+  const jsMatches = cleanedCode.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi);
+  const jsBlocks: string[] = [];
+  
+  for (const match of jsMatches) {
+    const scriptContent = match[1].trim();
+    
+    // Skip empty scripts
+    if (!scriptContent) continue;
+    
+    // Skip if it's malformed (contains actual HTML tags like <div>, <p>, etc.)
+    // But allow < > in legitimate JS (comparisons, template literals)
+    const hasHTMLTags = /<[a-zA-Z][a-zA-Z0-9]*[^>]*>/g.test(scriptContent.replace(/`[\s\S]*?`/g, '')); // Remove template literals first
+    if (hasHTMLTags) {
+      console.warn('⚠️ Skipping malformed script block containing HTML tags');
+      continue;
+    }
+    
+    jsBlocks.push(scriptContent);
+  }
+  
+  const js = jsBlocks.join('\n\n');
+  
+  console.log('📝 Parsed code:', {
+    htmlLength: html.length,
+    cssLength: css.length,
+    jsLength: js.length,
+    jsBlocksFound: jsBlocks.length,
+  });
+  
   return { html, css, js };
 }
 

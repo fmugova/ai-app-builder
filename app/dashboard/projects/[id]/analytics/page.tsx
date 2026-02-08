@@ -1,6 +1,5 @@
 'use client'
 
-import type { Page } from '@prisma/client';
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'

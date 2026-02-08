@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
+import type { ValidationResult } from '@/lib/validators/code-validator';
+import type { AutoFixResult } from '@/lib/validators/auto-fixer';
 
 const CodeQualityReport = dynamic(() => import('@/components/CodeQualityReport'), { ssr: false });
 import { Button } from '@/components/ui/button';
@@ -20,8 +22,8 @@ export default function ValidationExamplePage() {
 </body>
 </html>`);
 
-  const [validationResult, setValidationResult] = useState<any>(null);
-  const [autoFixResult, setAutoFixResult] = useState<any>(null);
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+  const [autoFixResult, setAutoFixResult] = useState<AutoFixResult | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [isFixing, setIsFixing] = useState(false);
 
@@ -123,7 +125,7 @@ export default function ValidationExamplePage() {
                 validationResult={validationResult}
                 onAutoFix={handleAutoFix}
                 isFixing={isFixing}
-                autoFixResult={autoFixResult}
+                autoFixResult={autoFixResult ?? undefined}
               />
             ) : (
               <Card>
@@ -154,7 +156,7 @@ export default function ValidationExamplePage() {
                   <li>Missing charset meta tag</li>
                   <li>Missing viewport meta tag</li>
                   <li>Missing lang attribute on html tag</li>
-                  <li>Images without loading="lazy"</li>
+                  <li>Images without loading=&quot;lazy&quot;</li>
                   <li>External links without rel attribute</li>
                 </ul>
               </div>

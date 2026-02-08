@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkUserRateLimit, createRateLimitResponse } from '@/lib/rate-limit'
 import { z } from 'zod'
-import type { ZodError } from 'zod'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import Anthropic from '@anthropic-ai/sdk'
 import type { MessageCreateParams } from '@anthropic-ai/sdk/resources/messages'
 import prisma from '@/lib/prisma'
-import { parseGeneratedCode, analyzeCodeQuality, checkCSPViolations, completeIncompleteHTML } from '@/lib/code-parser'
+import { parseGeneratedCode, analyzeCodeQuality, completeIncompleteHTML } from '@/lib/code-parser'
 import { enhanceGeneratedCode } from '@/lib/code-enhancer'
+import { validateCode } from '@/lib/validators/code-validator'
+import { autoFixCode } from '@/lib/validators/auto-fixer'
+import { ensureValidHTML } from '@/lib/templates/htmlTemplate'
 import { ProjectStatus } from '@prisma/client'
 import { apiQueue } from '@/lib/api-queue'
 
@@ -446,7 +448,66 @@ export async function POST(req: NextRequest) {
 </html>`
           }
 
-          // Send the parsed HTML to the client IMMEDIATELY
+          // ============================================================================
+          // CRITICAL: VALIDATION & AUTO-FIX PIPELINE
+          // ============================================================================
+          
+          console.log('📝 Generated code length:', completeHtml.length)
+          
+          // Step 1: Validate generated code
+          console.log('🔍 Validating generated code...')
+          let validation = validateCode(completeHtml)
+          
+          console.log('📊 Initial validation:', {
+            score: validation.score,
+            passed: validation.passed,
+            errors: validation.summary.errors,
+            warnings: validation.summary.warnings,
+          })
+
+          // Step 2: Apply auto-fix if there are issues
+          let autoFixResult = null
+          if (validation.summary.errors > 0 || validation.summary.warnings > 0) {
+            console.log('🔧 Applying server-side auto-fix...')
+            autoFixResult = autoFixCode(completeHtml, validation)
+            
+            console.log('✅ Server applied fixes:', autoFixResult.appliedFixes)
+            console.log('📏 Code length change:', completeHtml.length, '→', autoFixResult.fixed.length)
+            
+            // Update with fixed code
+            completeHtml = autoFixResult.fixed
+
+            // Re-validate after auto-fix
+            validation = validateCode(completeHtml)
+            console.log('📊 After auto-fix validation:', {
+              score: validation.score,
+              passed: validation.passed,
+              errors: validation.summary.errors,
+              warnings: validation.summary.warnings,
+            })
+          }
+
+          // Step 3: Apply template wrapper as final safety net (only if needed)
+          const projectTitle = prompt.split('\n')[0].slice(0, 50) || 'Generated Project'
+          
+          // Only wrap if score is too low (< 90)
+          if (validation.score < 90) {
+            console.log('⚠️ Score too low (' + validation.score + '), applying template wrapper');
+            completeHtml = ensureValidHTML(completeHtml, projectTitle)
+            
+            // Step 4: Final validation after template wrapper
+            validation = validateCode(completeHtml)
+            console.log('📊 Final validation after template wrapper:', {
+              score: validation.score,
+              passed: validation.passed,
+              errors: validation.summary.errors,
+              warnings: validation.summary.warnings,
+            })
+          } else {
+            console.log('✅ Score acceptable (' + validation.score + '), skipping template wrapper');
+          }
+
+          // Send the validated & fixed HTML to the client
           if (completeHtml) {
             const htmlEvent: StreamEvent = {
               type: 'html',
@@ -485,14 +546,22 @@ export async function POST(req: NextRequest) {
                   jsValid: parsed.jsValid,
                   jsError: parsed.jsError,
 
-                  // Validation results
-                  validationScore: quality.score,
-                  validationPassed: quality.score >= 70,
-                  validationErrors: quality.issues,
-                  validationWarnings: quality.warnings,
-                  cspViolations: parsed.html && parsed.javascript 
-                    ? checkCSPViolations(parsed.html, parsed.javascript)
-                    : [],
+                  // Validation results (from new validation system)
+                  validationScore: BigInt(Math.round(validation.score)),
+                  validationPassed: validation.passed,
+                  validationErrors: JSON.stringify(validation.errors.map(e => ({
+                    severity: e.severity || 'error',
+                    message: e.message,
+                    line: e.line,
+                    column: e.column,
+                  }))),
+                  validationWarnings: JSON.stringify(validation.warnings.map(w => ({
+                    severity: w.severity || 'warning',
+                    message: w.message,
+                    line: w.line,
+                    column: w.column,
+                  }))),
+                  cspViolations: JSON.stringify([]),
 
                   // Metadata
                   status: parsed.isComplete ? ProjectStatus.COMPLETED : ProjectStatus.GENERATING,
