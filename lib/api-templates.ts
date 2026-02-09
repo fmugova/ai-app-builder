@@ -338,12 +338,21 @@ export async function POST(req: Request) {
       data: { name, email, message }
     })
 
-    // TODO: Send email notification
-    // await sendEmail({
-    //   to: process.env.CONTACT_EMAIL,
-    //   subject: 'New Contact Form Submission',
-    //   body: \`Name: \${name}\\nEmail: \${email}\\nMessage: \${message}\`
-    // })
+    // Send email notification
+    try {
+      const { sendEmail, emailTemplates } = await import('@/lib/email-service')
+      const template = emailTemplates.contactFormNotification({ name, email, message })
+      await sendEmail({
+        to: process.env.CONTACT_EMAIL || process.env.EMAIL_FROM || 'admin@example.com',
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
+        replyTo: email // Allow direct reply to submitter
+      })
+    } catch (emailError) {
+      console.error('Failed to send contact notification:', emailError)
+      // Don't fail the request if email fails
+    }
 
     return NextResponse.json({
       success: true,
@@ -411,12 +420,20 @@ export async function POST(req: Request) {
       data: { email, name, status: 'active' }
     })
 
-    // TODO: Send welcome email
-    // await sendEmail({
-    //   to: email,
-    //   subject: 'Welcome to our newsletter!',
-    //   body: 'Thank you for subscribing...'
-    // })
+    // Send welcome email
+    try {
+      const { sendEmail, emailTemplates } = await import('@/lib/email-service')
+      const template = emailTemplates.newsletterWelcome({ name })
+      await sendEmail({
+        to: email,
+        subject: template.subject,
+        html: template.html,
+        text: template.text
+      })
+    } catch (emailError) {
+      console.error('Failed to send welcome email:', emailError)
+      // Don't fail the request if email fails
+    }
 
     return NextResponse.json({
       success: true,

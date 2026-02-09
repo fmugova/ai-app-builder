@@ -7,7 +7,7 @@ import { parseMultiPageHTML, validatePages } from '@/lib/multi-page-parser';
 
 // Validation schema
 const projectSaveSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().optional(),
   name: z.string().min(1, 'Name is required').max(255, 'Name too long'),
   code: z.string().max(500000, 'Code exceeds 500KB limit'),
   validation: z.object({

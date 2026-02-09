@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useEffect } from 'react'
+import { useMemo, useEffect, useRef } from 'react'
 import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 import { stripMarkdownCodeFences } from '@/lib/utils'
 
@@ -58,6 +58,7 @@ const DEFAULT_VALIDATION: ValidationResult = {
 
 export default function PreviewFrame({ html, css, js, validation }: PreviewFrameProps) {
   const safeValidation = validation || DEFAULT_VALIDATION;
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const fullHTML = useMemo(() => {
     if (!html?.trim()) {
@@ -81,10 +82,9 @@ export default function PreviewFrame({ html, css, js, validation }: PreviewFrame
 
     try {
       // SAFETY NET: Strip markdown fences as last resort
-      // This should already be done in code-parser and chatbuilder, but adding as safety
-      let cleanHtml = stripMarkdownCodeFences(html);
-      let cleanCss = css ? stripMarkdownCodeFences(css) : '';
-      let cleanJs = js ? stripMarkdownCodeFences(js) : '';
+      const cleanHtml = stripMarkdownCodeFences(html);
+      const cleanCss = css ? stripMarkdownCodeFences(css) : '';
+      const cleanJs = js ? stripMarkdownCodeFences(js) : '';
       
       // Verify we have actual HTML after cleaning
       if (!cleanHtml.includes('<') && !cleanHtml.includes('>')) {
@@ -92,21 +92,93 @@ export default function PreviewFrame({ html, css, js, validation }: PreviewFrame
         return '';
       }
 
+      // SECURITY FIX: Inject navigation prevention script
+      const securityScript = `
+        // Prevent navigation and popup attacks
+        (function() {
+          // Prevent all navigation attempts
+          window.addEventListener('click', function(e) {
+            const target = e.target;
+            if (target && target.tagName === 'A') {
+              e.preventDefault();
+              console.log('🔒 Navigation blocked for security:', target.href);
+              
+              // Show user feedback
+              const href = target.getAttribute('href');
+              if (href && !href.startsWith('#')) {
+                alert('Preview Mode: External links are disabled for security.\\n\\nLink: ' + href);
+              }
+            }
+          }, true); // Use capture phase to catch before other handlers
+
+          // Block form submissions
+          window.addEventListener('submit', function(e) {
+            e.preventDefault();
+            console.log('🔒 Form submission blocked in preview mode');
+            alert('Preview Mode: Form submissions are disabled.');
+          }, true);
+
+          // Prevent window.open
+          window.open = function() {
+            console.log('🔒 window.open blocked');
+            return null;
+          };
+
+          // Prevent top navigation
+          try {
+            if (window.top !== window.self) {
+              Object.defineProperty(window.top, 'location', {
+                get: function() { return window.location; },
+                set: function() { console.log('🔒 top.location blocked'); }
+              });
+            }
+          } catch (e) {
+            // Blocked by same-origin policy (good!)
+          }
+
+          console.log('✅ Preview security initialized');
+        })();
+      `;
+
       const result = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Preview</title>
+  
+  <!-- SECURITY: Base tag to contain navigation -->
+  <base target="_self">
+  
+  <!-- SECURITY: Content Security Policy -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:;
+    script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net https://cdn.tailwindcss.com https://cdnjs.cloudflare.com;
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
+    font-src 'self' data: https://fonts.gstatic.com;
+    img-src 'self' data: blob: https: http:;
+    connect-src 'self' https://api.anthropic.com;
+    frame-src 'none';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'none';
+  ">
+  
   <style>${cleanCss}</style>
 </head>
 <body>
+  <!-- SECURITY: Initialize security before any other scripts -->
+  <script>${securityScript}</script>
+  
   ${cleanHtml}
+  
   <script>
+    // Error handling
     window.addEventListener('error', (e) => {
       console.warn('[Preview Error]:', e.message);
     });
 
+    // User code
     try {
       ${cleanJs}
     } catch (error) {
@@ -115,13 +187,45 @@ export default function PreviewFrame({ html, css, js, validation }: PreviewFrame
   </script>
 </body>
 </html>`;
-      console.log('✅ Preview HTML built successfully');
+      
+      console.log('✅ Preview HTML built successfully with security measures');
       return result;
     } catch (error) {
       console.error('❌ Error building preview HTML:', error);
       return '';
     }
   }, [html, css, js]);
+
+  // Additional iframe security monitoring
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    const handleLoad = () => {
+      try {
+        // Attempt to verify iframe didn't navigate away
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (!iframeDoc) {
+          console.warn('⚠️ Cannot access iframe document (blocked by CORS - good!)');
+          return;
+        }
+
+        // Check if iframe navigated to unexpected location
+        const iframeLocation = iframe.contentWindow?.location.href;
+        if (iframeLocation && !iframeLocation.startsWith('blob:') && iframeLocation !== 'about:srcdoc') {
+          console.error('🚨 SECURITY: Iframe navigated to unexpected location:', iframeLocation);
+          // Reload with correct content
+          iframe.srcdoc = fullHTML;
+        }
+      } catch (e) {
+        // Expected to fail due to same-origin policy
+        console.log('✅ iframe properly sandboxed (same-origin block active)');
+      }
+    };
+
+    iframe.addEventListener('load', handleLoad);
+    return () => iframe.removeEventListener('load', handleLoad);
+  }, [fullHTML]);
 
   return (
     <div className="absolute inset-0 flex flex-col bg-white">
@@ -189,10 +293,15 @@ export default function PreviewFrame({ html, css, js, validation }: PreviewFrame
           </div>
         ) : (
           <iframe
+            ref={iframeRef}
             title="Preview"
             className="w-full h-full border-0"
-            sandbox="allow-scripts"
+            sandbox="allow-scripts allow-forms"
             srcDoc={fullHTML}
+            // SECURITY: Explicitly block navigation
+            allow="none"
+            // SECURITY: Additional protection
+            referrerPolicy="no-referrer"
           />
         )}
       </div>

@@ -20,7 +20,7 @@ import { apiQueue } from '@/lib/api-queue'
 
 const generateRequestSchema = z.object({
   prompt: z.string().min(1, 'Prompt is required').max(10000, 'Prompt too long'),
-  projectId: z.string().uuid().optional(),
+  projectId: z.string().optional(),
   generationType: z.string().max(50).optional(),
   retryAttempt: z.number().int().min(0).max(5).optional(),
   continuationContext: z.string().max(50000).optional()

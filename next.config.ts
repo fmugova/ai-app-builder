@@ -30,12 +30,30 @@ const nextConfig: NextConfig = {
       }
     }
 
+    // Exclude esbuild binary files from bundling
+    config.module.rules.push({
+      test: /\.exe$/,
+      type: 'asset/resource',
+      generator: {
+        emit: false,
+      },
+    })
+
+    config.module.rules.push({
+      test: /node_modules\/@esbuild\/.*\/README\.md$/,
+      type: 'asset/resource',
+      generator: {
+        emit: false,
+      },
+    })
+
     return config
   },
 
   serverExternalPackages: [
     '@prisma/client',
     'bcryptjs',
+    'esbuild',
   ],
 
   async headers() {

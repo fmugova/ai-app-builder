@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { prisma } from '@/lib/prisma'
 import { sendEmail, getSubscriptionSuccessHTML } from '@/lib/email'
+import { logWebhookEvent, updateWebhookEvent, isWebhookEventProcessed } from '@/lib/webhook-logger'
 
 // Server-side analytics logging (GA tracking happens client-side)
 const logAnalyticsEvent = (event: string, properties?: Record<string, any>) => {
@@ -18,6 +19,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
 
 export async function POST(request: NextRequest) {
+  let webhookLogId: string = ''
+  
   try {
     const body = await request.text()
     const signature = request.headers.get('stripe-signature')!
@@ -28,11 +31,40 @@ export async function POST(request: NextRequest) {
       event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
     } catch (err: any) {
       console.error('Webhook signature verification failed:', err.message)
+      
+      // Log failed signature verification
+      await logWebhookEvent(
+        {
+          provider: 'stripe',
+          eventType: 'signature_verification_failed',
+          data: { error: err.message },
+        },
+        { status: 'failed', error: err.message }
+      )
+      
       return NextResponse.json(
         { error: 'Webhook signature verification failed' },
         { status: 400 }
       )
     }
+
+    // Check for duplicate event
+    if (event.id && await isWebhookEventProcessed('stripe', event.id)) {
+      console.log(`⏭️ Skipping duplicate webhook event: ${event.id}`)
+      return NextResponse.json({ received: true, status: 'duplicate' })
+    }
+
+    // Log webhook event
+    webhookLogId = await logWebhookEvent({
+      provider: 'stripe',
+      eventType: event.type,
+      eventId: event.id,
+      data: event.data.object,
+      metadata: {
+        livemode: event.livemode,
+        apiVersion: event.api_version,
+      },
+    })
 
     // Handle the event
     switch (event.type) {
@@ -133,6 +165,15 @@ export async function POST(request: NextRequest) {
         })
 
         console.log(`✅ Subscription created for user: ${session.metadata.userId}`)
+        
+        // Update webhook log with user ID
+        if (webhookLogId && session.metadata.userId) {
+          await prisma.webhookEvent.update({
+            where: { id: webhookLogId },
+            data: { userId: session.metadata.userId },
+          }).catch(() => {})
+        }
+        
         break
       }
 
@@ -234,9 +275,20 @@ export async function POST(request: NextRequest) {
         console.log(`Unhandled event type: ${event.type}`)
     }
 
+    // Mark webhook as processed
+    if (webhookLogId) {
+      await updateWebhookEvent(webhookLogId, 'processed')
+    }
+
     return NextResponse.json({ received: true })
   } catch (error: any) {
     console.error('Webhook error:', error)
+    
+    // Mark webhook as failed
+    if (webhookLogId) {
+      await updateWebhookEvent(webhookLogId, 'failed', error.message)
+    }
+    
     return NextResponse.json(
       { error: 'Webhook handler failed' },
       { status: 500 }

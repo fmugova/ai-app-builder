@@ -520,7 +520,9 @@ export default function ChatBuilder() {
       });
 
       if (!response.ok) {
-        throw new Error('Regeneration failed');
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || errorData.message || `Regeneration failed (${response.status})`;
+        throw new Error(errorMessage);
       }
 
       setState(prev => ({ ...prev, progress: 10, currentStep: 'Connected to AI...' }));
@@ -842,7 +844,11 @@ Generate complete, production-ready code that fixes ALL issues above.`;
         body: JSON.stringify({ projectId: currentProjectId }),
       });
 
-      if (!response.ok) throw new Error('Vercel deploy failed');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || errorData.message || 'Vercel deploy failed';
+        throw new Error(errorMessage);
+      }
 
       const data = await response.json();
       toast.dismiss();
@@ -870,7 +876,11 @@ Generate complete, production-ready code that fixes ALL issues above.`;
         body: JSON.stringify({ projectId: currentProjectId }),
       });
 
-      if (!response.ok) throw new Error('GitHub deploy failed');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || errorData.message || 'GitHub deploy failed';
+        throw new Error(errorMessage);
+      }
 
       const data = await response.json();
       toast.dismiss();
@@ -898,7 +908,11 @@ Generate complete, production-ready code that fixes ALL issues above.`;
         body: JSON.stringify({ projectId: currentProjectId }),
       });
 
-      if (!response.ok) throw new Error('BuildFlow deploy failed');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || errorData.message || 'BuildFlow deploy failed';
+        throw new Error(errorMessage);
+      }
 
       const data = await response.json();
       toast.dismiss();

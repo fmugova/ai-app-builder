@@ -25,7 +25,7 @@ export const maxDuration = 300
 // Validation schema
 const chatbotRequestSchema = z.object({
   prompt: z.string().min(1, 'Prompt is required').max(10000, 'Prompt too long'),
-  projectId: z.string().uuid().optional(),
+  projectId: z.string().optional(),
   generationType: z.enum(['single-html', 'multi-file']).optional().default('single-html'),
   previousErrors: z.array(z.string()).optional(), // For validation feedback loop
   conversationHistory: z.array(z.object({

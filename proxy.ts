@@ -107,7 +107,9 @@ export async function proxy(request: NextRequest) {
   }
 
   // TEMPORARILY DISABLED: Email verification requirement
-  // TODO: Re-enable once email service is configured in production
+  // Enable email verification once email service is configured in production
+  // Instructions: Set RESEND_API_KEY or SENDGRID_API_KEY in .env.local
+  // Then uncomment the code block below
   /*
   // Check if email is verified (only enforce for new credential signups)
   const emailVerified = token.emailVerified;

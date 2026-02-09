@@ -74,7 +74,7 @@ export async function GET(
     const projects = await prisma.workspaceProject.findMany({
       where: { workspaceId: id },
       include: {
-        project: {
+        Project: {
           select: {
             id: true,
             name: true,

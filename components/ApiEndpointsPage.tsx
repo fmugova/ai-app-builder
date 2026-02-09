@@ -14,9 +14,12 @@ import {
   Lock,
   Terminal,
   CheckCircle2,
-  Sparkles
+  Sparkles,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react'
 import { CreateEndpointModal, CodeViewModal } from './ApiEndpointsModals'
+import APITestingPanel from './APITestingPanel'
 
 interface ApiEndpoint {
   id: string
@@ -48,6 +51,7 @@ export default function ApiEndpointsPage({ projectId, projectName }: Props) {
   const [selectedEndpoint, setSelectedEndpoint] = useState<ApiEndpoint | null>(null)
   const [isCodeModalOpen, setIsCodeModalOpen] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [expandedTestingPanel, setExpandedTestingPanel] = useState<string | null>(null)
 
   useEffect(() => {
     fetchEndpoints()
@@ -309,6 +313,36 @@ export default function ApiEndpointsPage({ projectId, projectName }: Props) {
                     </pre>
                   </div>
 
+                  {/* API Testing Panel Toggle */}
+                  <div className="mt-4">
+                    <button
+                      onClick={() => setExpandedTestingPanel(
+                        expandedTestingPanel === endpoint.id ? null : endpoint.id
+                      )}
+                      className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border border-blue-200 dark:border-blue-800 rounded-lg hover:from-blue-100 hover:to-purple-100 dark:hover:from-blue-900/30 dark:hover:to-purple-900/30 transition-all"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Play className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                        <span className="font-semibold text-blue-900 dark:text-blue-300">
+                          Test API Endpoint
+                        </span>
+                      </div>
+                      {expandedTestingPanel === endpoint.id ? (
+                        <ChevronUp className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      ) : (
+                        <ChevronDown className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      )}
+                    </button>
+
+                    {/* Testing Panel */}
+                    {expandedTestingPanel === endpoint.id && (
+                      <div className="mt-3">
+                        <APITestingPanel endpoint={endpoint} />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 
                   {/* Footer */}
                   <div className="flex items-center justify-between mt-4 text-xs text-gray-500">
                     <span>

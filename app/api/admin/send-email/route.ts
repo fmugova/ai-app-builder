@@ -25,25 +25,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // TODO: Integrate with your email service (SendGrid, Resend, etc.)
-    // For now, just log it
-    console.log('📧 Email to send:', {
+    // Send email using email service
+    const { sendEmail } = await import('@/lib/email-service')
+    const result = await sendEmail({
       to: user.email,
       subject,
-      message
+      html: message,
+      text: message.replace(/<[^>]*>/g, '') // Strip HTML for text version
     })
 
-    // If you have an email service configured:
-    // await sendEmail({
-    //   to: user.email,
-    //   subject,
-    //   html: message
-    // })
+    if (!result.success) {
+      return NextResponse.json({ 
+        error: 'Failed to send email',
+        details: result.error 
+      }, { status: 500 })
+    }
 
-    // For now, just return success
     return NextResponse.json({ 
       success: true,
-      message: 'Email queued for sending (email service not configured)'
+      message: 'Email sent successfully',
+      messageId: result.messageId
     })
   } catch (error) {
     console.error('Send email error:', error)

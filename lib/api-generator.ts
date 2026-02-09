@@ -1,6 +1,10 @@
 // lib/api-generator.ts
 // AI-powered API endpoint code generation
 
+import { validateAPICode, formatValidationIssues } from './api-code-validator'
+import { autoFixCode, fixWarnings, fixSecurityIssues } from './code-auto-fixer'
+import { smartGenerate } from './template-based-generator'
+
 interface GenerateEndpointParams {
   description: string
   method?: string
@@ -24,27 +28,56 @@ const ENDPOINT_GENERATION_PROMPT = `You are an expert Next.js API route develope
 - Uses Database: {usesDatabase}
 {databaseInfo}
 
+**CRITICAL - You MUST include ALL of these imports:**
+\`\`\`typescript
+import { NextRequest, NextResponse } from 'next/server'
+{authImports}
+{databaseImports}
+{validationImports}
+\`\`\`
+
 **Guidelines:**
 1. Use Next.js 14+ App Router syntax (app/api/...)
-2. Include proper error handling
-3. Add input validation
-4. Use TypeScript
+2. ALWAYS wrap the entire function in try-catch
+3. Add comprehensive input validation with Zod
+4. Use TypeScript with proper types
 5. Include helpful comments
-6. Handle edge cases
-7. Return proper status codes
-8. Use Prisma for database operations
-9. Use NextAuth for authentication
+6. Handle ALL edge cases
+7. Return proper HTTP status codes (200, 201, 400, 401, 403, 404, 500)
+8. Use Prisma for database operations with error handling
+9. Use NextAuth for authentication if required
 10. Follow REST best practices
+11. Add rate limiting for state-changing operations
+12. Sanitize all user inputs
 
 **Code Structure:**
-- Import statements first
-- Type definitions if needed
-- Main handler function
-- Error handling with try-catch
-- Proper HTTP status codes
-- JSON responses
+- Import statements first (REQUIRED)
+- Type definitions and Zod schemas
+- Main async handler function with proper types
+- Comprehensive try-catch with specific error handling
+- Input validation before processing
+- Database operations with error handling
+- Proper HTTP status codes for all scenarios
+- JSON responses with consistent structure
 
-**Return ONLY the TypeScript code, no explanations.**
+**Error Handling Pattern:**
+\`\`\`typescript
+try {
+  // Authentication check
+  // Input validation
+  // Business logic
+  // Database operations
+  // Success response
+} catch (error) {
+  console.error('Error:', error)
+  return NextResponse.json(
+    { error: 'Error message', details: error instanceof Error ? error.message : 'Unknown error' },
+    { status: 500 }
+  )
+}
+\`\`\`
+
+**Return ONLY the complete TypeScript code with ALL imports, no explanations.**
 
 Generate the complete API route code:`
 
@@ -60,11 +93,55 @@ export async function generateApiEndpoint(
     databaseTable
   } = params
 
+  // ENHANCED: Use template-first approach for simple APIs (prevents token limits)
+  const isSimpleAPI = description.length < 300 && 
+                      !description.includes('complex') && 
+                      !description.includes('multiple') &&
+                      (method === 'GET' || method === 'POST' || method === 'PUT' || method === 'DELETE')
+
+  if (isSimpleAPI && usesDatabase) {
+    try {
+      console.log('📋 Using template-first generation to prevent token limits...')
+      const result = await smartGenerate(description, {
+        description,
+        method,
+        tableName: databaseTable,
+        requiresAuth,
+        usesDatabase,
+      })
+      
+      return {
+        code: result.code,
+        path: result.path,
+        method: result.method,
+      }
+    } catch (error) {
+      console.warn('Template generation failed, falling back to full AI generation:', error)
+      // Fall through to full AI generation
+    }
+  }
+
+  // Original full AI generation for complex cases
+  // Build required imports based on configuration
+  let authImports = ''
+  if (requiresAuth) {
+    authImports = `import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'`
+  }
+
+  let databaseImports = ''
+  if (usesDatabase) {
+    databaseImports = `import { prisma } from '@/lib/prisma'`
+  }
+
+  const validationImports = `import { z } from 'zod'`
+
   // Build database info
   let databaseInfo = ''
   if (usesDatabase && databaseTable) {
     databaseInfo = `- Database Table: ${databaseTable}
-- Include Prisma queries`
+- Include Prisma queries with proper error handling
+- Use transactions for multiple operations`
   }
 
   // Replace placeholders in prompt
@@ -75,6 +152,9 @@ export async function generateApiEndpoint(
     .replace('{requiresAuth}', requiresAuth.toString())
     .replace('{usesDatabase}', usesDatabase.toString())
     .replace('{databaseInfo}', databaseInfo)
+    .replace('{authImports}', authImports)
+    .replace('{databaseImports}', databaseImports)
+    .replace('{validationImports}', validationImports)
 
   try {
     // Call Claude API (Anthropic)
@@ -105,12 +185,48 @@ export async function generateApiEndpoint(
     const code = data.content[0].text
 
     // Clean up code (remove markdown fences if present)
-    const cleanCode = code
+    let cleanCode = code
       .replace(/^```typescript\n/, '')
       .replace(/^```ts\n/, '')
       .replace(/^```\n/, '')
       .replace(/\n```$/, '')
       .trim()
+
+    // ENHANCED: Validate and auto-fix code quality
+    try {
+      let validationResult = await validateAPICode(cleanCode)
+      
+      if (!validationResult.isValid) {
+        console.warn('Generated code has quality issues:', formatValidationIssues(validationResult))
+        
+        // Auto-fix if score is low
+        if (validationResult.score < 80) {
+          console.log('🔧 Attempting auto-fix...')
+          cleanCode = await autoFixCode(cleanCode, validationResult)
+          cleanCode = fixWarnings(cleanCode, validationResult.issues.filter(i => i.severity === 'warning').map(i => i.message))
+          cleanCode = fixSecurityIssues(cleanCode)
+          
+          // Re-validate after fixes
+          validationResult = await validateAPICode(cleanCode)
+          console.log(`✅ After auto-fix: ${validationResult.score}/100`)
+        }
+        
+        // If still too low after auto-fix, throw error
+        if (validationResult.score < 60) {
+          throw new Error(
+            `Generated code quality too low (${validationResult.score}/100) even after auto-fix. Issues:\n${formatValidationIssues(validationResult)}`
+          )
+        }
+      }
+      
+      console.log(`✅ Code validation passed with score: ${validationResult.score}/100`)
+    } catch (validationError) {
+      console.error('Code validation error:', validationError)
+      // Re-throw only if it's a quality issue
+      if (validationError instanceof Error && validationError.message.includes('quality too low')) {
+        throw validationError
+      }
+    }
 
     return {
       code: cleanCode,
@@ -165,30 +281,92 @@ export function validateGeneratedCode(code: string): {
   const errors: string[] = []
   const warnings: string[] = []
 
-  // Check for required imports
-  if (!code.includes('NextResponse')) {
-    errors.push('Missing NextResponse import')
+  // CRITICAL: Check for required imports
+  if (!code.includes('NextResponse') || !code.includes('NextRequest')) {
+    errors.push('Missing NextRequest/NextResponse imports from next/server')
+  }
+
+  // Check for Zod import
+  if (!code.includes("from 'zod'") && !code.includes('from "zod"')) {
+    warnings.push('Consider adding Zod for input validation')
   }
 
   // Check for export
   if (!code.includes('export async function')) {
-    errors.push('Missing exported function')
+    errors.push('Missing exported async function handler')
   }
 
-  // Check for try-catch
+  // CRITICAL: Check for try-catch error handling
   if (!code.includes('try') || !code.includes('catch')) {
-    warnings.push('Missing error handling (try-catch)')
+    errors.push('Missing try-catch error handling - REQUIRED for production')
+  }
+
+  // Check for proper error logging
+  if (code.includes('catch') && !code.includes('console.error')) {
+    warnings.push('Add error logging in catch block for debugging')
   }
 
   // Check for status codes
   if (!code.includes('status:')) {
-    warnings.push('No explicit status codes found')
+    errors.push('Missing explicit HTTP status codes in responses')
   }
 
-  // Check for validation
-  if (code.includes('POST') || code.includes('PUT')) {
-    if (!code.includes('validation') && !code.includes('if (!')) {
-      warnings.push('Consider adding input validation')
+  // Check that all error responses have status codes
+  if (code.includes('NextResponse.json') && code.includes('error')) {
+    const errorResponsesWithoutStatus = !code.includes('status: 400') && 
+                                       !code.includes('status: 401') && 
+                                       !code.includes('status: 500')
+    if (errorResponsesWithoutStatus) {
+      warnings.push('Ensure all error responses have appropriate status codes')
+    }
+  }
+
+  // Check for input validation on POST/PUT/PATCH
+  if (code.includes('POST') || code.includes('PUT') || code.includes('PATCH')) {
+    if (!code.includes('parse') && !code.includes('validation') && !code.includes('if (!')) {
+      warnings.push('Add input validation for POST/PUT/PATCH requests using Zod')
+    }
+  }
+
+  // Check for authentication implementation
+  if (code.includes('getServerSession')) {
+    if (!code.includes('authOptions')) {
+      errors.push('Missing authOptions import when using getServerSession')
+    }
+    if (!code.includes('401')) {
+      warnings.push('Add 401 Unauthorized response for unauthenticated requests')
+    }
+  }
+
+  // Check for database error handling
+  if (code.includes('prisma')) {
+    if (!code.includes('@/lib/prisma')) {
+      errors.push('Missing prisma import from @/lib/prisma')
+    }
+    // Check for database error handling
+    const hasDatabaseErrorHandling = code.includes('PrismaClientKnownRequestError') || 
+                                     code.includes('catch') && code.includes('prisma')
+    if (!hasDatabaseErrorHandling) {
+      warnings.push('Add specific error handling for database operations')
+    }
+  }
+
+  // Check for TypeScript types
+  if (!code.includes('interface') && !code.includes('type ') && code.length > 200) {
+    warnings.push('Consider adding TypeScript interfaces or types for better type safety')
+  }
+
+  // Security checks
+  if ((code.includes('POST') || code.includes('DELETE') || code.includes('PUT')) && 
+      !code.includes('session') && !code.includes('auth')) {
+    warnings.push('Consider adding authentication for state-changing operations')
+  }
+
+  // Check for consistent error response format
+  if (code.includes('error:')) {
+    const hasConsistentFormat = code.includes('error:') && code.includes('NextResponse.json')
+    if (!hasConsistentFormat) {
+      warnings.push('Use consistent error response format: { error: string }')
     }
   }
 

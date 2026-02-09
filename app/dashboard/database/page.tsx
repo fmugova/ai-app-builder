@@ -17,6 +17,7 @@ interface DatabaseConnection {
   id: string
   name: string
   provider: string
+  status: string
   tables: Table[]
 }
 
@@ -127,15 +128,21 @@ export default function DatabasePage() {
         <div className="max-w-7xl mx-auto space-y-4">
           {connections.length === 0 ? (
             <div className="bg-gray-800 rounded-2xl p-12 border border-gray-700 text-center">
-              <div className="text-6xl mb-4">🗄️</div>
-              <h3 className="text-xl font-semibold mb-2">No database connections</h3>
-              <p className="text-gray-400 mb-6">Create your first database connection to get started</p>
+              <div className="text-6xl mb-4">⚡</div>
+              <h3 className="text-xl font-semibold mb-2">No database connections yet</h3>
+              <p className="text-gray-400 mb-6 max-w-md mx-auto">
+                Connect your Supabase project to start building full-stack applications with real-time databases, authentication, and storage.
+              </p>
               <button
                 onClick={() => router.push('/dashboard/database/new')}
-                className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg transition font-medium"
+                className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 rounded-lg transition font-medium inline-flex items-center gap-2"
               >
-                + Create Connection
+                <Plus className="w-5 h-5" />
+                Connect Supabase
               </button>
+              <p className="text-xs text-gray-500 mt-4">
+                Free tier available • Setup takes 2 minutes
+              </p>
             </div>
           ) : (
             connections.map((connection) => (
@@ -151,12 +158,21 @@ export default function DatabasePage() {
                     ) : (
                       <ChevronRight className="w-6 h-6 text-gray-400" />
                     )}
-                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-2xl">
-                      🗄️
+                    <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl flex items-center justify-center text-2xl">
+                      {connection.provider === 'supabase' ? '⚡' : '🗄️'}
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold">{connection.name}</h3>
-                      <p className="text-sm text-gray-400">{connection.provider} • {connection.tables.length} tables</p>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-xl font-bold">{connection.name}</h3>
+                        {connection.provider === 'supabase' && (
+                          <span className="px-2 py-0.5 bg-green-600 text-white text-xs font-semibold rounded">
+                            Supabase
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-400">
+                        {connection.provider} • {connection.tables.length} tables • {connection.status}
+                      </p>
                     </div>
                   </div>
                   
@@ -242,10 +258,10 @@ export default function DatabasePage() {
           <div className="max-w-7xl mx-auto mt-6">
             <button
               onClick={() => router.push('/dashboard/database/new')}
-              className="w-full p-6 bg-gray-800 hover:bg-gray-700 border-2 border-dashed border-gray-600 rounded-2xl transition flex items-center justify-center gap-3 text-gray-400 hover:text-white"
+              className="w-full p-6 bg-gradient-to-r from-green-600/10 to-emerald-600/10 hover:from-green-600/20 hover:to-emerald-600/20 border-2 border-dashed border-green-600/30 hover:border-green-600/50 rounded-2xl transition flex items-center justify-center gap-3 text-green-400 hover:text-green-300"
             >
               <Plus className="w-6 h-6" />
-              <span className="font-medium">Add New Database Connection</span>
+              <span className="font-medium">Add New Supabase Connection</span>
             </button>
           </div>
         )}

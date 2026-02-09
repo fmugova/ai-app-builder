@@ -69,7 +69,20 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, provider, connectionString, config } = body
+    const { 
+      name, 
+      provider, 
+      connectionString, 
+      config,
+      supabaseUrl,
+      supabaseAnonKey,
+      supabaseServiceKey,
+      host,
+      port,
+      database,
+      username,
+      password
+    } = body
 
     if (!name || !provider) {
       return NextResponse.json(
@@ -78,11 +91,31 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // For Supabase, validate required fields
+    if (provider === 'supabase') {
+      if (!supabaseUrl || !supabaseAnonKey) {
+        return NextResponse.json(
+          { error: 'Supabase URL and Anon Key are required for Supabase connections' },
+          { status: 400 }
+        )
+      }
+    }
+
     const connection = await prisma.databaseConnection.create({
       data: {
         name,
         provider,
+        connectionString,
         config: config || {},
+        supabaseUrl,
+        supabaseAnonKey,
+        supabaseServiceKey,
+        host,
+        port,
+        database,
+        username,
+        password,
+        status: 'connected',
         userId: user.id
       },
       include: {
