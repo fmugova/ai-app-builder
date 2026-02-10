@@ -11,6 +11,7 @@ import { GoogleAnalytics, GoogleTagManager } from '@next/third-parties/google'
 import { HomePageSchema } from '@/components/JsonLd'
 import SupportChat from '@/components/SupportChat'
 import FeedbackWidget from '@/components/FeedbackWidget'
+import CSPMonitor from '@/components/CSPMonitor'
 import Script from 'next/script'
 import type { Metadata, Viewport } from 'next'
 
@@ -211,6 +212,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <GoogleTagManager gtmId="GTM-KNTK3Z8G" />
         <SupportChat />
         <FeedbackWidget />
+        <CSPMonitor />
 
       </body>
     </html>

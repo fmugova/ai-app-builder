@@ -10,6 +10,7 @@ import PreviewFrame from '@/components/PreviewFrame';
 import MultiFileProjectSetup from '@/components/MultiFileProjectSetup';
 import CodeFileViewer from '@/components/CodeFileViewer';
 import PromptTemplates from '@/components/PromptTemplates';
+import { parseMultiFileProject, convertToSingleHTML } from '@/lib/multi-file-parser';
 import { AlertTriangle, CheckCircle, XCircle, Download, Copy, Github, ExternalLink, Save, Sparkles, RefreshCw, Upload, Link as LinkIcon, Code2, Lightbulb, Menu, X, Wand2 } from 'lucide-react';
 
 // Types remain the same as before...
@@ -1564,6 +1565,29 @@ function parseCode(fullCode: string): { html: string; css: string; js: string } 
   // CRITICAL: Strip markdown code fences first using utility function
   const cleanedCode = stripMarkdownCodeFences(fullCode);
   
+  // Check if this is a multi-file project (JSON format)
+  const trimmedCode = cleanedCode.trim();
+  if (trimmedCode.startsWith('{') || trimmedCode.startsWith('[')) {
+    console.log('📦 Detected multi-file project JSON format');
+    try {
+      // Try to parse as multi-file project
+      const parseResult = parseMultiFileProject(cleanedCode);
+      if (parseResult.success && parseResult.project) {
+        console.log('✅ Successfully parsed multi-file project:', parseResult.project.projectName);
+        // Convert to preview HTML
+        const previewHtml = convertToSingleHTML(parseResult.project);
+        return { html: previewHtml, css: '', js: '' };
+      } else {
+        console.warn('⚠️ Multi-file parsing failed:', parseResult.error);
+        // Fall through to regular HTML parsing
+      }
+    } catch (err) {
+      console.warn('⚠️ Error parsing multi-file project:', err);
+      // Fall through to regular HTML parsing
+    }
+  }
+  
+  // Regular HTML parsing
   const html = cleanedCode;
   
   // Extract CSS

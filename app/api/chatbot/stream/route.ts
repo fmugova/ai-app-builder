@@ -14,6 +14,8 @@ import { ensureValidHTML } from '@/lib/templates/htmlTemplate'
 import { completeIncompleteHTML } from '@/lib/code-parser'
 import { enhanceGeneratedCode } from '@/lib/code-enhancer'
 import { parseMultiFileProject, convertToSingleHTML } from '@/lib/multi-file-parser'
+import { extractProjectTitle } from '@/lib/utils/title-extraction'
+import { analyzePrompt } from '@/lib/utils/complexity-detection'
 import { z } from 'zod'
 
 const prisma = new PrismaClient()
@@ -85,20 +87,14 @@ export async function POST(req: NextRequest) {
     const validatedData = chatbotRequestSchema.parse(body);
     const { prompt, projectId, generationType, previousErrors } = validatedData;
 
-    // Auto-detect generation type based on prompt keywords
-    // Only trigger multi-file for EXPLICIT multi-page/framework requests
+    // Auto-detect generation type using complexity analysis
+    const complexityAnalysis = analyzePrompt(prompt);
     const isMultiFileRequest = generationType === 'multi-file' || 
-      prompt.toLowerCase().includes('next.js project') ||
-      prompt.toLowerCase().includes('nextjs project') ||
-      prompt.toLowerCase().includes('multi-page') ||
-      prompt.toLowerCase().includes('full stack app') ||
-      prompt.toLowerCase().includes('fullstack app') ||
-      (prompt.toLowerCase().includes('next.js') && prompt.toLowerCase().includes('pages')) ||
-      (prompt.toLowerCase().includes('nextjs') && prompt.toLowerCase().includes('pages'));
+      complexityAnalysis.shouldUseFullstack;
 
     // Use STRICT system prompt for single HTML files to enforce validation
     const systemPrompt = isMultiFileRequest 
-      ? ENHANCED_GENERATION_SYSTEM_PROMPT 
+      ? ENHANCED_GENERATION_SYSTEM_PROMPT + complexityAnalysis.systemPromptSuffix
       : STRICT_HTML_GENERATION_PROMPT;
 
     const maxTokens = getOptimalTokenLimit(prompt)
@@ -209,10 +205,13 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
             initialPassed = quickValidation.passed;
           }
 
+          // Extract clean project title
+          const projectTitle = extractProjectTitle(prompt, generatedHtml);
+
           const project = await prisma.project.create({
             data: {
               userId: user.id,
-              name: parseResult.project.projectName,
+              name: projectTitle,
               description: parseResult.project.description,
               code: convertToSingleHTML(parseResult.project), // Preview HTML
               html: convertToSingleHTML(parseResult.project),
@@ -253,11 +252,14 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
             where: { projectId: savedProjectId },
           });
 
+          // Extract clean project title
+          const projectTitle = extractProjectTitle(prompt, generatedHtml);
+
           // Update project
           await prisma.project.update({
             where: { id: savedProjectId, userId: user.id },
             data: {
-              name: parseResult.project.projectName,
+              name: projectTitle,
               description: parseResult.project.description,
               code: convertToSingleHTML(parseResult.project),
               html: convertToSingleHTML(parseResult.project),
@@ -585,10 +587,13 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
           if (!savedProjectId) {
             console.log('💾 Auto-saving project...')
             
+            // Extract clean project title
+            const projectTitle = extractProjectTitle(prompt, generatedHtml);
+            
             const project = await prisma.project.create({
               data: {
                 userId: user.id,
-                name: prompt.slice(0, 50) || 'New Project',
+                name: projectTitle,
                 description: prompt.slice(0, 200) || '',
                 code: finalHtml,
                 html: finalHtml,

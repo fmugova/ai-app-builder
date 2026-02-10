@@ -88,4 +88,12 @@ export const analytics = {
   demoVideoPlayed: () => {
     trackEvent('demo_video_played')
   },
+
+  // Security
+  cspViolation: (violatedDirective: string, blockedURI: string) => {
+    trackEvent('csp_violation', {
+      violated_directive: violatedDirective,
+      blocked_uri: blockedURI,
+    })
+  },
 }

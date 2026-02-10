@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
+import { checkRateLimitByIdentifier } from '@/lib/rate-limit';
+import { headers } from 'next/headers';
 import PreviewClient from './PreviewClient';
 
 // Force dynamic rendering
@@ -12,6 +14,34 @@ interface PreviewPageProps {
 export default async function PreviewPage({ params }: PreviewPageProps) {
   // Await params (Next.js 15 requirement)
   const { id } = await params;
+
+  // Get headers for rate limiting
+  const headersList = await headers();
+  const forwarded = headersList.get('x-forwarded-for');
+  const realIp = headersList.get('x-real-ip');
+  const identifier = forwarded?.split(',')[0]?.trim() || realIp || id || 'anonymous';
+
+  // Check rate limit (10 previews per minute)
+  const rateLimit = await checkRateLimitByIdentifier(identifier, 'preview');
+  
+  if (!rateLimit.success) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center max-w-md p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">⏱️ Rate Limit Exceeded</h2>
+          <p className="text-gray-600 mb-4">
+            You&apos;ve exceeded the preview limit of {rateLimit.limit} requests per minute.
+          </p>
+          <p className="text-sm text-gray-500">
+            Please wait a moment and try again.
+          </p>
+          <p className="text-xs text-gray-400 mt-4">
+            Remaining requests: {rateLimit.remaining}/{rateLimit.limit}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   let project = null;
   let dbError = false;

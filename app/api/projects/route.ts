@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { extractProjectTitle } from '@/lib/utils/title-extraction'
 
 // Helper function to convert BigInt fields to Number
 function serializeProject(project: any) {
@@ -64,10 +65,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    // Use provided name or extract clean title from description
+    const projectTitle = name || (description ? extractProjectTitle(description) : 'Untitled Project');
+
     const project = await prisma.project.create({
       data: {
         userId: user.id,
-        name,
+        name: projectTitle,
         description: description || null,
         type: type || 'web',
         code: code || '',

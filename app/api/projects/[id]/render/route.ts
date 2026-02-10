@@ -1,6 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { checkRateLimit } from '@/lib/rate-limit'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 
@@ -11,6 +12,28 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Rate limit check (10 renders per minute per IP)
+    const rateLimit = await checkRateLimit(request, 'preview');
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { 
+          error: 'Rate limit exceeded',
+          message: `Too many preview requests. Please wait ${Math.ceil((rateLimit.reset - Date.now()) / 1000)} seconds.`,
+          retryAfter: Math.ceil((rateLimit.reset - Date.now()) / 1000),
+          limit: rateLimit.limit,
+          remaining: rateLimit.remaining,
+        },
+        { 
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': rateLimit.limit.toString(),
+            'X-RateLimit-Remaining': rateLimit.remaining.toString(),
+            'Retry-After': Math.ceil((rateLimit.reset - Date.now()) / 1000).toString(),
+          }
+        }
+      );
+    }
+
     const hostname = request.headers.get('host') || ''
 
     // Check if this is a custom domain

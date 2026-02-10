@@ -52,9 +52,9 @@ export const GET = withAdmin(async () => {
       role: user.role || 'user',
       subscriptionTier: user.subscriptionTier || 'free',
       subscriptionStatus: user.subscriptionStatus || 'active',
-      generationsUsed: user.generationsUsed || 0,
-      generationsLimit: user.generationsLimit || 10,
-      projectsLimit: user.projectsLimit || 3,
+      generationsUsed: user.generationsUsed ? Number(user.generationsUsed) : 0,
+      generationsLimit: user.generationsLimit ? Number(user.generationsLimit) : 10,
+      projectsLimit: user.projectsLimit ? Number(user.projectsLimit) : 3,
       projectCount: user._count.Project || 0,
       projectsThisMonth: 0, // TODO: Calculate from Project.createdAt
       createdAt: user.createdAt.toISOString(),

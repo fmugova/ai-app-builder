@@ -69,10 +69,19 @@ export default function PreviewFrame({ html, css, js, validation }: PreviewFrame
     // CRITICAL: Check if content is actually HTML
     const trimmedHtml = html.trim();
     
-    // Detect if content is JSON instead of HTML
+    // Detect if content is JSON instead of HTML (streaming multi-file projects)
     if (trimmedHtml.startsWith('{') || trimmedHtml.startsWith('[')) {
-      console.error('❌ Received JSON instead of HTML:', trimmedHtml.substring(0, 200));
+      console.log('📦 Preview received JSON format (multi-file project) - waiting for conversion...');
+      // Return empty for now - the chatbuilder will convert this to preview HTML
       return '';
+    }
+    
+    // Detect if content contains project metadata fragments (partial JSON during streaming)
+    if (trimmedHtml.includes('"projectName"') || trimmedHtml.includes('"description"')) {
+      if (!trimmedHtml.includes('<!DOCTYPE') && !trimmedHtml.includes('<html')) {
+        console.log('📦 Preview received partial multi-file project - waiting for completion...');
+        return '';
+      }
     }
     
     // Detect if content contains markdown code fences

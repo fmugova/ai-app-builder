@@ -1,32 +1,12 @@
 // lib/vercel-deploy.ts
 // Automatic deployment to Vercel
 
+import { DeploymentConfig, DeploymentResult } from './types/deployment';
+
 interface VercelProject {
   id: string
   name: string
   url: string
-}
-
-interface DeploymentConfig {
-  projectId: string
-  projectName: string
-  html: string
-  css?: string
-  javascript?: string
-  apiEndpoints: Array<{
-    path: string
-    code: string
-  }>
-  envVars: Record<string, string>
-  supabaseUrl?: string
-  supabaseKey?: string
-}
-
-interface DeploymentResult {
-  success: boolean
-  vercelProjectId?: string
-  deploymentUrl?: string
-  error?: string
 }
 
 /**
@@ -34,7 +14,12 @@ interface DeploymentResult {
  * This handles both frontend (HTML) and backend (API routes)
  */
 export async function deployToVercel(
-  config: DeploymentConfig,
+  config: DeploymentConfig & {
+    projectId: string;
+    apiEndpoints: Array<{ path: string; method: string; code: string }>;
+    supabaseUrl?: string;
+    supabaseKey?: string;
+  },
   vercelToken: string
 ): Promise<DeploymentResult> {
   try {
@@ -51,7 +36,7 @@ export async function deployToVercel(
     const deployment = await createDeployment(
       project.id,
       files,
-      config.envVars,
+      config.envVars || {},
       vercelToken
     )
 
@@ -194,19 +179,27 @@ export default function RootLayout({
 `.trim()
 
   // Generate API routes
-  config.apiEndpoints.forEach(endpoint => {
-    const routePath = endpoint.path.replace('/api/', 'app/api/') + '/route.ts'
-    files[routePath] = endpoint.code
-  })
+  if (config.apiEndpoints && config.apiEndpoints.length > 0) {
+    config.apiEndpoints.forEach(endpoint => {
+      const routePath = endpoint.path.replace('/api/', 'app/api/') + '/route.ts'
+      files[routePath] = endpoint.code
+    })
+  }
 
   // .env.local for environment variables
-  const envContent = Object.entries(config.envVars)
-    .map(([key, value]) => `${key}=${value}`)
-    .join('\n')
-  files['.env.local'] = envContent
+  const envVars = config.envVars || {};
+  if (Object.keys(envVars).length > 0) {
+    const envContent = Object.entries(envVars)
+      .map(([key, value]) => `${key}=${value}`)
+      .join('\n')
+    files['.env.local'] = envContent
+  }
 
-  // Add Supabase config if provided
-  if (config.supabaseUrl && config.supabaseKey) {
+  // Add Supabase config if provided in envVars
+  const supabaseUrl = envVars.NEXT_PUBLIC_SUPABASE_URL || envVars.SUPABASE_URL;
+  const supabaseKey = envVars.NEXT_PUBLIC_SUPABASE_ANON_KEY || envVars.SUPABASE_ANON_KEY;
+  
+  if (supabaseUrl && supabaseKey) {
     files['lib/supabase.ts'] = `
 import { createClient } from '@supabase/supabase-js'
 

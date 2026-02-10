@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { generateApiEndpoint, validateGeneratedCode } from '@/lib/api-generator'
+import { Prisma } from '@prisma/client'
 
 // GET - List all endpoints for a project
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -27,7 +28,11 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
           orderBy: { createdAt: 'desc' }
         }
       }
-    })
+    }) as Prisma.ProjectGetPayload<{
+      include: {
+        ApiEndpoint: true
+      }
+    }> | null
 
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })

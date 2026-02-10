@@ -90,6 +90,17 @@ export function getAnalyticsScript(projectId: string) {
       timeOnPage: timeOnPage,
     });
   });
+  
+  // Track CSP violations for security monitoring
+  window.addEventListener('securitypolicyviolation', function(e) {
+    trackEvent('csp_violation', {
+      violatedDirective: e.violatedDirective,
+      blockedURI: e.blockedURI,
+      documentURI: e.documentURI,
+      sourceFile: e.sourceFile,
+      lineNumber: e.lineNumber,
+    });
+  });
 })();
 </script>
 `.trim();

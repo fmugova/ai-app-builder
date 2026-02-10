@@ -72,6 +72,13 @@ export const rateLimiters = {
     analytics: true,
     prefix: 'ratelimit:feedback',
   }),
+
+  preview: new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(10, '1 m'),
+    analytics: true,
+    prefix: 'ratelimit:preview',
+  }),
 }
 
 export type RateLimitType = keyof typeof rateLimiters
@@ -95,6 +102,34 @@ export async function checkRateLimit(
                       request.headers.get('x-real-ip') ||
                       'anonymous'
 
+    const limiter = rateLimiters[type]
+    const result = await limiter.limit(identifier)
+
+    return {
+      success: result.success,
+      limit: result.limit,
+      remaining: result.remaining,
+      reset: result.reset,
+    }
+  } catch (error) {
+    console.error('❌ Rate limit check failed:', error)
+    return {
+      success: true,
+      limit: 0,
+      remaining: 0,
+      reset: Date.now(),
+    }
+  }
+}
+
+/**
+ * Check rate limit using just an identifier (for use in Server Components)
+ */
+export async function checkRateLimitByIdentifier(
+  identifier: string,
+  type: RateLimitType = 'general'
+): Promise<RateLimitResult> {
+  try {
     const limiter = rateLimiters[type]
     const result = await limiter.limit(identifier)
 

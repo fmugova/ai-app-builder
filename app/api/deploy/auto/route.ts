@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const validatedData = autoDeploySchema.parse(body)
 
-    // Get the project
+    // Get the project with explicit type
     const project = await prisma.project.findUnique({
       where: { id: validatedData.projectId },
       include: {
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
           },
         },
       },
-    })
+    }) as ProjectWithRelations | null
 
     if (!project) {
       return NextResponse.json(
@@ -141,6 +141,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// Define type at the top level for proper inference
 type ProjectWithRelations = Prisma.ProjectGetPayload<{
   include: {
     ApiEndpoint: true
@@ -221,7 +222,7 @@ async function deployProjectInBackground(
         javascript: project.javascript ?? undefined,
         apiEndpoints: project.ApiEndpoint.map((endpoint) => ({
           path: endpoint.path,
-          method: endpoint.method,
+          method: endpoint.method as 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
           code: endpoint.code,
         })),
         envVars,

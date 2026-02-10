@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,6 +10,59 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(request: NextRequest) {
   try {
+    // Rate limit check (10 renders per minute per IP)
+    const rateLimit = await checkRateLimit(request, 'preview');
+    if (!rateLimit.success) {
+      return new NextResponse(
+        `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Rate Limit Exceeded</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <style>
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                margin: 0;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              }
+              .container {
+                text-align: center;
+                padding: 2rem;
+                background: white;
+                border-radius: 1rem;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                max-width: 500px;
+              }
+              h1 { color: #333; margin: 0 0 1rem 0; }
+              p { color: #666; line-height: 1.6; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h1>⏱️ Rate Limit Exceeded</h1>
+              <p>Too many preview requests. Please wait ${Math.ceil((rateLimit.reset - Date.now()) / 1000)} seconds.</p>
+              <p style="font-size: 0.875rem; color: #999;">Limit: ${rateLimit.limit} requests per minute</p>
+            </div>
+          </body>
+        </html>
+        `,
+        { 
+          status: 429,
+          headers: {
+            'Content-Type': 'text/html',
+            'X-RateLimit-Limit': rateLimit.limit.toString(),
+            'X-RateLimit-Remaining': rateLimit.remaining.toString(),
+            'Retry-After': Math.ceil((rateLimit.reset - Date.now()) / 1000).toString(),
+          }
+        }
+      );
+    }
+
     const { searchParams } = new URL(request.url)
     const domain = searchParams.get('domain')
     const path = searchParams.get('path') || '/'

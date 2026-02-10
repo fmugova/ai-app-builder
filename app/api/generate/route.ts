@@ -13,6 +13,7 @@ import { autoFixCode } from '@/lib/validators/auto-fixer'
 import { ensureValidHTML } from '@/lib/templates/htmlTemplate'
 import { ProjectStatus } from '@prisma/client'
 import { apiQueue } from '@/lib/api-queue'
+import { analyzePrompt } from '@/lib/utils/complexity-detection'
 
 // ============================================================================
 // VALIDATION
@@ -295,6 +296,18 @@ export async function POST(req: NextRequest) {
           let fullContent = ''
           let inputTokens = 0
 
+          // Analyze complexity to determine appropriate system prompt
+          const complexityAnalysis = analyzePrompt(prompt);
+          const systemPrompt = ENTERPRISE_SYSTEM_PROMPT + complexityAnalysis.systemPromptSuffix;
+
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🎯 Complexity Analysis:', {
+              mode: complexityAnalysis.analysis.mode,
+              confidence: complexityAnalysis.analysis.confidence,
+              features: complexityAnalysis.analysis.detectedFeatures.slice(0, 5),
+            });
+          }
+
           // Build enhanced prompt with continuation context if available
           const enhancedPrompt = continuationContext
             ? `${prompt}\n\nCONTINUATION CONTEXT: You previously generated:\n${continuationContext}\n\nPlease complete the generation, focusing on what's missing.`
@@ -306,7 +319,7 @@ export async function POST(req: NextRequest) {
               model: 'claude-sonnet-4-20250514',
               max_tokens: getOptimalTokenLimit(prompt, generationType),
               messages: [{ role: 'user', content: enhancedPrompt }],
-              system: ENTERPRISE_SYSTEM_PROMPT,
+              system: systemPrompt,
               stream: true,
             })
           )
