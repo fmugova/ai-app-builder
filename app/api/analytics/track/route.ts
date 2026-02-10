@@ -5,7 +5,26 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
-    const { projectId, event, properties } = await request.json()
+    // Handle both JSON and beacon requests
+    let body;
+    const contentType = request.headers.get('content-type') || '';
+    
+    if (contentType.includes('application/json')) {
+      body = await request.json();
+    } else {
+      // Handle sendBeacon which sends as text/plain
+      const text = await request.text();
+      try {
+        body = JSON.parse(text);
+      } catch {
+        return NextResponse.json(
+          { error: 'Invalid JSON in request body' },
+          { status: 400 }
+        );
+      }
+    }
+    
+    const { projectId, event, properties } = body;
     
     if (!projectId || !event) {
       return NextResponse.json(
