@@ -8,7 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { extractProjectTitle } from '@/lib/utils/title-extraction'
 
 // Helper function to convert BigInt fields to Number
-function serializeProject(project: any) {
+function serializeProject(project: Record<string, unknown>) {
   return {
     ...project,
     // Convert BigInt fields to Number

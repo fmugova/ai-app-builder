@@ -1433,6 +1433,8 @@ model WebhookEvent {
   userId      String?
   status      String    @default("pending")
   error       String?
+  attempts    Int       @default(0)
+  retryAt     DateTime?
   createdAt   DateTime  @default(now())
   processedAt DateTime?
 
@@ -1443,6 +1445,8 @@ model WebhookEvent {
   @@index([provider])
   @@index([status])
   @@index([userId])
+  @@index([status, retryAt])
+  @@index([provider, eventType])
   @@schema("public")
 }
 
