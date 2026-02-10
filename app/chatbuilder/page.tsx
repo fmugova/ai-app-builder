@@ -1588,6 +1588,23 @@ function parseCode(fullCode: string): { html: string; css: string; js: string } 
   }
   
   // Regular HTML parsing
+  // CRITICAL: Check if we actually have HTML content
+  if (!cleanedCode.includes('<') || !cleanedCode.includes('>')) {
+    console.warn('⚠️ No HTML tags found in response - likely explanatory text or partial response');
+    console.log('📄 Response preview:', cleanedCode.substring(0, 200));
+    
+    // Try to extract HTML from markdown code blocks that might be buried in the text
+    const htmlBlockMatch = cleanedCode.match(/```html\s*\n([\s\S]*?)\n```/);
+    if (htmlBlockMatch) {
+      console.log('✅ Found HTML in markdown code block');
+      const extractedHtml = htmlBlockMatch[1].trim();
+      return parseCode(extractedHtml); // Recursive call with extracted HTML
+    }
+    
+    // No HTML found - return empty to prevent Preview errors
+    return { html: '', css: '', js: '' };
+  }
+  
   const html = cleanedCode;
   
   // Extract CSS

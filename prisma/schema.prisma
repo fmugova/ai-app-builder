@@ -984,6 +984,7 @@ model Project {
   ProjectShare        ProjectShare[]
   ProjectVersion      ProjectVersion[]
   WorkspaceProject    WorkspaceProject[]
+  Preview             Preview[]
 
   @@index([isPublic])
   @@index([isPublished])
@@ -1044,6 +1045,26 @@ model ProjectVersion {
   @@index([createdAt])
   @@index([projectId])
   @@index([userId])
+  @@schema("public")
+}
+
+/// Preview deployments for full-stack Next.js apps
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model Preview {
+  id            String        @id @default(cuid())
+  projectId     String
+  url           String
+  deploymentId  String        @unique
+  status        PreviewStatus @default(DEPLOYING)
+  error         String?
+  createdAt     DateTime      @default(now())
+  expiresAt     DateTime
+  deletedAt     DateTime?
+  Project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([expiresAt])
+  @@index([status])
   @@schema("public")
 }
 
@@ -1543,6 +1564,15 @@ enum TemplateTier {
   FREE
   PRO
   COLLECTION
+
+  @@schema("public")
+}
+
+enum PreviewStatus {
+  DEPLOYING
+  READY
+  ERROR
+  EXPIRED
 
   @@schema("public")
 }

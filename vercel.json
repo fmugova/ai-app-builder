@@ -2,5 +2,11 @@
   "buildCommand": "prisma generate && prisma migrate deploy && next build",
   "env": {
     "SKIP_ENV_VALIDATION": "true"
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/cleanup-previews",
+      "schedule": "0 * * * *"
+    }
+  ]
 }

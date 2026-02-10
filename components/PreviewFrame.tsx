@@ -97,7 +97,10 @@ export default function PreviewFrame({ html, css, js, validation }: PreviewFrame
       
       // Verify we have actual HTML after cleaning
       if (!cleanHtml.includes('<') && !cleanHtml.includes('>')) {
-        console.error('❌ No HTML tags found after cleaning:', cleanHtml.substring(0, 200));
+        // Only log error if there's actual content (not just empty/whitespace)
+        if (cleanHtml.trim().length > 0) {
+          console.warn('⚠️ No HTML tags found - likely streaming explanatory text:', cleanHtml.substring(0, 100));
+        }
         return '';
       }
 
