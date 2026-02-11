@@ -9,6 +9,7 @@ import { HelpCircle, Loader2 } from 'lucide-react'
 import PromptAssistant from '@/components/PromptAssistant'
 import { EnhancedPromptInput } from '@/components/EnhancedPromptInput'
 import { useGenerateStream } from '@/hooks/useGenerateStream'
+import { generateSmartProjectName } from '@/lib/utils/project-name-generator'
 
 // Builder generates full HTML projects/pages, similar to ChatBuilder.
 // It supports generating full landing pages, web apps, dashboards, portfolios, and more.
@@ -33,6 +34,7 @@ function BuilderContent() {
   const [isLoadedProject, setIsLoadedProject] = useState(false)
   const [generatedCode, setGeneratedCode] = useState<string>('')
   const [showAssistant, setShowAssistant] = useState(false)
+  const [generationMode, setGenerationMode] = useState<'iterate' | 'fresh'>('iterate')
   // Track incomplete generation state
   const [incompleteIssues, setIncompleteIssues] = useState<string[] | null>(null)
   // Add step state for navigation
@@ -118,9 +120,11 @@ function BuilderContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: prompt + '\n(Continue from where you left off, do not repeat code)',
+          prompt: generationMode === 'fresh' 
+            ? `START FROM SCRATCH: ${prompt + '\n(Continue from where you left off, do not repeat code)'}`
+            : prompt + '\n(Continue from where you left off, do not repeat code)',
           type: projectType,
-          projectId: currentProjectId,
+          projectId: generationMode === 'fresh' ? undefined : currentProjectId,
           continueFrom: generatedCode
         })
       })
@@ -150,9 +154,11 @@ function BuilderContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: simplePrompt,
+          prompt: generationMode === 'fresh' 
+            ? `START FROM SCRATCH: ${simplePrompt}`
+            : simplePrompt,
           type: projectType,
-          projectId: currentProjectId
+          projectId: generationMode === 'fresh' ? undefined : currentProjectId
         })
       })
       const data = await res.json()
@@ -370,13 +376,17 @@ function BuilderContent() {
       if (!projectIdToUse) {
         console.log('📦 Creating project for auto-save...');
         
+        // Generate smart name from prompt
+        const smartName = generateSmartProjectName(prompt);
+        console.log('🏷️ Generated smart name:', smartName);
+        
         try {
           const createRes = await fetch('/api/projects', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              name: projectName || 'Untitled Project',
-              description: projectDescription || '',
+              name: projectName || smartName,
+              description: projectDescription || prompt.substring(0, 200),
               type: projectType,
               // ✅ Don't pass status field - let Prisma use default
             })
@@ -409,9 +419,11 @@ function BuilderContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          prompt, 
+          prompt: generationMode === 'fresh' 
+            ? `START FROM SCRATCH: ${prompt}`  // Override iteration detection
+            : prompt, 
           type: projectType,
-          projectId: projectIdToUse,  // ✅ Now has project ID!
+          projectId: generationMode === 'fresh' ? undefined : projectIdToUse,  // Clear projectId for fresh mode
           generationType: projectType  // Pass generation type for token limits
         })
       })
@@ -799,6 +811,39 @@ function BuilderContent() {
                     <option value="blog">Blog</option>
                   </select>
                 </div>
+
+                {/* Generation Mode Toggle */}
+                {currentProjectId && generatedCode && (
+                  <div className="flex items-center gap-2 mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setGenerationMode('iterate')}
+                        className={`px-4 py-2 rounded-md transition-colors font-medium ${
+                          generationMode === 'iterate'
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
+                        }`}
+                      >
+                        🔄 Add to Existing
+                      </button>
+                      <button
+                        onClick={() => setGenerationMode('fresh')}
+                        className={`px-4 py-2 rounded-md transition-colors font-medium ${
+                          generationMode === 'fresh'
+                            ? 'bg-purple-600 text-white shadow-md'
+                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
+                        }`}
+                      >
+                        ✨ Start Fresh
+                      </button>
+                    </div>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      {generationMode === 'iterate' 
+                        ? 'Will preserve existing code and add features'
+                        : 'Will generate from scratch'}
+                    </span>
+                  </div>
+                )}
 
                 <EnhancedPromptInput
                   value={prompt}

@@ -17,11 +17,24 @@ export async function POST(req: NextRequest) {
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
+      where: { email: session.user.email },
+      select: {
+        id: true,
+        email: true,
+        twoFactorEnabled: true
+      }
     })
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    // Prevent re-setup if already enabled
+    if (user.twoFactorEnabled) {
+      return NextResponse.json(
+        { error: '2FA is already enabled. Please disable it first to set up again.' },
+        { status: 400 }
+      )
     }
 
     // Generate TOTP secret

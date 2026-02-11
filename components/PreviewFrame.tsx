@@ -310,8 +310,6 @@ export default function PreviewFrame({ html, css, js, validation }: PreviewFrame
             className="w-full h-full border-0"
             sandbox="allow-scripts allow-forms"
             srcDoc={fullHTML}
-            // SECURITY: Explicitly block navigation
-            allow="none"
             // SECURITY: Additional protection
             referrerPolicy="no-referrer"
           />

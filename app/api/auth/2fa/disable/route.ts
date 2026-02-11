@@ -59,6 +59,23 @@ export async function POST(req: NextRequest) {
       }
     })
 
+    // Log security event
+    try {
+      await prisma.securityEvent.create({
+        data: {
+          userId: user.id,
+          type: '2FA_DISABLED',
+          action: 'success',
+          severity: 'warning',
+          metadata: {
+            timestamp: new Date().toISOString()
+          }
+        }
+      })
+    } catch (logError) {
+      console.error('Failed to log security event:', logError)
+    }
+
     return NextResponse.json({
       success: true,
       message: '2FA disabled successfully'

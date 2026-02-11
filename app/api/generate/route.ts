@@ -14,6 +14,9 @@ import { ensureValidHTML } from '@/lib/templates/htmlTemplate'
 import { ProjectStatus } from '@prisma/client'
 import { apiQueue } from '@/lib/api-queue'
 import { analyzePrompt } from '@/lib/utils/complexity-detection'
+import { IterationDetector } from '@/lib/services/iterationDetector'
+import { PromptBuilder, buildUserMessageWithContext } from '@/lib/services/promptBuilder'
+import { saveProjectFiles, updateProjectMetadata } from '@/lib/services/projectService'
 
 // ============================================================================
 // VALIDATION
@@ -24,7 +27,8 @@ const generateRequestSchema = z.object({
   projectId: z.string().optional(),
   generationType: z.string().max(50).optional(),
   retryAttempt: z.number().int().min(0).max(5).optional(),
-  continuationContext: z.string().max(50000).optional()
+  continuationContext: z.string().max(50000).optional(),
+  previousPrompts: z.array(z.string()).optional()
 });
 
 // ============================================================================
@@ -161,7 +165,15 @@ REMEMBER:
 - ALL code wrapped in DOMContentLoaded
 - ALWAYS check elements exist
 - Use proper error handling
-- Complete and valid HTML/CSS/JS`
+- Complete and valid HTML/CSS/JS
+
+OUTPUT RULES:
+- Return ONLY the HTML code
+- DO NOT include explanatory text like "I'll create..." or "Here's the implementation"
+- DO NOT include validation checklists or confirmation messages
+- DO NOT add summary sections, feature lists, or descriptions after the code
+- Start immediately with <!DOCTYPE html>
+- End with </html> and nothing after`
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -283,6 +295,32 @@ export async function POST(req: NextRequest) {
       retryAttempt
     })
 
+    // =========================================================================
+    // ITERATION DETECTION
+    // =========================================================================
+    console.log('🔍 Detecting iteration context...');
+
+    const iterationContext = await IterationDetector.detectIteration(
+      prompt,
+      projectId || undefined
+    );
+
+    console.log('📊 Iteration Context:', {
+      isIteration: iterationContext.isIteration,
+      changeScope: iterationContext.changeScope,
+      existingFiles: iterationContext.existingFiles.length,
+      filesCount: iterationContext.existingFiles.length
+    });
+
+    // Build appropriate system prompt based on context
+    const promptBuilder = new PromptBuilder();
+    const iterationSystemPrompt = promptBuilder.buildSystemPrompt(iterationContext);
+
+    // Enhance user message with context if iterating
+    const enhancedPromptFromIterator = buildUserMessageWithContext(prompt, iterationContext);
+
+    console.log('💬 Using enhanced prompt strategy:', iterationContext.changeScope);
+
     // ============================================================================
     // 5. STREAM AI GENERATION
     // ============================================================================
@@ -298,18 +336,25 @@ export async function POST(req: NextRequest) {
 
           // Analyze complexity to determine appropriate system prompt
           const complexityAnalysis = analyzePrompt(prompt);
-          const systemPrompt = ENTERPRISE_SYSTEM_PROMPT + complexityAnalysis.systemPromptSuffix;
+          
+          // Use iteration-aware system prompt if available, otherwise fall back to complexity-based
+          const systemPrompt = iterationContext.isIteration 
+            ? iterationSystemPrompt 
+            : ENTERPRISE_SYSTEM_PROMPT + complexityAnalysis.systemPromptSuffix;
 
           if (process.env.NODE_ENV === 'development') {
             console.log('🎯 Complexity Analysis:', {
               mode: complexityAnalysis.analysis.mode,
               confidence: complexityAnalysis.analysis.confidence,
               features: complexityAnalysis.analysis.detectedFeatures.slice(0, 5),
+              usingIterationPrompt: iterationContext.isIteration
             });
           }
 
-          // Build enhanced prompt with continuation context if available
-          const enhancedPrompt = continuationContext
+          // Build enhanced prompt with iteration context or continuation context
+          const enhancedPrompt = iterationContext.isIteration
+            ? enhancedPromptFromIterator
+            : continuationContext
             ? `${prompt}\n\nCONTINUATION CONTEXT: You previously generated:\n${continuationContext}\n\nPlease complete the generation, focusing on what's missing.`
             : prompt
 
@@ -589,6 +634,53 @@ export async function POST(req: NextRequest) {
                 console.log('✅ Project auto-saved successfully')
                 console.log('📝 Code field length:', completeHtml.length)
               }
+
+              // =========================================================================
+              // MULTI-FILE PROJECT HANDLING
+              // =========================================================================
+              if (iterationContext.isIteration || completeHtml.includes('<!-- File:') || completeHtml.includes('// File:')) {
+                try {
+                  // Extract files from the generated code
+                  const fileMatches = Array.from(completeHtml.matchAll(/(?:\/\/\s*(?:File|Filename):\s*(.+)|<!--\s*File:\s*(.+?)\s*-->)([\s\S]*?)(?=(?:\/\/\s*(?:File|Filename):|<!--\s*File:)|$)/gi));
+                  
+                  const extractedFiles = [];
+                  for (const match of fileMatches) {
+                    const filename = match[1] || match[2];
+                    const content = match[3].trim();
+                    if (filename && content) {
+                      extractedFiles.push({
+                        path: filename.trim(),
+                        content: content
+                      });
+                    }
+                  }
+
+                  // If files were extracted, save them
+                  if (extractedFiles.length > 0) {
+                    console.log(`📁 Saving ${extractedFiles.length} files for project ${projectId}`);
+                    
+                    await saveProjectFiles(projectId, extractedFiles);
+                    
+                    await updateProjectMetadata(projectId, {
+                      multiPage: extractedFiles.length > 1,
+                      isMultiFile: true
+                    });
+
+                    console.log('✅ Multi-file project saved successfully');
+                  } else if (iterationContext.isIteration) {
+                    // For iterations without explicit file markers, save as single file update
+                    await saveProjectFiles(projectId, [{
+                      path: 'index.html',
+                      content: completeHtml
+                    }]);
+                    console.log('✅ Iteration saved to index.html');
+                  }
+                } catch (multiFileError) {
+                  console.error('❌ Multi-file handling error:', multiFileError);
+                  // Don't fail the request
+                }
+              }
+
             } catch (dbError) {
               if (process.env.NODE_ENV === 'development') {
                 console.error('❌ Database save error:', dbError)

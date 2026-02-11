@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import TwoFactorCard from '@/components/TwoFactorCard'
 
 interface User {
   id: string
@@ -212,6 +213,32 @@ export default function SettingsClient({ user: initialUser }: SettingsClientProp
             </div>
           </div>
 
+          {/* Security */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 mb-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Security</h2>
+            
+            <div className="space-y-4">
+              <TwoFactorCard />
+              
+              <Link
+                href="/account/security"
+                className="block bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
+                      Active Sessions
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      View and manage devices where you&apos;re signed in
+                    </p>
+                  </div>
+                  <span className="text-blue-600 dark:text-blue-400">→</span>
+                </div>
+              </Link>
+            </div>
+          </div>
+
           {/* Subscription Info (if available) */}
           {user.subscriptionTier && (
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 mb-6">
@@ -275,14 +302,17 @@ export default function SettingsClient({ user: initialUser }: SettingsClientProp
                         Connected as @{user.githubUsername}
                       </p>
                     ) : (
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <p className="text-sm text-gray-900 dark:text-gray-200">
                         Export projects to GitHub repositories
                       </p>
                     )}
                   </div>
                 </div>
                 {/* GitHub integration */}
-                <Link href="/integrations/github">
+                <Link 
+                  href="/integrations/github"
+                  className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white rounded-lg transition font-medium border border-gray-200 dark:border-gray-600"
+                >
                   {user.githubUsername ? 'Manage' : 'Connect'}
                 </Link>
               </div>
@@ -297,13 +327,16 @@ export default function SettingsClient({ user: initialUser }: SettingsClientProp
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900 dark:text-white">Vercel</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-gray-900 dark:text-gray-200">
                       Deploy projects with one click
                     </p>
                   </div>
                 </div>
                 {/* Vercel integration */}
-                <Link href="/integrations/vercel">
+                <Link 
+                  href="/integrations/vercel"
+                  className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white rounded-lg transition font-medium border border-gray-200 dark:border-gray-600"
+                >
                   Configure
                 </Link>
               </div>

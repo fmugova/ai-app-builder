@@ -304,16 +304,29 @@ export function cleanMarkdownArtifacts(content: string): string {
   content = content.replace(/\*\*CSS\*\*/gi, '');
   content = content.replace(/\*\*JavaScript\*\*/gi, '');
   
-  // Remove AI's explanatory text at the beginning (e.g., "I'll create...", "Here's a...", etc.)
-  content = content.replace(/^(?:I'll|I will|Here's|Here is|This is|Let me|This will|I've|I have created?|I created?)\s+.+?\n+(?=<!DOCTYPE|<html)/is, '');
+  // Remove AI's explanatory text at the beginning (including validation checklists)
+  // This catches patterns like: "I'll create... Here's the full implementation: ✅ **VALIDATION CHECKLIST..."
+  content = content.replace(/^(?:I'll|I will|Here's|Here is|This is|Let me|This will|I've|I have created?|I created?)[\s\S]*?(?:full implementation|complete|files?)?[\s\S]*?(?:✅\s*\*\*VALIDATION CHECKLIST[\s\S]*?)?(?=<!DOCTYPE|<html|<!--\s*File:)/is, '');
   
-  // Remove validation checklist sections at the end (multiple patterns)
-  content = content.replace(/\n*##\s*Validation\s*Checklist[\s\S]*?(?=\n*$|$)/gi, '');
-  content = content.replace(/\n*\*\*VALIDATION CHECKLIST.*?\*\*[\s\S]*?(?=\n*$|$)/gi, '');
-  content = content.replace(/\n*VALIDATION CHECKLIST.*?(?:\n.*?)*?(?=\n*$|$)/gi, '');
-  content = content.replace(/\n*✅.*?VERIFICATION.*?[\s\S]*?(?=\n*$|$)/gi, '');
+  // Remove standalone validation sections at the beginning (before HTML or file markers)
+  content = content.replace(/^[\s\S]*?✅\s*\*\*VALIDATION CHECKLIST[^:]*:?\*\*[\s\S]*?(?=<!DOCTYPE|<html|<!--\s*File:)/i, '');
+  
+  // Remove validation checklist sections anywhere in the content (not just at end)
+  content = content.replace(/\n*##\s*Validation\s*Checklist[\s\S]*?(?=\n*(?:<!DOCTYPE|<html|<!--\s*File:|$))/gi, '');
+  content = content.replace(/\n*\*\*VALIDATION CHECKLIST[^:]*:?\*\*[\s\S]*?(?=\n*(?:<!DOCTYPE|<html|<!--\s*File:|$))/gi, '');
+  content = content.replace(/\n*VALIDATION CHECKLIST[^:]*:?[\s\S]*?(?=\n*(?:<!DOCTYPE|<html|<!--\s*File:|$))/gi, '');
+  content = content.replace(/\n*✅[\s\S]*?(?:VERIFICATION|VALIDATION|CHECKLIST)[\s\S]*?(?=\n*(?:<!DOCTYPE|<html|<!--\s*File:|$))/gi, '');
+  content = content.replace(/\n*##\s*Features[\s\S]*?(?=\n*(?:<!DOCTYPE|<html|<!--\s*File:|$))/gi, '');
+  content = content.replace(/\n*(?:This|The)\s+(?:landing page|portfolio|app|application|website)\s+includes:[\s\S]*?(?=\n*(?:<!DOCTYPE|<html|<!--\s*File:|$))/gi, '');
+  
+  // Remove "Here are the complete HTML files:" type headings
+  content = content.replace(/\n*##\s*(?:index\.html|about\.html|contact\.html|services\.html|[\w-]+\.html)[\s\S]*?(?=\n*(?:<!DOCTYPE|<html|<!--\s*File:))/gi, '');
+  content = content.replace(/Here (?:are|is) the complete (?:HTML )?files?:?[\s\S]*?(?=\n*(?:<!DOCTYPE|<html|<!--\s*File:))/gi, '');
+  
+  // Remove validation text between file markers in multi-page generation
+  content = content.replace(/(<!--\s*File:[^>]*-->[^<]*<\/html>)\s*\n+(?:✅|##)[\s\S]*?(?:VALIDATION|Features|includes:)[\s\S]*?(?=<!--\s*File:|$)/gi, '$1\n\n');
   content = content.replace(/\n*##\s*Features[\s\S]*?(?=\n*$|$)/gi, '');
-  content = content.replace(/\n*The\s+(?:portfolio|app|application)\s+includes:[\s\S]*?(?=\n*$|$)/gi, '');
+  content = content.replace(/\n*(?:This|The)\s+(?:landing page|portfolio|app|application|website)\s+includes:[\s\S]*?(?=\n*$|$)/gi, '');
   
   // Remove any markdown lists or explanations after </html>
   content = content.replace(/(<\/html>)\s*\n+[-*]\s+.*?[\s\S]*$/i, '$1');

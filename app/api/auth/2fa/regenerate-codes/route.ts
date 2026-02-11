@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import * as speakeasy from 'speakeasy'
+import { randomBytes } from 'crypto'
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
 
     if (!token) {
       return NextResponse.json(
-        { error: 'Token is required' },
+        { error: 'Verification code is required' },
         { status: 400 }
       )
     }
@@ -27,61 +28,50 @@ export async function POST(req: NextRequest) {
       where: { email: session.user.email }
     })
 
-    if (!user || !user.twoFactorSecret) {
+    if (!user || !user.twoFactorEnabled || !user.twoFactorSecret) {
       return NextResponse.json(
-        { error: 'No 2FA setup found' },
+        { error: '2FA is not enabled on this account' },
         { status: 400 }
       )
     }
 
-    // Verify TOTP token
+    // Verify TOTP token before regenerating codes
     const verified = speakeasy.totp.verify({
       secret: user.twoFactorSecret,
       encoding: 'base32',
       token: token,
-      window: 2 // Allow 2 time steps before/after
+      window: 2
     })
 
     if (!verified) {
       return NextResponse.json(
-        { error: 'Invalid token' },
+        { error: 'Invalid verification code' },
         { status: 400 }
       )
     }
 
-    // Enable 2FA
+    // Generate 10 new backup codes
+    const backupCodes = Array.from({ length: 10 }, () => {
+      return randomBytes(4).toString('hex').toUpperCase()
+    })
+
+    // Update user with new backup codes
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        twoFactorEnabled: true
+        twoFactorBackupCodes: backupCodes
       }
     })
 
-    // Log security event
-    try {
-      await prisma.securityEvent.create({
-        data: {
-          userId: user.id,
-          type: '2FA_ENABLED',
-          action: 'success',
-          severity: 'info',
-          metadata: {
-            timestamp: new Date().toISOString()
-          }
-        }
-      })
-    } catch (logError) {
-      console.error('Failed to log security event:', logError)
-    }
-
     return NextResponse.json({
       success: true,
-      message: '2FA enabled successfully'
+      backupCodes,
+      message: 'Backup codes regenerated successfully'
     })
   } catch (error) {
-    console.error('2FA verify error:', error)
+    console.error('Backup codes regeneration error:', error)
     return NextResponse.json(
-      { error: 'Failed to verify 2FA' },
+      { error: 'Failed to regenerate backup codes' },
       { status: 500 }
     )
   }

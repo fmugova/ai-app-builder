@@ -12,7 +12,6 @@ import { HomePageSchema } from '@/components/JsonLd'
 import SupportChat from '@/components/SupportChat'
 import FeedbackWidget from '@/components/FeedbackWidget'
 import CSPMonitor from '@/components/CSPMonitor'
-import Script from 'next/script'
 import type { Metadata, Viewport } from 'next'
 
 
@@ -20,9 +19,9 @@ import type { Metadata, Viewport } from 'next'
 const inter = Inter({
   subsets: ['latin'],
   display: 'swap', // Show fallback font immediately, swap when loaded
-  preload: true, // Preload font for faster rendering
+  preload: false, // Disable preload to avoid unused preload warnings
   variable: '--font-inter', // CSS variable for the font
-  weight: ['300', '400', '500', '600', '700'], // Only load weights we use
+  weight: ['400', '500', '600', '700'], // Only load weights we actually use
 })
 
 // Safe URL resolution
@@ -179,16 +178,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <head>
         {/* JSON-LD Structured Data */}
         <HomePageSchema />
-        {/* Preconnect to external domains for performance */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        {/* AMP Analytics */}
-        <Script 
-          async 
-          custom-element="amp-analytics" 
-          src="https://cdn.ampproject.org/v0/amp-analytics-0.1.js"
-          strategy="afterInteractive"
-        />
       </head>
       <body className={`${inter.variable} font-sans`}>
         {session && (
