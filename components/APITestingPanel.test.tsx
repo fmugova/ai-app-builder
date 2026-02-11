@@ -16,6 +16,7 @@ describe('APITestingPanel', () => {
     requiresAuth: true,
     requestBody: null,
     responseExample: { users: [] },
+    code: 'export async function GET() { return Response.json({ users: [] }); }',
   }
 
   beforeEach(() => {
