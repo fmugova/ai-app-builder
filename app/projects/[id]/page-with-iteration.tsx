@@ -5,7 +5,8 @@ import { useRouter, useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import DeployButton from '@/components/DeployButton'
 import GenerationInterface from '@/components/GenerationInterface'
-import { FileText, Eye, Edit2, Code2 } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { FileText, Eye, Edit2 } from 'lucide-react'
 
 interface ProjectFile {
   id: string
@@ -40,7 +41,7 @@ export default function ProjectViewPage() {
   const { data: session, status } = useSession()
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeView, setActiveView] = useState<'preview' | 'edit' | 'files' | 'code'>('preview')
+  const [activeTab, setActiveTab] = useState<'preview' | 'edit' | 'files'>('preview')
 
   const projectId = params.id as string
 
@@ -135,9 +136,9 @@ export default function ProjectViewPage() {
                 </span>
               )}
               <DeployButton 
-                projectId={project.id} 
+                code={project.code || ''} 
                 projectName={project.name}
-                size="md"
+                projectId={project.id}
               />
             </div>
           </div>
@@ -145,61 +146,28 @@ export default function ProjectViewPage() {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Tab Navigation */}
-        <div className="flex gap-2 mb-6 bg-gray-800 p-1 rounded-lg border border-gray-700 w-fit">
-          <button
-            onClick={() => setActiveView('preview')}
-            className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
-              activeView === 'preview'
-                ? 'bg-blue-600 text-white shadow-lg'
-                : 'text-gray-400 hover:text-white hover:bg-gray-700'
-            }`}
-          >
-            <Eye className="w-4 h-4" />
-            Preview
-          </button>
-          <button
-            onClick={() => setActiveView('edit')}
-            className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
-              activeView === 'edit'
-                ? 'bg-blue-600 text-white shadow-lg'
-                : 'text-gray-400 hover:text-white hover:bg-gray-700'
-            }`}
-          >
-            <Edit2 className="w-4 h-4" />
-            Edit & Iterate
-          </button>
-          {project.isMultiFile && existingFiles.length > 0 && (
-            <button
-              onClick={() => setActiveView('files')}
-              className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                activeView === 'files'
-                  ? 'bg-blue-600 text-white shadow-lg'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              Files
-            </button>
-          )}
-          <button
-            onClick={() => setActiveView('code')}
-            className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
-              activeView === 'code'
-                ? 'bg-blue-600 text-white shadow-lg'
-                : 'text-gray-400 hover:text-white hover:bg-gray-700'
-            }`}
-          >
-            <Code2 className="w-4 h-4" />
-            Code
-          </button>
-        </div>
-        </div>
+        {/* Tabs Navigation */}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-3 mb-6">
+            <TabsTrigger value="preview" className="flex items-center gap-2">
+              <Eye className="w-4 h-4" />
+              Preview
+            </TabsTrigger>
+            <TabsTrigger value="edit" className="flex items-center gap-2">
+              <Edit2 className="w-4 h-4" />
+              Edit & Iterate
+            </TabsTrigger>
+            {project.isMultiFile && (
+              <TabsTrigger value="files" className="flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                Files
+              </TabsTrigger>
+            )}
+          </TabsList>
 
-        {/* Preview View */}
-        {activeView === 'preview' && (
-          <div className="space-y-6">
-            <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+          {/* Preview Tab */}
+          <TabsContent value="preview" className="mt-0">
+            <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700 mb-6">
               <h2 className="text-xl font-bold mb-4">Project Details</h2>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -216,24 +184,22 @@ export default function ProjectViewPage() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-400">Project Type</p>
-                  <p className="font-medium">{project.isMultiFile ? 'Multi-File' : 'Single Page'}</p>
+                  <p className="font-medium">{project.multiPage ? 'Multi-Page' : 'Single Page'}</p>
                 </div>
               </div>
             </div>
 
             {project.description && (
-              <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+              <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700 mb-6">
                 <h2 className="text-xl font-bold mb-4">Description</h2>
                 <p className="text-gray-300">{project.description}</p>
               </div>
             )}
 
             {project.prompt && (
-              <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+              <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700 mb-6">
                 <h2 className="text-xl font-bold mb-4">Original Prompt</h2>
-                <div className="bg-gray-900 rounded-lg p-4">
-                  <p className="text-gray-300 whitespace-pre-wrap">{project.prompt}</p>
-                </div>
+                <p className="text-gray-300 whitespace-pre-wrap">{project.prompt}</p>
               </div>
             )}
 
@@ -262,84 +228,63 @@ export default function ProjectViewPage() {
                 </div>
               </div>
             )}
-          </div>
-        )}
+          </TabsContent>
 
-        {/* Edit & Iterate View */}
-        {activeView === 'edit' && (
-          <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold mb-2">✨ Edit & Iterate on Project</h2>
-              <p className="text-gray-400">
-                Use the AI assistant below to add features, modify styling, or enhance your project.
-                {existingFiles.length > 0 && ` Currently working with ${existingFiles.length} file(s).`}
-              </p>
+          {/* Edit & Iterate Tab */}
+          <TabsContent value="edit" className="mt-0">
+            <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold mb-2">Edit & Iterate on Project</h2>
+                <p className="text-gray-400">
+                  Use the AI assistant below to add features, modify styling, or enhance your project.
+                  {existingFiles.length > 0 && ` Currently working with ${existingFiles.length} file(s).`}
+                </p>
+              </div>
+              
+              <GenerationInterface
+                projectId={project.id}
+                existingFiles={existingFiles}
+              />
             </div>
-            
-            <GenerationInterface
-              projectId={project.id}
-              existingFiles={existingFiles}
-            />
-          </div>
-        )}
+          </TabsContent>
 
-        {/* Files View (multi-file projects) */}
-        {activeView === 'files' && project.isMultiFile && (
-          <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
-            <h2 className="text-xl font-bold mb-4">Project Files ({existingFiles.length})</h2>
-            
-            {existingFiles.length === 0 ? (
-              <p className="text-gray-400">No files found in this project.</p>
-            ) : (
-              <div className="space-y-4">
-                {existingFiles.map((file, index) => (
-                  <div key={index} className="bg-gray-900 rounded-lg border border-gray-700 overflow-hidden">
-                    <div className="flex items-center justify-between p-4 bg-gray-800/50">
-                      <div className="flex items-center gap-3">
-                        <FileText className="w-5 h-5 text-blue-400" />
-                        <div>
-                          <p className="font-medium text-white">{file.filename}</p>
-                          <p className="text-sm text-gray-400">{file.path}</p>
+          {/* Files Tab (multi-file projects only) */}
+          {project.isMultiFile && (
+            <TabsContent value="files" className="mt-0">
+              <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+                <h2 className="text-xl font-bold mb-4">Project Files</h2>
+                
+                {existingFiles.length === 0 ? (
+                  <p className="text-gray-400">No files found in this project.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {existingFiles.map((file, index) => (
+                      <div key={index} className="bg-gray-900 rounded-lg border border-gray-700 overflow-hidden">
+                        <div className="flex items-center justify-between p-4 bg-gray-800/50">
+                          <div className="flex items-center gap-3">
+                            <FileText className="w-5 h-5 text-blue-400" />
+                            <div>
+                              <p className="font-medium text-white">{file.filename}</p>
+                              <p className="text-sm text-gray-400">{file.path}</p>
+                            </div>
+                          </div>
+                          <div className="text-sm text-gray-400">
+                            {(file.content.length / 1024).toFixed(1)} KB
+                          </div>
+                        </div>
+                        <div className="p-4">
+                          <pre className="text-sm text-gray-300 overflow-x-auto">
+                            <code>{file.content}</code>
+                          </pre>
                         </div>
                       </div>
-                      <div className="text-sm text-gray-400">
-                        {(file.content.length / 1024).toFixed(1)} KB
-                      </div>
-                    </div>
-                    <div className="p-4 bg-gray-950">
-                      <pre className="text-sm text-gray-300 overflow-x-auto max-h-96">
-                        <code>{file.content}</code>
-                      </pre>
-                    </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
-            )}
-          </div>
-        )}
-
-        {/* Code View */}
-        {activeView === 'code' && (
-          <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold">Source Code</h2>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(project.code || '')
-                  alert('Code copied to clipboard!')
-                }}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition text-sm"
-              >
-                Copy Code
-              </button>
-            </div>
-            <div className="bg-gray-900 rounded-lg p-4 overflow-x-auto max-h-[600px]">
-              <pre className="text-sm text-gray-300">
-                <code>{project.code}</code>
-              </pre>
-            </div>
-          </div>
-        )}
+            </TabsContent>
+          )}
+        </Tabs>
       </div>
     </div>
   )

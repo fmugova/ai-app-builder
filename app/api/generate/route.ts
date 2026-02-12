@@ -17,6 +17,12 @@ import { analyzePrompt } from '@/lib/utils/complexity-detection'
 import { IterationDetector } from '@/lib/services/iterationDetector'
 import { PromptBuilder, buildUserMessageWithContext } from '@/lib/services/promptBuilder'
 import { saveProjectFiles, updateProjectMetadata } from '@/lib/services/projectService'
+import { BUILDFLOW_ITERATION_AWARE_PROMPT } from '@/lib/prompts/iteration-aware-prompt'
+import { 
+  GENERATED_APP_ITERATION_DETECTOR, 
+  GENERATED_APP_SUPABASE_CONFIG,
+  GENERATED_APP_DATABASE_SCHEMA 
+} from '@/lib/templates/iteration-templates'
 
 // ============================================================================
 // VALIDATION
@@ -203,6 +209,32 @@ function getOptimalTokenLimit(prompt: string, generationType: string): number {
   return baseTokens
 }
 
+/**
+ * Determines if the generated app should include iteration detection capabilities
+ */
+function shouldIncludeIterationSupport(
+  prompt: string, 
+  complexityAnalysis: { analysis: { mode: string; confidence: number }; systemPromptSuffix: string; shouldUseFullstack: boolean }
+): boolean {
+  const lowerPrompt = prompt.toLowerCase();
+  
+  // Include iteration support for complex full-stack applications
+  const iterationKeywords = [
+    'full-stack', 'fullstack', 'full stack',
+    'dashboard', 'crm', 'admin panel',
+    'multi-page', 'multiple pages',
+    'database', 'backend', 'api',
+    'supabase', 'authentication', 'auth',
+    'iteration', 'improve', 'update'
+  ];
+  
+  const hasIterationKeyword = iterationKeywords.some(kw => lowerPrompt.includes(kw));
+  const isComplexApp = complexityAnalysis.analysis?.mode === 'multi-page' || 
+                       complexityAnalysis.analysis?.mode === 'dashboard';
+  
+  return hasIterationKeyword || isComplexApp;
+}
+
 async function createMessageWithRetry(
   anthropic: Anthropic,
   params: MessageCreateParams & { stream: true }
@@ -322,6 +354,16 @@ export async function POST(req: NextRequest) {
     console.log('💬 Using enhanced prompt strategy:', iterationContext.changeScope);
 
     // ============================================================================
+    // 4. ANALYZE COMPLEXITY & ITERATION CAPABILITY
+    // ============================================================================
+    const complexityAnalysis = analyzePrompt(prompt);
+    const wantsIterationCapability = shouldIncludeIterationSupport(prompt, complexityAnalysis);
+    
+    if (wantsIterationCapability) {
+      console.log('🔄 Generated app will include iteration detection capabilities');
+    }
+
+    // ============================================================================
     // 5. STREAM AI GENERATION
     // ============================================================================
     const anthropic = new Anthropic({
@@ -333,13 +375,12 @@ export async function POST(req: NextRequest) {
         try {
           let fullContent = ''
           let inputTokens = 0
-
-          // Analyze complexity to determine appropriate system prompt
-          const complexityAnalysis = analyzePrompt(prompt);
           
           // Use iteration-aware system prompt if available, otherwise fall back to complexity-based
           const systemPrompt = iterationContext.isIteration 
             ? iterationSystemPrompt 
+            : wantsIterationCapability
+            ? BUILDFLOW_ITERATION_AWARE_PROMPT
             : ENTERPRISE_SYSTEM_PROMPT + complexityAnalysis.systemPromptSuffix;
 
           if (process.env.NODE_ENV === 'development') {
@@ -653,6 +694,42 @@ export async function POST(req: NextRequest) {
                         content: content
                       });
                     }
+                  }
+
+                  // Add iteration detection files for full-stack apps
+                  if (wantsIterationCapability && extractedFiles.length > 0) {
+                    console.log('🔄 Adding iteration detection capabilities to generated app...');
+                    
+                    // Add iteration detector service
+                    extractedFiles.push({
+                      path: 'services/iterationDetector.ts',
+                      content: GENERATED_APP_ITERATION_DETECTOR
+                    });
+                    
+                    // Add Supabase config
+                    extractedFiles.push({
+                      path: 'lib/supabase.ts',
+                      content: GENERATED_APP_SUPABASE_CONFIG
+                    });
+                    
+                    // Add database schema
+                    extractedFiles.push({
+                      path: 'schema.sql',
+                      content: GENERATED_APP_DATABASE_SCHEMA
+                    });
+                    
+                    // Add environment template
+                    extractedFiles.push({
+                      path: '.env.example',
+                      content: `# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+
+# AI Configuration
+ANTHROPIC_API_KEY=your-anthropic-key`
+                    });
+                    
+                    console.log('✅ Iteration detection files added');
                   }
 
                   // If files were extracted, save them
