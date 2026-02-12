@@ -46,6 +46,23 @@ export default function ProjectViewPage() {
   const projectId = params.id as string
 
   useEffect(() => {
+    const loadProject = async () => {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/view`)
+        if (res.ok) {
+          const data = await res.json()
+          setProject(data)
+        } else {
+          alert('Project not found or access denied')
+          router.push('/dashboard')
+        }
+      } catch (error) {
+        console.error('Failed to load project:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
     if (status === 'loading') return
 
     if (!session) {
@@ -54,24 +71,7 @@ export default function ProjectViewPage() {
     }
 
     loadProject()
-  }, [session, status, projectId])
-
-  const loadProject = async () => {
-    try {
-      const res = await fetch(`/api/projects/${projectId}/view`)
-      if (res.ok) {
-        const data = await res.json()
-        setProject(data)
-      } else {
-        alert('Project not found or access denied')
-        router.push('/dashboard')
-      }
-    } catch (error) {
-      console.error('Failed to load project:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [session, status, projectId, router])
 
   if (status === 'loading' || loading) {
     return (
@@ -136,7 +136,6 @@ export default function ProjectViewPage() {
                 </span>
               )}
               <DeployButton 
-                code={project.code || ''} 
                 projectName={project.name}
                 projectId={project.id}
               />

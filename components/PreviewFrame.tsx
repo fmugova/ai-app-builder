@@ -148,7 +148,7 @@ export default function PreviewFrame({ html, css, js, validation }: PreviewFrame
             // Blocked by same-origin policy (good!)
           }
 
-          console.log('✅ Preview security initialized');
+          // Security initialized
         })();
       `;
 
@@ -200,7 +200,6 @@ export default function PreviewFrame({ html, css, js, validation }: PreviewFrame
 </body>
 </html>`;
       
-      console.log('✅ Preview HTML built successfully with security measures');
       return result;
     } catch (error) {
       console.error('❌ Error building preview HTML:', error);
@@ -229,9 +228,8 @@ export default function PreviewFrame({ html, css, js, validation }: PreviewFrame
           // Reload with correct content
           iframe.srcdoc = fullHTML;
         }
-      } catch (e) {
-        // Expected to fail due to same-origin policy
-        console.log('✅ iframe properly sandboxed (same-origin block active)');
+      } catch {
+        // Expected to fail due to same-origin policy (iframe properly sandboxed)
       }
     };
 

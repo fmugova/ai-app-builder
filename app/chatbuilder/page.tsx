@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import { stripMarkdownCodeFences } from '@/lib/utils';
+import { generateSmartProjectName } from '@/lib/utils/project-name-generator';
 import PreviewFrame from '@/components/PreviewFrame';
 import MultiFileProjectSetup from '@/components/MultiFileProjectSetup';
 import CodeFileViewer from '@/components/CodeFileViewer';
@@ -221,6 +222,7 @@ export default function ChatBuilder() {
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [showViewCode, setShowViewCode] = useState(false);
   const [showCodeViewer, setShowCodeViewer] = useState(false);
+  const [generationMode, setGenerationMode] = useState<'iterate' | 'fresh'>('iterate');
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Multi-file project data
@@ -306,6 +308,13 @@ export default function ChatBuilder() {
       return;
     }
 
+    // Generate smart name if project name is empty
+    if (!projectName || projectName.trim() === '') {
+      const smartName = generateSmartProjectName(prompt);
+      setProjectName(smartName);
+      console.log('🏷️ Generated smart name:', smartName);
+    }
+
     setState(prev => ({ 
       ...prev, 
       isGenerating: true, 
@@ -318,10 +327,12 @@ export default function ChatBuilder() {
     }));
     
     try {
-      const requestBody: { prompt: string; projectId?: string } = { prompt };
+      const requestBody: { prompt: string; projectId?: string } = { 
+        prompt: generationMode === 'fresh' ? `START FROM SCRATCH: ${prompt}` : prompt 
+      };
       
-      // Only include projectId if it's a valid UUID string
-      if (currentProjectId && currentProjectId.trim()) {
+      // Only include projectId if in iterate mode and it's a valid UUID string
+      if (generationMode === 'iterate' && currentProjectId && currentProjectId.trim()) {
         requestBody.projectId = currentProjectId;
       }
       
@@ -467,7 +478,7 @@ export default function ChatBuilder() {
     } finally {
       setState(prev => ({ ...prev, isGenerating: false }));
     }
-  }, [prompt, currentProjectId, projectName]);
+  }, [prompt, currentProjectId, projectName, generationMode]);
 
   // Regenerate & Fix function - Uses validation feedback loop with API
   const handleRegenerateFix = useCallback(async () => {
@@ -647,7 +658,7 @@ export default function ChatBuilder() {
   }, []);
 
   // Template selection handler for PromptTemplates component
-  const handleTemplateSelect = useCallback((templatePrompt: string, _type: string) => {
+  const handleTemplateSelect = useCallback((templatePrompt: string) => {
     setPrompt(templatePrompt);
     toast.success('Template loaded! Click Generate to create your app.');
   }, []);
@@ -1273,15 +1284,47 @@ Generate complete, production-ready code that fixes ALL issues above.`;
                 disabled={state.isGenerating}
               />
 
-              {/* Iteration Mode Indicator */}
-              {state.fullCode && !state.isGenerating && (
-                <div className="mt-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                  <p className="text-xs sm:text-sm text-purple-800 flex items-center gap-2">
-                    <RefreshCw className="w-4 h-4" />
-                    <span>
-                      <strong>Iteration Mode:</strong> Modify your prompt above to add features, change design, or refine functionality, then click &quot;Generate App&quot; again.
-                    </span>
-                  </p>
+              {/* Generation Mode Toggle */}
+              {(currentProjectId || state.fullCode) && (
+                <div className="mt-3 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border-2 border-blue-200">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="text-2xl">🎯</div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900">Generation Mode</h4>
+                      <p className="text-xs text-gray-600">Choose how to generate your code</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setGenerationMode('iterate')}
+                      className={`px-4 py-3 rounded-lg transition-all font-medium shadow-sm ${
+                        generationMode === 'iterate'
+                          ? 'bg-blue-600 text-white shadow-lg scale-105'
+                          : 'bg-white text-gray-700 hover:bg-gray-100 border-2 border-gray-200'
+                      }`}
+                    >
+                      <div className="text-xl mb-1">🔄</div>
+                      <div className="font-bold text-sm">Add to Existing</div>
+                      <div className="text-xs opacity-80 mt-1">Preserve current code</div>
+                    </button>
+                    <button
+                      onClick={() => setGenerationMode('fresh')}
+                      className={`px-4 py-3 rounded-lg transition-all font-medium shadow-sm ${
+                        generationMode === 'fresh'
+                          ? 'bg-purple-600 text-white shadow-lg scale-105'
+                          : 'bg-white text-gray-700 hover:bg-gray-100 border-2 border-gray-200'
+                      }`}
+                    >
+                      <div className="text-xl mb-1">✨</div>
+                      <div className="font-bold text-sm">Start Fresh</div>
+                      <div className="text-xs opacity-80 mt-1">Generate from scratch</div>
+                    </button>
+                  </div>
+                  <div className="mt-3 p-2 bg-white/60 rounded text-sm text-gray-700">
+                    {generationMode === 'iterate' 
+                      ? '💡 Will add features to your existing code without losing what you have'
+                      : '💡 Will create a completely new project, ignoring previous code'}
+                  </div>
                 </div>
               )}
 

@@ -30,7 +30,7 @@ export function sanitizeForPreview(code: string): string {
     (trimmed.includes('<head>') && trimmed.includes('<body>'));
   
   if (isCompleteHTML) {
-    console.log('✅ Complete HTML detected - returning as-is');
+    // Complete HTML document detected - return as-is
     // Ensure proper meta tags for mobile-web-app-capable
     let sanitized = trimmed;
     if (sanitized.includes('apple-mobile-web-app-capable') && !sanitized.includes('mobile-web-app-capable')) {
@@ -42,7 +42,7 @@ export function sanitizeForPreview(code: string): string {
     return sanitized;
   }
   
-  console.log('⚠️ Code fragment detected - wrapping with React infrastructure');
+  // Code fragment detected - wrapping with React/HTML infrastructure
   
   // Escape any unmatched template literals or problematic syntax
   const safeCode = trimmed;

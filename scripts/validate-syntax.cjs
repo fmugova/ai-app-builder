@@ -4,9 +4,8 @@
  * Checks for hidden issues that could break deployment
  */
 
-const { execSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+import { execSync } from 'child_process';
+import fs from 'fs';
 
 console.log('🔬 COMPREHENSIVE VALIDATION TESTS\n');
 console.log('=' .repeat(70));

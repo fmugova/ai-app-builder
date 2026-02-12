@@ -5,11 +5,32 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { toast, Toaster } from 'react-hot-toast'
 import { analytics } from '@/lib/analytics'
 import CodePreview from './code-preview'
-import { HelpCircle, Loader2 } from 'lucide-react'
+import { HelpCircle, Loader2, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react'
 import PromptAssistant from '@/components/PromptAssistant'
 import { EnhancedPromptInput } from '@/components/EnhancedPromptInput'
 import { useGenerateStream } from '@/hooks/useGenerateStream'
 import { generateSmartProjectName } from '@/lib/utils/project-name-generator'
+import PromptTemplates from '@/components/PromptTemplates'
+
+interface ValidationMessage {
+  message: string;
+  line?: number;
+  column?: number;
+  severity?: 'critical' | 'high' | 'medium' | 'low';
+}
+
+interface ValidationResult {
+  isComplete: boolean;
+  hasHtml: boolean;
+  hasCss: boolean;
+  hasJs: boolean;
+  validationScore: number;
+  validationPassed: boolean;
+  errors: ValidationMessage[];
+  warnings: ValidationMessage[];
+  cspViolations: string[];
+  passed: boolean;
+}
 
 // Builder generates full HTML projects/pages, similar to ChatBuilder.
 // It supports generating full landing pages, web apps, dashboards, portfolios, and more.
@@ -39,6 +60,9 @@ function BuilderContent() {
   const [incompleteIssues, setIncompleteIssues] = useState<string[] | null>(null)
   // Add step state for navigation
   const [step, setStep] = useState<'select-type' | 'build'>('select-type')
+  // Validation and multi-file support
+  const [validation, setValidation] = useState<ValidationResult | null>(null)
+  const [showPromptGuide, setShowPromptGuide] = useState(false)
 
   // Add router instance
   const router = useRouter();
@@ -380,6 +404,11 @@ function BuilderContent() {
         const smartName = generateSmartProjectName(prompt);
         console.log('🏷️ Generated smart name:', smartName);
         
+        // Set the project name in UI if not already set
+        if (!projectName || projectName.trim() === '') {
+          setProjectName(smartName);
+        }
+        
         try {
           const createRes = await fetch('/api/projects', {
             method: 'POST',
@@ -463,10 +492,13 @@ function BuilderContent() {
                 setGeneratingStep(Math.floor(receivedCode.length / 5000));
               }
             }
+            // Handle validation data
+            else if (data.validation) {
+              setValidation(ensureValidValidation(data.validation))
+            }
             // ✅ SIMPLE FIX: handle 'html' event for string state
             else if (data.type === 'html') {
               setGeneratedCode(data.content);  // ✅ Set the code
-              console.log('✅ HTML received:', data.content.length, 'chars');  // Debug log
             }
             else if (data.type === 'complete') {
               console.log('✅ Generation complete');
@@ -582,6 +614,63 @@ function BuilderContent() {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
+  }
+
+  // Regenerate with validation fixes
+  const handleRegenerateWithFixes = () => {
+    if (!validation) {
+      toast.error('No validation errors to fix')
+      return
+    }
+
+    // Build comprehensive list of issues
+    const errors = validation.errors.map(e => 
+      typeof e === 'string' ? e : e.message
+    )
+    const warnings = validation.warnings.map(w => 
+      typeof w === 'string' ? w : w.message
+    )
+    const cspIssues = validation.cspViolations || []
+
+    const allIssues = [...errors, ...warnings, ...cspIssues]
+    
+    if (allIssues.length === 0) {
+      toast('No issues detected')
+      return
+    }
+
+    // Create detailed fix instructions
+    const issuesList = allIssues.map((issue, i) => `${i + 1}. ${issue}`).join('\n')
+
+    const improvedPrompt = `${prompt}
+
+CRITICAL FIXES REQUIRED from previous generation:
+${issuesList}
+
+MANDATORY REQUIREMENTS:
+- Add exactly ONE <h1> tag with the main page title
+- Add viewport meta tag: <meta name="viewport" content="width=device-width, initial-scale=1.0">
+- Use ONLY Tailwind CSS classes (NO inline styles)
+- Use addEventListener for events (NO inline event handlers like onclick)
+- Use textContent instead of innerHTML for dynamic content
+- Add charset meta tag: <meta charset="UTF-8">
+- Use proper semantic HTML5 elements
+- All CSS must use CSS variables for maintainability
+
+Generate complete, production-ready code that fixes ALL issues above.`
+
+    setPrompt(improvedPrompt)
+    
+    // Small delay to ensure prompt is updated, then trigger generation
+    setTimeout(() => {
+      handleGenerate()
+    }, 100)
+  }
+
+  // Template selection handler
+  const handleTemplateSelect = (templatePrompt: string) => {
+    setPrompt(templatePrompt)
+    toast.success('Template loaded! Click Generate to create your app.')
   }
 
   // Define templates for the template selection UI
@@ -773,7 +862,14 @@ function BuilderContent() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Project Name *</label>
+                  <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+                    Project Name *
+                    {projectName && !isLoadedProject && (
+                      <span className="text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded">
+                        ✨ Smart Generated
+                      </span>
+                    )}
+                  </label>
                   <input
                     type="text"
                     value={projectName}
@@ -782,6 +878,11 @@ function BuilderContent() {
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-900"
                     disabled={generating}
                   />
+                  {!projectName && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      💡 Leave empty for automatic smart naming from your prompt
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -812,36 +913,65 @@ function BuilderContent() {
                   </select>
                 </div>
 
-                {/* Generation Mode Toggle */}
-                {currentProjectId && generatedCode && (
-                  <div className="flex items-center gap-2 mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <div className="flex gap-2">
+                {/* Generation Mode Toggle - Show when we have a project or generated code */}
+                {(currentProjectId || generatedCode) && (
+                  <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg border-2 border-blue-200 dark:border-blue-800">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="text-2xl">🎯</div>
+                      <div>
+                        <h4 className="font-semibold text-gray-900 dark:text-white">Generation Mode</h4>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Choose how to generate your code</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
                       <button
                         onClick={() => setGenerationMode('iterate')}
-                        className={`px-4 py-2 rounded-md transition-colors font-medium ${
+                        className={`flex-1 px-4 py-3 rounded-lg transition-all font-medium shadow-sm ${
                           generationMode === 'iterate'
-                            ? 'bg-blue-600 text-white shadow-md'
-                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
+                            ? 'bg-blue-600 text-white shadow-lg scale-105'
+                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border-2 border-gray-200 dark:border-gray-600'
                         }`}
                       >
-                        🔄 Add to Existing
+                        <div className="text-xl mb-1">🔄</div>
+                        <div className="font-bold">Add to Existing</div>
+                        <div className="text-xs opacity-80 mt-1">Preserve current code</div>
                       </button>
                       <button
                         onClick={() => setGenerationMode('fresh')}
-                        className={`px-4 py-2 rounded-md transition-colors font-medium ${
+                        className={`flex-1 px-4 py-3 rounded-lg transition-all font-medium shadow-sm ${
                           generationMode === 'fresh'
-                            ? 'bg-purple-600 text-white shadow-md'
-                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
+                            ? 'bg-purple-600 text-white shadow-lg scale-105'
+                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border-2 border-gray-200 dark:border-gray-600'
                         }`}
                       >
-                        ✨ Start Fresh
+                        <div className="text-xl mb-1">✨</div>
+                        <div className="font-bold">Start Fresh</div>
+                        <div className="text-xs opacity-80 mt-1">Generate from scratch</div>
                       </button>
                     </div>
-                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                    <div className="mt-3 p-2 bg-white/60 dark:bg-gray-800/60 rounded text-sm text-gray-700 dark:text-gray-300">
                       {generationMode === 'iterate' 
-                        ? 'Will preserve existing code and add features'
-                        : 'Will generate from scratch'}
-                    </span>
+                        ? '💡 Will add features to your existing code without losing what you have'
+                        : '💡 Will create a completely new project, ignoring previous code'}
+                    </div>
+                  </div>
+                )}
+
+                {/* Prompt Templates Toggle */}
+                <div className="mb-4">
+                  <button
+                    onClick={() => setShowPromptGuide(!showPromptGuide)}
+                    className="flex items-center gap-2 text-sm text-purple-600 hover:text-purple-700 font-medium"
+                  >
+                    <HelpCircle className="w-4 h-4" />
+                    {showPromptGuide ? 'Hide' : 'Show'} Prompt Templates
+                  </button>
+                </div>
+
+                {/* Prompt Templates Component */}
+                {showPromptGuide && (
+                  <div className="mb-4">
+                    <PromptTemplates onSelect={handleTemplateSelect} />
                   </div>
                 )}
 
@@ -899,6 +1029,102 @@ function BuilderContent() {
                     Simplify & Retry
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* Validation Results Panel */}
+            {validation && !generating && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    {validation.validationPassed ? (
+                      <>
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                        <span>Validation Passed</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertTriangle className="w-5 h-5 text-red-600" />
+                        <span>Validation Issues Detected</span>
+                      </>
+                    )}
+                  </h3>
+                  <div className="text-sm px-3 py-1 rounded-full bg-gray-100">
+                    Score: {validation.validationScore}/100
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {validation.errors.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="text-sm font-medium text-red-900 mb-2 flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4" />
+                        Critical Errors ({validation.errors.length})
+                      </h4>
+                      <ul className="space-y-2">
+                        {validation.errors.map((error, i) => (
+                          <li key={i} className="text-sm text-red-700 flex items-start gap-2 bg-red-50 p-2 rounded">
+                            <span className="text-red-500">•</span>
+                            <span>{error.message}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {validation.cspViolations.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="text-sm font-medium text-orange-900 mb-2 flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4" />
+                        Security Issues ({validation.cspViolations.length})
+                      </h4>
+                      <ul className="space-y-2">
+                        {validation.cspViolations.map((violation, i) => (
+                          <li key={i} className="text-sm text-orange-700 flex items-start gap-2 bg-orange-50 p-2 rounded">
+                            <span className="text-orange-500">•</span>
+                            <span>{violation}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {validation.warnings.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-yellow-900 mb-2 flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4" />
+                        Warnings ({validation.warnings.length})
+                      </h4>
+                      <ul className="space-y-2">
+                        {validation.warnings.map((warning, i) => (
+                          <li key={i} className="text-sm text-yellow-700 flex items-start gap-2 bg-yellow-50 p-2 rounded">
+                            <span className="text-yellow-500">•</span>
+                            <span>{warning.message}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {validation.errors.length === 0 && 
+                   validation.warnings.length === 0 && 
+                   validation.cspViolations.length === 0 && (
+                    <p className="text-sm text-green-700 flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4" />
+                      All validation checks passed! Great job!
+                    </p>
+                  )}
+                </div>
+
+                {(validation.errors.length > 0 || validation.cspViolations.length > 0) && (
+                  <button
+                    onClick={handleRegenerateWithFixes}
+                    className="mt-4 w-full sm:w-auto flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg transition-colors font-medium"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Fix & Regenerate
+                  </button>
+                )}
               </div>
             )}
 
@@ -1096,6 +1322,22 @@ function BuilderContent() {
       )}
     </div>
   )
+}
+
+// Helper function to ensure valid validation object
+function ensureValidValidation(validation: Partial<ValidationResult> | undefined): ValidationResult {
+  return {
+    isComplete: validation?.isComplete ?? true,
+    hasHtml: validation?.hasHtml ?? true,
+    hasCss: validation?.hasCss ?? false,
+    hasJs: validation?.hasJs ?? false,
+    validationScore: validation?.validationScore ?? 0,
+    validationPassed: validation?.validationPassed ?? false,
+    errors: validation?.errors ?? [],
+    warnings: validation?.warnings ?? [],
+    cspViolations: validation?.cspViolations ?? [],
+    passed: validation?.passed ?? false,
+  }
 }
  
 export default function Builder() {

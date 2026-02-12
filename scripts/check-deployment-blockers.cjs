@@ -4,8 +4,8 @@
  * Identifies specific issues that prevent Vercel deployments
  */
 
-const { execSync } = require('child_process');
-const fs = require('fs');
+import { execSync } from 'child_process';
+import fs from 'fs';
 
 console.log('🔍 DEPLOYMENT BLOCKER DETECTION\n');
 console.log('=' .repeat(70));
@@ -59,7 +59,7 @@ try {
   } else {
     console.log('   ✅ Working directory clean');
   }
-} catch (e) {
+} catch {
   console.log('   ℹ️  Could not check git status');
 }
 
