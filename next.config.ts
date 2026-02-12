@@ -77,7 +77,9 @@ const nextConfig: NextConfig = {
   },
 }
 
-module.exports = {
+const config = {
   ...nextConfig,
   turbopack: {},
 }
+
+export default config
