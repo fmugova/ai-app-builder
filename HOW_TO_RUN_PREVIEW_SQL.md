@@ -17,7 +17,7 @@ DATABASE_URL="...pooler.supabase.com:6543/postgres?pgbouncer=true"
 
 1. **Open Supabase Dashboard**
    - Go to https://app.supabase.com
-   - Select your project: `szwruvvcjmwxdigthjze`
+   - Select your project
 
 2. **Navigate to SQL Editor**
    - Click "SQL Editor" in the left sidebar
@@ -48,10 +48,12 @@ cd C:\Users\panas\ai-app-builder
 
 # Run the SQL file directly
 # Use the DIRECT_URL (not pooled connection)
-psql "postgresql://postgres.szwruvvcjmwxdigthjze:oJQeo3FU7Su3DLvV@aws-1-eu-west-2.pooler.supabase.com:5432/postgres" -f add-preview-system.sql
+psql "postgresql://[USERNAME]:[PASSWORD]@[HOST]:5432/postgres" -f add-preview-system.sql
 ```
 
-**Note:** Uses port `5432` (direct) instead of `6543` (pooled)
+**Note:** 
+- Replace `[USERNAME]`, `[PASSWORD]`, and `[HOST]` with your Supabase credentials from `.env.local`
+- Uses port `5432` (direct) instead of `6543` (pooled)
 
 ---
 
