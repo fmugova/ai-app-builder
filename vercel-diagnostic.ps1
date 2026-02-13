@@ -173,8 +173,8 @@ if (Test-Path "vercel.json") {
 }
 
 # Check if main branch exists
-$mainExists = git show-ref --verify --quiet refs/heads/main 2>&1
-$masterExists = git show-ref --verify --quiet refs/heads/master 2>&1
+git show-ref --verify --quiet refs/heads/main 2>&1
+git show-ref --verify --quiet refs/heads/master 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[WARNING] No 'main' or 'master' branch found" -ForegroundColor Yellow
     Write-Host "   Current branch: $(git branch --show-current)"
