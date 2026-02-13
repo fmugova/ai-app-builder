@@ -8,12 +8,12 @@ import {
 global.fetch = jest.fn()
 
 describe('vercel-env-sync', () => {
-  const mockVercelToken = 'vercel_token_123'
+  const mockVercelToken = 'MOCK_VERCEL_TOKEN_FOR_TESTING_ONLY'
   const mockProjectId = 'prj_abc123'
   const mockEnvVars = {
-    NEXT_PUBLIC_SUPABASE_URL: 'https://xxx.supabase.co',
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-    SUPABASE_SERVICE_ROLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+    NEXT_PUBLIC_SUPABASE_URL: 'https://MOCK-PROJECT-ID.supabase.co',
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.MOCK_JWT_TOKEN',
+    SUPABASE_SERVICE_ROLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.MOCK_SERVICE_ROLE_KEY',
   }
 
   beforeEach(() => {
