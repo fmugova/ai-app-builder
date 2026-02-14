@@ -154,7 +154,13 @@ export default function DashboardClient({
     }
   }
 
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
+
+  if (status === 'loading') return (
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500" />
+    </div>
+  )
 
   if (!session) return null
 
