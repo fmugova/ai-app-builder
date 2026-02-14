@@ -4,7 +4,12 @@ import { prisma } from '@/lib/prisma'
 import SubmissionsClient from './SubmissionsClient'
 
 export default async function SubmissionsPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await getServerSession(authOptions)
+  let session = null
+  try {
+    session = await getServerSession(authOptions)
+  } catch {
+    // Stale/invalid JWT — treat as unauthenticated
+  }
   const { id } = await params
 
   const submissions = await prisma.formSubmission.findMany({

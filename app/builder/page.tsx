@@ -170,37 +170,30 @@ function BuilderContent() {
     }
   }
 
-  // Handler for simplifying and retrying
-  const handleSimplifyAndRetry = async () => {
+  // Handler for fixing incomplete generation — removes/trims failing features so output is always complete
+  const handleFixIncomplete = () => {
     if (!prompt.trim()) return toast.error('Please enter a prompt')
-    setGenerating(true)
-    setIsLoadedProject(false)
-    try {
-      // Retry with a simpler prompt
-      const simplePrompt = prompt + '\n(Simplify the implementation, reduce features, and ensure completion)'
-      const res = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: generationMode === 'fresh' 
-            ? `START FROM SCRATCH: ${simplePrompt}`
-            : simplePrompt,
-          type: projectType,
-          projectId: generationMode === 'fresh' ? undefined : currentProjectId
-        })
-      })
-      const data = await res.json()
-      if (res.ok && data.code) {
-        setGeneratedCode(data.code)
-        toast.success('Simplified and retried!')
-      } else {
-        toast.error(data.error || 'Failed to retry')
-      }
-    } catch {
-      toast.error('Failed to retry')
-    } finally {
-      setGenerating(false)
-    }
+
+    const issuesList = incompleteIssues?.length
+      ? incompleteIssues.map((iss, i) => `${i + 1}. ${iss}`).join('\n')
+      : '1. Generation was truncated before completion'
+
+    const fixedPrompt = `${prompt}
+
+PREVIOUS GENERATION WAS INCOMPLETE — the output was cut off before finishing.
+Detected issues:
+${issuesList}
+
+MANDATORY RULES FOR THIS REGENERATION:
+- Identify which features caused the output to be too long
+- Remove or simplify ONLY those features to fit within the output limit
+- Every feature you include MUST be 100% finished — no partial code
+- The output MUST end with </html> (or the final closing tag for the format)
+- Do NOT truncate, trail off, or leave any tags unclosed
+- Prefer a smaller, complete app over a large, broken one`
+
+    setPrompt(fixedPrompt)
+    setTimeout(() => { handleGenerate() }, 100)
   }
 
   // AI Chat state
@@ -452,12 +445,16 @@ function BuilderContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          prompt: generationMode === 'fresh' 
+          prompt: generationMode === 'fresh'
             ? `START FROM SCRATCH: ${prompt}`  // Override iteration detection
-            : prompt, 
+            : prompt,
           type: projectType,
-          projectId: generationMode === 'fresh' ? undefined : projectIdToUse,  // Clear projectId for fresh mode
-          generationType: projectType  // Pass generation type for token limits
+          projectId: generationMode === 'fresh' ? undefined : projectIdToUse,
+          generationType: projectType,
+          // Tell the server to always iterate when user picked "Add to Existing",
+          // bypassing keyword heuristics that might otherwise treat the prompt
+          // as a new-project request (e.g. "create a sidebar").
+          forceIteration: generationMode === 'iterate' && !!projectIdToUse
         })
       })
 
@@ -548,11 +545,33 @@ function BuilderContent() {
         const finalCode = htmlMatch ? htmlMatch[1] : receivedCode;
         
         setGeneratedCode(finalCode);
-        
-        if (projectIdToUse) {
-          console.log('✅ Code generated and auto-saved to project:', projectIdToUse);
+
+        // Auto-save via /api/projects/save so BuildFlow injections (forms,
+        // analytics, CSP) and Page records are applied automatically —
+        // no manual Save click required.
+        if (projectIdToUse && finalCode) {
+          const nameToSave = projectName?.trim() || generateSmartProjectName(prompt)
+          try {
+            const saveRes = await fetch('/api/projects/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: projectIdToUse,
+                name: nameToSave,
+                code: finalCode,
+                isComplete: true,
+              }),
+            })
+            if (saveRes.ok) {
+              console.log('✅ Project auto-saved with BuildFlow injections')
+            } else {
+              console.warn('⚠️ Auto-save returned non-ok status')
+            }
+          } catch (saveErr) {
+            console.warn('⚠️ Auto-save failed (non-critical):', saveErr)
+          }
         }
-        
+
         analytics.aiGeneration(true, projectType);
         toast.success('Code generated successfully!', {
           duration: 2000,
@@ -1031,6 +1050,45 @@ Generate complete, production-ready code that fixes ALL issues above.`
 
           <div className="space-y-6">
 
+            {/* Validation Score Banner — visible immediately after generation */}
+            {validation && !generating && (
+              <div className={`flex items-center justify-between px-4 py-3 rounded-xl border ${
+                validation.validationPassed
+                  ? 'bg-green-50 border-green-200 text-green-800'
+                  : validation.validationScore >= 50
+                  ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
+                  : 'bg-red-50 border-red-200 text-red-800'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">
+                    {validation.validationPassed ? '✅' : validation.validationScore >= 50 ? '⚠️' : '❌'}
+                  </span>
+                  <div>
+                    <span className="font-semibold text-sm">
+                      {validation.validationPassed ? 'Validation Passed' : 'Validation Issues'}
+                    </span>
+                    {validation.errors?.length > 0 && (
+                      <span className="ml-2 text-xs opacity-80">
+                        {validation.errors.length} error{validation.errors.length !== 1 ? 's' : ''}
+                        {validation.warnings?.length > 0 ? `, ${validation.warnings.length} warning${validation.warnings.length !== 1 ? 's' : ''}` : ''}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {/* Score pill */}
+                <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold ${
+                  validation.validationPassed
+                    ? 'bg-green-200 text-green-900'
+                    : validation.validationScore >= 50
+                    ? 'bg-yellow-200 text-yellow-900'
+                    : 'bg-red-200 text-red-900'
+                }`}>
+                  <span>{validation.validationScore}</span>
+                  <span className="font-normal opacity-70">/ 100</span>
+                </div>
+              </div>
+            )}
+
             {/* Enhanced Error Recovery UI for Incomplete Generations */}
             {incompleteIssues && (
               <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-xl mb-4">
@@ -1053,10 +1111,10 @@ Generate complete, production-ready code that fixes ALL issues above.`
                     Continue Generation
                   </button>
                   <button
-                    onClick={handleSimplifyAndRetry}
+                    onClick={handleFixIncomplete}
                     className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm font-semibold"
                   >
-                    Simplify & Retry
+                    Fix & Regenerate
                   </button>
                 </div>
               </div>
@@ -1403,7 +1461,15 @@ Generate complete, production-ready code that fixes ALL issues above.`
         </div>
       )}
 
-      <Toaster position="top-right" />
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          success: { duration: 3000 },
+          error: { duration: 5000 },
+          style: { fontSize: '14px', maxWidth: '380px' },
+        }}
+      />
 
       {showAssistant && (
         <PromptAssistant

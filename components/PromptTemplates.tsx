@@ -5,23 +5,100 @@ import { Card } from '@/components/ui/card';
 
 const QUICK_TEMPLATES = [
   {
-    label: '☕ Coffee Shop Site',
-    prompt: 'Create a landing page for a coffee shop with home, menu, and contact pages',
-    type: 'simple-website',
+    label: '☕ Coffee Shop',
+    prompt: `Create a multi-page website for a coffee shop called "Brew & Bean" with these SEPARATE pages:
+
+1. Home page — hero banner, featured drinks (3 cards), customer testimonials, newsletter signup
+2. Services page — full menu (hot drinks, cold drinks, pastries) with prices and images
+3. About page — brand story, team photos, our values section
+4. Contact page — contact form (name, email, message), store hours, Google Maps placeholder
+5. Basket page — shopping cart with items, quantities, subtotal, checkout button (requires login)
+
+Authentication:
+- Email/password login and signup
+- Protected basket/checkout pages (redirect to login if not authenticated)
+- User account dropdown in nav showing name when logged in
+
+Design: warm browns, creams, orange accents. Cozy, modern café aesthetic.
+Tech: Next.js 14 App Router, NextAuth.js, Prisma + PostgreSQL, Tailwind CSS, TypeScript`,
+    type: 'full-stack-app',
   },
   {
     label: '✅ Task Manager',
-    prompt: 'Build a task management app with user authentication, create/edit/delete tasks, and filtering',
+    prompt: `Build a full-stack task management app with:
+
+Pages: Landing (public), Login/Signup, Dashboard, Task List, Task Detail, Profile
+
+Features:
+- Email/password auth with protected routes
+- Create, edit, delete tasks with title, description, status (todo/in-progress/done), due date, priority
+- Filter by status and priority, search by title, sort by due date
+- Dashboard showing task stats (total, completed, overdue)
+
+Tech: Next.js 14 App Router, NextAuth.js, Prisma + PostgreSQL, TypeScript, Tailwind CSS + shadcn/ui`,
     type: 'full-stack-app',
   },
   {
     label: '💼 Portfolio',
-    prompt: 'Create a developer portfolio with home, projects, about, and contact pages',
+    prompt: `Create a professional developer portfolio website with 4 separate pages:
+
+1. Home page — animated hero with name/tagline, tech stack grid, 3 featured project cards, CTA to contact
+2. Projects page — filterable grid of 6 project cards (each with title, description, tech badges, live/GitHub links)
+3. About page — professional bio, work experience timeline, education, downloadable CV button
+4. Contact page — contact form (name, email, subject, message), social media links, email display
+
+Design: dark theme, electric blue/purple accents, smooth scroll animations, glassmorphism cards
+Tech: separate HTML pages with shared CSS, vanilla JS for animations and form validation`,
     type: 'simple-website',
   },
   {
+    label: '🏋️ AI Fitness Coach',
+    prompt: `Build a full-stack AI Fitness & Nutrition Coach app — personalized plans driven by AI.
+
+Pages: Landing, Login/Signup, Onboarding (goals + preferences wizard), Dashboard, Workout Plan, Meal Plan, Progress Tracker, AI Chat Coach, Settings, Subscription/Billing
+
+Core Features:
+- AI-generated workout plans based on goal (weight loss / muscle gain / endurance), fitness level, available equipment
+- AI-generated 7-day meal plans matching calorie/macro targets
+- Habit reminders (push notification opt-in)
+- Progress tracker with weight, measurements, workout completion charts (Recharts)
+- AI Chat Coach — conversational interface powered by Claude API for motivation, plan tweaks, questions
+- Wearable sync placeholder (Fitbit / Apple Health API connection UI)
+
+Monetization:
+- Stripe subscription: Free (basic plan), Pro £9.99/mo (AI chat + custom plans), Elite £19.99/mo (all features)
+- Feature gates based on plan tier
+
+Tech: Next.js 14 App Router, NextAuth.js (Google + email), Prisma + PostgreSQL, Stripe, Anthropic Claude API (claude-sonnet-4-5-20250929), Tailwind CSS + shadcn/ui, Recharts, TypeScript
+
+Database: Users, WorkoutPlans, MealPlans, ProgressEntries, ChatMessages, Subscriptions`,
+    type: 'full-stack-app',
+  },
+  {
     label: '📝 Blog CMS',
-    prompt: 'Build a blog with post creation, rich text editor, categories, and public blog pages',
+    prompt: `Build a blog CMS with public site and admin dashboard:
+
+Public site: Home (featured posts), Blog list (pagination + search), Post detail (rich content, reading time, related posts), Category pages, Author pages
+
+Admin dashboard (protected): Post editor with rich text (TipTap), Media library, Categories + Tags management, Draft/Publish/Schedule workflow, SEO settings per post, Comment moderation
+
+Tech: Next.js 14 App Router, NextAuth.js, Prisma + PostgreSQL, TipTap editor, Cloudinary for media, TypeScript, Tailwind CSS`,
+    type: 'full-stack-app',
+  },
+  {
+    label: '🛒 E-commerce Store',
+    prompt: `Build a full e-commerce store:
+
+Pages: Home, Product listing (filters + search), Product detail (gallery, reviews), Cart, Checkout, Order confirmation, Order history, User profile, Admin dashboard
+
+Features:
+- Product catalog with categories, price filter, ratings
+- Cart persisted to database for logged-in users
+- Multi-step Stripe checkout
+- Order tracking
+- Admin: manage products, orders, customers, sales analytics
+
+Tech: Next.js 14 App Router, NextAuth.js, Prisma + PostgreSQL, Stripe, TypeScript, Tailwind CSS`,
     type: 'full-stack-app',
   },
 ];

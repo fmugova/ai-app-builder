@@ -12,7 +12,12 @@ import DashboardTutorialPopUp from './components/DashboardTutorialPopUpClient'
 
 async function DashboardContent() {
   // Get session
-  const session = await getServerSession(authOptions)
+  let session = null
+  try {
+    session = await getServerSession(authOptions)
+  } catch {
+    // Stale/invalid JWT — treat as unauthenticated
+  }
   
   if (!session?.user?.email) {
     redirect('/auth/signin?callbackUrl=/dashboard')

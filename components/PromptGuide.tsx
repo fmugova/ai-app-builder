@@ -14,319 +14,382 @@ interface PromptExample {
 }
 
 const PROMPT_EXAMPLES: PromptExample[] = [
+  // ─── SIMPLE WEBSITES ────────────────────────────────────────────────────────
   {
-    id: 'coffee-landing',
-    title: 'Coffee Shop Landing Page',
+    id: 'coffee-shop',
+    title: 'Coffee Shop Website',
     category: 'simple',
-    description: 'Multi-page marketing website for a coffee shop',
-    prompt: `Create a professional landing page for a coffee shop called "Brew & Bean" with the following pages:
+    description: '5-page website with basket, auth, and online ordering',
+    prompt: `Create a full multi-page website for a coffee shop called "Brew & Bean" with these SEPARATE pages:
 
-1. Home page with:
-   - Hero section with call-to-action
-   - Featured products grid (3 items)
-   - About section
-   - Contact information
+PAGE 1 — Home (index.html):
+- Full-width hero with headline "Crafted With Love, Served With Warmth", subtext, and "Order Now" CTA button
+- Featured drinks section: 3 cards (Signature Latte, Cold Brew, Matcha Latte) each with image, name, description, price, "Add to Basket" button
+- Customer testimonials: 3 reviews with star ratings and customer names
+- Newsletter signup form (email input + subscribe button)
+- Sticky navigation with logo, links to all 5 pages, and basket icon showing item count
 
-2. Menu page with:
-   - Coffee drinks section
-   - Pastries section
-   - Prices for each item
+PAGE 2 — Services (services.html):
+- Full menu organised into sections: Hot Drinks, Cold Drinks, Pastries & Food, Seasonal Specials
+- Each item: photo, name, brief description, price, dietary tags (vegan/gluten-free), "Add to Basket" button
+- Filter buttons to show all / drinks / food / seasonal
 
-3. Contact page with:
-   - Contact form (name, email, message)
-   - Store hours
-   - Location map placeholder
+PAGE 3 — About (about.html):
+- Brand story section with large image and text
+- "Meet the Team" grid: 4 team member cards with photo, name, role, fun fact
+- Our Values section: 3 pillars (Quality, Community, Sustainability) with icons and descriptions
+- Timeline of the coffee shop's history
 
-Design Requirements:
-- Warm, inviting color scheme (browns, creams, warm oranges)
-- Modern, clean layout
-- Responsive mobile design
-- Professional typography
-- Navigation menu on all pages
+PAGE 4 — Contact (contact.html):
+- Contact form: name, email, subject (dropdown), message textarea, submit button
+- Store info card: address, phone, email, opening hours (Mon-Fri 7am-7pm, Sat-Sun 8am-6pm)
+- Google Maps embed placeholder
+- Three location cards if multiple branches
 
-Technical Requirements:
-- Separate HTML file for each page
-- Shared CSS file for consistent styling
-- Proper semantic HTML
-- Form validation
-- Mobile-first responsive design`,
-    tags: ['landing-page', 'multi-page', 'forms', 'responsive'],
-    expectedOutput: 'Separate files: index.html, menu.html, contact.html, styles.css',
-  },
-  {
-    id: 'task-manager',
-    title: 'Task Management App',
-    category: 'full-stack',
-    description: 'Complete CRUD application with authentication',
-    prompt: `Build a full-stack task management application with these features:
+PAGE 5 — Basket (basket.html) [REQUIRES LOGIN]:
+- If not logged in: show login prompt and redirect to login modal
+- If logged in: basket table with item name, quantity stepper, unit price, line total, remove button
+- Order summary card: subtotal, delivery fee, total
+- Checkout button (Stripe placeholder)
+- Continue shopping link
 
 Authentication:
-- Email/password signup and login
-- Protected routes
-- User profile page
+- Login/Signup modal (email + password, Google OAuth button)
+- User state persisted in localStorage
+- Logged-in state shows user name and logout button in nav
+- Basket protected — redirect to login if not authenticated
 
-Task Management:
-- Create, read, update, delete tasks
-- Task properties: title, description, status (todo/in-progress/done), due date, priority
-- Filter tasks by status and priority
-- Search tasks by title
-- Sort tasks by due date or priority
+Design:
+- Colour palette: deep espresso brown (#3D1A00), warm cream (#FFF8F0), burnt orange (#E87722), soft gold (#D4A853)
+- Font: Playfair Display for headings, Lato for body
+- Card-based layout with subtle shadows
+- Hover animations on all interactive elements
+- Fully mobile responsive (hamburger menu on mobile)
 
-Pages:
-- Landing page (public)
-- Login/Signup pages
-- Dashboard (shows task summary)
-- Task list page with filters
-- Task detail/edit page
-- User profile page
-
-Tech Stack:
-- Next.js 14 with App Router
-- Supabase for auth and database
-- Prisma ORM
-- TypeScript
-- Tailwind CSS + shadcn/ui components
-- Server actions for mutations
-
-Database Schema:
-- Users table (managed by Supabase Auth)
-- Tasks table with user_id foreign key
-- Implement Row Level Security`,
-    tags: ['full-stack', 'crud', 'authentication', 'database'],
-    expectedOutput: 'Complete Next.js app with multiple routes, API routes, database schema',
+Technical:
+- Separate HTML file per page
+- Single shared styles.css with CSS custom properties
+- Single shared app.js with basket state management (localStorage), auth state, nav active state
+- Form validation on all forms
+- Smooth page transitions`,
+    tags: ['multi-page', 'basket', 'auth', 'e-commerce', 'forms', 'responsive'],
+    expectedOutput: 'Files: index.html, services.html, about.html, contact.html, basket.html, styles.css, app.js',
   },
   {
     id: 'portfolio',
     title: 'Developer Portfolio',
     category: 'simple',
-    description: 'Personal portfolio website with project showcase',
-    prompt: `Create a developer portfolio website with:
+    description: '4-page dark portfolio with project gallery and animations',
+    prompt: `Create a professional developer portfolio website with 4 separate pages:
 
-Home Page:
-- Hero section with name and tagline
-- Skills section (display programming languages and tools)
-- Featured projects (3 project cards)
-- Contact CTA
+PAGE 1 — Home (index.html):
+- Animated hero: large name heading, animated typewriter tagline cycling through "Full-Stack Developer", "UI/UX Enthusiast", "Problem Solver"
+- Tech stack grid: 12 skill pills with icons (React, Next.js, TypeScript, Node.js, Python, PostgreSQL, AWS, Docker, Git, Figma, Tailwind, GraphQL)
+- Featured projects: 3 cards with screenshot (Picsum photo), title, 2-line description, 3 tech tags, "View Project" and "GitHub" buttons
+- Stats bar: "3+ Years Experience | 20+ Projects | 5 Happy Clients | Open to Work"
+- CTA section with "Download CV" and "Get in Touch" buttons
 
-Projects Page:
-- Grid of project cards
-- Each card shows: title, description, tech stack, live demo link, GitHub link
-- Filter by technology
-- Projects data can be hardcoded for now
+PAGE 2 — Projects (projects.html):
+- Filter bar: All | Frontend | Full-Stack | Mobile | Open Source
+- Masonry or grid of 8 project cards — each shows real screenshot (Picsum seed), title, description, tech stack badges, live demo link, GitHub link
+- Each card has a colour-coded difficulty badge (Beginner / Intermediate / Advanced)
+- "Load More" button
 
-About Page:
-- Professional bio
-- Work experience timeline
-- Education
-- Downloadable resume button
+PAGE 3 — About (about.html):
+- Professional headshot placeholder (Picsum round photo) + bio paragraph
+- Work Experience timeline: 3 roles with company, title, dates, bullet points of achievements
+- Education section: degree, university, graduation year
+- Certifications: 3 badge-style cards
+- Hobbies section with emoji icons
+- Downloadable CV button (links to placeholder PDF)
 
-Contact Page:
-- Contact form with name, email, message
-- Social media links (GitHub, LinkedIn, Twitter)
-- Email address
+PAGE 4 — Contact (contact.html):
+- Headline "Let's Build Something Together"
+- Contact form: name, email, subject, message, budget range dropdown, submit button
+- Social links: GitHub, LinkedIn, Twitter/X, Dev.to — as large icon buttons
+- Availability badge "Currently Available for Freelance"
+- Response time notice "Usually responds within 24 hours"
 
 Design:
-- Dark theme by default
-- Modern, minimal aesthetic
-- Smooth animations and transitions
-- Code syntax highlighting for any code snippets
-- Responsive design
+- Dark theme: background #0A0A0F, cards #13131A, borders #1E1E2E
+- Accent: electric purple #7C3AED, cyan #06B6D4
+- Glassmorphism cards with backdrop-filter
+- Subtle particle or grid background on hero
+- Smooth fade-in animations on scroll
+- Responsive with hamburger menu
 
 Technical:
-- Separate HTML files for each page
-- Shared CSS with CSS custom properties for theming
-- Optional: Add theme toggle (light/dark)`,
-    tags: ['portfolio', 'showcase', 'dark-theme', 'animations'],
-    expectedOutput: 'Multi-page website with index.html, projects.html, about.html, contact.html',
+- Separate HTML files, shared dark.css, shared portfolio.js
+- Intersection Observer for scroll animations
+- Active nav link highlighting
+- Theme toggle (dark/light)`,
+    tags: ['portfolio', 'dark-theme', 'animations', 'glassmorphism', 'multi-page'],
+    expectedOutput: 'Files: index.html, projects.html, about.html, contact.html, dark.css, portfolio.js',
+  },
+
+  // ─── FULL-STACK APPS ─────────────────────────────────────────────────────────
+  {
+    id: 'task-manager',
+    title: 'Task Management App',
+    category: 'full-stack',
+    description: 'Full CRUD app with auth, priorities, and dashboard analytics',
+    prompt: `Build a full-stack task management application:
+
+PAGES / ROUTES:
+- / — Public landing page with feature highlights and pricing comparison
+- /login & /signup — Auth pages with email/password + Google OAuth
+- /dashboard — Protected: task stats cards (total, completed, overdue, due today), activity chart (Recharts), quick-add form
+- /tasks — Protected: full task list with table + card view toggle
+- /tasks/[id] — Task detail with comments thread
+- /profile — User settings, avatar upload, notification preferences
+
+TASK FEATURES:
+- Create / edit / delete tasks
+- Fields: title, description, status (todo / in-progress / done / cancelled), priority (low/medium/high/urgent), due date, tags, assignee (for team use)
+- Bulk actions: mark complete, delete, change priority
+- Filter by status, priority, tag, due date range
+- Full-text search
+- Sort by due date, priority, created date
+- Drag-and-drop kanban board view (optional)
+
+NOTIFICATIONS:
+- Email reminders for tasks due tomorrow (via Resend)
+- In-app notification bell with unread count
+
+TECH STACK:
+- Next.js 14 App Router
+- NextAuth.js (email/password + Google)
+- Prisma ORM + PostgreSQL
+- TypeScript
+- Tailwind CSS + shadcn/ui
+- Recharts for dashboard charts
+- Zod for validation
+- Server Actions for mutations
+
+DATABASE SCHEMA:
+- User (id, name, email, avatar, createdAt)
+- Task (id, title, description, status, priority, dueDate, userId, tags, createdAt, updatedAt)
+- Comment (id, taskId, userId, body, createdAt)
+- Notification (id, userId, message, read, createdAt)`,
+    tags: ['full-stack', 'crud', 'auth', 'kanban', 'charts', 'real-time'],
+    expectedOutput: 'Complete Next.js app: app router pages, API routes, Prisma schema, components',
   },
   {
     id: 'saas-dashboard',
     title: 'SaaS Dashboard',
     category: 'full-stack',
-    description: 'Complete SaaS application with subscriptions',
-    prompt: `Build a SaaS dashboard application with subscription management:
+    description: 'Multi-tenant SaaS with Stripe subscriptions and team management',
+    prompt: `Build a production-ready SaaS dashboard application:
 
-Authentication & Onboarding:
-- Email/password and social login (Google)
-- Email verification
-- Onboarding wizard for new users
+PAGES / ROUTES:
+- / — Marketing landing page: hero, features, pricing (3 tiers), testimonials, FAQ, footer
+- /login & /signup — Auth with Google, GitHub, email/password + email verification
+- /onboarding — 3-step wizard: workspace name → invite team → choose plan
+- /dashboard — KPI cards (MRR, active users, churn rate, NPS), line charts (Recharts), recent activity feed
+- /settings/profile — Name, avatar, password, 2FA setup
+- /settings/team — Invite members, manage roles (Owner/Admin/Member), remove members
+- /settings/billing — Current plan, usage meters, upgrade/downgrade, payment history, cancel
+- /settings/api-keys — Generate, name, copy, revoke API keys
+- /analytics — Detailed charts: user growth, feature usage, geographic breakdown
 
-Dashboard:
-- Overview with key metrics (cards/charts)
-- Recent activity feed
-- Quick actions
+SUBSCRIPTION (STRIPE):
+- Free: 1 user, 100 API calls/day
+- Pro (£29/mo): 10 users, 10,000 API calls/day, priority support
+- Enterprise (£99/mo): unlimited users, unlimited API calls, SSO, dedicated support
+- Webhook handler for subscription events (created, updated, cancelled, payment_failed)
+- Billing portal redirect via Stripe Customer Portal
 
-Subscription Management:
-- Stripe integration with 3 tiers (Free, Pro, Enterprise)
-- Billing page showing current plan
-- Upgrade/downgrade functionality
-- Payment history
+TECH STACK:
+- Next.js 14 App Router
+- NextAuth.js (Google + GitHub + Email)
+- Prisma ORM + PostgreSQL
+- Stripe (subscriptions + webhooks + billing portal)
+- Resend for transactional emails
+- TypeScript, Tailwind CSS + shadcn/ui
+- Recharts, Zod, React Hook Form
 
-User Management:
-- Profile settings
-- Account settings
-- Team members (for higher tiers)
-- API keys management
-
-Tech Stack:
-- Next.js 14 with App Router
-- Supabase (auth, database, storage)
-- Stripe for payments
-- Prisma ORM
-- TypeScript
-- Tailwind CSS + shadcn/ui
-- Recharts for data visualization
-
-Database:
-- Users table
-- Subscriptions table
-- API keys table
-- Activity logs table
-- Implement Row Level Security
-
-Features:
-- Usage tracking and limits based on plan
-- Email notifications for important events
-- Export data functionality`,
-    tags: ['saas', 'stripe', 'subscriptions', 'dashboard', 'charts'],
-    expectedOutput: 'Full Next.js application with auth, payments, multiple routes',
-  },
-  {
-    id: 'blog-cms',
-    title: 'Blog CMS',
-    category: 'full-stack',
-    description: 'Content management system for blog posts',
-    prompt: `Create a blog CMS with:
-
-Public Pages:
-- Home page with featured posts
-- Blog list page with pagination
-- Individual blog post pages
-- Category pages
-- Author pages
-- Search functionality
-
-Admin Dashboard:
-- Post list (draft, published, scheduled)
-- Rich text editor for creating/editing posts
-- Media library for images
-- Categories management
-- Tags management
-- SEO settings per post
-
-Post Features:
-- Draft/publish workflow
-- Schedule posts for future
-- Featured image
-- Categories and tags
-- Author attribution
-- Reading time estimate
-- Related posts
-- Comments section
-
-Tech Stack:
-- Next.js 14 with App Router
-- Supabase (auth, database, storage)
-- Prisma ORM
-- TipTap or Lexical for rich text editing
-- TypeScript
-- Tailwind CSS
-
-Database Schema:
-- Users (authors)
-- Posts (title, slug, content, status, published_at)
-- Categories
-- Tags
-- Media (uploaded images)
-- Comments
-
-SEO:
-- Dynamic meta tags per post
-- Open Graph images
-- Sitemap generation
-- RSS feed`,
-    tags: ['cms', 'blog', 'rich-text', 'seo', 'media'],
-    expectedOutput: 'Complete blog CMS with public site and admin dashboard',
+DATABASE:
+- User, Workspace, WorkspaceMember, Subscription, ApiKey, ActivityLog, Invitation tables
+- Row-level data isolation per workspace`,
+    tags: ['saas', 'stripe', 'multi-tenant', 'team', 'billing', 'onboarding'],
+    expectedOutput: 'Full Next.js SaaS with auth, Stripe webhooks, team management, analytics',
   },
   {
     id: 'ecommerce',
     title: 'E-commerce Store',
     category: 'full-stack',
-    description: 'Online store with cart and checkout',
-    prompt: `Create an e-commerce store with:
+    description: 'Full-featured store with Stripe checkout and admin dashboard',
+    prompt: `Build a complete e-commerce store:
 
-Product Catalog:
-- Product listing page with filters (category, price, rating)
-- Search functionality
-- Product detail pages with image gallery
-- Related products
-- Product reviews and ratings
+PUBLIC PAGES:
+- / — Hero banner, featured products (6 cards), category browsing, promotional banner, newsletter signup
+- /products — Product grid with sidebar filters (category, price range, rating, in-stock toggle), search, sort (price/rating/newest)
+- /products/[slug] — Image gallery (5 photos), description tabs (details/specs/reviews), related products, add-to-cart with quantity, wishlist button
+- /cart — Cart items table, quantity stepper, remove, promo code input, order summary, "Proceed to Checkout" button
+- /checkout — Multi-step: Shipping → Payment (Stripe Elements) → Review → Confirmation
+- /orders/[id] — Order confirmation with tracking timeline
+- /account — Login-protected: profile, order history, saved addresses, wishlist
 
-Shopping Cart:
-- Add to cart functionality
-- Update quantities
-- Remove items
-- Cart summary
-- Persistent cart (save to database)
+ADMIN DASHBOARD (/admin — separate protected section):
+- /admin/dashboard — Revenue chart, orders today, top-selling products, recent orders table
+- /admin/products — CRUD: add/edit/delete products with image upload (Cloudinary), stock management
+- /admin/orders — Order list, status updates (pending/processing/shipped/delivered/cancelled), print invoice
+- /admin/customers — Customer list with order count, lifetime value
+- /admin/analytics — Sales trends, conversion funnel, category breakdown
 
-Checkout:
-- Multi-step checkout process
-- Shipping information form
-- Payment integration (Stripe)
-- Order summary
-- Order confirmation page
+TECH STACK:
+- Next.js 14 App Router
+- NextAuth.js (customer + admin roles)
+- Prisma ORM + PostgreSQL
+- Stripe (checkout + webhooks)
+- Cloudinary for product images
+- Resend for order confirmation emails
+- TypeScript, Tailwind CSS + shadcn/ui, Recharts
 
-User Features:
-- User authentication
-- Order history
-- Wishlist
-- Profile management
+DATABASE:
+- Product, Category, ProductImage, Cart, CartItem, Order, OrderItem, Review, Address, Wishlist tables`,
+    tags: ['e-commerce', 'stripe', 'cart', 'admin', 'cloudinary', 'reviews'],
+    expectedOutput: 'Full Next.js e-commerce with admin dashboard, Stripe checkout, image uploads',
+  },
+  {
+    id: 'blog-cms',
+    title: 'Blog CMS',
+    category: 'full-stack',
+    description: 'Public blog with admin CMS, rich editor, and SEO',
+    prompt: `Create a blog CMS with public site and admin dashboard:
 
-Admin Dashboard:
-- Product management (CRUD)
-- Order management
-- Customer list
-- Sales analytics
+PUBLIC SITE:
+- / — Hero with latest post, featured posts grid (6), sidebar: categories, popular tags, newsletter signup
+- /blog — Paginated post list (12/page), search bar, filter by category/tag
+- /blog/[slug] — Full post: featured image, author card, reading time, table of contents, rich content, social share buttons, related posts (3), comments section
+- /categories/[slug] & /authors/[slug] — Filtered post lists
+- /rss.xml — Auto-generated RSS feed
+- /sitemap.xml — Dynamic sitemap
 
-Tech Stack:
-- Next.js 14 with App Router
-- Supabase (auth, database)
-- Stripe for payments
-- Prisma ORM
-- TypeScript
-- Tailwind CSS
+ADMIN DASHBOARD (/admin):
+- /admin — Stats: total posts, views this month, popular posts, recent comments
+- /admin/posts — Post list with status badges (Draft/Published/Scheduled), bulk actions
+- /admin/posts/new & /admin/posts/[id]/edit — Full TipTap rich text editor with: headings, bold/italic, images (drag-drop), code blocks, embeds, slash commands; SEO sidebar (meta title, description, OG image, canonical URL, noindex toggle)
+- /admin/media — Image library with Cloudinary upload, search, delete
+- /admin/categories & /admin/tags — CRUD management
+- /admin/comments — Approve/reject/delete comments, spam detection
 
-Database:
-- Products, Categories, Orders, OrderItems, Reviews tables`,
-    tags: ['ecommerce', 'stripe', 'cart', 'checkout'],
-    expectedOutput: 'Full e-commerce application with product catalog, cart, and checkout',
+POST FEATURES:
+- Draft → Review → Published workflow
+- Schedule publish for future date/time
+- Revision history (last 10 versions)
+- Reading time auto-calculation
+- Estimated word count
+
+TECH STACK:
+- Next.js 14 App Router
+- NextAuth.js (admin role)
+- Prisma ORM + PostgreSQL
+- TipTap editor
+- Cloudinary for media
+- Resend for comment notifications
+- TypeScript, Tailwind CSS
+
+DATABASE:
+- Post, Author, Category, Tag, PostTag, Comment, Media, Revision tables`,
+    tags: ['blog', 'cms', 'rich-text', 'tiptap', 'seo', 'media', 'cloudinary'],
+    expectedOutput: 'Complete blog CMS with public site, admin editor, media library, RSS/sitemap',
+  },
+
+  // ─── ADVANCED / AI APPS ──────────────────────────────────────────────────────
+  {
+    id: 'ai-fitness-coach',
+    title: 'AI Fitness & Nutrition Coach',
+    category: 'advanced',
+    description: 'Health tech app with AI workout/meal plans, chat coach, and Stripe subscriptions',
+    prompt: `Build a full-stack AI Fitness & Nutrition Coach web application.
+
+TREND: Health tech + personalised AI — growing market with strong subscription monetisation.
+
+PAGES / ROUTES:
+- / — Marketing landing: hero video background, feature highlights, before/after testimonials, pricing, FAQ
+- /login & /signup — Email/password + Google OAuth, email verification
+- /onboarding — 4-step wizard: (1) personal stats (age, height, weight, gender), (2) fitness goal (weight loss/muscle gain/endurance/flexibility), (3) experience level + available equipment, (4) dietary preferences (vegan/vegetarian/keto/standard) + allergies
+- /dashboard — Welcome banner, today's workout card, calorie progress ring, streak counter, macro summary, upcoming reminders, AI tip of the day
+- /workout-plan — Weekly plan grid (7 days), each day shows: exercise cards with sets/reps/rest/video placeholder, swap exercise button, mark complete checkbox, XP reward animation
+- /meal-plan — 7-day meal plan with breakfast/lunch/dinner/snacks, macro breakdown per meal, calorie total, grocery list generator, swap meal button
+- /progress — Charts: weight trend (line), body measurements (radar), workout completion rate (bar), streak calendar (heatmap); log new entry form; milestone badges
+- /chat — Full-screen AI Chat Coach interface: conversation history, typing indicator, quick prompt chips ("Motivate me", "Adjust my plan", "What should I eat?"), voice input button, message timestamp, Claude API streaming responses
+- /reminders — Habit reminder setup: workout time, meal prep reminder, water intake alerts, sleep target; notification preferences (email/push)
+- /wearables — Integration cards: Fitbit, Apple Health, Garmin, Google Fit — each with "Connect" OAuth button and sync status; last sync timestamp
+- /settings — Profile, goals update, unit preferences (metric/imperial), notification settings, data export, delete account
+- /billing — Current plan display, usage stats (AI requests used), upgrade/downgrade plan, payment history, cancel subscription
+
+AI FEATURES (Claude API — claude-sonnet-4-5-20250929):
+- Onboarding → generate personalised 4-week workout program using structured output
+- Onboarding → generate 7-day meal plan matching calorie/macro targets using structured output
+- Chat Coach — streaming conversational responses for motivation, plan adjustments, nutrition questions
+- Weekly plan regeneration based on progress data
+- Smart swap: suggest alternative exercises/meals based on constraints
+
+MONETISATION (Stripe):
+- Free: 1 AI plan generation, 5 chat messages/month, basic tracking
+- Pro (£9.99/mo): unlimited plan regeneration, 100 chat messages/month, wearable sync, meal grocery list
+- Elite (£19.99/mo): unlimited everything, priority AI, human coach booking placeholder, advanced analytics
+- Feature gates enforced server-side; upgrade prompts in UI when limit reached
+- Stripe webhook: handle subscription.created, updated, cancelled, payment_failed
+
+TECH STACK:
+- Next.js 14 App Router
+- NextAuth.js (email/password + Google)
+- Prisma ORM + PostgreSQL
+- Anthropic SDK (claude-sonnet-4-5-20250929) for AI features
+- Stripe for subscriptions + webhooks
+- Resend for email notifications
+- Recharts for progress charts
+- TypeScript, Tailwind CSS + shadcn/ui
+- Zod for validation, React Hook Form
+
+DATABASE SCHEMA:
+- User (id, name, email, age, height, weight, goal, level, dietaryPreference, createdAt)
+- WorkoutPlan (id, userId, weekStart, planData JSON, generatedAt)
+- WorkoutDay (id, planId, dayOfWeek, exercises JSON, completed, completedAt)
+- MealPlan (id, userId, weekStart, planData JSON, dailyCalories, generatedAt)
+- ProgressEntry (id, userId, date, weight, bodyFat, notes, measurements JSON)
+- ChatMessage (id, userId, role, content, createdAt)
+- Reminder (id, userId, type, time, enabled)
+- Subscription (id, userId, stripeCustomerId, stripePriceId, status, currentPeriodEnd)
+- WearableConnection (id, userId, provider, accessToken, lastSync)`,
+    tags: ['ai', 'health-tech', 'claude-api', 'stripe', 'subscriptions', 'charts', 'chat', 'wearables'],
+    expectedOutput: 'Full Next.js AI app with Claude chat, Stripe subscriptions, workout/meal AI generation, progress charts',
   },
 ];
 
 const BEST_PRACTICES = [
   {
-    title: 'Be Specific About Pages',
+    title: 'Name Every Page Explicitly',
     icon: Layers,
-    description: 'List every page you want and what should be on each page',
-    example: 'Instead of: "Create a website for my business"\nWrite: "Create a website with: Home page (hero, services, testimonials), About page (team, history), Services page (list of services with pricing), Contact page (form, map, hours)"',
+    description: 'List each page by name and describe exactly what sections/components it contains. The more specific, the better the output.',
+    example: '❌ Vague:\n"Create a website for my coffee shop"\n\n✅ Specific:\n"Create 5 pages: (1) Home — hero, 3 featured drinks, testimonials, newsletter. (2) Services — full menu with prices. (3) About — team photos, brand story. (4) Contact — form, opening hours, map. (5) Basket — cart items, quantities, checkout (requires login)"',
   },
   {
-    title: 'Specify Technical Requirements',
+    title: 'Specify Tech Stack Explicitly',
     icon: FileCode,
-    description: 'Mention tech stack, frameworks, and styling preferences',
-    example: 'Include: "Use Tailwind CSS, Next.js App Router, TypeScript, Supabase for backend, implement Row Level Security"',
+    description: 'Name the exact frameworks, libraries, and services. The AI will use what you specify — override defaults by naming them.',
+    example: '✅ Good:\n"Next.js 14 App Router, NextAuth.js (email + Google), Prisma + PostgreSQL, Stripe for payments, Tailwind CSS + shadcn/ui, TypeScript, Zod for validation"\n\n✅ For AI apps:\n"Anthropic Claude API (claude-sonnet-4-5-20250929) for chat, streaming responses, structured JSON output"',
   },
   {
-    title: 'Describe the Design',
+    title: 'Define the Design System',
     icon: Sparkles,
-    description: 'Mention colors, layout style, and design aesthetic',
-    example: 'Include: "Modern minimal design, blue and white color scheme, card-based layout, smooth animations, mobile-first responsive"',
+    description: 'Give exact colours (hex codes), fonts, layout style, and UI mood. This eliminates generic blue-and-white outputs.',
+    example: '✅ Good:\n"Colour palette: espresso brown #3D1A00, warm cream #FFF8F0, burnt orange #E87722. Font: Playfair Display headings, Lato body. Style: cozy café aesthetic, card-based with subtle drop shadows, smooth hover animations, fully mobile responsive with hamburger menu"',
   },
   {
-    title: 'Define Features Clearly',
+    title: 'Define Features with Behaviour',
     icon: Zap,
-    description: 'Break down each feature with specific behavior',
-    example: 'Instead of: "Add user accounts"\nWrite: "User authentication with email/password, profile page where users can update name and avatar, password reset flow via email"',
+    description: 'Describe what each feature does, not just its name. Include edge cases, validation rules, and user flows.',
+    example: '❌ Vague:\n"Add user accounts"\n\n✅ Specific:\n"Authentication: email/password signup + Google OAuth. Protected routes redirect unauthenticated users to /login. User avatar shown in nav when logged in. Logout clears session and redirects to /"',
+  },
+  {
+    title: 'Define the Database Schema',
+    icon: BookOpen,
+    description: 'List your main tables and key fields. This ensures relationships are correct and the AI doesn\'t guess your data model.',
+    example: '✅ Good:\n"Database tables:\n- User (id, name, email, avatar, createdAt)\n- Task (id, title, status, priority, dueDate, userId)\n- Comment (id, taskId, userId, body, createdAt)\nRelationships: Task belongs to User, Comment belongs to Task and User"',
   },
 ];
 
@@ -433,36 +496,24 @@ export default function PromptGuide({ onSelectExample }: PromptGuideProps) {
                   />
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  <button
-                    onClick={() => setSelectedCategory('all')}
-                    className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                      selectedCategory === 'all'
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    All
-                  </button>
-                  <button
-                    onClick={() => setSelectedCategory('simple')}
-                    className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                      selectedCategory === 'simple'
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    Simple Website
-                  </button>
-                  <button
-                    onClick={() => setSelectedCategory('full-stack')}
-                    className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                      selectedCategory === 'full-stack'
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    Full-Stack App
-                  </button>
+                  {[
+                    { value: 'all', label: 'All' },
+                    { value: 'simple', label: 'Simple Website' },
+                    { value: 'full-stack', label: 'Full-Stack App' },
+                    { value: 'advanced', label: '⚡ Advanced / AI' },
+                  ].map(({ value, label }) => (
+                    <button
+                      key={value}
+                      onClick={() => setSelectedCategory(value)}
+                      className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                        selectedCategory === value
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -522,12 +573,14 @@ function ExampleCard({
           <h4 className="font-semibold text-gray-900 mb-1">{example.title}</h4>
           <p className="text-sm text-gray-600">{example.description}</p>
         </div>
-        <span className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
+        <span className={`px-2 py-1 text-xs rounded-full whitespace-nowrap font-medium ${
           example.category === 'simple'
             ? 'bg-green-100 text-green-700'
+            : example.category === 'advanced'
+            ? 'bg-orange-100 text-orange-700'
             : 'bg-blue-100 text-blue-700'
         }`}>
-          {example.category === 'simple' ? 'Simple' : 'Full-Stack'}
+          {example.category === 'simple' ? 'Simple' : example.category === 'advanced' ? '⚡ Advanced' : 'Full-Stack'}
         </span>
       </div>
 

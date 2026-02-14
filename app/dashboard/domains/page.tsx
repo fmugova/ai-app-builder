@@ -11,7 +11,12 @@ interface DomainsPageProps {
 }
 
 export default async function CustomDomainsPage({ params }: DomainsPageProps) {
-  const session = await getServerSession(authOptions)
+  let session = null
+  try {
+    session = await getServerSession(authOptions)
+  } catch {
+    // Stale/invalid JWT — treat as unauthenticated
+  }
   
   if (!session?.user?.email) {
     redirect('/auth/signin')

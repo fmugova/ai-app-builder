@@ -36,7 +36,10 @@ const generateRequestSchema = z.object({
   generationType: z.string().max(50).optional(),
   retryAttempt: z.number().int().min(0).max(5).optional(),
   continuationContext: z.string().max(50000).optional(),
-  previousPrompts: z.array(z.string()).optional()
+  previousPrompts: z.array(z.string()).optional(),
+  /** When true (user selected "Add to Existing" mode), skip keyword heuristics
+   *  and always treat the request as an iteration over the existing project. */
+  forceIteration: z.boolean().optional(),
 });
 
 // ============================================================================
@@ -188,27 +191,32 @@ OUTPUT RULES:
 // ============================================================================
 
 function getOptimalTokenLimit(prompt: string, generationType: string): number {
-  // Estimate tokens needed based on prompt length and type
-  const baseTokens = 15000 // Increased base for more complete generations
-  const promptTokenEstimate = Math.ceil(prompt.length / 4)
-  
+  // Claude Sonnet 4 supports up to 64 K output tokens.
+  // Use generous limits so complex apps are never cut off mid-generation.
+  const MAX_TOKENS = 64000
+
   // Detect complex prompts (longer descriptions, multiple features)
-  const isComplexPrompt = prompt.length > 500 || 
-                          prompt.includes('dashboard') || 
+  const isComplexPrompt = prompt.length > 500 ||
+                          prompt.includes('dashboard') ||
                           prompt.includes('multiple') ||
                           prompt.includes('pages') ||
                           prompt.includes('CRM') ||
-                          prompt.includes('admin')
-  
+                          prompt.includes('admin') ||
+                          prompt.includes('fullstack') ||
+                          prompt.includes('full-stack') ||
+                          prompt.includes('next.js') ||
+                          prompt.includes('database') ||
+                          prompt.includes('authentication') ||
+                          prompt.includes('auth')
+
   if (generationType === 'landing-page') {
-    const limit = isComplexPrompt ? 25000 : 18000
-    return Math.min(limit, baseTokens + promptTokenEstimate * 2)
+    return isComplexPrompt ? 32000 : 24000
   } else if (generationType === 'webapp') {
-    const limit = isComplexPrompt ? 40000 : 30000
-    return Math.min(limit, baseTokens + promptTokenEstimate * 3)
+    return isComplexPrompt ? MAX_TOKENS : 48000
   }
-  
-  return baseTokens
+
+  // Default: fullstack / unknown type — use max
+  return MAX_TOKENS
 }
 
 /**
@@ -340,7 +348,7 @@ export async function POST(req: NextRequest) {
     // ============================================================================
     const body = await req.json()
     const validatedData = generateRequestSchema.parse(body);
-    const { prompt, projectId, generationType = 'webapp', retryAttempt = 0, continuationContext } = validatedData;
+    const { prompt, projectId, generationType = 'webapp', retryAttempt = 0, continuationContext, forceIteration = false } = validatedData;
 
     console.log('🚀 Starting generation:', {
       projectId,
@@ -355,10 +363,21 @@ export async function POST(req: NextRequest) {
     // =========================================================================
     console.log('🔍 Detecting iteration context...');
 
-    const iterationContext = await IterationDetector.detectIteration(
+    let iterationContext = await IterationDetector.detectIteration(
       prompt,
       projectId || undefined
     );
+
+    // When the user explicitly chose "Add to Existing" mode, override the
+    // keyword heuristics: if the project has files, force iteration so the
+    // existing code is always included in context regardless of prompt wording.
+    if (forceIteration && projectId && !iterationContext.isIteration && iterationContext.existingFiles.length === 0) {
+      // Re-detect with a guaranteed iteration signal
+      iterationContext = await IterationDetector.detectIteration(
+        `update and extend the existing project: ${prompt}`,
+        projectId
+      );
+    }
 
     console.log('📊 Iteration Context:', {
       isIteration: iterationContext.isIteration,

@@ -186,6 +186,26 @@ Step 5: PRESENT CHANGES
 - ✅ Error handling for async operations
 - ✅ Clear, commented code for complex logic
 
+**⚠️ CSP COMPLIANCE — MANDATORY:**
+NEVER use inline event handlers. They violate Content-Security-Policy and will be stripped automatically.
+❌ NEVER:
+\`\`\`html
+<button onclick="doSomething()">Click</button>
+<form onsubmit="handleForm(event)">
+<input onchange="update(this.value)">
+\`\`\`
+✅ ALWAYS use addEventListener inside a <script> block:
+\`\`\`html
+<button id="myBtn">Click</button>
+<script>
+document.getElementById('myBtn').addEventListener('click', function() {
+  doSomething();
+});
+</script>
+\`\`\`
+Also NEVER use javascript: URIs in href or src attributes:
+❌ <a href="javascript:void(0)">  →  ✅ <a href="#" role="button">
+
 **Responsive Design:**
 \`\`\`css
 /* Mobile first approach */
@@ -206,6 +226,45 @@ Step 5: PRESENT CHANGES
 - Sufficient color contrast
 - Focus indicators
 - Alt text for images
+
+**📸 IMAGES — USE REAL STOCK PHOTOS (MANDATORY):**
+NEVER use broken image placeholders, empty src attributes, or placeholder.com boxes.
+ALL images must use real, loading URLs from these free services:
+
+1. **Lorem Picsum** (best for generic photos — always loads, no API key needed):
+   - Fixed size:    https://picsum.photos/800/500
+   - Seed-based (same seed = same image every time, great for consistency):
+     https://picsum.photos/seed/portfolio1/800/500
+     https://picsum.photos/seed/project-hero/1200/600
+     https://picsum.photos/seed/team-member-1/400/400
+   - Use unique seeds per image so every image looks different
+
+2. **Unsplash Source** (topic-specific photos — use relevant keywords):
+   - https://source.unsplash.com/800x500/?technology,code
+   - https://source.unsplash.com/400x400/?portrait,professional
+   - https://source.unsplash.com/1200x600/?office,workspace
+   - https://source.unsplash.com/800x600/?nature,landscape
+   - https://source.unsplash.com/600x400/?food,restaurant
+
+3. **DiceBear** (for avatars/profile photos):
+   - https://api.dicebear.com/7.x/personas/svg?seed=John
+   - https://api.dicebear.com/7.x/avataaars/svg?seed=Team1
+
+**Portfolio / Gallery projects:** Use Unsplash Source with relevant keywords for project thumbnails.
+**Team / About sections:** Use DiceBear or Picsum seed-based URLs for consistent avatars.
+**Hero sections:** Use high-res Picsum seed images (1200×600 or wider).
+
+ALWAYS add descriptive alt text matching the image content.
+\`\`\`html
+<!-- ✅ CORRECT — real photos that load -->
+<img src="https://picsum.photos/seed/project1/800/500" alt="E-commerce dashboard project" loading="lazy">
+<img src="https://source.unsplash.com/400x400/?portrait,professional" alt="Team member Sarah" loading="lazy">
+
+<!-- ❌ WRONG — these never load -->
+<img src="placeholder.jpg" alt="...">
+<img src="#" alt="...">
+<img src="" alt="...">
+\`\`\`
 </quality_standards>
 
 ### 4. User Experience Patterns

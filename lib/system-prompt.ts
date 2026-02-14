@@ -161,6 +161,25 @@ Wrap each page in special delimiters so BuildFlow can extract them into separate
 - Add :focus styles for keyboard navigation
 - Use semantic HTML elements instead of generic divs where appropriate
 
+### 📸 IMAGE REQUIREMENTS — REAL STOCK PHOTOS (MANDATORY):
+NEVER use broken/fake image sources. ALL <img> tags must load real photos.
+
+Use these free services — no API key required:
+- **Lorem Picsum** (seed-based, always loads):
+  https://picsum.photos/seed/{unique-seed}/{width}/{height}
+  → Hero: https://picsum.photos/seed/hero/1200/600
+  → Project card: https://picsum.photos/seed/proj1/800/500
+  → Avatar: https://picsum.photos/seed/user1/200/200
+- **Unsplash Source** (keyword photos):
+  https://source.unsplash.com/{width}x{height}/?{keyword}
+  → https://source.unsplash.com/800x500/?technology,design
+  → https://source.unsplash.com/400x400/?portrait,professional
+- **DiceBear** (profile avatars):
+  https://api.dicebear.com/7.x/avataaars/svg?seed={name}
+
+Use UNIQUE seeds per image. Match Unsplash keywords to context.
+❌ NEVER: src="placeholder.jpg" or src="#" or src=""
+
 ## 3. Navigation & Routing
 
 Implement JavaScript-based page routing with error handling:

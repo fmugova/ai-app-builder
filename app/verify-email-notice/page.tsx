@@ -5,7 +5,12 @@ import { prisma } from '@/lib/prisma'
 import VerifyEmailNoticeClient from './VerifyEmailNoticeClient'
 
 export default async function VerifyEmailNoticePage() {
-  const session = await getServerSession(authOptions)
+  let session = null
+  try {
+    session = await getServerSession(authOptions)
+  } catch {
+    // Stale/invalid JWT — treat as unauthenticated
+  }
 
   if (!session?.user?.email) {
     redirect('/auth/signin')

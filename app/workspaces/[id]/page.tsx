@@ -59,7 +59,12 @@ const Invites = dynamic(() => import('./invites'), {
 
 export default async function WorkspacePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const session = await getServerSession(authOptions);
+  let session = null
+  try {
+    session = await getServerSession(authOptions)
+  } catch {
+    // Stale/invalid JWT — treat as unauthenticated
+  }
 
   if (!session?.user?.email) {
     redirect('/auth/signin');

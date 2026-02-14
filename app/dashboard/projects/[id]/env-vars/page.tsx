@@ -7,7 +7,12 @@ import EnvironmentVariablesPage from '@/components/EnvironmentVariablesPage'
 import { EnvironmentVariablesSkeleton } from '@/components/LoadingSkeleton'
 
 async function EnvVarsContent({ params }: { params: Promise<{ id: string }> }) {
-  const session = await getServerSession(authOptions)
+  let session = null
+  try {
+    session = await getServerSession(authOptions)
+  } catch {
+    // Stale/invalid JWT — treat as unauthenticated
+  }
   if (!session) redirect('/login')
 
   const { id } = await params

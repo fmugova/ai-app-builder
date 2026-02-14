@@ -5,7 +5,12 @@ import { prisma } from '@/lib/prisma'
 import GitHubIntegrationClient from './GitHubIntegrationClient'
 
 export default async function GitHubIntegrationPage() {
-  const session = await getServerSession(authOptions)
+  let session = null
+  try {
+    session = await getServerSession(authOptions)
+  } catch {
+    // Stale/invalid JWT — treat as unauthenticated
+  }
   
   if (!session?.user?.email) {
     redirect('/auth/signin')

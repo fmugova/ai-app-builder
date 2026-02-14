@@ -101,9 +101,20 @@ export default function PreviewFrame({ html, css, js, validation }: PreviewFrame
 
     try {
       // SAFETY NET: Strip markdown fences as last resort
-      const cleanHtml = stripMarkdownCodeFences(html);
+      let cleanHtml = stripMarkdownCodeFences(html);
       const cleanCss = css ? stripMarkdownCodeFences(css) : '';
       const cleanJs = js ? stripMarkdownCodeFences(js) : '';
+
+      // Fix malformed image src attributes from AI output:
+      // 1. Strip extra leading quote: src=""https:// → src="https://
+      cleanHtml = cleanHtml.replace(/(\bsrc=")(?:["'])(https?:\/\/[^"]+)(")/gi, '$1$2$3');
+      // 2. Unresolved template placeholders: src="{item.image}" → picsum
+      cleanHtml = cleanHtml.replace(/\bsrc=["']\{([^}"']+)\}["']/gi, (_m, v) => {
+        const seed = v.replace(/[^a-z0-9]/gi, '').toLowerCase() || 'img';
+        return `src="https://picsum.photos/seed/${seed}/800/600"`;
+      });
+      // 3. Empty or hash-only src on img tags
+      cleanHtml = cleanHtml.replace(/(<img\b[^>]*)\bsrc=["'](?:|#)["']/gi, '$1src="https://picsum.photos/seed/placeholder/800/600"');
       
       // Verify we have actual HTML after cleaning
       if (!cleanHtml.includes('<') && !cleanHtml.includes('>')) {
@@ -157,6 +168,15 @@ export default function PreviewFrame({ html, css, js, validation }: PreviewFrame
           } catch (e) {
             // Blocked by same-origin policy (good!)
           }
+
+          // Override history.pushState/replaceState to prevent SecurityError
+          // in srcdoc iframes (about:srcdoc origin can't push absolute URLs)
+          (function() {
+            var _push = history.pushState.bind(history);
+            var _replace = history.replaceState.bind(history);
+            history.pushState = function() { try { _push.apply(history, arguments); } catch(e) { console.log('🔒 pushState intercepted (preview mode)'); } };
+            history.replaceState = function() { try { _replace.apply(history, arguments); } catch(e) { console.log('🔒 replaceState intercepted (preview mode)'); } };
+          })();
 
           // Security initialized
         })();

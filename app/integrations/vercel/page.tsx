@@ -4,7 +4,12 @@ import { authOptions } from '@/lib/auth'
 import VercelIntegrationClient from './VercelIntegrationClient'
 
 export default async function VercelIntegrationPage() {
-  const session = await getServerSession(authOptions)
+  let session = null
+  try {
+    session = await getServerSession(authOptions)
+  } catch {
+    // Stale/invalid JWT — treat as unauthenticated
+  }
   
   if (!session) {
     redirect('/auth/signin')

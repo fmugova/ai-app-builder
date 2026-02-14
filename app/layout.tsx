@@ -161,15 +161,21 @@ export const metadata: Metadata = {
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const session = await getServerSession(authOptions)
-  
+  // Wrap in try/catch: JWEDecryptionFailed (stale cookie after secret rotation)
+  // must not crash the entire layout — just treat as unauthenticated
+  let session = null
+  try {
+    session = await getServerSession(authOptions)
+  } catch {
+    // Invalid/expired JWT — user will be signed out on next interaction
+  }
+
   // Check if user is admin with error handling
   let isAdmin = false
   try {
     isAdmin = session?.user?.email ? await checkIfAdmin(session.user.email) : false
   } catch (error) {
     console.error('[Layout] Error checking admin status:', error)
-    // Gracefully degrade - continue without admin check
     isAdmin = false
   }
 

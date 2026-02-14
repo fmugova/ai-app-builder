@@ -22,20 +22,24 @@ export interface FileInfo {
 }
 
 export class IterationDetector {
-  
-  // Keywords that indicate user wants to modify existing code
+
+  // Keywords that SPECIFICALLY indicate modifying existing code.
+  // Deliberately conservative — vague words like "make", "please", "also"
+  // are NOT included because they appear in new-project prompts too.
   private static ITERATION_KEYWORDS = [
-    'add', 'modify', 'update', 'change', 'enhance', 'improve',
-    'fix', 'edit', 'adjust', 'include', 'remove', 'delete',
+    'modify', 'update', 'change', 'enhance', 'improve',
+    'fix', 'edit', 'adjust', 'remove', 'delete',
     'refactor', 'optimize', 'extend', 'integrate', 'append',
-    'make', 'can you', 'please', 'also', 'now'
+    'add to', 'add a', 'add the', 'add an',   // "add X to existing" patterns
   ];
 
-  // Keywords that indicate brand new generation
+  // Keywords that clearly signal a brand-new generation regardless of projectId.
+  // No longer require a secondary "fresh"/"new" qualifier — any of these alone
+  // means the user wants to start from scratch.
   private static NEW_PROJECT_KEYWORDS = [
-    'create', 'build', 'generate', 'start from scratch',
-    'new project', 'new app', 'new website', 'fresh start',
-    'make me a', 'build me a'
+    'start from scratch', 'fresh start', 'new project', 'new app', 'new website',
+    'build me a', 'make me a', 'create a', 'create an', 'generate a', 'generate an',
+    'build a ', 'build an ', 'write a ', 'write an ',
   ];
 
   /**
@@ -63,10 +67,9 @@ export class IterationDetector {
       };
     }
 
-    // Case 2: User explicitly says "start fresh" or "new project"
-    const explicitlyNew = this.NEW_PROJECT_KEYWORDS.some(keyword => 
-      lowerMessage.includes(keyword) && 
-      (lowerMessage.includes('fresh') || lowerMessage.includes('new'))
+    // Case 2: User explicitly signals a brand-new generation
+    const explicitlyNew = this.NEW_PROJECT_KEYWORDS.some(keyword =>
+      lowerMessage.includes(keyword)
     );
 
     if (explicitlyNew) {
@@ -79,23 +82,21 @@ export class IterationDetector {
       };
     }
 
-    // Case 3: Check for iteration keywords
+    // Case 3: Check for unambiguous iteration keywords
     const hasIterationKeywords = this.ITERATION_KEYWORDS.some(keyword =>
       lowerMessage.includes(keyword)
     );
 
-    // Case 4: Check if user references existing features
+    // Case 4: Check if user references existing components/files by name
     const referencesExisting = this.detectExistingFeatureReference(
       lowerMessage,
       existingProject.files
     );
 
-    // Case 5: Determine if this is an iteration
-    const isIteration = (
-      hasIterationKeywords || 
-      referencesExisting ||
-      existingProject.files.length > 0 // Has existing files
-    );
+    // Case 5: Determine if this is an iteration.
+    // Require at least one positive signal — don't default to iteration just
+    // because files exist.  That was the root cause of false positives.
+    const isIteration = hasIterationKeywords || referencesExisting;
 
     if (!isIteration) {
       return {
@@ -201,13 +202,26 @@ export class IterationDetector {
       if (!project) return null;
 
       // Convert ProjectFile to FileInfo format
-      const files: FileInfo[] = project.ProjectFile.map(file => ({
+      let files: FileInfo[] = project.ProjectFile.map(file => ({
         filename: file.path.split('/').pop() || file.path,
         path: file.path,
         content: file.content,
         lastModified: file.updatedAt || file.createdAt || new Date(),
         type: this.getFileType(file.path)
       }));
+
+      // Fallback for simple HTML projects: if no ProjectFile records exist but
+      // the project has code in the `code` field, expose it as a synthetic file
+      // so the iteration prompt can show Claude the existing HTML.
+      if (files.length === 0 && project.code && project.code.trim().length > 0) {
+        files = [{
+          filename: 'index.html',
+          path: 'index.html',
+          content: project.code,
+          lastModified: project.updatedAt || project.createdAt || new Date(),
+          type: 'html',
+        }];
+      }
 
       // Get previous prompts from versions
       const previousPrompts = project.ProjectVersion

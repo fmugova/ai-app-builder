@@ -104,14 +104,43 @@ export function sanitizeForPreview(code: string): string {
 }
 
 /**
- * Check if code is safe (for security)
+ * Check if code is safe (for security).
+ * Returns false if disallowed external scripts, javascript: URIs, or bare
+ * iframes are detected.  Inline event handlers (onclick etc.) are flagged
+ * as unsafe because they violate CSP — they will be stripped at save time
+ * by sanitizeInlineHandlers() in lib/code-injector.ts.
  */
 export function isCodeSafe(code: string): boolean {
   const dangerous = [
+    // External scripts from non-allowlisted CDNs
     /<script[^>]*src=["'](?!https:\/\/(unpkg\.com|cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com|cdn\.tailwindcss\.com))/i,
+    // javascript: URIs (XSS vector)
     /javascript:/i,
-    /<iframe(?![^>]*srcdoc)/i
-  ];
-  
-  return !dangerous.some(pattern => pattern.test(code));
+    // Bare iframes without srcdoc (potential navigation hijack)
+    /<iframe(?![^>]*srcdoc)/i,
+    // Inline event handlers violate CSP script-src-attr 'none'
+    /\s(onclick|onsubmit|onchange|oninput|onkeyup|onkeydown|onmouseover|onload)\s*=/i,
+  ]
+
+  return !dangerous.some(pattern => pattern.test(code))
+}
+
+/**
+ * Returns a list of CSP violations found in the HTML string.
+ * Useful for logging/debugging; call before saving to report issues.
+ */
+export function findCspViolations(code: string): string[] {
+  const violations: string[] = []
+
+  if (/\s(onclick|onsubmit|onchange|oninput|onkeyup|onkeydown|onmouseover|onload)\s*=/i.test(code)) {
+    violations.push('Inline event handlers detected (onclick/onsubmit/etc.) — violates script-src-attr')
+  }
+  if (/<script[^>]*>[\s\S]*?<\/script>/i.test(code) && !/data-buildflow/i.test(code)) {
+    violations.push('Inline <script> blocks detected — requires script-src unsafe-inline or nonce')
+  }
+  if (/\sstyle\s*=\s*["'][^"']+["']/i.test(code)) {
+    violations.push('Inline style attributes detected — requires style-src unsafe-inline')
+  }
+
+  return violations
 }

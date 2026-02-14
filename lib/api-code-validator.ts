@@ -20,11 +20,13 @@ interface ValidationResult {
 export async function validateAPICode(code: string): Promise<ValidationResult> {
   const issues: ValidationIssue[] = []
 
-  // Check 1: Has Supabase client initialization
-  if (!code.includes('createClient') && !code.includes('supabase')) {
+  // Check 1: Has database client (Prisma) when database access is used
+  const hasDatabaseCall = code.includes('prisma.') || code.includes("from '@prisma/client'")
+  const claimsDbAccess = code.includes('database') || code.includes('db.') || code.includes('findMany') || code.includes('findFirst') || code.includes('findUnique')
+  if (claimsDbAccess && !hasDatabaseCall) {
     issues.push({
       severity: 'warning',
-      message: 'No Supabase client initialization found. Make sure to import and use Supabase.',
+      message: 'Database access detected but no Prisma client found. Import prisma from @/lib/prisma.',
     })
   }
 
@@ -106,9 +108,9 @@ export async function validateAPICode(code: string): Promise<ValidationResult> {
 
   // Check 9: Has proper async/await
   const hasAsync = code.includes('async') && code.includes('await')
-  const hasDatabaseCall = code.includes('.from(') || code.includes('prisma.') || code.includes('supabase.')
+  const hasDbCallForAsync = code.includes('.from(') || code.includes('prisma.') || code.includes('supabase.')
   
-  if (hasDatabaseCall && !hasAsync) {
+  if (hasDbCallForAsync && !hasAsync) {
     issues.push({
       severity: 'error',
       message: 'Database calls require async/await. Make sure the handler is async.',

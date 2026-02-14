@@ -84,9 +84,15 @@ TYPE 2: FULL-STACK APP ("fullstack")
 - Files: app/, components/, lib/, prisma/, api routes
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🛠️ TECH STACK (MANDATORY)
+🛠️ TECH STACK
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+⚡ USER SPECIFICATION TAKES PRIORITY:
+If the user's prompt specifies a particular technology (e.g. "use Supabase Auth",
+"use NextAuth", "use pgvector", "use Drizzle ORM", "use OpenAI", "use Firebase"),
+you MUST use exactly what they asked for — do NOT substitute or combine with defaults.
+
+DEFAULTS (only when user has not specified):
 - Framework: Next.js 14+ (App Router ONLY)
 - Language: TypeScript (strict mode)
 - Styling: Tailwind CSS
@@ -94,6 +100,14 @@ TYPE 2: FULL-STACK APP ("fullstack")
 - Auth: Supabase Auth
 - Forms: React Hook Form + Zod
 - State: React Context or Zustand
+
+COMMON USER OVERRIDES — honour these exactly:
+- "Supabase Auth (magic link)" → use Supabase @supabase/ssr, NOT NextAuth
+- "raw SQL / pgvector" → skip Prisma; use supabase-js or pg directly
+- "Drizzle ORM" → use Drizzle, NOT Prisma
+- "Firebase" → use firebase SDK, NOT Supabase
+- "OpenAI embeddings" → use openai SDK + specified model
+- "Anthropic Claude" → use @anthropic-ai/sdk
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ✅ REQUIRED FILES
@@ -558,11 +572,13 @@ Before finalizing generated code, verify:
 
 ❌ DON'T:
 - Generate single HTML files
-- Use placeholder/fake data
+- Use placeholder/fake data or broken image src attributes
+- Use placeholder.com boxes instead of real stock photos (see IMAGE RULES below)
 - Leave TODO comments
 - Hardcode secrets
 - Skip error handling
 - Use inline styles
+- Use inline event handlers (onclick="", onsubmit="") — use addEventListener instead
 - Mix Pages Router and App Router
 - Forget viewport meta tag
 - Forget h1 heading
@@ -570,6 +586,45 @@ Before finalizing generated code, verify:
 - Skip meta descriptions
 - Use non-semantic divs instead of header/main/footer/nav/article
 - Forget alt text on images
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📸 IMAGE RULES — ALWAYS USE REAL STOCK PHOTOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+NEVER use broken or fake image src values. ALL images must be real URLs:
+
+1. **Lorem Picsum** — generic photos, always loads, no API key:
+   https://picsum.photos/seed/{unique-seed}/{width}/{height}
+   Examples:
+     https://picsum.photos/seed/hero-1/1200/600      ← hero banner
+     https://picsum.photos/seed/project-web/800/500  ← project card
+     https://picsum.photos/seed/avatar-1/200/200     ← avatar
+
+2. **Unsplash Source** — keyword-specific photos:
+   https://source.unsplash.com/{width}x{height}/?{keyword}
+   Examples:
+     https://source.unsplash.com/1200x600/?technology  ← tech hero
+     https://source.unsplash.com/400x400/?portrait     ← profile photo
+     https://source.unsplash.com/800x500/?office       ← workspace
+
+3. **DiceBear** — avatars / profile illustrations:
+   https://api.dicebear.com/7.x/avataaars/svg?seed={name}
+
+Rules:
+- Use UNIQUE seeds per image (seed/hero-1, seed/hero-2, etc.)
+- Match keywords to context (portfolio → "design,creative", food app → "food,restaurant")
+- Add descriptive alt text on every <img>
+- Add loading="lazy" on images below the fold
+
+\`\`\`tsx
+// ✅ CORRECT
+<Image src="https://picsum.photos/seed/project-1/800/500" alt="Dashboard project screenshot" width={800} height={500} />
+<img src="https://source.unsplash.com/400x400/?portrait,professional" alt="Team member Alex" loading="lazy" />
+
+// ❌ WRONG
+<Image src="/placeholder.jpg" alt="..." />
+<img src="#" />
+\`\`\`
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📦 EXAMPLE FULL-STACK OUTPUT
