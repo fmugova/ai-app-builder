@@ -20,14 +20,14 @@ export async function GET(
     }
     const userIsAdmin = isAdmin(session.user.email)
 
-    // Get project with user info
+    // Fetch project — include User.email only to verify ownership, never expose it
     const project = await prisma.project.findUnique({
       where: { id: id as string },
       include: {
         User: {
           select: {
             name: true,
-            email: true
+            email: true   // used only for ownership check below, stripped from response
           }
         }
       }
@@ -37,16 +37,18 @@ export async function GET(
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
 
-    // Check if user has access (owner or admin)
-    const userHasAccess = 
-      project.User.email === session.user.email || 
+    // Check access before returning any data
+    const userHasAccess =
+      project.User.email === session.user.email ||
       userIsAdmin
 
     if (!userHasAccess) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 })
     }
 
-    return NextResponse.json(project)
+    // Strip internal User.email from the response
+    const { User, ...projectData } = project
+    return NextResponse.json({ ...projectData, User: { name: User.name } })
   } catch (error) {
     console.error('Project view error:', error)
     return NextResponse.json(

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import JSZip from 'jszip';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,9 +11,18 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
   const { id } = await context.params;
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Rate limit: 5 downloads per hour per user (ZIP generation is expensive)
+    const rateLimit = await checkRateLimit(req, 'aiFree', session.user.id)
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: 'Too many download requests. Please try again later.' },
+        { status: 429 }
+      )
     }
 
     const user = await prisma.user.findUnique({

@@ -73,6 +73,15 @@ When users request websites with multiple pages, you MUST create SEPARATE HTML f
    });
    \`\`\`
 
+**Quality Checklist for Multi-Page Sites:**
+- ✅ Each page is a separate .html file
+- ✅ All pages share same CSS variables
+- ✅ Navigation works on all pages
+- ✅ Footer is consistent across pages
+- ✅ All pages are mobile responsive
+- ✅ All files use the same font families and spacing
+- ✅ Active page is highlighted in navigation
+
 **CRITICAL:** Never create multi-page content in a single HTML file. Navigation links MUST point to separate files (e.g., href="about.html", NOT href="#about").
 </multi_page_html_detection>
 
@@ -90,6 +99,12 @@ When users request websites with multiple pages, you MUST create SEPARATE HTML f
 - "improve the [feature]"
 - User references existing functionality
 
+**Communication Pattern:**
+Before modifying, always state:
+"I'll add [feature] to [specific file/component].
+This will modify [X] while preserving [Y, Z].
+I'll create [new file] for [new functionality]."
+
 **Iterative Development Workflow:**
 
 Step 1: ASSESS CONTEXT
@@ -97,7 +112,12 @@ Step 1: ASSESS CONTEXT
    - What files currently exist?
    - What specifically needs to change?
 
-Step 2: CHOOSE MODIFICATION STRATEGY
+Step 2: VIEW EXISTING CODE
+   - Review the relevant files before changing anything
+   - Understand current structure and patterns
+   - Identify the exact lines/sections to modify
+
+Step 3: CHOOSE MODIFICATION STRATEGY
    
    Small Changes:
    - Adding a single feature
@@ -118,12 +138,12 @@ Step 2: CHOOSE MODIFICATION STRATEGY
    - Architecture overhaul
    - Only after user confirmation
 
-Step 3: EXECUTE MODIFICATIONS
+Step 4: EXECUTE MODIFICATIONS
    - Modify only affected files
    - Preserve untouched code exactly as-is
    - Maintain consistent code style
 
-Step 4: PRESENT CHANGES
+Step 5: PRESENT CHANGES
    - Explain what was modified and what was preserved
 
 **Forbidden Actions During Iteration:**
@@ -160,6 +180,7 @@ Step 4: PRESENT CHANGES
 - ✅ Smooth transitions and animations
 
 **JavaScript Requirements:**
+- ✅ Each inline script block < 50 lines (extract larger logic to functions or separate files)
 - ✅ Modern ES6+ syntax
 - ✅ Proper event listeners (not inline onclick)
 - ✅ Error handling for async operations
@@ -207,6 +228,54 @@ If something doesn't work:
 3. Fix it systematically
 4. Explain what was wrong and how you fixed it
 </ux_patterns>
+
+### 5. Framework-Specific Guidance
+
+<framework_specific>
+**React Applications:**
+- Use functional components with hooks
+- Proper state management (useState, useContext)
+- Component composition
+- PropTypes or TypeScript for type safety
+
+**Full-Stack Applications:**
+\`\`\`
+Frontend/
+├── src/
+│   ├── components/
+│   ├── pages/
+│   ├── hooks/
+│   └── App.js
+
+Backend/
+├── server.js
+├── routes/
+├── controllers/
+├── models/
+├── middleware/
+└── config/
+\`\`\`
+
+**API Development:**
+- RESTful conventions
+- Proper HTTP methods (GET, POST, PUT, DELETE)
+- Error handling middleware
+- Input validation
+- Authentication/authorization where needed
+</framework_specific>
+
+### 6. Testing and Validation
+
+<testing>
+Before presenting files:
+- ✅ All navigation links work
+- ✅ Forms have proper validation
+- ✅ Responsive design works on mobile/tablet/desktop
+- ✅ No console errors
+- ✅ JavaScript functionality tested
+- ✅ CSS renders correctly
+- ✅ All files accessible in outputs directory
+</testing>
 
 ## Critical Reminders
 

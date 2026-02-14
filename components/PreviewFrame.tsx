@@ -69,14 +69,24 @@ export default function PreviewFrame({ html, css, js, validation }: PreviewFrame
     // CRITICAL: Check if content is actually HTML
     const trimmedHtml = html.trim();
     
-    // Detect if content is JSON instead of HTML (streaming multi-file projects)
+    // Detect if content is JSON instead of HTML (multi-file fullstack project)
     if (trimmedHtml.startsWith('{') || trimmedHtml.startsWith('[')) {
-      console.log('📦 Preview received JSON format (multi-file project) - waiting for conversion...');
-      // Return empty for now - the chatbuilder will convert this to preview HTML
-      return '';
+      console.log('📦 Preview received JSON format (multi-file project) - use file viewer to browse files.');
+      return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+        body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f8fafc;}
+        .msg{text-align:center;padding:2rem;background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);max-width:360px;}
+        .icon{font-size:2.5rem;margin-bottom:.75rem;}
+        h2{margin:0 0 .5rem;font-size:1.1rem;color:#1e293b;}
+        p{margin:0;color:#64748b;font-size:.875rem;}
+      </style></head><body>
+        <div class="msg"><div class="icon">🏗️</div>
+          <h2>Full-Stack Project Generated</h2>
+          <p>Use <strong>Browse Files</strong> to view and download your project files.</p>
+        </div>
+      </body></html>`;
     }
-    
-    // Detect if content contains project metadata fragments (partial JSON during streaming)
+
+    // Detect partial JSON fragments during streaming
     if (trimmedHtml.includes('"projectName"') || trimmedHtml.includes('"description"')) {
       if (!trimmedHtml.includes('<!DOCTYPE') && !trimmedHtml.includes('<html')) {
         console.log('📦 Preview received partial multi-file project - waiting for completion...');

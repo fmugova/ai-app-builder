@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma'
 import * as speakeasy from 'speakeasy'
 import * as QRCode from 'qrcode'
 import { randomBytes } from 'crypto'
+import bcrypt from 'bcryptjs'
 
 export async function POST(req: NextRequest) {
   try {
@@ -46,17 +47,20 @@ export async function POST(req: NextRequest) {
     // Generate QR code
     const qrCode = await QRCode.toDataURL(secret.otpauth_url!)
 
-    // Generate 10 backup codes
-    const backupCodes = Array.from({ length: 10 }, () => {
-      return randomBytes(4).toString('hex').toUpperCase()
-    })
+    // Generate 10 backup codes — 10 bytes = 80-bit entropy (plaintext returned once, hashed for storage)
+    const backupCodes = Array.from({ length: 10 }, () =>
+      randomBytes(10).toString('hex').toUpperCase()
+    )
+    const hashedBackupCodes = await Promise.all(
+      backupCodes.map(code => bcrypt.hash(code, 10))
+    )
 
     // Store secret temporarily (not enabled yet)
     await prisma.user.update({
       where: { id: user.id },
       data: {
         twoFactorSecret: secret.base32,
-        twoFactorBackupCodes: backupCodes, // In production, encrypt these!
+        twoFactorBackupCodes: hashedBackupCodes,
         twoFactorEnabled: false // Not enabled until verified
       }
     })
@@ -64,7 +68,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       secret: secret.base32,
       qrCode,
-      backupCodes,
+      backupCodes, // plaintext shown once to user
       message: 'Scan the QR code with your authenticator app'
     })
   } catch (error) {

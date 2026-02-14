@@ -194,7 +194,6 @@ export default function ProjectViewPage() {
             Code
           </button>
         </div>
-        </div>
 
         {/* Preview View */}
         {activeView === 'preview' && (

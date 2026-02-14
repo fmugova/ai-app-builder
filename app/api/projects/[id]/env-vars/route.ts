@@ -15,7 +15,7 @@ import { logSecurityEvent } from '@/lib/security'
 
 // GET - List all environment variables for a project
 export async function GET(
-  req: Request,
+  _req: Request,
   context: { params: Promise<{ id: string }> }
 ) {
   const { id } = await context.params;
@@ -98,6 +98,28 @@ export async function POST(
     if (!key || !value) {
       return NextResponse.json(
         { error: 'Key and value are required' },
+        { status: 400 }
+      )
+    }
+
+    const VALID_ENVIRONMENTS = ['development', 'preview', 'production', 'all'] as const
+    if (!VALID_ENVIRONMENTS.includes(environment)) {
+      return NextResponse.json(
+        { error: `Invalid environment. Must be one of: ${VALID_ENVIRONMENTS.join(', ')}` },
+        { status: 400 }
+      )
+    }
+
+    // Block system-reserved key names that could shadow platform configuration
+    const RESERVED_KEYS = [
+      'DATABASE_URL', 'NEXTAUTH_SECRET', 'NEXTAUTH_URL', 'ENCRYPTION_KEY',
+      'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'GOOGLE_CLIENT_SECRET',
+      'RESEND_API_KEY', 'UPSTASH_REDIS_REST_TOKEN', 'NODE_ENV', 'PORT',
+      'ADMIN_EMAILS', 'NEXT_PUBLIC_ADMIN_EMAILS',
+    ]
+    if (RESERVED_KEYS.includes(key.toUpperCase())) {
+      return NextResponse.json(
+        { error: `Key "${key}" is reserved and cannot be used.` },
         { status: 400 }
       )
     }

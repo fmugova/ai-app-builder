@@ -7,12 +7,23 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import * as speakeasy from 'speakeasy'
 import { randomBytes } from 'crypto'
+import bcrypt from 'bcryptjs'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Rate limit: max 5 attempts per 15-minute window per user
+    const rateLimit = await checkRateLimit(req, 'auth', session.user.id)
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: 'Too many regeneration attempts. Please try again later.' },
+        { status: 429 }
+      )
     }
 
     const { token } = await req.json()
@@ -50,22 +61,25 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Generate 10 new backup codes
-    const backupCodes = Array.from({ length: 10 }, () => {
-      return randomBytes(4).toString('hex').toUpperCase()
-    })
+    // Generate 10 new backup codes — 10 bytes = 80-bit entropy (plaintext returned once, hashed for storage)
+    const backupCodes = Array.from({ length: 10 }, () =>
+      randomBytes(10).toString('hex').toUpperCase()
+    )
+    const hashedBackupCodes = await Promise.all(
+      backupCodes.map(code => bcrypt.hash(code, 10))
+    )
 
-    // Update user with new backup codes
+    // Update user with hashed backup codes
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        twoFactorBackupCodes: backupCodes
+        twoFactorBackupCodes: hashedBackupCodes
       }
     })
 
     return NextResponse.json({
       success: true,
-      backupCodes,
+      backupCodes, // plaintext shown once to user
       message: 'Backup codes regenerated successfully'
     })
   } catch (error) {

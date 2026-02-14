@@ -113,7 +113,7 @@ export async function proxy(request: NextRequest) {
 
   // Only redirect if explicitly not verified (false or specific unverified state)
   // Allow null to pass through (existing users, OAuth users)
-  if (emailVerified === false && isCredentialsUser && pathname !== '/verify-email-notice') {
+  if (emailVerified === null && isCredentialsUser && pathname !== '/verify-email-notice') {
     return NextResponse.redirect(new URL('/verify-email-notice', request.url));
   }
 

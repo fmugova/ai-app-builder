@@ -8,23 +8,35 @@ import crypto from 'crypto'
  * Validates CSRF tokens to prevent Cross-Site Request Forgery attacks
  */
 
-// Generate CSRF token
-export function generateCSRFToken(): string {
-  return crypto.randomBytes(32).toString('hex')
+const CSRF_SECRET = process.env.NEXTAUTH_SECRET!
+const CSRF_TOKEN_TTL_MS = 60 * 60 * 1000 // 1 hour
+
+/**
+ * Generate a stateless HMAC-signed CSRF token bound to a user ID.
+ * Format: `<timestamp>.<hmac>` where hmac = HMAC-SHA256(userId:timestamp, secret)
+ */
+export function generateCSRFToken(userId: string): string {
+  const timestamp = Date.now().toString()
+  const hmac = crypto
+    .createHmac('sha256', CSRF_SECRET)
+    .update(`${userId}:${timestamp}`)
+    .digest('hex')
+  return Buffer.from(`${timestamp}.${hmac}`).toString('base64url')
 }
 
-// Validate CSRF token from request
+/**
+ * Validate a CSRF token against the current session.
+ * Token must be signed with the user's ID and not older than 1 hour.
+ */
 export async function validateCSRF(request: Request): Promise<boolean> {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) {
+    if (!session?.user?.id) {
       return false
     }
 
-    // Get CSRF token from header or body
+    // Accept token from header or JSON body
     const headerToken = request.headers.get('x-csrf-token')
-    
-    // For POST/PUT/DELETE requests, also check body
     let bodyToken: string | undefined
     try {
       const body = await request.clone().json()
@@ -33,17 +45,46 @@ export async function validateCSRF(request: Request): Promise<boolean> {
       // Body might not be JSON
     }
 
-    const csrfToken = headerToken || bodyToken
-
-    if (!csrfToken) {
-      console.error('CSRF token missing from request')
+    const rawToken = headerToken || bodyToken
+    if (!rawToken) {
+      console.error('CSRF: token missing from request')
       return false
     }
 
-    // In production, tokens should be stored in session/database
-    // For now, we'll use a simple validation
-    // The token is included in the session when created
-    return true
+    // Decode and parse
+    let timestamp: string
+    let providedHmac: string
+    try {
+      const decoded = Buffer.from(rawToken, 'base64url').toString()
+      const dot = decoded.indexOf('.')
+      if (dot === -1) return false
+      timestamp = decoded.slice(0, dot)
+      providedHmac = decoded.slice(dot + 1)
+    } catch {
+      return false
+    }
+
+    // Check token age
+    const tokenAge = Date.now() - parseInt(timestamp, 10)
+    if (isNaN(tokenAge) || tokenAge > CSRF_TOKEN_TTL_MS || tokenAge < 0) {
+      console.error('CSRF: token expired or invalid timestamp')
+      return false
+    }
+
+    // Verify HMAC
+    const expectedHmac = crypto
+      .createHmac('sha256', CSRF_SECRET)
+      .update(`${session.user.id}:${timestamp}`)
+      .digest('hex')
+
+    const tokensMatch = crypto.timingSafeEqual(
+      Buffer.from(providedHmac, 'hex'),
+      Buffer.from(expectedHmac, 'hex')
+    )
+    if (!tokensMatch) {
+      console.error('CSRF: HMAC mismatch')
+    }
+    return tokensMatch
   } catch (error) {
     console.error('CSRF validation error:', error)
     return false

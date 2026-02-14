@@ -5,7 +5,7 @@ import { NextRequest } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { PrismaClient } from '@prisma/client'
+import prisma from '@/lib/prisma'
 import CodeValidator from '@/lib/validators/code-validator'
 import { processGeneratedCode } from '@/utils/extractInlineStyles.server'
 import { ENHANCED_GENERATION_SYSTEM_PROMPT } from '@/lib/enhanced-system-prompt'
@@ -18,7 +18,6 @@ import { extractProjectTitle } from '@/lib/utils/title-extraction'
 import { analyzePrompt } from '@/lib/utils/complexity-detection'
 import { z } from 'zod'
 
-const prisma = new PrismaClient()
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
 export const runtime = 'nodejs'
@@ -81,11 +80,22 @@ export async function POST(req: NextRequest) {
       return new Response('Unauthorized', { status: 401 })
     }
 
-    const body = await req.json()
-    
+    let body: unknown
+    try {
+      body = await req.json()
+    } catch {
+      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400 })
+    }
+
     // Validate input
-    const validatedData = chatbotRequestSchema.parse(body);
-    const { prompt, projectId, generationType, previousErrors } = validatedData;
+    const parseResult = chatbotRequestSchema.safeParse(body)
+    if (!parseResult.success) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid request', details: parseResult.error.issues }),
+        { status: 422 }
+      )
+    }
+    const { prompt, projectId, generationType, previousErrors } = parseResult.data
 
     // Auto-detect generation type using complexity analysis
     const complexityAnalysis = analyzePrompt(prompt);
@@ -136,10 +146,11 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
             model: 'claude-sonnet-4-20250514',
             max_tokens: maxTokens,
             temperature: 1,
+            system: systemPrompt,
             messages: [
               {
                 role: 'user',
-                content: systemPrompt + '\n\nUser Request:\n' + enhancedPrompt
+                content: enhancedPrompt
               }
             ],
             stream: true,

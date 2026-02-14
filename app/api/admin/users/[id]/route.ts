@@ -57,14 +57,31 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
     }
 
     // Don't allow deleting yourself
-
     const { id } = await context.params
     if (id === session.user.id) {
       return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 })
     }
 
-    await prisma.user.delete({
-      where: { id }
+    // Capture target user details before deletion for the audit trail
+    const targetUser = await prisma.user.findUnique({
+      where: { id },
+      select: { email: true, name: true, role: true }
+    })
+
+    if (!targetUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    await prisma.user.delete({ where: { id } })
+
+    await createAuditLog({
+      userId: session.user.id,
+      action: 'admin.user_delete',
+      resourceType: 'user',
+      resourceId: id,
+      details: { deletedEmail: targetUser.email, deletedRole: targetUser.role },
+      ipAddress: getIpAddress(request.headers),
+      userAgent: getUserAgent(request.headers),
     })
 
     return NextResponse.json({ success: true })

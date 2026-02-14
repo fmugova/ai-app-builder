@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,6 +12,15 @@ export async function POST(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Rate limit: 10 form submissions per 10 minutes per IP
+    const rateLimit = await checkRateLimit(request, 'external')
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: 'Too many submissions. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil((rateLimit.reset - Date.now()) / 1000)) } }
+      )
+    }
+
     const { id: projectId } = await context.params
     const body = await request.json()
 

@@ -3,6 +3,7 @@
 
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
+import bcrypt from 'bcryptjs'
 
 // ============================================================================
 // SECURITY EVENT LOGGING
@@ -341,7 +342,7 @@ export async function resetFailedLoginAttempts(email: string, ipAddress: string)
 
 export async function checkPasswordHistory(
   userId: string,
-  newPasswordHash: string
+  newPlainPassword: string
 ): Promise<boolean> {
   const history = await prisma.passwordHistory.findMany({
     where: { userId },
@@ -349,9 +350,11 @@ export async function checkPasswordHistory(
     take: 5 // Check last 5 passwords
   })
 
-  // You would need to compare hashes properly with bcrypt
-  // For now, just check if exact hash exists
-  return history.some(h => h.hashedPassword === newPasswordHash)
+  // bcrypt is salted so === comparison never works — must compare plaintext against each stored hash
+  const results = await Promise.all(
+    history.map(h => bcrypt.compare(newPlainPassword, h.hashedPassword))
+  )
+  return results.some(Boolean)
 }
 
 export async function addPasswordToHistory(userId: string, hashedPassword: string) {
@@ -410,15 +413,25 @@ export async function useBackupCode(userId: string, code: string): Promise<boole
     select: { twoFactorBackupCodes: true }
   })
 
-  if (!user?.twoFactorBackupCodes.includes(code)) {
+  if (!user) return false
+
+  // Compare against hashed backup codes
+  const storedHashes = user.twoFactorBackupCodes ?? []
+  const matchedIndex = (
+    await Promise.all(storedHashes.map(hash => bcrypt.compare(code, hash)))
+  ).findIndex(Boolean)
+
+  if (matchedIndex === -1) {
     return false
   }
 
   // Remove used code
+  const updatedCodes = [...storedHashes]
+  updatedCodes.splice(matchedIndex, 1)
   await prisma.user.update({
     where: { id: userId },
     data: {
-      twoFactorBackupCodes: user.twoFactorBackupCodes.filter(c => c !== code)
+      twoFactorBackupCodes: updatedCodes
     }
   })
 

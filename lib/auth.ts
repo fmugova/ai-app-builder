@@ -95,8 +95,6 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         try {
-          console.log('[DEBUG] Credentials received:', credentials)
-
           if (!credentials?.email || !credentials?.password) {
             throw new Error('Email and password required')
           }
@@ -131,7 +129,6 @@ export const authOptions: NextAuthOptions = {
             },
           })
 
-          console.log('[DEBUG] User from DB:', user)
 
           if (!user || !user.password) {
             // Track failed login attempt using comprehensive function
@@ -146,7 +143,6 @@ export const authOptions: NextAuthOptions = {
             user.password
           )
 
-          console.log('[DEBUG] Password valid:', isPasswordValid)
 
           if (!isPasswordValid) {
             // Track failed login attempt using comprehensive function
@@ -193,17 +189,20 @@ export const authOptions: NextAuthOptions = {
             })
 
             if (!verified) {
-              // Check if it's a backup code
-              const backupCodeIndex = user.twoFactorBackupCodes?.indexOf(twoFactorToken) ?? -1
-              
-              if (backupCodeIndex === -1) {
+              // Check if it's a backup code (hashed comparison)
+              const storedHashes = user.twoFactorBackupCodes ?? []
+              const matchedIndex = (
+                await Promise.all(storedHashes.map(hash => bcrypt.compare(twoFactorToken, hash)))
+              ).findIndex(Boolean)
+
+              if (matchedIndex === -1) {
                 await trackFailedLoginAttempt(credentials.email, ipAddress, userAgent)
                 throw new Error('Invalid 2FA code')
               }
 
               // Remove used backup code
-              const updatedBackupCodes = [...(user.twoFactorBackupCodes || [])]
-              updatedBackupCodes.splice(backupCodeIndex, 1)
+              const updatedBackupCodes = [...storedHashes]
+              updatedBackupCodes.splice(matchedIndex, 1)
               
               await prisma.user.update({
                 where: { id: user.id },
@@ -281,10 +280,16 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.role = user.role;
         token.emailVerified = user.emailVerified ?? null;
+        token.roleRefreshedAt = Date.now();
       }
-      
-      // Refresh emailVerified status on session update
-      if (trigger === 'update' && token.id) {
+
+      // Refresh role + emailVerified from DB every 15 minutes or on explicit update
+      const ROLE_TTL_MS = 15 * 60 * 1000
+      const shouldRefresh =
+        trigger === 'update' ||
+        (token.id && (!token.roleRefreshedAt || Date.now() - (token.roleRefreshedAt as number) > ROLE_TTL_MS))
+
+      if (shouldRefresh && token.id) {
         const dbUser = await prisma.user.findUnique({
           where: { id: token.id as string },
           select: { emailVerified: true, role: true },
@@ -292,9 +297,10 @@ export const authOptions: NextAuthOptions = {
         if (dbUser) {
           token.emailVerified = dbUser.emailVerified;
           token.role = dbUser.role;
+          token.roleRefreshedAt = Date.now();
         }
       }
-      
+
       return token;
     },
     async session({ session, token }) {
@@ -321,7 +327,7 @@ export const authOptions: NextAuthOptions = {
       })
 
       if (isNewUser) {
-        console.log(`New user signed up: ${user.email}`)
+        // New user signed in for the first time — handled via security event logging above
         
         // Send welcome email (implement this)
         // await sendWelcomeEmail(user.email)

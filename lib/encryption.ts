@@ -3,10 +3,16 @@
 
 import crypto from 'crypto'
 
-// Use environment variable for encryption key
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || process.env.NEXTAUTH_SECRET || 'fallback-dev-key-change-in-production'
+// Encryption key must be explicitly set — never fall back to a known/public value
+const _rawEncryptionKey = process.env.ENCRYPTION_KEY
 
-// Ensure key is 32 bytes
+if (!_rawEncryptionKey && process.env.NODE_ENV === 'production') {
+  throw new Error('ENCRYPTION_KEY environment variable is required in production')
+}
+
+const ENCRYPTION_KEY = _rawEncryptionKey || 'dev-only-fallback-not-for-production-use'
+
+// Ensure key is 32 bytes via SHA-256 derivation
 function getEncryptionKey(): Buffer {
   return crypto.createHash('sha256').update(ENCRYPTION_KEY).digest()
 }

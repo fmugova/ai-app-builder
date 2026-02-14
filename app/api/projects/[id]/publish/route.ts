@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { nanoid } from 'nanoid'
+import { randomBytes } from 'crypto'
+
+function isPrismaP2002(e: unknown): boolean {
+  return (e as any)?.code === 'P2002'
+}
 
 // Next.js 15 RouteContext interface
 interface RouteContext {
@@ -46,43 +50,40 @@ export async function POST(
 
     // Generate unique public slug if not exists
     let publicSlug = project.publicSlug
-    
+
     if (!publicSlug) {
-      // Create slug from project name + random ID
       const baseSlug = project.name
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '')
-        .substring(0, 50) // Max 50 chars
-      
-      // Add random suffix for uniqueness
-      publicSlug = `${baseSlug}-${nanoid(8)}`
-      
-      // Check for collisions (unlikely but possible)
-      const existing = await prisma.project.findFirst({
-        where: { publicSlug }
-      })
-      
-      if (existing) {
-        // Regenerate with different suffix
-        publicSlug = `${baseSlug}-${nanoid(12)}`
-      }
+        .substring(0, 40)
+
+      const makeSlug = () => `${baseSlug}-${randomBytes(5).toString('hex')}`
+      publicSlug = makeSlug()
     }
 
     // Generate public URL
     const publicUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/p/${publicSlug}`
 
-    // Update project with publish info
-    const updated = await prisma.project.update({
-      where: { id: projectId },
-      data: {
-        isPublished: true,
-        publishedAt: new Date(),
-        publicSlug: publicSlug,
-        publicUrl: publicUrl,
-        updatedAt: new Date()
+    // Attempt the update; retry once on unique constraint collision
+    let updated
+    try {
+      updated = await prisma.project.update({
+        where: { id: projectId },
+        data: { isPublished: true, publishedAt: new Date(), publicSlug, publicUrl, updatedAt: new Date() }
+      })
+    } catch (e) {
+      if (isPrismaP2002(e)) {
+        publicSlug = `${publicSlug.substring(0, 30)}-${randomBytes(5).toString('hex')}`
+        const retryUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/p/${publicSlug}`
+        updated = await prisma.project.update({
+          where: { id: projectId },
+          data: { isPublished: true, publishedAt: new Date(), publicSlug, publicUrl: retryUrl, updatedAt: new Date() }
+        })
+      } else {
+        throw e
       }
-    })
+    }
 
     console.log('✅ Project published:', {
       id: projectId,

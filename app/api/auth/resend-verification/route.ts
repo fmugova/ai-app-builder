@@ -22,32 +22,23 @@ export async function POST(request: NextRequest) {
       )
     }
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
+    // Always return success to prevent account enumeration
+    if (user && !user.emailVerified) {
+      const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+      await prisma.user.update({
+        where: { email },
+        data: { emailVerificationToken, emailVerificationTokenExpiry: new Date(Date.now() + 1000 * 60 * 60 * 24) }
+      });
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://buildflow.ai';
+      const verifyUrl = `${baseUrl}/verify-email?token=${emailVerificationToken}`;
+      await sendEmail({
+        to: email,
+        subject: 'Verify your email address',
+        html: `<p>Click <a href="${verifyUrl}">here</a> to verify your email.</p>`,
+        from: 'BuildFlow <noreply@buildflow-ai.app>'
+      });
     }
-    if (user.emailVerified) {
-      return NextResponse.json(
-        { error: 'Email already verified' },
-        { status: 400 }
-      )
-    }
-    const emailVerificationToken = crypto.randomBytes(32).toString('hex');
-    await prisma.user.update({
-      where: { email },
-      data: { emailVerificationToken, emailVerificationTokenExpiry: new Date(Date.now() + 1000 * 60 * 60 * 24) }
-    });
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://buildflow.ai';
-    const verifyUrl = `${baseUrl}/verify-email?token=${emailVerificationToken}`;
-    await sendEmail({
-      to: email,
-      subject: 'Verify your email address',
-      html: `<p>Click <a href="${verifyUrl}">here</a> to verify your email.</p>`,
-      from: 'BuildFlow <noreply@buildflow-ai.app>'
-    });
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, message: 'If that email is registered and unverified, you will receive a verification link.' });
   } catch (error) {
     console.error('Resend verification error:', error);
     return NextResponse.json(

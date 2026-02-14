@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { randomBytes } from 'crypto';
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,42 +37,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    // Generate slug from project name if not provided
-    let publishSlug = slug;
-    if (!publishSlug) {
-      publishSlug = project.name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '')
-        .substring(0, 50);
-      
-      // Add random suffix to ensure uniqueness
-      publishSlug = `${publishSlug}-${Math.random().toString(36).substring(2, 8)}`;
-    }
+    // Generate slug — always append a crypto-random suffix so it is globally unique
+    // without needing a separate read-then-write (eliminates race condition).
+    const uniqueSuffix = randomBytes(5).toString('hex') // 10 hex chars, ~1 trillion combinations
+    let publishSlug = slug
+      ? `${slug.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-|-$/g, '').substring(0, 40)}-${uniqueSuffix}`
+      : `${project.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').substring(0, 40)}-${uniqueSuffix}`
 
-    // Check if slug is already taken
-    const existingPublish = await prisma.project.findFirst({
-      where: {
-        publicSlug: publishSlug,
-        NOT: { id: projectId }
-      }
-    });
-
-    if (existingPublish) {
-      // Add random suffix if slug is taken
-      publishSlug = `${publishSlug}-${Math.random().toString(36).substring(2, 8)}`;
-    }
-
-    // Update project with slug and publish status
-    const _updatedProject = await prisma.project.update({
+    // Update project atomically — DB unique constraint is the real guard.
+    // Catch P2002 (unique violation) in the unlikely event of a collision and retry once.
+    const doUpdate = (slug: string) => prisma.project.update({
       where: { id: projectId, userId: user.id },
       data: {
-        publicSlug: publishSlug,
+        publicSlug: slug,
         isPublished: true,
         publishedAt: new Date(),
         status: 'PUBLISHED',
       },
-    });
+    })
+
+    try {
+      await doUpdate(publishSlug)
+    } catch (e: unknown) {
+      const isPrismaUniqueViolation =
+        typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === 'P2002'
+      if (!isPrismaUniqueViolation) throw e
+      // Retry with a fresh suffix on the rare collision
+      publishSlug = `${publishSlug.substring(0, 40)}-${randomBytes(5).toString('hex')}`
+      await doUpdate(publishSlug)
+    }
 
     // Construct the published URL
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';

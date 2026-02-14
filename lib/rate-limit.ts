@@ -113,8 +113,9 @@ export async function checkRateLimit(
     }
   } catch (error) {
     console.error('❌ Rate limit check failed:', error)
+    // Fail closed: deny the request when Redis is unavailable
     return {
-      success: true,
+      success: false,
       limit: 0,
       remaining: 0,
       reset: Date.now(),
@@ -141,8 +142,9 @@ export async function checkRateLimitByIdentifier(
     }
   } catch (error) {
     console.error('❌ Rate limit check failed:', error)
+    // Fail closed: deny the request when Redis is unavailable
     return {
-      success: true,
+      success: false,
       limit: 0,
       remaining: 0,
       reset: Date.now(),
@@ -197,8 +199,9 @@ export async function checkUserRateLimit(
 
   } catch (error) {
     console.error('❌ User rate limit check failed:', error)
+    // Fail closed: deny the request when Redis is unavailable
     return {
-      success: true,
+      success: false,
       limit: 0,
       remaining: 0,
       reset: Date.now(),

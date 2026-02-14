@@ -8,9 +8,11 @@ import CodePreview from './code-preview'
 import { HelpCircle, Loader2, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react'
 import PromptAssistant from '@/components/PromptAssistant'
 import { EnhancedPromptInput } from '@/components/EnhancedPromptInput'
-import { useGenerateStream } from '@/hooks/useGenerateStream'
 import { generateSmartProjectName } from '@/lib/utils/project-name-generator'
 import PromptTemplates from '@/components/PromptTemplates'
+import MultiFileProjectSetup from '@/components/MultiFileProjectSetup'
+import CodeFileViewer from '@/components/CodeFileViewer'
+import type { MultiFileProject } from '@/lib/multi-file-parser'
 
 interface ValidationMessage {
   message: string;
@@ -63,13 +65,15 @@ function BuilderContent() {
   // Validation and multi-file support
   const [validation, setValidation] = useState<ValidationResult | null>(null)
   const [showPromptGuide, setShowPromptGuide] = useState(false)
+  // Multi-file project state (fullstack projects)
+  const [isMultiFileProject, setIsMultiFileProject] = useState(false)
+  const [projectFiles, setProjectFiles] = useState<Array<{path: string; content: string; language: string}>>([])
+  const [filesCount, setFilesCount] = useState(0)
+  const [projectDependencies, setProjectDependencies] = useState<Record<string, string>>({})
+  const [showCodeViewer, setShowCodeViewer] = useState(false)
 
   // Add router instance
   const router = useRouter();
-
-  const {
-    // Only use what is needed from useGenerateStream
-  } = useGenerateStream()
 
   // Helper to extract project ID from various API responses
   function extractProjectId(responseData: unknown): string | null {
@@ -492,13 +496,37 @@ function BuilderContent() {
                 setGeneratingStep(Math.floor(receivedCode.length / 5000));
               }
             }
-            // Handle validation data
+            // Fullstack multi-file project (Next.js JSON output)
+            else if (data.type === 'multifile') {
+              try {
+                const project: MultiFileProject = JSON.parse(data.content)
+                setIsMultiFileProject(true)
+                setProjectFiles(project.files.map(f => ({
+                  path: f.path,
+                  content: f.content,
+                  language: f.language ?? 'text',
+                })))
+                setFilesCount(project.files.length)
+                setProjectDependencies(project.dependencies ?? {})
+                if (!projectName || projectName.trim() === '') {
+                  setProjectName(project.projectName ?? projectName)
+                }
+                // Show a representative entry file in the code view
+                const entry = project.files.find(f =>
+                  f.path.includes('page.tsx') || f.path === 'app/page.tsx' || f.path.endsWith('index.tsx')
+                ) ?? project.files[0]
+                if (entry) setGeneratedCode(entry.content)
+                toast.success(`Full-stack project generated — ${project.files.length} files`)
+              } catch (e) {
+                console.error('Failed to parse multifile event:', e)
+              }
+            }
+            else if (data.type === 'html') {
+              setGeneratedCode(data.content)
+            }
+            // Validation result attached to stream
             else if (data.validation) {
               setValidation(ensureValidValidation(data.validation))
-            }
-            // ✅ SIMPLE FIX: handle 'html' event for string state
-            else if (data.type === 'html') {
-              setGeneratedCode(data.content);  // ✅ Set the code
             }
             else if (data.type === 'complete') {
               console.log('✅ Generation complete');
@@ -558,13 +586,15 @@ function BuilderContent() {
       const payload = {
         name: projectName,
         description: projectDescription,
-        code: generatedCode,        // ✅ Use generatedCode
-        html: generatedCode,         // ✅ Same
-        htmlCode: generatedCode,     // ✅ Same
+        code: generatedCode,
+        html: generatedCode,
+        htmlCode: generatedCode,
         hasHtml: true,
-        isComplete: true,
-        validationPassed: true,
-        type: projectType
+        isComplete: !incompleteIssues,
+        validationPassed: validation?.validationPassed ?? true,
+        validationScore: validation?.validationScore,
+        type: projectType,
+        isMultiFile: isMultiFileProject,
       };
 
       const res = await fetch(url, {
@@ -1128,6 +1158,21 @@ Generate complete, production-ready code that fixes ALL issues above.`
               </div>
             )}
 
+            {/* Multi-file project notice */}
+            {isMultiFileProject && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <p className="text-sm text-blue-800 font-medium">
+                  Full-stack project — {filesCount} files generated.
+                </p>
+                <button
+                  onClick={() => setShowCodeViewer(true)}
+                  className="mt-2 text-sm text-blue-600 underline hover:text-blue-800"
+                >
+                  Browse all files
+                </button>
+              </div>
+            )}
+
             <CodePreview
               code={generatedCode}
               projectId={currentProjectId || null}
@@ -1161,6 +1206,36 @@ Generate complete, production-ready code that fixes ALL issues above.`
                   </pre>
                 </div>
               </div>
+            )}
+
+            {/* Multi-file project setup instructions */}
+            {isMultiFileProject && generatedCode && (
+              <MultiFileProjectSetup
+                projectName={projectName || 'My Project'}
+                filesCount={filesCount}
+                projectType={projectType || 'fullstack'}
+                dependencies={projectDependencies}
+                onDownload={downloadCode}
+                onViewCode={() => setShowCodeViewer(true)}
+                onDeploy={async () => {
+                  if (!currentProjectId) { toast.error('Save the project first'); return; }
+                  toast.loading('Publishing to Vercel...')
+                  try {
+                    const res = await fetch('/api/deploy/vercel', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ projectId: currentProjectId }),
+                    })
+                    const data = await res.json()
+                    toast.dismiss()
+                    if (res.ok) { toast.success('Published!'); window.open(data.url, '_blank') }
+                    else throw new Error(data.error)
+                  } catch (e) {
+                    toast.dismiss()
+                    toast.error('Deploy failed: ' + (e instanceof Error ? e.message : 'Unknown error'))
+                  }
+                }}
+              />
             )}
           </div>
         </div>
@@ -1307,6 +1382,26 @@ Generate complete, production-ready code that fixes ALL issues above.`
       >
         <HelpCircle className="w-6 h-6" />
       </button>
+
+      {/* Code File Viewer Modal */}
+      {showCodeViewer && projectFiles.length > 0 && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-xl font-semibold text-gray-900">Project Files ({filesCount})</h3>
+              <button
+                onClick={() => setShowCodeViewer(false)}
+                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <CodeFileViewer files={projectFiles} />
+            </div>
+          </div>
+        </div>
+      )}
 
       <Toaster position="top-right" />
 

@@ -2,10 +2,9 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { isAdminAsync } from '@/lib/admin'
 
 export const dynamic = 'force-dynamic'
-
-const ADMIN_EMAILS = ['fmugova@yahoo.com', 'admin@buildflow-ai.app']
 
 export async function GET() {
   try {
@@ -15,7 +14,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!ADMIN_EMAILS.includes(session.user.email)) {
+    if (!(await isAdminAsync())) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

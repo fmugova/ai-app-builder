@@ -17,7 +17,9 @@ import { analyzePrompt } from '@/lib/utils/complexity-detection'
 import { IterationDetector } from '@/lib/services/iterationDetector'
 import { PromptBuilder, buildUserMessageWithContext } from '@/lib/services/promptBuilder'
 import { saveProjectFiles, updateProjectMetadata } from '@/lib/services/projectService'
-import { BUILDFLOW_ITERATION_AWARE_PROMPT } from '@/lib/prompts/iteration-aware-prompt'
+import { BUILDFLOW_ENHANCED_SYSTEM_PROMPT } from '@/lib/prompts/buildflow-enhanced-prompt'
+import { ENHANCED_GENERATION_SYSTEM_PROMPT } from '@/lib/enhanced-system-prompt'
+import { parseMultiFileProject } from '@/lib/multi-file-parser'
 import { 
   GENERATED_APP_ITERATION_DETECTOR, 
   GENERATED_APP_SUPABASE_CONFIG,
@@ -42,7 +44,7 @@ const generateRequestSchema = z.object({
 // ============================================================================
 
 interface StreamEvent {
-  type: 'content' | 'html' | 'complete' | 'error' | 'retry'
+  type: 'content' | 'html' | 'multifile' | 'complete' | 'error' | 'retry'
   text?: string
   content?: string
   totalLength?: number
@@ -207,6 +209,27 @@ function getOptimalTokenLimit(prompt: string, generationType: string): number {
   }
   
   return baseTokens
+}
+
+/**
+ * Detects if the prompt requests a new multi-page HTML site (not fullstack).
+ * These requests need BUILDFLOW_ENHANCED_SYSTEM_PROMPT for separate .html files.
+ */
+function isNewMultiPageHTMLRequest(
+  prompt: string,
+  complexityAnalysis: { shouldUseFullstack: boolean }
+): boolean {
+  if (complexityAnalysis.shouldUseFullstack) return false;
+  const lower = prompt.toLowerCase();
+  const multiPageTriggers = [
+    'home, about', 'home, services', 'home, contact',
+    'about, contact', 'about, services',
+    'multi-page', 'multiple pages', 'multiple html',
+    'portfolio with', 'website with pages',
+    'navigation to', 'nav to',
+  ];
+  const hasNamedPages = /\b(home|landing)\b.{0,60}\b(about|services|contact|projects|portfolio|blog)\b/i.test(prompt);
+  return hasNamedPages || multiPageTriggers.some(t => lower.includes(t));
 }
 
 /**
@@ -377,10 +400,14 @@ export async function POST(req: NextRequest) {
           let inputTokens = 0
           
           // Use iteration-aware system prompt if available, otherwise fall back to complexity-based
-          const systemPrompt = iterationContext.isIteration 
-            ? iterationSystemPrompt 
-            : wantsIterationCapability
-            ? BUILDFLOW_ITERATION_AWARE_PROMPT
+          const isMultiPageHTML = isNewMultiPageHTMLRequest(prompt, complexityAnalysis);
+          const isFullstackGeneration = !iterationContext.isIteration && complexityAnalysis.shouldUseFullstack;
+          const systemPrompt = iterationContext.isIteration
+            ? iterationSystemPrompt
+            : isFullstackGeneration
+            ? ENHANCED_GENERATION_SYSTEM_PROMPT
+            : isMultiPageHTML
+            ? BUILDFLOW_ENHANCED_SYSTEM_PROMPT
             : ENTERPRISE_SYSTEM_PROMPT + complexityAnalysis.systemPromptSuffix;
 
           if (process.env.NODE_ENV === 'development') {
@@ -445,11 +472,78 @@ export async function POST(req: NextRequest) {
             }
           }
 
+          // ============================================================================
+          // FULLSTACK JSON PIPELINE — parse multi-file Next.js project from JSON output
+          // ============================================================================
+          if (isFullstackGeneration) {
+            console.log('🏗️ Attempting fullstack JSON parse...')
+            const parseResult = parseMultiFileProject(fullContent)
+
+            if (parseResult.success && parseResult.project) {
+              console.log('✅ Fullstack project parsed:', {
+                name: parseResult.project.projectName,
+                files: parseResult.project.files.length,
+                type: parseResult.project.projectType,
+              })
+
+              // Stream the structured project to the client
+              const multifileEvent: StreamEvent = {
+                type: 'multifile',
+                content: JSON.stringify(parseResult.project),
+              }
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(multifileEvent)}\n\n`))
+
+              // Save files to DB if project exists
+              if (projectId) {
+                try {
+                  await saveProjectFiles(projectId, parseResult.project.files)
+                  await updateProjectMetadata(projectId, {
+                    multiPage: true,
+                    isMultiFile: true,
+                  })
+                  await prisma.project.update({
+                    where: { id: projectId },
+                    data: {
+                      status: ProjectStatus.COMPLETED,
+                      tokensUsed: inputTokens,
+                      generationTime: Date.now() - startTime,
+                      updatedAt: new Date(),
+                    },
+                  })
+                  console.log('✅ Fullstack project saved to DB')
+                } catch (dbErr) {
+                  console.error('❌ Fullstack DB save error:', dbErr)
+                }
+              }
+
+              const completeEvent: StreamEvent = {
+                type: 'complete',
+                parsed: { hasHtml: true, hasCss: true, hasJavaScript: true, isComplete: true },
+                metadata: {
+                  tokensUsed: inputTokens,
+                  generationTime: Date.now() - startTime,
+                  wasTruncated: false,
+                  stopReason: 'complete',
+                },
+              }
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(completeEvent)}\n\n`))
+              controller.close()
+              return
+            }
+
+            // JSON parse failed — log and fall through to HTML pipeline as safety net
+            console.warn('⚠️ Fullstack JSON parse failed, falling back to HTML pipeline')
+          }
+
+          // ============================================================================
+          // HTML PIPELINE — parse and validate single-file or multi-page HTML output
+          // ============================================================================
+
           // Parse and validate generated code
           if (process.env.NODE_ENV === 'development') {
             console.log('🔍 Parsing generated code (' + fullContent.length + ' characters)...')
           }
-          
+
           const parsed = parseGeneratedCode(fullContent)
           
           if (process.env.NODE_ENV === 'development') {

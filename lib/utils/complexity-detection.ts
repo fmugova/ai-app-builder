@@ -216,15 +216,17 @@ OUTPUT FORMAT: Multi-file structure with file delimiters
     return `
 
 ℹ️ DETECTED COMPLEXITY LEVEL: SIMPLE HTML
-This can be accomplished with a single HTML file.
 
-YOU MUST generate a single HTML file with:
-- Multiple pages/sections with JavaScript navigation
-- Tailwind CSS for styling
-- Interactive features using vanilla JavaScript
-- Professional design and UX
+If the user requests MULTIPLE PAGES (home, about, services, contact, etc.):
+- Create SEPARATE .html files (index.html, about.html, etc.)
+- Link pages with href="about.html" style navigation
+- Never use JavaScript-based routing for multi-page sites
 
-OUTPUT FORMAT: Single complete HTML file
+If the user requests a SINGLE PAGE app or interactive tool:
+- Generate one complete HTML file with all CSS and JS inline
+- Use JavaScript for dynamic sections/tabs within the page
+
+OUTPUT FORMAT: Separate .html files for multi-page, single file for single-page apps
 `;
   }
 }

@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
       secret: user.twoFactorSecret,
       encoding: 'base32',
       token,
-      window: 1, // Allow 1 time step before/after for clock skew
+      window: 2, // Allow 2 time steps before/after for clock skew (consistent with all other 2FA routes)
     })
 
     if (!isValid) {

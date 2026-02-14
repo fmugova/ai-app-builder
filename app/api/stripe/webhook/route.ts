@@ -76,8 +76,26 @@ export async function POST(request: NextRequest) {
           break
         }
 
-        // Get plan from metadata (more reliable than amount)
-        const plan = session.metadata?.plan || 'pro'
+        // Derive plan from actual Stripe subscription price, not metadata
+        // to prevent plan escalation via metadata tampering
+        let plan = 'pro'
+        if (session.subscription) {
+          try {
+            const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
+            const priceId = subscription.items.data[0]?.price.id
+            const PRICE_PLAN_MAP: Record<string, string> = {
+              [process.env.STRIPE_PRO_PRICE_ID || '']: 'pro',
+              [process.env.STRIPE_BUSINESS_PRICE_ID || '']: 'business',
+              [process.env.STRIPE_ENTERPRISE_PRICE_ID || '']: 'enterprise',
+            }
+            plan = PRICE_PLAN_MAP[priceId] ?? session.metadata?.plan ?? 'pro'
+          } catch (stripeErr) {
+            console.error('Failed to retrieve subscription for plan verification:', stripeErr)
+            plan = session.metadata?.plan ?? 'pro'
+          }
+        } else {
+          plan = session.metadata?.plan ?? 'pro'
+        }
 
         const planConfig = {
           pro: { generationsLimit: 100, projectsLimit: 50 },
