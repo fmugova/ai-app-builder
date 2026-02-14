@@ -350,6 +350,11 @@ export function fixMalformedImageUrls(html: string): string {
  *     there is no outer <header>)
  *  9. Missing <main> wrapper around page body content
  * 10. Ensure exactly one <h1> — if none found, promote first <h2> to <h1>
+ * 11. Multiple <h1> elements — demote 2nd+ to <h2>
+ * 12. Heading hierarchy jumps (e.g. h1 → h3) — insert bridging hidden heading
+ * 13. External <a> tags missing rel="noopener noreferrer"
+ * 14. <img> tags missing loading="lazy"
+ * 15. Missing Open Graph meta tags (og:title, og:description, og:type)
  */
 export function fixCriticalHtmlGaps(html: string): string {
   if (!html || !html.includes('<')) return html
@@ -450,6 +455,74 @@ export function fixCriticalHtmlGaps(html: string): string {
       }
       return _m
     })
+  }
+
+  // 11. Multiple <h1> elements — demote 2nd+ to <h2>
+  const h1Matches = [...result.matchAll(/<h1\b[^>]*>/gi)]
+  if (h1Matches.length > 1) {
+    let firstSeen = false
+    result = result.replace(/(<\/?)h1(\b)/gi, (_m, slash, after) => {
+      if (!firstSeen) {
+        if (!slash.endsWith('/')) firstSeen = true   // opening tag
+        return _m
+      }
+      return `${slash}h2${after}`
+    })
+  }
+
+  // 12. Heading hierarchy — fix jumps (e.g. h1 → h3 inserts a synthetic h2)
+  //     We fix the output tags so the DOM structure is valid; the inserted
+  //     <h2> is hidden via inline style so it doesn't visually affect layout.
+  const headingTagRe = /<h([1-6])\b[^>]*>/gi
+  let lastLevel = 0
+  const headingInserts: Array<{ index: number; tag: string }> = []
+  let match: RegExpExecArray | null
+  while ((match = headingTagRe.exec(result)) !== null) {
+    const level = parseInt(match[1])
+    if (lastLevel > 0 && level - lastLevel > 1) {
+      // Insert a bridging heading just before this tag
+      headingInserts.push({ index: match.index, tag: `<h${lastLevel + 1} style="display:none" aria-hidden="true"></h${lastLevel + 1}>` })
+    }
+    lastLevel = level
+  }
+  // Apply inserts in reverse so indices stay valid
+  for (let i = headingInserts.length - 1; i >= 0; i--) {
+    const { index, tag } = headingInserts[i]
+    result = result.slice(0, index) + tag + result.slice(index)
+  }
+
+  // 13. Add rel="noopener noreferrer" to external <a> tags that are missing it
+  result = result.replace(
+    /<a\b([^>]*)\bhref=["'](https?:\/\/[^"']+)["']([^>]*)>/gi,
+    (_m, before, href, after) => {
+      const combined = before + after
+      if (/\brel=/.test(combined)) return _m   // already has rel
+      return `<a${before} href="${href}"${after} rel="noopener noreferrer">`
+    }
+  )
+
+  // 14. Add loading="lazy" to <img> tags that are missing it
+  result = result.replace(
+    /<img\b(?![^>]*\bloading=)([^>]*?)(\s*\/?>)/gi,
+    (_m, attrs, close) => `<img loading="lazy"${attrs}${close}`
+  )
+
+  // 15. Open Graph tags — add og:title + og:description if missing
+  if (!result.includes('property="og:title"') && /<\/head>/i.test(result)) {
+    const titleMatch = result.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
+    const descMatch = result.match(/name=["']description["'][^>]+content=["']([^"']+)["']/i)
+    const ogTitle = titleMatch ? stripHTML(titleMatch[1]).trim() : ''
+    const ogDesc = descMatch ? descMatch[1] : ''
+
+    const ogTags = [
+      ogTitle ? `  <meta property="og:title" content="${ogTitle.replace(/"/g, '&quot;')}">` : '',
+      ogDesc ? `  <meta property="og:description" content="${ogDesc.replace(/"/g, '&quot;')}">` : '',
+      `  <meta property="og:type" content="website">`,
+    ].filter(Boolean).join('\n')
+
+    if (ogTags) {
+      result = result.replace(/<\/head>/i, `${ogTags}\n</head>`)
+    }
   }
 
   return result

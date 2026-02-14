@@ -91,9 +91,6 @@ Format your response like this:
               const chunk = event.delta.text;
               accumulatedCode += chunk;
 
-              if (accumulatedCode.length % 1000 < chunk.length) {
-                console.log(`Progress: ${accumulatedCode.length} chars`);
-              }
 
               controller.enqueue(
                 encoder.encode(
@@ -107,31 +104,7 @@ Format your response like this:
             }
 
             if (event.type === 'message_stop') {
-              console.log('✅ Stream complete');
-              console.log('📊 Total accumulated:', accumulatedCode.length, 'characters');
-              
-              // ============================================================================
-              // DEBUG: Show EXACTLY what Claude sent
-              // ============================================================================
-              
-              console.log('\n=== CLAUDE\'S RESPONSE ===');
-              console.log('First 1000 chars:');
-              console.log(accumulatedCode.substring(0, 1000));
-              console.log('\n...\n');
-              console.log('Last 500 chars:');
-              console.log(accumulatedCode.substring(accumulatedCode.length - 500));
-              console.log('=== END RESPONSE ===\n');
-              
-              // Check what's in the response
-              console.log('🔍 Checking content:');
-              console.log('- Contains "```html":', accumulatedCode.includes('```html'));
-              console.log('- Contains "```HTML":', accumulatedCode.includes('```HTML'));
-              console.log('- Contains "<!DOCTYPE":', accumulatedCode.includes('<!DOCTYPE'));
-              console.log('- Contains "<html":', accumulatedCode.includes('<html'));
-              console.log('- Contains "```":', accumulatedCode.includes('```'));
-              
               // Try extraction
-              console.log('\n🔍 Attempting extraction...');
               const extracted = extractCodeBlocks(accumulatedCode);
 
               // === POST-PROCESSING: Repair HTML with cheerio ===
@@ -147,27 +120,8 @@ Format your response like this:
               }
               extracted.html = repairHtml(extracted.html);
 
-              console.log('🔍 Extracted code lengths:', {
-                html: extracted.html.length,
-                css: extracted.css.length,
-                js: extracted.js.length
-              });
-              
               // If extraction failed, try alternative approaches
               if (!extracted.html && !extracted.css && !extracted.js) {
-                console.error('\n❌ EXTRACTION FAILED!');
-                console.log('💡 Trying manual extraction...');
-                
-                // Try to find ANY code between ``` markers
-                const allCodeBlocks = accumulatedCode.match(/```[\s\S]*?```/g);
-                if (allCodeBlocks) {
-                  console.log(`Found ${allCodeBlocks.length} code blocks`);
-                  allCodeBlocks.forEach((block, i) => {
-                    console.log(`Block ${i + 1} preview:`, block.substring(0, 200));
-                  });
-                } else {
-                  console.log('❌ No code blocks found at all!');
-                }
                 
                 // Send error to client
                 controller.enqueue(
@@ -190,9 +144,6 @@ Format your response like this:
               // Validate the extracted code
               const validator = new CodeValidator();
               const validation = validator.validateAll(extracted.html, extracted.css, extracted.js);
-              console.log('🔍 Validation:', validation.passed ? 'PASSED' : 'FAILED');
-              console.log('🔍 Validation score:', validation.score);
-              console.log('🔍 Validation errors:', validation.errors.length);
               
               if (!validation.passed) {
                 // ✅ FIXED: Check for incomplete/truncated HTML properly
@@ -205,8 +156,6 @@ Format your response like this:
                      (err.message.includes('empty') || 
                       err.message.includes('Missing DOCTYPE')))
                   );
-                
-                console.log('🔍 Is truncated?', isTruncated);
                 
                 controller.enqueue(
                   encoder.encode(

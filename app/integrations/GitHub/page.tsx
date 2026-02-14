@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -27,9 +28,11 @@ export default async function GitHubIntegrationPage() {
   const isConnected = !!user?.githubUsername
 
   return (
-    <GitHubIntegrationClient 
-      initialUsername={user?.githubUsername}
-      initialConnected={isConnected}
-    />
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+      <GitHubIntegrationClient
+        initialUsername={user?.githubUsername}
+        initialConnected={isConnected}
+      />
+    </Suspense>
   )
 }

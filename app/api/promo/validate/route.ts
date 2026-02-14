@@ -9,20 +9,15 @@ import { prisma } from '@/lib/prisma'
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
-    console.log('🔍 Promo validation - Session:', session) // DEBUG
-    
+
     if (!session?.user?.email) {
-      console.log('❌ No session found in promo validation') // DEBUG
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Unauthorized', 
         valid: false 
       }, { status: 401 })
     }
 
     const { code, plan } = await request.json()
-
-    console.log('📦 Promo validation request:', { code, plan }) // DEBUG
 
     if (!code || !plan) {
       return NextResponse.json(
@@ -34,8 +29,6 @@ export async function POST(request: NextRequest) {
     const promo = await prisma.promo_codes.findUnique({
       where: { code: code.toUpperCase() },
     })
-
-    console.log('🎟️ Promo found:', promo ? 'Yes' : 'No') // DEBUG
 
     if (!promo) {
       return NextResponse.json(
@@ -82,12 +75,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-
-    console.log('✅ Promo valid:', {
-      code: promo.code,
-      discount: promo.discountValue,
-      type: promo.discountType
-    }) // DEBUG
 
     return NextResponse.json({
       valid: true,

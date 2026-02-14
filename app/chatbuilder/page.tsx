@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -206,7 +206,7 @@ class ErrorBoundary extends React.Component<
   }
 }
 
-export default function ChatBuilder() {
+function ChatBuilderContent() {
   const { status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1598,6 +1598,14 @@ Generate complete, production-ready code that fixes ALL issues above.`;
         </div>
       )}
     </div>
+  );
+}
+
+export default function ChatBuilder() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen bg-gray-900 text-gray-400">Loading...</div>}>
+      <ChatBuilderContent />
+    </Suspense>
   );
 }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 
@@ -16,7 +16,7 @@ interface AnalyticsData {
   topReferrers: Array<{ source: string; count: number }>
 }
 
-export default function AnalyticsPage() {
+function AnalyticsContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { data: session, status } = useSession()
@@ -278,5 +278,13 @@ export default function AnalyticsPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function AnalyticsPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen bg-gray-900">Loading...</div>}>
+      <AnalyticsContent />
+    </Suspense>
   )
 }

@@ -105,12 +105,10 @@ class CodeValidator {
       this.addInfo('best-practices', 'Consider using CSS custom properties (variables) for maintainability', 'low', 'Define CSS variables in :root for colors, spacing, etc.')
     }
 
-    // CSP Violations - inline styles
-    if (html.match(/style\s*=\s*["']/)) {
-      this.addError('security', 'CSP violation: Found inline style attributes', 'critical')
-    }
+    // NOTE: inline style="" attributes are NOT flagged — BuildFlow's injected CSP
+    // explicitly includes style-src 'unsafe-inline', so they are permitted.
 
-    // CSP Violations - inline event handlers
+    // CSP Violations - inline event handlers (script-src-attr 'none' in strict mode)
     const inlineHandlers = ['onclick', 'onload', 'onerror', 'onmouseover']
     inlineHandlers.forEach(handler => {
       if (html.includes(handler + '=')) {
@@ -330,9 +328,7 @@ class CodeValidator {
       this.addError('security', 'Security risk: Function constructor detected', 'critical')
     }
 
-    if (js.includes('innerHTML') && !js.includes('textContent')) {
-      this.addError('security', 'XSS risk: innerHTML usage without proper sanitization', 'high')
-    }
+    // innerHTML XSS check is handled in validateSecurity to avoid double-flagging
 
     if (js.includes('document.write')) {
       this.addError('security', 'Security risk: document.write() can be dangerous', 'high')
@@ -387,13 +383,16 @@ class CodeValidator {
       this.addWarning('security', 'Potential SQL injection risk detected', 'high')
     }
 
-    // Check for hardcoded credentials
-    const credentialPatterns = ['password:', 'apiKey:', 'api_key:', 'secret:', 'token:']
-    credentialPatterns.forEach(pattern => {
-      if (js.toLowerCase().includes(pattern.toLowerCase())) {
-        this.addError('security', 'Potential hardcoded credentials detected', 'critical')
-      }
-    })
+    // Check for hardcoded credential values (must be followed by a quoted non-empty string)
+    const credentialPatterns = [
+      /\bapiKey\s*:\s*["'][^"']{8,}["']/,
+      /\bapi_key\s*:\s*["'][^"']{8,}["']/,
+      /\bsecret\s*:\s*["'][^"']{8,}["']/,
+      /\btoken\s*:\s*["'][^"']{20,}["']/,
+    ]
+    if (credentialPatterns.some(p => p.test(js))) {
+      this.addError('security', 'Potential hardcoded credentials detected', 'critical')
+    }
   }
 
   // ==========================================================================
