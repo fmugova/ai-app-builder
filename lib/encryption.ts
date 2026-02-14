@@ -3,18 +3,13 @@
 
 import crypto from 'crypto'
 
-// Encryption key must be explicitly set — never fall back to a known/public value
-const _rawEncryptionKey = process.env.ENCRYPTION_KEY
-
-if (!_rawEncryptionKey && process.env.NODE_ENV === 'production') {
-  throw new Error('ENCRYPTION_KEY environment variable is required in production')
-}
-
-const ENCRYPTION_KEY = _rawEncryptionKey || 'dev-only-fallback-not-for-production-use'
-
-// Ensure key is 32 bytes via SHA-256 derivation
+// Ensure key is 32 bytes via SHA-256 derivation — validated at runtime, not module load
 function getEncryptionKey(): Buffer {
-  return crypto.createHash('sha256').update(ENCRYPTION_KEY).digest()
+  const key = process.env.ENCRYPTION_KEY
+  if (!key && process.env.NODE_ENV === 'production') {
+    throw new Error('ENCRYPTION_KEY environment variable is required in production')
+  }
+  return crypto.createHash('sha256').update(key || 'dev-only-fallback-not-for-production-use').digest()
 }
 
 /**
