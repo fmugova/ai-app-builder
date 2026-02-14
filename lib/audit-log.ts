@@ -14,6 +14,7 @@ export type AuditAction =
   | 'project.unpublish'
   | 'admin.access'
   | 'admin.user_action'
+  | 'admin.user_delete'
   | 'admin.bulk_action'
   | 'workspace.create'
   | 'workspace.update'
