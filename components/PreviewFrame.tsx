@@ -129,26 +129,53 @@ export default function PreviewFrame({ html, css, js, validation }: PreviewFrame
       const securityScript = `
         // Prevent navigation and popup attacks
         (function() {
-          // Prevent all navigation attempts
+          // In-page toast — no browser alert() popups
+          function showPreviewToast(msg) {
+            var existing = document.getElementById('__bf_toast');
+            if (existing) existing.remove();
+            var t = document.createElement('div');
+            t.id = '__bf_toast';
+            t.style.cssText = 'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:rgba(30,30,30,.92);color:#fff;padding:8px 16px;border-radius:8px;font:13px/1.4 system-ui,sans-serif;z-index:2147483647;pointer-events:none;max-width:320px;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,.3);';
+            t.textContent = msg;
+            document.body.appendChild(t);
+            setTimeout(function(){ if(t.parentNode) t.remove(); }, 2500);
+          }
+
+          // Intercept link clicks
           window.addEventListener('click', function(e) {
-            const target = e.target;
-            if (target && target.tagName === 'A') {
+            var el = e.target;
+            // Walk up to find the <a> tag (click may land on a child element)
+            while (el && el.tagName !== 'A') el = el.parentElement;
+            if (!el || el.tagName !== 'A') return;
+
+            var href = el.getAttribute('href') || '';
+
+            // Allow same-page hash anchors to scroll normally
+            if (!href || href.startsWith('#')) return;
+
+            // Silently block internal .html page links (multi-page nav)
+            // — srcdoc iframes cannot navigate between .html files
+            if (/^[^/]*\.html?(#.*)?$/i.test(href) || href === '/' || href === './') {
               e.preventDefault();
-              console.log('🔒 Navigation blocked for security:', target.href);
-              
-              // Show user feedback
-              const href = target.getAttribute('href');
-              if (href && !href.startsWith('#')) {
-                alert('Preview Mode: External links are disabled for security.\\n\\nLink: ' + href);
-              }
+              showPreviewToast('Page navigation is previewed inline only.');
+              return;
             }
+
+            // Block everything else (external URLs, parent-app paths like /dashboard)
+            e.preventDefault();
+            console.log('🔒 Navigation blocked for security:', href);
+            showPreviewToast('Links open in your published site, not in preview.');
           }, true); // Use capture phase to catch before other handlers
 
           // Block form submissions
           window.addEventListener('submit', function(e) {
             e.preventDefault();
             console.log('🔒 Form submission blocked in preview mode');
-            alert('Preview Mode: Form submissions are disabled.');
+            var t = document.createElement('div');
+            t.style.cssText = 'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:rgba(30,30,30,.92);color:#fff;padding:8px 16px;border-radius:8px;font:13px/1.4 system-ui,sans-serif;z-index:2147483647;pointer-events:none;';
+            t.textContent = 'Form submissions work on your published site.';
+            document.body.appendChild(t);
+            setTimeout(function(){ if(t.parentNode) t.remove(); }, 2500);
           }, true);
 
           // Prevent window.open

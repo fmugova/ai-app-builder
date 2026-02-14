@@ -529,6 +529,69 @@ export function fixCriticalHtmlGaps(html: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Active navigation highlighter
+// ---------------------------------------------------------------------------
+
+/**
+ * Injects a small script that highlights the nav link matching the current
+ * page filename (e.g. about.html → highlights the About nav link).
+ *
+ * Works by comparing each anchor's href basename against
+ * window.location.pathname's basename.  Adds class="active" + inline
+ * accent styles so it works without any CSS framework.
+ */
+export function injectActiveNavigation(html: string): string {
+  if (!html) return html
+  // Only inject if there's a <nav> with links
+  if (!/<nav\b/i.test(html) || !/<a\b[^>]*href=/i.test(html)) return html
+  // Don't inject twice
+  if (html.includes('data-buildflow-activenav')) return html
+
+  const script = `
+<!-- BuildFlow: active nav highlight (auto-injected) -->
+<script data-buildflow-activenav="1">
+(function () {
+  function setActiveNav() {
+    var page = (window.location.pathname.split('/').pop() || 'index.html').toLowerCase();
+    if (!page || page === '') page = 'index.html';
+    var links = document.querySelectorAll('nav a, header a, .nav-links a, .navbar a, .navigation a');
+    links.forEach(function(link) {
+      var href = (link.getAttribute('href') || '').toLowerCase().split('?')[0].split('#')[0];
+      var base = href.split('/').pop() || 'index.html';
+      if (base === '' || base === '.') base = 'index.html';
+      var isActive = (base === page) || (page === 'index.html' && (base === '' || base === '/' || base === '.' || base === '#'));
+      if (isActive) {
+        link.classList.add('active');
+        link.setAttribute('aria-current', 'page');
+        // Apply accent style only if no custom active style already exists
+        if (!link.style.color) {
+          link.style.color = 'var(--primary, var(--color-primary, #6366f1))';
+          link.style.fontWeight = 'bold';
+        }
+      } else {
+        link.classList.remove('active');
+        link.removeAttribute('aria-current');
+      }
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setActiveNav);
+  } else {
+    setActiveNav();
+  }
+  // Re-run on hash changes for SPAs
+  window.addEventListener('hashchange', setActiveNav);
+  window.addEventListener('popstate', setActiveNav);
+})();
+</script>`
+
+  if (/<\/body>/i.test(html)) {
+    return html.replace(/<\/body>/i, `${script}\n</body>`)
+  }
+  return html + script
+}
+
+// ---------------------------------------------------------------------------
 // Convenience: apply all injections at once
 // ---------------------------------------------------------------------------
 
@@ -543,7 +606,8 @@ export function fixCriticalHtmlGaps(html: string): string {
  * 3. sanitizeInlineHandlers — rewrite onclick/onsubmit etc. before we inject our scripts
  * 4. injectFormHandler      — wire up <form> submits
  * 5. injectAnalytics        — page-view + click tracking
- * 6. addCspMetaTag          — add CSP policy after all scripts are known
+ * 6. injectActiveNavigation — highlight current page in nav
+ * 7. addCspMetaTag          — add CSP policy after all scripts are known
  */
 export function applyBuildFlowInjections(html: string, projectId: string): string {
   let result = html
@@ -552,6 +616,7 @@ export function applyBuildFlowInjections(html: string, projectId: string): strin
   result = sanitizeInlineHandlers(result)
   result = injectFormHandler(result, projectId)
   result = injectAnalytics(result, projectId)
+  result = injectActiveNavigation(result)
   result = addCspMetaTag(result)
   return result
 }
