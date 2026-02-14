@@ -8,10 +8,12 @@ import { toast } from 'react-hot-toast';
 import { stripMarkdownCodeFences } from '@/lib/utils';
 import { generateSmartProjectName } from '@/lib/utils/project-name-generator';
 import PreviewFrame from '@/components/PreviewFrame';
+import MonacoCodeEditor from '@/components/MonacoCodeEditor';
 import MultiFileProjectSetup from '@/components/MultiFileProjectSetup';
 import CodeFileViewer from '@/components/CodeFileViewer';
 import PromptTemplates from '@/components/PromptTemplates';
 import { parseMultiFileProject, convertToSingleHTML } from '@/lib/multi-file-parser';
+import { parseGeneratedCode } from '@/lib/code-parser';
 import { AlertTriangle, CheckCircle, XCircle, Download, Copy, Github, ExternalLink, Save, Sparkles, RefreshCw, Upload, Link as LinkIcon, Code2, Lightbulb, Menu, X, Wand2 } from 'lucide-react';
 
 // Types remain the same as before...
@@ -222,6 +224,7 @@ function ChatBuilderContent() {
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [showViewCode, setShowViewCode] = useState(false);
   const [showCodeViewer, setShowCodeViewer] = useState(false);
+  const [editableCode, setEditableCode] = useState('');
   const [generationMode, setGenerationMode] = useState<'iterate' | 'fresh'>('iterate');
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -1528,32 +1531,62 @@ Generate complete, production-ready code that fixes ALL issues above.`;
             )}
 
 
-            {/* View Code Modal */}
+            {/* View / Edit Code Modal — Monaco Editor */}
             {showViewCode && state.fullCode && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-                  <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
-                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900">Generated Code</h3>
+              <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+                <div className="bg-gray-900 rounded-xl shadow-2xl w-full max-w-5xl flex flex-col" style={{ height: '88vh' }}>
+                  {/* Toolbar */}
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700 flex-shrink-0">
+                    <div className="flex items-center gap-3">
+                      <Code2 className="w-5 h-5 text-purple-400" />
+                      <h3 className="text-base font-semibold text-white">Code Editor</h3>
+                      <span className="text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded">HTML · editable</span>
+                    </div>
                     <div className="flex items-center gap-2">
                       <button
+                        onClick={() => {
+                          const changed = editableCode && editableCode !== state.fullCode;
+                          if (changed) {
+                            const parsed = parseGeneratedCode(editableCode);
+                            setState(prev => ({
+                              ...prev,
+                              html: parsed.html || editableCode,
+                              css: parsed.css || '',
+                              js: parsed.javascript || '',
+                              fullCode: editableCode,
+                            }));
+                            toast.success('Code changes applied to preview');
+                          }
+                          setShowViewCode(false);
+                        }}
+                        className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg transition-colors text-sm"
+                      >
+                        <Save className="w-4 h-4" />
+                        {editableCode && editableCode !== state.fullCode ? 'Apply & Close' : 'Close'}
+                      </button>
+                      <button
                         onClick={handleCopy}
-                        className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg transition-colors text-sm"
+                        className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg transition-colors text-sm"
                       >
                         <Copy className="w-4 h-4" />
                         Copy
                       </button>
                       <button
                         onClick={() => setShowViewCode(false)}
-                        className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+                        className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg"
                       >
                         <X className="w-5 h-5" />
                       </button>
                     </div>
                   </div>
-                  <div className="flex-1 overflow-auto p-4 sm:p-6">
-                    <pre className="text-xs sm:text-sm bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto">
-                      <code>{state.fullCode}</code>
-                    </pre>
+                  {/* Monaco */}
+                  <div className="flex-1 overflow-hidden rounded-b-xl">
+                    <MonacoCodeEditor
+                      value={editableCode || state.fullCode}
+                      onChange={setEditableCode}
+                      language="html"
+                      height="100%"
+                    />
                   </div>
                 </div>
               </div>

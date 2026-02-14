@@ -79,8 +79,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Decrypt the GitHub token for API use
-    const githubToken = decrypt(userWithGithub.githubAccessToken);
+    // Decrypt the GitHub token — token may be encrypted with old key if user connected before ENCRYPTION_KEY was set
+    let githubToken: string;
+    try {
+      githubToken = decrypt(userWithGithub.githubAccessToken);
+    } catch {
+      // Stale token — was encrypted with the dev fallback key before ENCRYPTION_KEY was set in production
+      return NextResponse.json(
+        { error: 'GitHub connection has expired. Please disconnect and reconnect your GitHub account.', reconnect: true },
+        { status: 401 }
+      );
+    }
     
     // Get the project
     const project = await prisma.project.findUnique({

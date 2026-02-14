@@ -30,6 +30,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.70.1",
     "@auth/prisma-adapter": "^2.11.1",
+    "@monaco-editor/react": "^4.7.0",
     "@next/third-parties": "^16.0.8",
     "@octokit/rest": "^22.0.1",
     "@prisma/client": "^5.22.0",
