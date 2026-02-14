@@ -350,6 +350,30 @@ export async function POST(req: NextRequest) {
     const validatedData = generateRequestSchema.parse(body);
     const { prompt, projectId, generationType = 'webapp', retryAttempt = 0, continuationContext, forceIteration = false } = validatedData;
 
+    // =========================================================================
+    // PROMPT INJECTION DETECTION
+    // =========================================================================
+    const injectionPatterns = [
+      /ignore\s+(previous|all|above|prior)\s+(instructions?|prompts?|rules?|constraints?)/i,
+      /forget\s+(everything|all|your\s+instructions?|previous)/i,
+      /you\s+are\s+now\s+(a|an)\s+/i,
+      /new\s+(persona|identity|role|instructions?):/i,
+      /\[system\]/i,
+      /\]\s*system\s*\[/i,
+      /override\s+(system|safety|rules?|constraints?)/i,
+      /act\s+as\s+(if\s+you\s+(are|were)|a\s+)/i,
+      /do\s+not\s+(follow|apply|use)\s+(your\s+)?(guidelines|rules|instructions|safety)/i,
+      /reveal\s+(your\s+)?(system\s+prompt|instructions?|prompt)/i,
+      /print\s+(your\s+)?(system\s+prompt|instructions?)/i,
+    ]
+    const injectionMatch = injectionPatterns.find(p => p.test(prompt))
+    if (injectionMatch) {
+      return NextResponse.json(
+        { error: 'Prompt contains disallowed content. Please describe what you want to build.' },
+        { status: 400 }
+      )
+    }
+
     console.log('🚀 Starting generation:', {
       projectId,
       promptLength: prompt.length,

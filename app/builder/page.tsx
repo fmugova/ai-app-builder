@@ -1501,17 +1501,32 @@ function ensureValidValidation(validation: Partial<ValidationResult> | undefined
   }
 }
  
+// Redirect /builder → /chatbuilder (unified builder experience)
+function BuilderRedirect() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    const qs = searchParams.toString()
+    router.replace(qs ? `/chatbuilder?${qs}` : '/chatbuilder')
+  }, [router, searchParams])
+  return (
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="text-center">
+        <Loader2 className="w-10 h-10 text-purple-500 animate-spin mx-auto mb-3" />
+        <p className="text-gray-400 text-sm">Redirecting to AI Builder…</p>
+      </div>
+    </div>
+  )
+}
+
 export default function Builder() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-16 h-16 text-purple-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 text-lg">Loading Builder...</p>
-        </div>
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-purple-500 animate-spin" />
       </div>
     }>
-      <BuilderContent />
+      <BuilderRedirect />
     </Suspense>
   )
 }

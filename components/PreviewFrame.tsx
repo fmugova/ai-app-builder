@@ -1,8 +1,16 @@
 'use client'
 
-import { useMemo, useEffect, useRef } from 'react'
-import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
+import { useMemo, useEffect, useRef, useState } from 'react'
+import { AlertTriangle, CheckCircle, XCircle, Monitor, Tablet, Smartphone } from 'lucide-react'
 import { stripMarkdownCodeFences } from '@/lib/utils'
+
+type Viewport = 'desktop' | 'tablet' | 'mobile'
+
+const VIEWPORT_WIDTHS: Record<Viewport, string> = {
+  desktop: '100%',
+  tablet: '768px',
+  mobile: '375px',
+}
 
 // ============================================
 // TYPES
@@ -59,6 +67,7 @@ const DEFAULT_VALIDATION: ValidationResult = {
 export default function PreviewFrame({ html, css, js, validation }: PreviewFrameProps) {
   const safeValidation = validation || DEFAULT_VALIDATION;
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [viewport, setViewport] = useState<Viewport>('desktop');
 
   const fullHTML = useMemo(() => {
     if (!html?.trim()) {
@@ -349,8 +358,44 @@ export default function PreviewFrame({ html, css, js, validation }: PreviewFrame
         </div>
       )}
 
+      {/* Viewport Toggle Bar */}
+      {fullHTML && (
+        <div className="flex items-center justify-center gap-1 px-3 py-1.5 bg-gray-100 border-b border-gray-200">
+          <button
+            onClick={() => setViewport('desktop')}
+            title="Desktop"
+            className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+              viewport === 'desktop' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Monitor className="w-3.5 h-3.5" /> Desktop
+          </button>
+          <button
+            onClick={() => setViewport('tablet')}
+            title="Tablet (768px)"
+            className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+              viewport === 'tablet' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Tablet className="w-3.5 h-3.5" /> Tablet
+          </button>
+          <button
+            onClick={() => setViewport('mobile')}
+            title="Mobile (375px)"
+            className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+              viewport === 'mobile' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Smartphone className="w-3.5 h-3.5" /> Mobile
+          </button>
+          {viewport !== 'desktop' && (
+            <span className="ml-2 text-xs text-gray-400">{VIEWPORT_WIDTHS[viewport]}</span>
+          )}
+        </div>
+      )}
+
       {/* Preview Frame */}
-      <div className="flex-1 relative overflow-hidden">
+      <div className="flex-1 relative overflow-hidden bg-gray-200">
         {!fullHTML ? (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
             <div className="text-center text-gray-500">
@@ -358,16 +403,31 @@ export default function PreviewFrame({ html, css, js, validation }: PreviewFrame
               <p className="text-xs mt-1">Start generating to see the preview</p>
             </div>
           </div>
-        ) : (
+        ) : viewport === 'desktop' ? (
           <iframe
             ref={iframeRef}
             title="Preview"
             className="w-full h-full border-0"
             sandbox="allow-scripts allow-forms"
             srcDoc={fullHTML}
-            // SECURITY: Additional protection
             referrerPolicy="no-referrer"
           />
+        ) : (
+          <div className="absolute inset-0 flex justify-center overflow-auto py-2">
+            <div
+              className="relative bg-white shadow-lg flex-shrink-0"
+              style={{ width: VIEWPORT_WIDTHS[viewport], height: '100%', minHeight: '500px' }}
+            >
+              <iframe
+                ref={iframeRef}
+                title="Preview"
+                className="w-full h-full border-0"
+                sandbox="allow-scripts allow-forms"
+                srcDoc={fullHTML}
+                referrerPolicy="no-referrer"
+              />
+            </div>
+          </div>
         )}
       </div>
     </div>
