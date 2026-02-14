@@ -10,6 +10,7 @@ import CodeValidator from '@/lib/validators/code-validator'
 import { processGeneratedCode } from '@/utils/extractInlineStyles.server'
 import { ENHANCED_GENERATION_SYSTEM_PROMPT } from '@/lib/enhanced-system-prompt'
 import { STRICT_HTML_GENERATION_PROMPT } from '@/lib/generation/systemPrompt'
+import { BUILDFLOW_ENHANCED_SYSTEM_PROMPT } from '@/lib/prompts/buildflow-enhanced-prompt'
 import { ensureValidHTML } from '@/lib/templates/htmlTemplate'
 import { completeIncompleteHTML } from '@/lib/code-parser'
 import { enhanceGeneratedCode } from '@/lib/code-enhancer'
@@ -99,21 +100,36 @@ export async function POST(req: NextRequest) {
 
     // Auto-detect generation type using complexity analysis
     const complexityAnalysis = analyzePrompt(prompt);
-    const isMultiFileRequest = generationType === 'multi-file' || 
+    const isMultiFileRequest = generationType === 'multi-file' ||
       complexityAnalysis.shouldUseFullstack;
 
+    // Detect multi-page HTML requests (portfolio/website with named pages, NOT fullstack)
+    const multiPageTriggers = [
+      /\b(home|landing).{0,30}(about|services|contact|portfolio|projects|blog)\b/i,
+      /\b(about|services|contact|portfolio|projects|blog).{0,30}(home|landing)\b/i,
+      /multi-?page\s+(website|site|html)/i,
+      /website\s+with\s+(multiple\s+)?pages/i,
+      /portfolio\s+with\s+(pages|sections)/i,
+      /\b(home|about|services|contact|portfolio|projects|blog|faq)\s*(,\s*(home|about|services|contact|portfolio|projects|blog|faq)){2,}/i,
+    ];
+    const isMultiPageHTMLRequest = !isMultiFileRequest &&
+      multiPageTriggers.some(p => p.test(prompt));
+
     // Use STRICT system prompt for single HTML files to enforce validation
-    const systemPrompt = isMultiFileRequest 
+    const systemPrompt = isMultiFileRequest
       ? ENHANCED_GENERATION_SYSTEM_PROMPT + complexityAnalysis.systemPromptSuffix
+      : isMultiPageHTMLRequest
+      ? BUILDFLOW_ENHANCED_SYSTEM_PROMPT
       : STRICT_HTML_GENERATION_PROMPT;
 
     const maxTokens = getOptimalTokenLimit(prompt)
-    
+
     console.log('🚀 Starting generation:', {
       projectId: projectId || 'new',
       promptLength: prompt.length,
       isMultiFile: isMultiFileRequest,
-      usingStrictPrompt: !isMultiFileRequest
+      isMultiPageHTML: isMultiPageHTMLRequest,
+      usingStrictPrompt: !isMultiFileRequest && !isMultiPageHTMLRequest
     });
 
     const stream = new ReadableStream({
@@ -688,6 +704,46 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
           });
           
           send(controller, { validation: validationData })
+
+          // ── Multi-page HTML: extract <!-- File: --> sections → Page records ──
+          if (isMultiPageHTMLRequest && savedProjectId && finalHtml.includes('<!-- File:')) {
+            try {
+              const fileMatches = Array.from(
+                finalHtml.matchAll(/<!--\s*File:\s*(.+?)\s*-->([\s\S]*?)(?=<!--\s*File:|$)/gi)
+              );
+              const htmlFiles = fileMatches.filter(m => m[1].trim().endsWith('.html'));
+
+              if (htmlFiles.length > 0) {
+                for (let i = 0; i < htmlFiles.length; i++) {
+                  const rawSlug = htmlFiles[i][1].trim().replace(/\.html$/, '');
+                  const slug = rawSlug === 'index' ? 'home' : rawSlug;
+                  const title = slug.charAt(0).toUpperCase() + slug.slice(1).replace(/-/g, ' ');
+                  const content = htmlFiles[i][2].trim();
+                  await prisma.page.upsert({
+                    where: { projectId_slug: { projectId: savedProjectId, slug } },
+                    update: { content, title },
+                    create: {
+                      projectId: savedProjectId,
+                      slug,
+                      title,
+                      content,
+                      isHomepage: i === 0,
+                      order: i,
+                      isPublished: true,
+                    },
+                  });
+                }
+                await prisma.project.update({
+                  where: { id: savedProjectId },
+                  data: { multiPage: true },
+                });
+                console.log(`✅ Saved ${htmlFiles.length} pages to Page model`);
+                send(controller, { isMultiPage: true, pagesCount: htmlFiles.length });
+              }
+            } catch (pageErr) {
+              console.error('❌ Multi-page extraction error:', pageErr);
+            }
+          }
 
           // Send project ID
           send(controller, { projectId: savedProjectId })

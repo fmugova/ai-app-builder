@@ -7,7 +7,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import { stripMarkdownCodeFences } from '@/lib/utils';
 import { generateSmartProjectName } from '@/lib/utils/project-name-generator';
-import PreviewFrame from '@/components/PreviewFrame';
+import PreviewFrame from '@/components/PreviewFrame'
+import PreviewFrameMultiPage from '@/components/PreviewFrameMultiPage';
 import MonacoCodeEditor from '@/components/MonacoCodeEditor';
 import MultiFileProjectSetup from '@/components/MultiFileProjectSetup';
 import CodeFileViewer from '@/components/CodeFileViewer';
@@ -46,6 +47,12 @@ interface GenerationState {
   validation: ValidationResult | null;
   progress: number;
   currentStep: string;
+}
+
+interface ProjectPage {
+  id: string; slug: string; title: string; content: string;
+  description: string | null; isHomepage: boolean; order: number;
+  isPublished: boolean; metaTitle: string | null; metaDescription: string | null;
 }
 
 // Prompt Templates
@@ -233,6 +240,20 @@ function ChatBuilderContent() {
   const [filesCount, setFilesCount] = useState(0);
   const [projectType, setProjectType] = useState('');
   const [projectDependencies, setProjectDependencies] = useState<Record<string, string>>({});
+
+  // Multi-page project data (Page model)
+  const [projectPages, setProjectPages] = useState<ProjectPage[]>([]);
+  const [showAddPageModal, setShowAddPageModal] = useState(false);
+  const [newPageNameInput, setNewPageNameInput] = useState('');
+  const [pendingNewPageName, setPendingNewPageName] = useState<string | null>(null);
+
+  const fetchProjectPages = useCallback(async (pid: string) => {
+    try {
+      const res = await fetch(`/api/projects/${pid}/pages`);
+      const data = await res.json();
+      if (Array.isArray(data)) setProjectPages(data);
+    } catch { /* non-fatal */ }
+  }, []);
   
   const [state, setState] = useState<GenerationState>({
     html: '',
@@ -287,6 +308,11 @@ function ChatBuilderContent() {
       } else {
         toast.success(`Loaded project: ${project.name} (no code yet)`);
       }
+
+      // Load pages if this is a multi-page project
+      if (project.multiPage) {
+        fetchProjectPages(project.id);
+      }
     } catch (error) {
       console.error('Error loading project:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to load project';
@@ -294,7 +320,7 @@ function ChatBuilderContent() {
     } finally {
       setIsLoadingProject(false);
     }
-  }, []);
+  }, [fetchProjectPages]);
 
   // Load project from URL parameter
   useEffect(() => {
@@ -428,6 +454,27 @@ function ChatBuilderContent() {
                       .catch(err => console.error('Failed to fetch project files:', err));
                   }
                 }
+                // Check if multi-page HTML pages were created
+                if (data.isMultiPage) {
+                  fetchProjectPages(data.projectId);
+                }
+              }
+
+              if (data.done && pendingNewPageName && currentProjectId && state.html) {
+                const slug = pendingNewPageName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                fetch(`/api/projects/${currentProjectId}/pages`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    title: pendingNewPageName,
+                    slug,
+                    content: state.html,
+                    isHomepage: false,
+                  }),
+                })
+                  .then(() => fetchProjectPages(currentProjectId))
+                  .catch(err => console.error('Failed to save new page:', err));
+                setPendingNewPageName(null);
               }
 
               if (data.error) {
@@ -481,7 +528,7 @@ function ChatBuilderContent() {
     } finally {
       setState(prev => ({ ...prev, isGenerating: false }));
     }
-  }, [prompt, currentProjectId, projectName, generationMode]);
+  }, [prompt, currentProjectId, projectName, generationMode, fetchProjectPages, pendingNewPageName, state.html]);
 
   // Regenerate & Fix function - Uses validation feedback loop with API
   const handleRegenerateFix = useCallback(async () => {
@@ -1417,6 +1464,15 @@ Generate complete, production-ready code that fixes ALL issues above.`;
                   </div>
                 )}
                 
+                {projectPages.length > 0 && (
+                  <button
+                    onClick={() => { setNewPageNameInput(''); setShowAddPageModal(true); }}
+                    className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors text-sm mb-3"
+                  >
+                    <span>+</span> Add Page
+                  </button>
+                )}
+
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={handleSave}
@@ -1597,27 +1653,86 @@ Generate complete, production-ready code that fixes ALL issues above.`;
           <div className="flex flex-col min-h-[400px] lg:min-h-0">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex-1 overflow-hidden relative">
               <ErrorBoundary>
-                <PreviewFrame
-                  html={state.html}
-                  css={state.css}
-                  js={state.js}
-                  validation={state.validation || undefined}
-                  onElementClick={(info) => {
-                    const suggestion = `Edit the ${info.tag}${info.classes ? ` with class "${info.classes.split(' ').filter(Boolean).slice(0, 3).join(' ')}"` : ''}${info.text ? ` that says "${info.text.slice(0, 60)}"` : ''}: `;
-                    setPrompt(suggestion);
-                    // Focus the prompt textarea
-                    setTimeout(() => {
-                      const ta = document.querySelector<HTMLTextAreaElement>('textarea[placeholder*="prompt" i], textarea[placeholder*="describe" i], textarea[placeholder*="build" i]');
-                      ta?.focus();
-                      ta?.setSelectionRange(suggestion.length, suggestion.length);
-                    }, 50);
-                  }}
-                />
+                {projectPages.length > 0 ? (
+                  <PreviewFrameMultiPage pages={projectPages} />
+                ) : (
+                  <PreviewFrame
+                    html={state.html}
+                    css={state.css}
+                    js={state.js}
+                    validation={state.validation || undefined}
+                    onElementClick={(info) => {
+                      const suggestion = `Edit the ${info.tag}${info.classes ? ` with class "${info.classes.split(' ').filter(Boolean).slice(0, 3).join(' ')}"` : ''}${info.text ? ` that says "${info.text.slice(0, 60)}"` : ''}: `;
+                      setPrompt(suggestion);
+                      setTimeout(() => {
+                        const ta = document.querySelector<HTMLTextAreaElement>('textarea[placeholder*="prompt" i], textarea[placeholder*="describe" i], textarea[placeholder*="build" i]');
+                        ta?.focus();
+                        ta?.setSelectionRange(suggestion.length, suggestion.length);
+                      }, 50);
+                    }}
+                  />
+                )}
               </ErrorBoundary>
             </div>
           </div>
         </div>
       </main>
+
+      {/* Add Page Modal */}
+      {showAddPageModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Add a New Page</h3>
+              <button onClick={() => setShowAddPageModal(false)} className="p-1 text-gray-400 hover:text-gray-600 rounded">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Enter a page name and we&apos;ll generate it consistently with your existing design.
+            </p>
+            <input
+              type="text"
+              value={newPageNameInput}
+              onChange={e => setNewPageNameInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && newPageNameInput.trim()) {
+                  const name = newPageNameInput.trim();
+                  setShowAddPageModal(false);
+                  setPendingNewPageName(name);
+                  setPrompt(`Create a "${name}" page for this website. Make it visually consistent with the existing pages — same header, footer, navigation, color scheme, fonts, and design system. The page should have appropriate content for a "${name}" section.`);
+                  setTimeout(() => handleGenerate(), 100);
+                }
+              }}
+              placeholder="e.g. About, Services, Contact, Blog…"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent mb-4 text-sm"
+              autoFocus
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowAddPageModal(false)}
+                className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={!newPageNameInput.trim()}
+                onClick={() => {
+                  const name = newPageNameInput.trim();
+                  if (!name) return;
+                  setShowAddPageModal(false);
+                  setPendingNewPageName(name);
+                  setPrompt(`Create a "${name}" page for this website. Make it visually consistent with the existing pages — same header, footer, navigation, color scheme, fonts, and design system. The page should have appropriate content for a "${name}" section.`);
+                  setTimeout(() => handleGenerate(), 100);
+                }}
+                className="flex-1 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Generate Page
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Code File Viewer Modal */}
       {showCodeViewer && projectFiles.length > 0 && (
