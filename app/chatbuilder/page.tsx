@@ -1602,6 +1602,16 @@ Generate complete, production-ready code that fixes ALL issues above.`;
                   css={state.css}
                   js={state.js}
                   validation={state.validation || undefined}
+                  onElementClick={(info) => {
+                    const suggestion = `Edit the ${info.tag}${info.classes ? ` with class "${info.classes.split(' ').filter(Boolean).slice(0, 3).join(' ')}"` : ''}${info.text ? ` that says "${info.text.slice(0, 60)}"` : ''}: `;
+                    setPrompt(suggestion);
+                    // Focus the prompt textarea
+                    setTimeout(() => {
+                      const ta = document.querySelector<HTMLTextAreaElement>('textarea[placeholder*="prompt" i], textarea[placeholder*="describe" i], textarea[placeholder*="build" i]');
+                      ta?.focus();
+                      ta?.setSelectionRange(suggestion.length, suggestion.length);
+                    }, 50);
+                  }}
                 />
               </ErrorBoundary>
             </div>

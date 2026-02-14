@@ -41,6 +41,7 @@ interface PreviewFrameProps {
   css: string;
   js: string;
   validation?: ValidationResult;
+  onElementClick?: (info: { tag: string; classes: string; text: string; outerHTML: string }) => void;
 }
 
 // ============================================
@@ -64,10 +65,11 @@ const DEFAULT_VALIDATION: ValidationResult = {
 // COMPONENT
 // ============================================
 
-export default function PreviewFrame({ html, css, js, validation }: PreviewFrameProps) {
+export default function PreviewFrame({ html, css, js, validation, onElementClick }: PreviewFrameProps) {
   const safeValidation = validation || DEFAULT_VALIDATION;
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [viewport, setViewport] = useState<Viewport>('desktop');
+  const [editMode, setEditMode] = useState(false);
 
   const fullHTML = useMemo(() => {
     if (!html?.trim()) {
@@ -263,15 +265,46 @@ export default function PreviewFrame({ html, css, js, validation }: PreviewFrame
       console.error('[Preview JS Error]:', error);
     }
   </script>
+  ${editMode ? `
+  <!-- BuildFlow: click-to-edit overlay -->
+  <script>
+  (function(){
+    var _hovered = null;
+    var _origOutline = '';
+    var _origCursor = '';
+    var SKIP = new Set(['HTML','BODY','HEAD','SCRIPT','STYLE','META','LINK']);
+    function highlight(el){
+      if(_hovered && _hovered !== el){ _hovered.style.outline=_origOutline; _hovered.style.cursor=_origCursor; }
+      if(!el||SKIP.has(el.tagName)) return;
+      _origOutline=el.style.outline; _origCursor=el.style.cursor;
+      el.style.outline='2px solid #a855f7'; el.style.cursor='crosshair';
+      _hovered=el;
+    }
+    document.addEventListener('mouseover',function(e){ highlight(e.target); },true);
+    document.addEventListener('mouseout',function(e){ if(_hovered===e.target){ _hovered.style.outline=_origOutline; _hovered.style.cursor=_origCursor; _hovered=null; } },true);
+    document.addEventListener('click',function(e){
+      var el=e.target;
+      if(!el||SKIP.has(el.tagName)) return;
+      e.stopImmediatePropagation(); e.preventDefault();
+      var info={
+        tag: el.tagName.toLowerCase(),
+        classes: el.className||'',
+        text: (el.innerText||'').trim().slice(0,120),
+        outerHTML: el.outerHTML.slice(0,600)
+      };
+      window.parent.postMessage({type:'bf-element-click',info:info},'*');
+    },true);
+  })();
+  </script>` : ''}
 </body>
 </html>`;
-      
+
       return result;
     } catch (error) {
       console.error('❌ Error building preview HTML:', error);
       return '';
     }
-  }, [html, css, js]);
+  }, [html, css, js, editMode]);
 
   // Additional iframe security monitoring
   useEffect(() => {
@@ -302,6 +335,18 @@ export default function PreviewFrame({ html, css, js, validation }: PreviewFrame
     iframe.addEventListener('load', handleLoad);
     return () => iframe.removeEventListener('load', handleLoad);
   }, [fullHTML]);
+
+  // Listen for element-click messages from the iframe in edit mode
+  useEffect(() => {
+    if (!editMode || !onElementClick) return;
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === 'bf-element-click') {
+        onElementClick(e.data.info);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [editMode, onElementClick]);
 
   return (
     <div className="absolute inset-0 flex flex-col bg-white">
@@ -391,6 +436,19 @@ export default function PreviewFrame({ html, css, js, validation }: PreviewFrame
           {viewport !== 'desktop' && (
             <span className="ml-2 text-xs text-gray-400">{VIEWPORT_WIDTHS[viewport]}</span>
           )}
+          <div className="ml-auto pl-2 border-l border-gray-300">
+            <button
+              onClick={() => setEditMode(v => !v)}
+              title={editMode ? 'Exit edit mode' : 'Click any element to edit it'}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                editMode
+                  ? 'bg-purple-600 text-white shadow'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-white'
+              }`}
+            >
+              {editMode ? '✏️ Editing' : '✏️ Edit'}
+            </button>
+          </div>
         </div>
       )}
 
