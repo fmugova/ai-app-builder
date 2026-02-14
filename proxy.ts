@@ -106,11 +106,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // TEMPORARILY DISABLED: Email verification requirement
-  // Enable email verification once email service is configured in production
-  // Instructions: Set RESEND_API_KEY or SENDGRID_API_KEY in .env.local
-  // Then uncomment the code block below
-  /*
+  // ✅ EMAIL VERIFICATION ENFORCEMENT ENABLED
   // Check if email is verified (only enforce for new credential signups)
   const emailVerified = token.emailVerified;
   const isCredentialsUser = !token.sub?.includes('google'); // Basic check for OAuth users
@@ -125,7 +121,6 @@ export async function proxy(request: NextRequest) {
   if (emailVerified && pathname === '/verify-email-notice') {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
-  */
 
   return NextResponse.next();
 }
