@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Toaster, toast } from 'react-hot-toast'
@@ -42,6 +42,14 @@ const staticWithPricing: DbTemplate[] = staticTemplates.map((t, i) => ({
 }))
 
 export default function TemplatesPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" /></div>}>
+      <TemplatesContent />
+    </Suspense>
+  )
+}
+
+function TemplatesContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
