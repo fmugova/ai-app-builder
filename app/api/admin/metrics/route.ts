@@ -184,7 +184,7 @@ export async function GET(req: NextRequest) {
     prisma.user.count({
       where: {
         createdAt: { gte: periodStart },
-        projects: { some: {} },
+        Project: { some: {} },
       },
     }),
     (prisma.subscription as unknown as { count: (args: unknown) => Promise<number> }).count({
