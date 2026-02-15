@@ -8,14 +8,15 @@ import { toast } from 'react-hot-toast';
 import { stripMarkdownCodeFences } from '@/lib/utils';
 import { generateSmartProjectName } from '@/lib/utils/project-name-generator';
 import PreviewFrame from '@/components/PreviewFrame'
-import PreviewFrameMultiPage from '@/components/PreviewFrameMultiPage';
+import PreviewFrameMultiPage from '@/components/PreviewFrameMultiPage'
+import MediaLibrary from '@/components/MediaLibrary';
 import MonacoCodeEditor from '@/components/MonacoCodeEditor';
 import MultiFileProjectSetup from '@/components/MultiFileProjectSetup';
 import CodeFileViewer from '@/components/CodeFileViewer';
 import PromptTemplates from '@/components/PromptTemplates';
 import { parseMultiFileProject, convertToSingleHTML } from '@/lib/multi-file-parser';
 import { parseGeneratedCode } from '@/lib/code-parser';
-import { AlertTriangle, CheckCircle, XCircle, Download, Copy, Github, ExternalLink, Save, Sparkles, RefreshCw, Upload, Link as LinkIcon, Code2, Lightbulb, Menu, X, Wand2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle, XCircle, Download, Copy, Github, ExternalLink, Save, Sparkles, RefreshCw, Upload, Link as LinkIcon, Code2, Lightbulb, Menu, X, Wand2, ImageIcon } from 'lucide-react';
 
 // Types remain the same as before...
 interface ValidationMessage {
@@ -246,6 +247,10 @@ function ChatBuilderContent() {
   const [showAddPageModal, setShowAddPageModal] = useState(false);
   const [newPageNameInput, setNewPageNameInput] = useState('');
   const [pendingNewPageName, setPendingNewPageName] = useState<string | null>(null);
+
+  // Media library
+  const [showMediaLibrary, setShowMediaLibrary] = useState(false);
+  const [attachedImageUrls, setAttachedImageUrls] = useState<string[]>([]);
 
   const fetchProjectPages = useCallback(async (pid: string) => {
     try {
@@ -812,6 +817,12 @@ Generate complete, production-ready code that fixes ALL issues above.`;
     }
   }, [state.fullCode, state.validation, projectName, currentProjectId, prompt]);
 
+  const handleAssetSelected = (url: string) => {
+    setAttachedImageUrls(prev => [...prev, url]);
+    setPrompt(prev => `${prev}${prev ? '\n' : ''}Use this image: ${url}`);
+    setShowMediaLibrary(false);
+  };
+
   const handleDownload = useCallback(async () => {
     if (!state.fullCode && !isMultiFileProject) {
       toast.error('No code to download');
@@ -1334,6 +1345,28 @@ Generate complete, production-ready code that fixes ALL issues above.`;
                 disabled={state.isGenerating}
               />
 
+              {/* Attached image chips */}
+              {attachedImageUrls.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {attachedImageUrls.map((url, i) => (
+                    <div key={url} className="flex items-center gap-1.5 px-2 py-1 bg-purple-100 border border-purple-200 rounded-lg text-xs text-purple-800">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt="" className="w-4 h-4 object-cover rounded" />
+                      <span>Image {i + 1}</span>
+                      <button
+                        onClick={() => {
+                          setAttachedImageUrls(prev => prev.filter(u => u !== url));
+                          setPrompt(prev => prev.replace(`\nUse this image: ${url}`, '').replace(`Use this image: ${url}`, '').trim());
+                        }}
+                        className="ml-0.5 text-purple-500 hover:text-purple-800"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Generation Mode Toggle */}
               {(currentProjectId || state.fullCode) && (
                 <div className="mt-3 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border-2 border-blue-200">
@@ -1464,6 +1497,13 @@ Generate complete, production-ready code that fixes ALL issues above.`;
                   </div>
                 )}
                 
+                <button
+                  onClick={() => setShowMediaLibrary(true)}
+                  className="w-full flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-gray-200 px-4 py-2.5 rounded-lg font-medium transition-colors text-sm mb-2"
+                >
+                  <ImageIcon className="w-4 h-4" /> Images
+                </button>
+
                 {projectPages.length > 0 && (
                   <button
                     onClick={() => { setNewPageNameInput(''); setShowAddPageModal(true); }}
@@ -1733,6 +1773,13 @@ Generate complete, production-ready code that fixes ALL issues above.`;
           </div>
         </div>
       )}
+
+      {/* Media Library Modal */}
+      <MediaLibrary
+        isOpen={showMediaLibrary}
+        onClose={() => setShowMediaLibrary(false)}
+        onSelectAsset={handleAssetSelected}
+      />
 
       {/* Code File Viewer Modal */}
       {showCodeViewer && projectFiles.length > 0 && (
