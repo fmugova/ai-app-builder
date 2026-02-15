@@ -76,6 +76,46 @@ export async function POST(request: NextRequest) {
           break
         }
 
+        // ── Template one-time purchase ──────────────────────────────────────
+        if (session.metadata?.type === 'template_purchase') {
+          const { templateId, userId, creatorId, price } = session.metadata
+          const purchasePrice = parseFloat(price || '0')
+          const PLATFORM_SHARE = 0.30
+          const CREATOR_SHARE = 0.70
+
+          try {
+            // Record the purchase
+            await prisma.templatePurchase.upsert({
+              where: { templateId_userId: { templateId, userId } },
+              update: {},
+              create: { templateId, userId, price: purchasePrice },
+            })
+
+            // Record revenue split
+            await prisma.templateRevenue.create({
+              data: {
+                templateId,
+                creatorId,
+                amount: purchasePrice,
+                platformShare: parseFloat((purchasePrice * PLATFORM_SHARE).toFixed(2)),
+                creatorShare: parseFloat((purchasePrice * CREATOR_SHARE).toFixed(2)),
+                stripePaymentId: session.payment_intent as string || null,
+              },
+            })
+
+            // Increment download count
+            await prisma.template.update({
+              where: { id: templateId },
+              data: { downloads: { increment: 1 } },
+            })
+
+            console.log(`✅ Template purchase recorded: ${templateId} by ${userId}`)
+          } catch (tplErr) {
+            console.error('Template purchase recording failed:', tplErr)
+          }
+          break
+        }
+
         // Derive plan from actual Stripe subscription price, not metadata
         // to prevent plan escalation via metadata tampering
         let plan = 'pro'
