@@ -24,6 +24,44 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 export const runtime = 'nodejs'
 export const maxDuration = 300
 
+/**
+ * Prompt sanitization — runs on every user message BEFORE it reaches Claude.
+ * Goal: remove null bytes / control chars and neutralise obvious injection patterns
+ * without blocking legitimate requests like "create a form that ignores empty fields".
+ *
+ * We do NOT try to block all jailbreaks here (impossible). The system prompt +
+ * Claude's own safety filters are the real defence. This layer stops the laziest
+ * attempts and prevents control characters from corrupting the API payload.
+ */
+function sanitizePrompt(raw: string): string {
+  // 1. Strip null bytes and non-printable control characters (keep \n \t \r)
+  let s = raw.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+
+  // 2. Collapse excessive repetition (e.g. 1000 newlines → 3)
+  s = s.replace(/(\n){4,}/g, '\n\n\n').replace(/( ){10,}/g, '   ')
+
+  // 3. Redact the most common direct system-prompt injection patterns.
+  //    These are very unlikely to appear in legitimate "build me a webpage" prompts.
+  const injectionPatterns = [
+    /ignore\s+(all\s+)?(previous|above|prior)\s+instructions?/gi,
+    /disregard\s+(all\s+)?(previous|above|prior)\s+instructions?/gi,
+    /forget\s+(all\s+)?(previous|above|prior)\s+instructions?/gi,
+    /you\s+are\s+now\s+(a|an)\s+\w+/gi,         // "you are now a DAN"
+    /\bDAN\b|\bjailbreak\b/gi,
+    /reveal\s+(your\s+)?(system\s+)?prompt/gi,
+    /print\s+(your\s+)?(system\s+)?prompt/gi,
+    /output\s+(your\s+)?(system\s+)?prompt/gi,
+    /\bACT\s+AS\b/gi,
+    /respond\s+only\s+in\s+(json|xml|yaml|plain\s+text)/gi,
+  ]
+
+  for (const pattern of injectionPatterns) {
+    s = s.replace(pattern, '[removed]')
+  }
+
+  return s.trim()
+}
+
 // Validation schema
 const chatbotRequestSchema = z.object({
   prompt: z.string().min(1, 'Prompt is required').max(10000, 'Prompt too long'),
@@ -96,7 +134,8 @@ export async function POST(req: NextRequest) {
         { status: 422 }
       )
     }
-    const { prompt, projectId, generationType, previousErrors } = parseResult.data
+    const { prompt: rawPrompt, projectId, generationType, previousErrors } = parseResult.data
+    const prompt = sanitizePrompt(rawPrompt)
 
     // Auto-detect generation type using complexity analysis
     const complexityAnalysis = analyzePrompt(prompt);
