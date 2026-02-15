@@ -2,23 +2,5 @@
   "buildCommand": "prisma generate && prisma migrate deploy && next build",
   "env": {
     "SKIP_ENV_VALIDATION": "true"
-  },
-  "_crons": [
-    {
-      "path": "/api/cron/cleanup-previews",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/db-health",
-      "schedule": "0 6 * * *"
-    },
-    {
-      "path": "/api/cron/webhook-retries",
-      "schedule": "*/15 * * * *"
-    },
-    {
-      "path": "/api/cron/drip-emails",
-      "schedule": "0 9 * * *"
-    }
-  ]
+  }
 }
