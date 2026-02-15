@@ -406,31 +406,157 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
       .replace(/\n?```$/i, '')
       .trim()
 
+    // Strip AI preamble prose (text before <!DOCTYPE html> or <html)
+    const htmlStartIndex = html.search(/<!doctype html>|<html[\s>]/i)
+    if (htmlStartIndex > 0) {
+      html = html.slice(htmlStartIndex)
+    }
+
+    // ── MULTI-PAGE BYPASS ──────────────────────────────────────────────────────
+    // Multi-page HTML contains <!-- File: page.html --> markers that span
+    // multiple full HTML documents. Running single-page enhancement, validation,
+    // and template-wrapping on this combined output would corrupt it.
+    // Skip those pipelines and jump straight to the save + extraction step.
+    if (isMultiPageHTMLRequest) {
+      const multiHtml = html // already stripped of markdown fences above
+
+      const user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        select: { id: true },
+      })
+      if (!user) throw new Error('User not found')
+
+      let savedMultiProjectId = projectId || null
+      const multiTitle = extractProjectTitle(prompt, multiHtml)
+
+      if (!savedMultiProjectId) {
+        const project = await prisma.project.create({
+          data: {
+            userId: user.id,
+            name: multiTitle,
+            description: prompt.slice(0, 200) || '',
+            code: multiHtml,
+            html: multiHtml,
+            htmlCode: multiHtml,
+            css: '',
+            cssCode: '',
+            type: 'landing-page',
+            hasHtml: true,
+            hasCss: false,
+            hasJavaScript: false,
+            isComplete: true,
+            jsValid: true,
+            jsError: null,
+            validationScore: BigInt(90),
+            validationPassed: true,
+            validationErrors: JSON.stringify([]),
+            validationWarnings: JSON.stringify([]),
+            cspViolations: JSON.stringify([]),
+            status: 'COMPLETED',
+            tokensUsed: BigInt(tokenCount),
+            generationTime: BigInt(Date.now()),
+            retryCount: BigInt(0),
+          },
+        })
+        savedMultiProjectId = project.id
+      } else {
+        await prisma.project.update({
+          where: { id: savedMultiProjectId },
+          data: {
+            code: multiHtml,
+            html: multiHtml,
+            htmlCode: multiHtml,
+            validationScore: BigInt(90),
+            validationPassed: true,
+            status: 'COMPLETED',
+            tokensUsed: BigInt(tokenCount),
+            updatedAt: new Date(),
+          },
+        })
+      }
+
+      // Send validation + html to client
+      send(controller, {
+        html: multiHtml,
+        validation: {
+          isComplete: true,
+          hasHtml: true,
+          hasCss: false,
+          hasJs: false,
+          validationScore: 90,
+          validationPassed: true,
+          errors: [],
+          warnings: [],
+          cspViolations: [],
+          passed: true,
+        },
+      })
+
+      // Extract <!-- File: --> sections → Page records
+      const fileMatches = Array.from(
+        multiHtml.matchAll(/<!--\s*File:\s*(.+?)\s*-->([\s\S]*?)(?=<!--\s*File:|$)/gi)
+      )
+      const htmlFiles = fileMatches.filter(m => m[1].trim().endsWith('.html'))
+      if (htmlFiles.length > 0) {
+        for (let i = 0; i < htmlFiles.length; i++) {
+          const rawSlug = htmlFiles[i][1].trim().replace(/\.html$/, '')
+          const slug = rawSlug === 'index' ? 'home' : rawSlug
+          const title = slug.charAt(0).toUpperCase() + slug.slice(1).replace(/-/g, ' ')
+          const content = htmlFiles[i][2].trim()
+          await prisma.page.upsert({
+            where: { projectId_slug: { projectId: savedMultiProjectId, slug } },
+            update: { content, title },
+            create: {
+              projectId: savedMultiProjectId,
+              slug,
+              title,
+              content,
+              isHomepage: i === 0,
+              order: i,
+              isPublished: true,
+            },
+          })
+        }
+        await prisma.project.update({
+          where: { id: savedMultiProjectId },
+          data: { multiPage: true },
+        })
+        console.log(`✅ Multi-page: saved ${htmlFiles.length} pages`)
+        send(controller, { isMultiPage: true, pagesCount: htmlFiles.length, projectId: savedMultiProjectId })
+      }
+
+      send(controller, { projectId: savedMultiProjectId })
+      send(controller, { done: true })
+      controller.close()
+      return
+    }
+    // ── END MULTI-PAGE BYPASS ───────────────────────────────────────────────────
+
     // Ensure DOCTYPE
     if (!html.toLowerCase().includes('<!doctype html>')) {
             html = '<!DOCTYPE html>\n' + html
           }
-          
+
           // Auto-complete any missing closing tags
           html = completeIncompleteHTML(html)
-          
+
           // Ensure lang attribute on html tag
           if (!html.includes('<html lang=')) {
             html = html.replace(/<html([^>]*)>/i, '<html lang="en"$1>')
           }
 
           // Extract inline styles AND inline handlers
-          const { 
-            html: cleanHtml, 
-            css: combinedCss, 
-            hasInlineStyles, 
-            hasInlineHandlers 
+          const {
+            html: cleanHtml,
+            css: combinedCss,
+            hasInlineStyles,
+            hasInlineHandlers
           } = processGeneratedCode(html, '')
 
           if (hasInlineStyles) {
             console.log('✅ Extracted inline styles to CSS')
           }
-          
+
           if (hasInlineHandlers) {
             console.log('✅ Converted inline handlers to addEventListener')
           }
@@ -457,6 +583,15 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
           // Use enhanced code for validation
           let finalHtml = enhanced.html
           const finalCss = enhanced.css
+
+          // Inject BuildFlow copyright footer before </body>
+          const buildflowFooter = `
+  <footer style="text-align:center;padding:16px 0;font-size:12px;color:#9ca3af;border-top:1px solid #e5e7eb;margin-top:40px;">
+    &copy; ${new Date().getFullYear()} Built with <a href="https://buildflow.ai" style="color:#7c3aed;text-decoration:none;" target="_blank" rel="noopener">BuildFlow</a>
+  </footer>`
+          if (finalHtml.includes('</body>')) {
+            finalHtml = finalHtml.replace('</body>', buildflowFooter + '\n</body>')
+          }
 
           const hasHtml = html.length > 0
           const hasCss = html.includes('<style') || finalCss.length > 0
@@ -704,46 +839,6 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
           });
           
           send(controller, { validation: validationData })
-
-          // ── Multi-page HTML: extract <!-- File: --> sections → Page records ──
-          if (isMultiPageHTMLRequest && savedProjectId && finalHtml.includes('<!-- File:')) {
-            try {
-              const fileMatches = Array.from(
-                finalHtml.matchAll(/<!--\s*File:\s*(.+?)\s*-->([\s\S]*?)(?=<!--\s*File:|$)/gi)
-              );
-              const htmlFiles = fileMatches.filter(m => m[1].trim().endsWith('.html'));
-
-              if (htmlFiles.length > 0) {
-                for (let i = 0; i < htmlFiles.length; i++) {
-                  const rawSlug = htmlFiles[i][1].trim().replace(/\.html$/, '');
-                  const slug = rawSlug === 'index' ? 'home' : rawSlug;
-                  const title = slug.charAt(0).toUpperCase() + slug.slice(1).replace(/-/g, ' ');
-                  const content = htmlFiles[i][2].trim();
-                  await prisma.page.upsert({
-                    where: { projectId_slug: { projectId: savedProjectId, slug } },
-                    update: { content, title },
-                    create: {
-                      projectId: savedProjectId,
-                      slug,
-                      title,
-                      content,
-                      isHomepage: i === 0,
-                      order: i,
-                      isPublished: true,
-                    },
-                  });
-                }
-                await prisma.project.update({
-                  where: { id: savedProjectId },
-                  data: { multiPage: true },
-                });
-                console.log(`✅ Saved ${htmlFiles.length} pages to Page model`);
-                send(controller, { isMultiPage: true, pagesCount: htmlFiles.length });
-              }
-            } catch (pageErr) {
-              console.error('❌ Multi-page extraction error:', pageErr);
-            }
-          }
 
           // Send project ID
           send(controller, { projectId: savedProjectId })

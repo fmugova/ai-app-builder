@@ -110,7 +110,15 @@ interface PromptTemplatesProps {
 export default function PromptTemplates({ onSelect }: PromptTemplatesProps) {
   return (
     <Card className="p-4">
-      <h3 className="text-sm font-semibold mb-3">Quick Start Templates</h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold">Quick Start Templates</h3>
+        <a
+          href="/templates"
+          className="text-xs text-purple-600 hover:text-purple-800 hover:underline font-medium"
+        >
+          Browse all →
+        </a>
+      </div>
       <div className="grid grid-cols-2 gap-2">
         {QUICK_TEMPLATES.map((template) => (
           <Button

@@ -93,6 +93,12 @@ VALIDATION CHECKLIST - VERIFY BEFORE RESPONDING:
 
 IF YOU GENERATE CODE THAT FAILS ANY OF THESE CHECKS, IT WILL BE REJECTED AND YOU WILL BE ASKED TO REGENERATE.
 
+🚫 OUTPUT FORMAT (CRITICAL):
+   - Your ENTIRE response must be ONLY the HTML document — starting with <!DOCTYPE html>
+   - DO NOT write any explanation, introduction, or commentary before or after the HTML
+   - DO NOT write "I'll create...", "Here is...", "This page..." or any prose
+   - Start your response with <!DOCTYPE html> and end it with </html>
+
 Now generate the complete HTML based on the user's request, ensuring ALL mandatory requirements are met.`;
 
 export const getSystemPrompt = () => STRICT_HTML_GENERATION_PROMPT;

@@ -22,10 +22,10 @@ export function extractTitleFromPrompt(prompt: string): string {
   const cleanPrompt = prompt.trim().toLowerCase();
 
   // Pattern 1: "create a [TYPE] for [SUBJECT]"
-  const createForMatch = cleanPrompt.match(/create\s+(?:a|an)\s+(.+?)\s+for\s+(?:a|an)?\s*(.+?)(?:\s+with|\s+that|\.|$)/i);
+  const createForMatch = cleanPrompt.match(/create\s+(?:a|an)\s+(.+?)\s+for\s+(?:a|an|my)?\s*(.+?)(?:\s+with|\s+that|\.|,|$)/i);
   if (createForMatch) {
-    const subject = createForMatch[2].trim();
-    const type = createForMatch[1].trim();
+    const type = createForMatch[1].trim().split(/\s+/).slice(0, 2).join(' ');
+    const subject = createForMatch[2].trim().split(/\s+/).slice(0, 3).join(' ');
     return formatTitle(`${subject} ${type}`);
   }
 

@@ -437,7 +437,7 @@ function ChatBuilderContent() {
               if (data.projectId) {
                 setCurrentProjectId(data.projectId);
                 if (!projectName) {
-                  setProjectName(prompt.slice(0, 50));
+                  setProjectName(generateSmartProjectName(prompt));
                 }
                 // Check if this is a multi-file project
                 if (data.isMultiFile) {
@@ -1414,7 +1414,7 @@ Generate complete, production-ready code that fixes ALL issues above.`;
               {/* Upload & Parse Section */}
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <p className="text-xs font-medium text-gray-700 mb-3">Enhance your prompt:</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-2">
                   {/* File Upload */}
                   <div>
                     <input
@@ -1426,9 +1426,9 @@ Generate complete, production-ready code that fixes ALL issues above.`;
                     />
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className="w-full flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-lg border border-gray-300 transition-colors text-sm"
+                      className="w-full flex items-center justify-center gap-1.5 bg-white hover:bg-gray-50 text-gray-700 px-2 py-2 rounded-lg border border-gray-300 transition-colors text-xs"
                     >
-                      <Upload className="w-4 h-4" />
+                      <Upload className="w-3.5 h-3.5 flex-shrink-0" />
                       <span>Upload File</span>
                     </button>
                   </div>
@@ -1440,16 +1440,25 @@ Generate complete, production-ready code that fixes ALL issues above.`;
                       value={websiteUrl}
                       onChange={(e) => setWebsiteUrl(e.target.value)}
                       placeholder="Website URL"
-                      className="w-full px-3 py-2 pr-10 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      className="w-full px-2 py-2 pr-8 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     />
                     <button
                       onClick={handleParseWebsite}
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-purple-600 hover:text-purple-700"
                       title="Add website to prompt"
                     >
-                      <LinkIcon className="w-4 h-4" />
+                      <LinkIcon className="w-3.5 h-3.5" />
                     </button>
                   </div>
+
+                  {/* Media Library */}
+                  <button
+                    onClick={() => setShowMediaLibrary(true)}
+                    className="w-full flex items-center justify-center gap-1.5 bg-white hover:bg-gray-50 text-gray-700 px-2 py-2 rounded-lg border border-gray-300 transition-colors text-xs"
+                  >
+                    <ImageIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span>Images</span>
+                  </button>
                 </div>
                 
                 {uploadedFile && (
@@ -1497,13 +1506,6 @@ Generate complete, production-ready code that fixes ALL issues above.`;
                   </div>
                 )}
                 
-                <button
-                  onClick={() => setShowMediaLibrary(true)}
-                  className="w-full flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-gray-200 px-4 py-2.5 rounded-lg font-medium transition-colors text-sm mb-2"
-                >
-                  <ImageIcon className="w-4 h-4" /> Images
-                </button>
-
                 {projectPages.length > 0 && (
                   <button
                     onClick={() => { setNewPageNameInput(''); setShowAddPageModal(true); }}
