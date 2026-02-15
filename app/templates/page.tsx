@@ -24,21 +24,21 @@ interface DbTemplate {
   owned: boolean
 }
 
-// Static templates with mock pricing (fallback / supplemental)
+// Static built-in templates — always FREE and owned by everyone
 const staticWithPricing: DbTemplate[] = staticTemplates.map((t, i) => ({
   id: t.id,
   name: t.name,
   description: t.description,
   category: t.category,
-  tier: (['FREE', 'PRO', 'COLLECTION'] as const)[i % 3],
-  price: [0, 9.99, 49.99][i % 3],
+  tier: 'FREE' as const,
+  price: 0,
   thumbnail: null,
   tags: t.tags || [],
   downloads: 100 + i * 73,
   rating: 4.5 + (i % 5) * 0.1,
   reviewCount: 10 + i * 7,
   creatorName: 'BuildFlow',
-  owned: i % 3 === 0,
+  owned: true,
 }))
 
 export default function TemplatesPage() {

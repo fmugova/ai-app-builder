@@ -3,9 +3,16 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { Check, ArrowLeft, Loader2 } from 'lucide-react'
+import { Check, ArrowLeft, Loader2, Zap } from 'lucide-react'
 import { Toaster, toast } from 'react-hot-toast'
 import { analytics } from '@/lib/analytics'
+
+const CREDIT_PACKAGES = [
+  { id: 'starter', name: 'Starter Pack', credits: 10, price: 5, perCredit: '$0.50', badge: null },
+  { id: 'growth',  name: 'Growth Pack',  credits: 50, price: 20, perCredit: '$0.40', badge: 'Best Value' },
+  { id: 'power',   name: 'Power Pack',   credits: 120, price: 40, perCredit: '$0.33', badge: null },
+  { id: 'agency',  name: 'Agency Pack',  credits: 300, price: 80, perCredit: '$0.27', badge: 'Lowest Cost/Credit' },
+]
 
 const PLANS = [
   {
@@ -75,6 +82,32 @@ export default function PricingPage() {
   const router = useRouter()
   const { data: session } = useSession()
   const [loading, setLoading] = useState<string | null>(null)
+  const [buyingCredits, setBuyingCredits] = useState<string | null>(null)
+
+  const handleBuyCredits = async (packageId: string) => {
+    if (!session) {
+      router.push('/auth/signin?callbackUrl=/pricing')
+      return
+    }
+    setBuyingCredits(packageId)
+    try {
+      const res = await fetch('/api/stripe/credits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ packageId }),
+      })
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        throw new Error(data.error || 'Failed to start checkout')
+      }
+    } catch {
+      toast.error('Failed to start checkout')
+    } finally {
+      setBuyingCredits(null)
+    }
+  }
   const [promoCode, setPromoCode] = useState('')
   const [appliedPromo, setAppliedPromo] = useState<{
     code: string
@@ -337,6 +370,65 @@ export default function PricingPage() {
                 </div>
               )
             })}
+          </div>
+
+          {/* Pay-as-you-go Credits */}
+          <div className="mt-20">
+            <div className="text-center mb-10">
+              <div className="inline-flex items-center gap-2 bg-purple-100 text-purple-700 px-4 py-1.5 rounded-full text-sm font-medium mb-4">
+                <Zap className="w-4 h-4" />
+                Pay-as-you-go
+              </div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-3">
+                Need More Credits?
+              </h2>
+              <p className="text-gray-600 max-w-xl mx-auto">
+                Top up anytime. Credits never expire and work across all plans. Each credit = one AI generation.
+              </p>
+            </div>
+
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
+              {CREDIT_PACKAGES.map((pkg) => (
+                <div
+                  key={pkg.id}
+                  className={`relative bg-white rounded-2xl shadow-md border p-6 flex flex-col hover:shadow-xl transition-all ${
+                    pkg.badge ? 'border-purple-400 ring-2 ring-purple-400' : 'border-gray-100'
+                  }`}
+                >
+                  {pkg.badge && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-purple-600 text-white text-xs font-semibold px-3 py-1 rounded-full whitespace-nowrap">
+                      {pkg.badge}
+                    </div>
+                  )}
+                  <h3 className="text-lg font-bold text-gray-900 mb-1">{pkg.name}</h3>
+                  <div className="flex items-baseline gap-1 mb-1">
+                    <span className="text-4xl font-bold text-gray-900">${pkg.price}</span>
+                    <span className="text-gray-500 text-sm">one-time</span>
+                  </div>
+                  <p className="text-purple-600 font-semibold mb-1">{pkg.credits} credits</p>
+                  <p className="text-gray-400 text-xs mb-6">{pkg.perCredit} per credit</p>
+                  <button
+                    onClick={() => handleBuyCredits(pkg.id)}
+                    disabled={buyingCredits === pkg.id}
+                    className={`mt-auto w-full py-3 rounded-xl font-semibold transition-all text-sm ${
+                      pkg.badge
+                        ? 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-md'
+                        : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    {buyingCredits === pkg.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                    ) : (
+                      `Buy ${pkg.credits} Credits`
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-center text-gray-400 text-sm mt-6">
+              Credits are added to your account instantly after purchase.
+            </p>
           </div>
 
           {/* FAQ Section */}

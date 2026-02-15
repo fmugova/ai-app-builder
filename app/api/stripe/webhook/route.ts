@@ -76,6 +76,25 @@ export async function POST(request: NextRequest) {
           break
         }
 
+        // ── Credit top-up ───────────────────────────────────────────────────
+        if (session.metadata?.type === 'credit_purchase') {
+          const { userId, credits } = session.metadata
+          const creditsToAdd = parseInt(credits || '0', 10)
+          if (creditsToAdd > 0) {
+            try {
+              await prisma.user.update({
+                where: { id: userId },
+                data: { generationsLimit: { increment: BigInt(creditsToAdd) } },
+              })
+              console.log(`✅ Added ${creditsToAdd} credits to user ${userId}`)
+              logAnalyticsEvent('credits_purchased', { userId, credits: creditsToAdd })
+            } catch (creditErr) {
+              console.error('Credit top-up failed:', creditErr)
+            }
+          }
+          break
+        }
+
         // ── Template one-time purchase ──────────────────────────────────────
         if (session.metadata?.type === 'template_purchase') {
           const { templateId, userId, creatorId, price } = session.metadata
