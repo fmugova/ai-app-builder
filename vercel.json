@@ -3,7 +3,8 @@
   "env": {
     "SKIP_ENV_VALIDATION": "true"
   },
-  "crons": [
+  "_crons_disabled": "Re-enable on paid plan before shipping",
+  "_crons": [
     {
       "path": "/api/cron/cleanup-previews",
       "schedule": "0 2 * * *"
