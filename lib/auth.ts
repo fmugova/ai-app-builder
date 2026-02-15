@@ -3,6 +3,7 @@ import { PrismaAdapter } from '@auth/prisma-adapter'
 import { Adapter } from 'next-auth/adapters'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
+import GitHubProvider from 'next-auth/providers/github'
 import { prisma } from './prisma'
 import bcrypt from 'bcryptjs'
 import { sendSecurityAlert } from './security-emails'
@@ -86,6 +87,11 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       allowDangerousEmailAccountLinking: false, // CRITICAL: Prevent account takeover via OAuth
     }),
+    GitHubProvider({
+      clientId: process.env.GITHUB_CLIENT_ID!,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+      allowDangerousEmailAccountLinking: false,
+    }),
     CredentialsProvider({
       name: 'credentials',
       credentials: {
@@ -93,16 +99,19 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' },
         twoFactorToken: { label: '2FA Token', type: 'text', optional: true },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         try {
           if (!credentials?.email || !credentials?.password) {
             throw new Error('Email and password required')
           }
 
-          // Check for account lockout (IP-based rate limiting)
-          // Note: In production, pass IP from request context
-          const ipAddress = 'unknown' // Should be passed from API route context
-          const userAgent = 'unknown' // Should be passed from API route context
+          // Extract real IP from request headers (Cloudflare → forwarded → socket)
+          const ipAddress =
+            (req?.headers?.['cf-connecting-ip'] as string) ||
+            (req?.headers?.['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+            (req?.headers?.['x-real-ip'] as string) ||
+            'unknown'
+          const userAgent = (req?.headers?.['user-agent'] as string) || 'unknown'
           
           // Use comprehensive lockout check from lib/security.ts
           const lockoutCheck = await checkAccountLockout(credentials.email, ipAddress)

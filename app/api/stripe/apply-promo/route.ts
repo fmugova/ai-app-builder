@@ -77,15 +77,18 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Update user with promo code
-    // promoCodeUsed is String, discountRate is Float
+    // Update user with promo code.
+    // Convention: positive discountRate = percentage off (e.g. 20 = 20%)
+    //             negative discountRate = fixed dollar off (e.g. -10 = $10 off)
+    const discountRate = promo.discountType === 'percentage'
+      ? promo.discountValue
+      : -Math.abs(promo.discountValue) // negative signals fixed-dollar discount
+
     await prisma.user.update({
       where: { email: session.user.email },
       data: {
-        promoCodeUsed: promo.code, // String - store the actual promo code
-        discountRate: promo.discountType === 'percentage' 
-          ? promo.discountValue 
-          : 0, // Float - store the discount rate
+        promoCodeUsed: promo.code,
+        discountRate,
       },
     })
 

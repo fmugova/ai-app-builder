@@ -23,6 +23,7 @@ Store: [what gets saved? e.g. "users, projects, time entries, invoices"]
 
 [A] Aesthetics & Feel:
 Style: [e.g. "Clean and minimal, dark sidebar"]
+Pages: [list the separate pages, e.g. "Home, About, Services, Contact"]
 Layout: [e.g. "Sidebar navigation, card-based dashboard, data tables"]`;
 
 const QUICK_TEMPLATES = [

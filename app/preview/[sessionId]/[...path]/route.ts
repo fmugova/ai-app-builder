@@ -90,8 +90,9 @@ export async function GET(
     headers: {
       'Content-Type': finalMime,
       'Cache-Control': 'no-store',
-      // Allow iframe embedding from our own origin
       'X-Frame-Options': 'SAMEORIGIN',
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
       'Content-Security-Policy': [
         "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:",
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",

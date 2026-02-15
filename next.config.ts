@@ -56,45 +56,110 @@ const nextConfig: NextConfig = {
     'esbuild',
   ],
 
-  headers: async () => [{
-    source: '/:path*',
-    headers: [
-      // Prevent clickjacking (belt + braces with X-Frame-Options)
-      {
-        key: 'Content-Security-Policy',
-        value: "frame-ancestors 'self'",
-      },
-      {
-        key: 'X-Frame-Options',
-        value: 'SAMEORIGIN',
-      },
-      // Prevent MIME-type sniffing
-      {
-        key: 'X-Content-Type-Options',
-        value: 'nosniff',
-      },
-      // Force HTTPS for 2 years (preload-eligible)
-      {
-        key: 'Strict-Transport-Security',
-        value: 'max-age=63072000; includeSubDomains; preload',
-      },
-      // Control referrer info on cross-origin navigation
-      {
-        key: 'Referrer-Policy',
-        value: 'strict-origin-when-cross-origin',
-      },
-      // Restrict browser feature access
-      {
-        key: 'Permissions-Policy',
-        value: 'camera=(), microphone=(), geolocation=(), payment=(self)',
-      },
-      // Basic XSS filter for legacy browsers
-      {
-        key: 'X-XSS-Protection',
-        value: '1; mode=block',
-      },
-    ],
-  }],
+  headers: async () => [
+    {
+      // ── Global security headers (all routes) ───────────────────────────
+      source: '/:path*',
+      headers: [
+        // Full Content Security Policy
+        // Next.js requires 'unsafe-inline' for its hydration <script> tags.
+        // We compensate by keeping the default-src strict ('self') and
+        // explicitly allowlisting every external source we actually use.
+        {
+          key: 'Content-Security-Policy',
+          value: [
+            "default-src 'self'",
+            // Scripts: self + Next.js inline hydration + Stripe.js (checkout)
+            "script-src 'self' 'unsafe-inline' https://js.stripe.com",
+            // Styles: self + inline (Tailwind/shadcn) + Google Fonts
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+            // Fonts: self + data URIs + Google Fonts CDN
+            "font-src 'self' data: https://fonts.gstatic.com",
+            // Images: self + data URIs + blobs (canvas) + any HTTPS host (CDN thumbnails)
+            "img-src 'self' data: blob: https:",
+            // Fetch/XHR: self + Stripe + Anthropic (streaming) + Upstash
+            "connect-src 'self' https://api.stripe.com https://api.anthropic.com https://*.upstash.io",
+            // Frames: self only — preview iframes are on same origin at /preview/*
+            "frame-src 'self'",
+            // Clickjacking: only we can embed our own pages
+            "frame-ancestors 'self'",
+            // Block <object> and <embed> entirely
+            "object-src 'none'",
+            // Ensure all resources loaded over HTTPS
+            "upgrade-insecure-requests",
+          ].join('; '),
+        },
+        // Belt + braces clickjacking (legacy browsers)
+        {
+          key: 'X-Frame-Options',
+          value: 'SAMEORIGIN',
+        },
+        // Prevent MIME-type sniffing
+        {
+          key: 'X-Content-Type-Options',
+          value: 'nosniff',
+        },
+        // Force HTTPS for 2 years (preload-eligible)
+        {
+          key: 'Strict-Transport-Security',
+          value: 'max-age=63072000; includeSubDomains; preload',
+        },
+        // Referrer control
+        {
+          key: 'Referrer-Policy',
+          value: 'strict-origin-when-cross-origin',
+        },
+        // Restrict browser feature access
+        {
+          key: 'Permissions-Policy',
+          value: 'camera=(), microphone=(), geolocation=(), payment=(self)',
+        },
+        // Basic XSS filter (legacy browsers)
+        {
+          key: 'X-XSS-Protection',
+          value: '1; mode=block',
+        },
+      ],
+    },
+    {
+      // ── Preview routes: relax CSP to allow user-generated HTML to run ──
+      // sessionId is a 32-char random hex token (unguessable, 20-min TTL)
+      source: '/preview/:sessionId/:path*',
+      headers: [
+        {
+          key: 'Content-Security-Policy',
+          value: [
+            "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
+            "font-src 'self' data: https://fonts.gstatic.com",
+            "img-src 'self' data: blob: https:",
+            "connect-src 'self'",
+            "frame-ancestors 'self'",
+          ].join('; '),
+        },
+      ],
+    },
+    {
+      // ── Published sites: allow user-generated content to run ──────────
+      source: '/p/:slug/:path*',
+      headers: [
+        {
+          key: 'Content-Security-Policy',
+          value: [
+            "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
+            "font-src 'self' data: https://fonts.gstatic.com",
+            "img-src 'self' data: blob: https:",
+            "connect-src 'self' https:",
+            "frame-ancestors 'self'",
+          ].join('; '),
+        },
+        { key: 'X-Content-Type-Options', value: 'nosniff' },
+      ],
+    },
+  ],
   output: 'standalone',
   reactStrictMode: true,
   poweredByHeader: false,

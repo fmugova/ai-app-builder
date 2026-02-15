@@ -131,7 +131,12 @@ export async function GET(
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'public, max-age=60, stale-while-revalidate=300',
+      // Security headers must be set explicitly — next.config.ts headers()
+      // does not apply to raw NextResponse objects returned from route handlers.
       'X-Frame-Options': 'SAMEORIGIN',
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+      'X-XSS-Protection': '1; mode=block',
     },
   })
 }

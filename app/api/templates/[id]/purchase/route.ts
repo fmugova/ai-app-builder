@@ -29,6 +29,11 @@ export async function POST(
   })
   if (!template) return NextResponse.json({ error: 'Template not found' }, { status: 404 })
 
+  // Block self-purchase — creators cannot buy their own template
+  if (template.creatorId === user.id) {
+    return NextResponse.json({ error: 'You cannot purchase your own template' }, { status: 400 })
+  }
+
   // Check if already owned
   if (template.tier !== 'FREE') {
     const existing = await prisma.templatePurchase.findUnique({

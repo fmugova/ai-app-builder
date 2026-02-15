@@ -82,7 +82,11 @@ When users request websites with multiple pages, you MUST create SEPARATE HTML f
 - ✅ All files use the same font families and spacing
 - ✅ Active page is highlighted in navigation
 
-**CRITICAL:** Never create multi-page content in a single HTML file. Navigation links MUST point to separate files (e.g., href="about.html", NOT href="#about").
+**CRITICAL RULES — VIOLATION WILL BREAK THE PREVIEW:**
+- NEVER use hash anchors for navigation (e.g. href="#about" is FORBIDDEN). Use href="about.html" instead.
+- NEVER put all pages in one HTML file. Each page = its own <!-- File: name.html --> block.
+- If the user's prompt lists page names (e.g. "Home, Find Sitters, About, Contact"), create a separate .html file for EACH page.
+- The first file is always index.html (the home/landing page).
 </multi_page_html_detection>
 
 ### 2. Iterative Development Mode

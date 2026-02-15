@@ -143,13 +143,23 @@ export async function POST(req: NextRequest) {
       complexityAnalysis.shouldUseFullstack;
 
     // Detect multi-page HTML requests (portfolio/website with named pages, NOT fullstack)
+    const PAGE_KEYWORDS = '(?:home|landing|index|about|services|contact|portfolio|projects|blog|faq|gallery|team|pricing|login|signup|register|sitters?|coaches?|trainers?|listings?|menu|shop|store|booking|bookings|schedule|events?|testimonials?|reviews?|careers?|jobs?|press|media|resources?|docs?|help|support)'
     const multiPageTriggers = [
-      /\b(home|landing).{0,30}(about|services|contact|portfolio|projects|blog)\b/i,
-      /\b(about|services|contact|portfolio|projects|blog).{0,30}(home|landing)\b/i,
+      // "home" near any known page keyword (wider 60-char window)
+      new RegExp(`\\b(home|landing).{0,60}(about|services|contact|portfolio|projects|blog|faq|gallery|team|pricing)\\b`, 'i'),
+      new RegExp(`\\b(about|services|contact|portfolio|projects|blog|faq).{0,60}(home|landing)\\b`, 'i'),
+      // Explicit multi-page phrasing
       /multi-?page\s+(website|site|html)/i,
       /website\s+with\s+(multiple\s+)?pages/i,
       /portfolio\s+with\s+(pages|sections)/i,
-      /\b(home|about|services|contact|portfolio|projects|blog|faq)\s*(,\s*(home|about|services|contact|portfolio|projects|blog|faq)){2,}/i,
+      /separate\s+(html\s+)?pages/i,
+      /\b(create|build|make)\s+.{0,30}\b(pages?|sections?)\b.{0,30}\b(home|about|contact|services)/i,
+      // "Pages:" or "Navigation:" label followed by a list (P.F.D.A. layout / prompt structure)
+      new RegExp(`\\b(pages?|navigation|nav|sections?|layout)\\s*[:\\-]\\s*.{0,20}${PAGE_KEYWORDS}`, 'i'),
+      // Any 3+ comma-separated capitalized/known page names (broader than before)
+      new RegExp(`${PAGE_KEYWORDS}\\s*(?:,\\s*${PAGE_KEYWORDS}){2,}`, 'i'),
+      // "home, X, Y, Z" where X/Y/Z can be anything (catches "Home, Find Sitters, About, Contact")
+      /\bhome\b.{0,5},\s*.+,.{0,5},\s*.{0,30}(about|contact|services|faq)/i,
     ];
     const isMultiPageHTMLRequest = !isMultiFileRequest &&
       multiPageTriggers.some(p => p.test(prompt));

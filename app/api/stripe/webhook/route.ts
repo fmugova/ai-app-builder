@@ -108,25 +108,37 @@ export async function POST(request: NextRequest) {
         if (session.metadata?.type === 'credit_purchase') {
           const { userId, credits } = session.metadata
           const creditsToAdd = parseInt(credits || '0', 10)
-          if (creditsToAdd > 0) {
-            // withRetry: DB failure → propagates → 500 → Stripe retries the webhook
-            await withRetry(
-              () => prisma.user.update({
-                where: { id: userId },
-                data: { generationsLimit: { increment: BigInt(creditsToAdd) } },
-              }),
-              `credit_purchase user=${userId}`
-            )
-            console.log(`✅ Added ${creditsToAdd} credits to user ${userId}`)
-            logAnalyticsEvent('credits_purchased', { userId, credits: creditsToAdd })
+
+          // Validate: must be a positive integer within a sane cap (1–10 000)
+          if (!Number.isInteger(creditsToAdd) || creditsToAdd <= 0 || creditsToAdd > 10_000) {
+            console.error(`❌ Invalid credits value in metadata: "${credits}" for user ${userId}`)
+            break
           }
+
+          // withRetry: DB failure → propagates → 500 → Stripe retries the webhook
+          await withRetry(
+            () => prisma.user.update({
+              where: { id: userId },
+              data: { generationsLimit: { increment: BigInt(creditsToAdd) } },
+            }),
+            `credit_purchase user=${userId}`
+          )
+          console.log(`✅ Added ${creditsToAdd} credits to user ${userId}`)
+          logAnalyticsEvent('credits_purchased', { userId, credits: creditsToAdd })
           break
         }
 
         // ── Template one-time purchase ──────────────────────────────────────
         if (session.metadata?.type === 'template_purchase') {
-          const { templateId, userId, creatorId, price } = session.metadata
-          const purchasePrice = parseFloat(price || '0')
+          const { templateId, userId, creatorId } = session.metadata
+
+          // Use Stripe's amount_total (cents) as the authoritative price — never metadata.price
+          const purchasePrice = session.amount_total ? session.amount_total / 100 : 0
+          if (purchasePrice <= 0) {
+            console.error(`❌ Template purchase has zero/negative amount_total for session ${session.id}`)
+            break
+          }
+
           const PLATFORM_SHARE = 0.30
           const CREATOR_SHARE = 0.70
 
@@ -156,25 +168,27 @@ export async function POST(request: NextRequest) {
           break
         }
 
-        // Derive plan from actual Stripe subscription price, not metadata
-        // to prevent plan escalation via metadata tampering
-        let plan = 'pro'
+        // Derive plan from actual Stripe subscription price — never trust metadata alone
+        const PRICE_PLAN_MAP: Record<string, string> = {
+          [process.env.STRIPE_PRO_PRICE_ID || '']: 'pro',
+          [process.env.STRIPE_BUSINESS_PRICE_ID || '']: 'business',
+          [process.env.STRIPE_ENTERPRISE_PRICE_ID || '']: 'enterprise',
+        }
+        // Remove empty-string key so stray '' doesn't match unknown priceIds
+        delete PRICE_PLAN_MAP['']
+
+        let plan = 'pro' // safe minimum paid default
         if (session.subscription) {
           try {
             const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
             const priceId = subscription.items.data[0]?.price.id
-            const PRICE_PLAN_MAP: Record<string, string> = {
-              [process.env.STRIPE_PRO_PRICE_ID || '']: 'pro',
-              [process.env.STRIPE_BUSINESS_PRICE_ID || '']: 'business',
-              [process.env.STRIPE_ENTERPRISE_PRICE_ID || '']: 'enterprise',
-            }
-            plan = PRICE_PLAN_MAP[priceId] ?? session.metadata?.plan ?? 'pro'
+            // Only accept plans we recognise — fallback to 'pro', never use metadata
+            plan = PRICE_PLAN_MAP[priceId] ?? 'pro'
           } catch (stripeErr) {
             console.error('Failed to retrieve subscription for plan verification:', stripeErr)
-            plan = session.metadata?.plan ?? 'pro'
+            // Do NOT fall back to metadata — default to minimum paid tier to prevent escalation
+            plan = 'pro'
           }
-        } else {
-          plan = session.metadata?.plan ?? 'pro'
         }
 
         const planConfig = {
@@ -284,7 +298,18 @@ export async function POST(request: NextRequest) {
       case 'customer.subscription.updated': {
         const subscription = event.data.object
 
-        const status = subscription.status === 'active' ? 'active' : 'canceled'
+        // Map Stripe statuses accurately — don't collapse past_due/trialing into 'canceled'
+        const STATUS_MAP: Record<string, string> = {
+          active: 'active',
+          trialing: 'active',
+          past_due: 'past_due',
+          canceled: 'canceled',
+          unpaid: 'past_due',
+          incomplete: 'past_due',
+          incomplete_expired: 'canceled',
+          paused: 'canceled',
+        }
+        const status = STATUS_MAP[subscription.status] ?? 'canceled'
 
         // Update subscription in database
         await prisma.subscription.updateMany({

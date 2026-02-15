@@ -53,14 +53,18 @@ export async function GET() {
       cancelAtPeriodEnd: subscription?.cancelAtPeriodEnd || false,
       usage: {
         projects: {
-          used: Number(user.projectsThisMonth),      // BigInt → Number
-          limit: Number(user.projectsLimit),         // BigInt → Number
-          percentage: Math.round((Number(user.projectsThisMonth) / Number(user.projectsLimit)) * 100),
+          used: Number(user.projectsThisMonth),
+          limit: Number(user.projectsLimit),
+          percentage: Number(user.projectsLimit) > 0
+            ? Math.min(100, Math.round((Number(user.projectsThisMonth) / Number(user.projectsLimit)) * 100))
+            : 0,
         },
         generations: {
-          used: Number(user.generationsUsed),        // BigInt → Number
-          limit: Number(user.generationsLimit),      // BigInt → Number
-          percentage: Math.round((Number(user.generationsUsed) / Number(user.generationsLimit)) * 100),
+          used: Number(user.generationsUsed),
+          limit: Number(user.generationsLimit),
+          percentage: Number(user.generationsLimit) > 0
+            ? Math.min(100, Math.round((Number(user.generationsUsed) / Number(user.generationsLimit)) * 100))
+            : 0,
         },
       },
     })
