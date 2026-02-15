@@ -2,11 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { Redis } from '@upstash/redis'
+import { Ratelimit } from '@upstash/ratelimit'
 import { randomBytes } from 'crypto'
 
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL!,
   token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+})
+
+// 20 preview sessions per user per minute — prevents Redis abuse
+const previewRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(20, '1 m'),
+  analytics: false,
+  prefix: 'ratelimit:preview-session',
 })
 
 const TTL_SECONDS = 20 * 60 // 20 minutes
@@ -22,6 +31,16 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Rate limit: 20 sessions/min per user
+  const { success, reset } = await previewRateLimit.limit(session.user.id)
+  if (!success) {
+    const retryAfter = Math.ceil((reset - Date.now()) / 1000)
+    return NextResponse.json(
+      { error: 'Too many preview requests. Please wait before retrying.' },
+      { status: 429, headers: { 'Retry-After': String(retryAfter) } }
+    )
   }
 
   const { files }: { files: PreviewFile[] } = await req.json()

@@ -1,0 +1,21 @@
+Contact: mailto:security@buildflow-ai.app
+Expires: 2027-02-15T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://buildflow-ai.app/.well-known/security.txt
+Policy: https://buildflow-ai.app/security
+
+# BuildFlow AI - Responsible Disclosure Policy
+#
+# We take security seriously. If you discover a vulnerability:
+# 1. Email security@buildflow-ai.app with details
+# 2. Do NOT publicly disclose until we have had 90 days to remediate
+# 3. Do NOT access, modify, or delete user data
+# 4. Do NOT perform DoS attacks or disrupt service
+#
+# We commit to:
+# - Acknowledge receipt within 48 hours
+# - Provide a resolution timeline within 7 days
+# - Credit researchers in our security acknowledgements (if desired)
+# - Not pursue legal action against good-faith researchers
+#
+# Thank you for helping keep BuildFlow and our users safe.

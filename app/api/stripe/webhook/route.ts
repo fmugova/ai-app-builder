@@ -12,6 +12,34 @@ const logAnalyticsEvent = (event: string, properties?: Record<string, any>) => {
   console.log(`📊 Analytics [${event}]:`, properties || {})
 }
 
+/**
+ * Retry a critical async operation with exponential backoff.
+ * maxAttempts = 3 → delays: 200ms, 400ms then throws.
+ * Only retries on transient errors (network, DB pool exhaustion, etc.).
+ */
+const MAX_WEBHOOK_RETRIES = 3
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  label: string,
+  maxAttempts = MAX_WEBHOOK_RETRIES
+): Promise<T> {
+  let lastErr: unknown
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      lastErr = err
+      if (attempt < maxAttempts) {
+        const delay = 200 * Math.pow(2, attempt - 1) // 200ms, 400ms
+        console.warn(`⚠️ [webhook retry] ${label} failed (attempt ${attempt}/${maxAttempts}), retrying in ${delay}ms`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+    }
+  }
+  console.error(`❌ [webhook retry] ${label} failed after ${maxAttempts} attempts`)
+  throw lastErr
+}
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-12-15.clover',
 })
@@ -81,16 +109,16 @@ export async function POST(request: NextRequest) {
           const { userId, credits } = session.metadata
           const creditsToAdd = parseInt(credits || '0', 10)
           if (creditsToAdd > 0) {
-            try {
-              await prisma.user.update({
+            // withRetry: DB failure → propagates → 500 → Stripe retries the webhook
+            await withRetry(
+              () => prisma.user.update({
                 where: { id: userId },
                 data: { generationsLimit: { increment: BigInt(creditsToAdd) } },
-              })
-              console.log(`✅ Added ${creditsToAdd} credits to user ${userId}`)
-              logAnalyticsEvent('credits_purchased', { userId, credits: creditsToAdd })
-            } catch (creditErr) {
-              console.error('Credit top-up failed:', creditErr)
-            }
+              }),
+              `credit_purchase user=${userId}`
+            )
+            console.log(`✅ Added ${creditsToAdd} credits to user ${userId}`)
+            logAnalyticsEvent('credits_purchased', { userId, credits: creditsToAdd })
           }
           break
         }
@@ -102,15 +130,13 @@ export async function POST(request: NextRequest) {
           const PLATFORM_SHARE = 0.30
           const CREATOR_SHARE = 0.70
 
-          try {
-            // Record the purchase
+          // withRetry: DB failure → propagates → 500 → Stripe retries the webhook
+          await withRetry(async () => {
             await prisma.templatePurchase.upsert({
               where: { templateId_userId: { templateId, userId } },
               update: {},
               create: { templateId, userId, price: purchasePrice },
             })
-
-            // Record revenue split
             await prisma.templateRevenue.create({
               data: {
                 templateId,
@@ -121,17 +147,12 @@ export async function POST(request: NextRequest) {
                 stripePaymentId: session.payment_intent as string || null,
               },
             })
-
-            // Increment download count
             await prisma.template.update({
               where: { id: templateId },
               data: { downloads: { increment: 1 } },
             })
-
-            console.log(`✅ Template purchase recorded: ${templateId} by ${userId}`)
-          } catch (tplErr) {
-            console.error('Template purchase recording failed:', tplErr)
-          }
+          }, `template_purchase ${templateId} user=${userId}`)
+          console.log(`✅ Template purchase recorded: ${templateId} by ${userId}`)
           break
         }
 
@@ -162,24 +183,27 @@ export async function POST(request: NextRequest) {
           free: { generationsLimit: 3, projectsLimit: 3 },
         }[plan] || { generationsLimit: 100, projectsLimit: 50 }
 
-        // Update or create subscription
-        await prisma.subscription.upsert({
-          where: { userId: session.metadata.userId },
-          update: {
-            plan: plan,
-            status: 'active',
-            stripeSubscriptionId: session.subscription as string,
-            stripePriceId: session.metadata?.priceId,
-          },
-          create: {
-            userId: session.metadata.userId,
-            plan: plan,
-            status: 'active',
-            stripeCustomerId: session.customer as string,
-            stripeSubscriptionId: session.subscription as string,
-            stripePriceId: session.metadata?.priceId,
-          },
-        })
+        // Update or create subscription — withRetry for transient DB failures
+        await withRetry(
+          () => prisma.subscription.upsert({
+            where: { userId: session.metadata!.userId },
+            update: {
+              plan,
+              status: 'active',
+              stripeSubscriptionId: session.subscription as string,
+              stripePriceId: session.metadata?.priceId,
+            },
+            create: {
+              userId: session.metadata!.userId,
+              plan,
+              status: 'active',
+              stripeCustomerId: session.customer as string,
+              stripeSubscriptionId: session.subscription as string,
+              stripePriceId: session.metadata?.priceId,
+            },
+          }),
+          `subscription.upsert user=${session.metadata!.userId}`
+        )
 
         // Update user
         // Apply promo code if present
@@ -205,19 +229,22 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        const updatedUser = await prisma.user.update({
-          where: { email: session.customer_details?.email || undefined },
-          data: {
-            subscriptionTier: plan,
-            subscriptionStatus: 'active',
-            stripeCustomerId: session.customer as string,
-            stripeSubscriptionId: session.subscription as string,
-            generationsLimit: planConfig.generationsLimit,
-            projectsLimit: planConfig.projectsLimit,
-            generationsUsed: 0,
-            ...(session.metadata?.promoCode && { promoCodeUsed: session.metadata.promoCode }),
-          },
-        })
+        const updatedUser = await withRetry(
+          () => prisma.user.update({
+            where: { email: session.customer_details?.email || undefined },
+            data: {
+              subscriptionTier: plan,
+              subscriptionStatus: 'active',
+              stripeCustomerId: session.customer as string,
+              stripeSubscriptionId: session.subscription as string,
+              generationsLimit: planConfig.generationsLimit,
+              projectsLimit: planConfig.projectsLimit,
+              generationsUsed: 0,
+              ...(session.metadata?.promoCode && { promoCodeUsed: session.metadata.promoCode }),
+            },
+          }),
+          `user.update email=${session.customer_details?.email}`
+        )
 
         // Send subscription success email
         if (updatedUser.email) {
