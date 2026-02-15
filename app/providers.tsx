@@ -2,10 +2,12 @@
 
 import { SessionProvider } from 'next-auth/react'
 import { Toaster } from 'react-hot-toast'
+import PostHogProvider from '@/components/providers/PostHogProvider'
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
+      <PostHogProvider>
       {children}
       <Toaster
         position="top-right"
@@ -31,6 +33,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           },
         }}
       />
+      </PostHogProvider>
     </SessionProvider>
   )
 }
