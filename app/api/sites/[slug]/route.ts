@@ -13,19 +13,27 @@ export async function GET(
   try {
     const { slug } = await context.params
 
-    const project = await prisma.project.findFirst({
+    type PageRow = { slug: string; title: string; content: string; isHomepage: boolean }
+    type ProjectWithPages = {
+      id: string; name: string; code: string; type: string; createdAt: Date;
+      User: { name: string | null } | null;
+      pages: PageRow[];
+    }
+
+    const project = await (prisma.project.findFirst as (args: unknown) => Promise<ProjectWithPages | null>)({
       where: {
         publicSlug: slug,
         isPublished: true,
-        publishedAt: { not: null }  // ✅ Correct camelCase!
+        publishedAt: { not: null }
       },
       include: {
-        User: {
-          select: {
-            name: true
-          }
-        }
-      }
+        User: { select: { name: true } },
+        pages: {
+          where: { isPublished: true },
+          orderBy: { order: 'asc' },
+          select: { slug: true, title: true, content: true, isHomepage: true },
+        },
+      },
     })
 
     if (!project) {
@@ -35,13 +43,24 @@ export async function GET(
       )
     }
 
+    const pages = project.pages ?? []
+    const isMultiPage = pages.length > 1
+
+    // For multi-page: serve the homepage page's content as the root code
+    let code = project.code
+    if (isMultiPage) {
+      const homepage = pages.find(p => p.isHomepage) || pages[0]
+      if (homepage) code = homepage.content
+    }
+
     return NextResponse.json({
       id: project.id,
       name: project.name,
-      code: project.code,
+      code,
       type: project.type,
+      isMultiPage,
       createdAt: project.createdAt,
-      User: project.User
+      User: project.User,
     })
 
   } catch (error) {

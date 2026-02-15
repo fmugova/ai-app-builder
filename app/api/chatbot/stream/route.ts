@@ -143,13 +143,19 @@ export async function POST(req: NextRequest) {
           let enhancedPrompt = prompt;
           if (previousErrors && previousErrors.length > 0) {
             console.log('🔄 Regenerating with error feedback:', previousErrors.length, 'issues');
+            // Sanitize: strip anything resembling a prompt injection attempt
+            const safeErrors = previousErrors
+              .slice(0, 20) // cap number of errors
+              .map((e: string) => String(e).slice(0, 200)) // cap length
+              .filter((e: string) => !/ignore|forget|disregard|system\s*prompt|instruction|pretend|jailbreak/i.test(e))
+              .map((e: string) => e.replace(/[<>]/g, '')) // strip angle brackets
             enhancedPrompt = `${prompt}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚠️ PREVIOUS GENERATION HAD VALIDATION ERRORS - FIX THEM NOW ⚠️
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-${previousErrors.map(err => `❌ ${err}`).join('\n')}
+${safeErrors.map((err: string) => `❌ ${err}`).join('\n')}
 
 MANDATORY FIXES YOU MUST APPLY:
 ${previousErrors.some(e => e.includes('h1')) ? '✅ Add exactly ONE <h1>Page Title</h1> in the page\n' : ''}${previousErrors.some(e => e.includes('description')) ? '✅ Add <meta name="description" content="..."> in <head>\n' : ''}${previousErrors.some(e => e.includes('CSS') || e.includes('variable')) ? '✅ Define CSS variables in :root { --primary: ...; --text: ...; }\n' : ''}${previousErrors.some(e => e.includes('script')) ? '✅ Keep inline scripts under 50 lines or extract to external file\n' : ''}${previousErrors.some(e => e.includes('charset')) ? '✅ Add <meta charset="UTF-8"> in <head>\n' : ''}${previousErrors.some(e => e.includes('viewport')) ? '✅ Add <meta name="viewport" content="width=device-width, initial-scale=1.0">\n' : ''}

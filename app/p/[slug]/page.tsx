@@ -9,6 +9,7 @@ interface SiteData {
   name: string;
   code: string;
   type: string;
+  isMultiPage?: boolean;
   createdAt: string;
   User: {
     name: string | null;
