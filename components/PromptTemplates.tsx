@@ -1,7 +1,29 @@
 'use client';
 
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+
+// P.F.D.A. starter template — fills the prompt with structured placeholders
+const PFDA_STARTER = `[P] Persona & Purpose:
+App for: [who is it for? e.g. "a freelance project manager"]
+Goal: [what's the big win? e.g. "to track billable hours and invoice clients"]
+
+[F] Features & Logic:
+Must-haves:
+- [feature 1, e.g. "User login / signup"]
+- [feature 2, e.g. "Project dashboard with time tracker"]
+- [feature 3, e.g. "Invoice generator with PDF export"]
+Logic: [how do things flow? e.g. "User starts timer → stops it → hours added to project total"]
+
+[D] Data & Tech Stack:
+Stack: [e.g. "Next.js + Supabase" or "leave blank for best choice"]
+Store: [what gets saved? e.g. "users, projects, time entries, invoices"]
+
+[A] Aesthetics & Feel:
+Style: [e.g. "Clean and minimal, dark sidebar"]
+Layout: [e.g. "Sidebar navigation, card-based dashboard, data tables"]`;
 
 const QUICK_TEMPLATES = [
   {
@@ -108,8 +130,11 @@ interface PromptTemplatesProps {
 }
 
 export default function PromptTemplates({ onSelect }: PromptTemplatesProps) {
+  const [showFormula, setShowFormula] = useState(false);
+
   return (
     <Card className="p-4">
+      {/* Header row */}
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold">Quick Start Templates</h3>
         <a
@@ -119,6 +144,64 @@ export default function PromptTemplates({ onSelect }: PromptTemplatesProps) {
           Browse all →
         </a>
       </div>
+
+      {/* P.F.D.A. Formula button */}
+      <button
+        onClick={() => setShowFormula(!showFormula)}
+        className="w-full mb-3 flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 hover:from-purple-100 hover:to-pink-100 transition-colors text-left"
+      >
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-3.5 h-3.5 text-purple-600 flex-shrink-0" />
+          <span className="text-xs font-semibold text-purple-700">Ultra-Prompt Formula (P.F.D.A.)</span>
+          <span className="text-xs text-purple-500 hidden sm:inline">— get better results first time</span>
+        </div>
+        {showFormula
+          ? <ChevronUp className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />
+          : <ChevronDown className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />
+        }
+      </button>
+
+      {/* Collapsible formula content */}
+      {showFormula && (
+        <div className="mb-3 rounded-xl border border-purple-100 bg-white overflow-hidden">
+          <div className="grid grid-cols-2 gap-px bg-gray-100">
+            {[
+              { letter: 'P', label: 'Persona & Purpose', color: 'text-purple-700 bg-purple-50', hint: 'Who is it for? What\u2019s the big win?' },
+              { letter: 'F', label: 'Features & Logic',  color: 'text-blue-700 bg-blue-50',   hint: 'List 3–4 must-haves + how they flow' },
+              { letter: 'D', label: 'Data & Tech Stack', color: 'text-green-700 bg-green-50', hint: 'What gets saved? Preferred stack?' },
+              { letter: 'A', label: 'Aesthetics & Feel', color: 'text-pink-700 bg-pink-50',   hint: 'Style, mood, UI layout' },
+            ].map((p) => (
+              <div key={p.letter} className={`p-2.5 ${p.color}`}>
+                <span className="font-bold text-sm">[{p.letter}]</span>
+                <span className="font-semibold text-xs ml-1">{p.label}</span>
+                <p className="text-xs opacity-70 mt-0.5 leading-tight">{p.hint}</p>
+              </div>
+            ))}
+          </div>
+          <div className="p-2.5 bg-amber-50 border-t border-amber-100">
+            <p className="text-xs text-amber-800 leading-relaxed">
+              <span className="font-semibold">Example:</span> &ldquo;A pet sitting platform for busy owners.
+              Features: map search, booking calendar, photo feed.
+              Stack: React + Firebase. Style: friendly pastels, card layout.&rdquo;
+            </p>
+          </div>
+          <div className="px-2.5 pb-2.5">
+            <Button
+              size="sm"
+              className="w-full mt-2 bg-purple-600 hover:bg-purple-700 text-white text-xs h-8"
+              onClick={() => {
+                onSelect(PFDA_STARTER, 'single-html');
+                setShowFormula(false);
+              }}
+            >
+              <Sparkles className="w-3 h-3 mr-1.5" />
+              Use Formula as Prompt Template
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Quick template buttons */}
       <div className="grid grid-cols-2 gap-2">
         {QUICK_TEMPLATES.map((template) => (
           <Button
