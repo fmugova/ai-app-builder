@@ -73,16 +73,12 @@ export default function PreviewFrame({ html, css, js, validation, onElementClick
 
   const fullHTML = useMemo(() => {
     if (!html?.trim()) {
-      console.warn('⚠️ No HTML content to preview');
       return '';
     }
 
-    // CRITICAL: Check if content is actually HTML
-    const trimmedHtml = html.trim();
-    
     // Detect if content is JSON instead of HTML (multi-file fullstack project)
+    const trimmedHtml = html.trim();
     if (trimmedHtml.startsWith('{') || trimmedHtml.startsWith('[')) {
-      console.log('📦 Preview received JSON format (multi-file project) - use file viewer to browse files.');
       return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
         body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f8fafc;}
         .msg{text-align:center;padding:2rem;background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);max-width:360px;}

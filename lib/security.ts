@@ -2,8 +2,41 @@
 // Comprehensive security utilities
 
 import { prisma } from '@/lib/prisma'
+import { redis } from '@/lib/rate-limit'
 import crypto from 'crypto'
 import bcrypt from 'bcryptjs'
+
+// ============================================================================
+// AGGREGATE (PER-EMAIL, IP-INDEPENDENT) BRUTE FORCE LOCKOUT
+// ============================================================================
+// Keys:
+//   brute:email:{email}        — INCR counter, TTL 1h
+//   brute:email:{email}:locked — SET 1, TTL 30min when threshold reached
+
+const EMAIL_BRUTE_THRESHOLD = 20      // total failures across all IPs
+const EMAIL_BRUTE_WINDOW_S   = 3600   // sliding window: 1 hour
+const EMAIL_BRUTE_LOCKOUT_S  = 1800   // lockout duration: 30 minutes
+
+async function incrEmailFailureCount(email: string): Promise<number> {
+  const key = `brute:email:${email}`
+  const count = await redis.incr(key)
+  // Only set expiry on the first increment to keep the sliding window
+  if (count === 1) await redis.expire(key, EMAIL_BRUTE_WINDOW_S)
+  return count
+}
+
+async function lockEmailGlobally(email: string): Promise<void> {
+  await redis.set(`brute:email:${email}:locked`, '1', { ex: EMAIL_BRUTE_LOCKOUT_S })
+}
+
+async function isEmailLockedGlobally(email: string): Promise<boolean> {
+  const v = await redis.get(`brute:email:${email}:locked`)
+  return v !== null
+}
+
+async function clearEmailFailures(email: string): Promise<void> {
+  await redis.del(`brute:email:${email}`, `brute:email:${email}:locked`)
+}
 
 // ============================================================================
 // SECURITY EVENT LOGGING
@@ -215,7 +248,34 @@ export async function trackFailedLoginAttempt(
   const MAX_ATTEMPTS = 5
   const LOCKOUT_DURATION_MINUTES = 30
 
-  // Find or create failed attempt record
+  // Aggregate counter: increment regardless of which IP this attempt came from.
+  // If the email-level threshold is crossed, lock immediately before per-IP check.
+  const emailFailCount = await incrEmailFailureCount(email)
+  if (emailFailCount >= EMAIL_BRUTE_THRESHOLD) {
+    await lockEmailGlobally(email)
+    const lockedUntil = new Date(Date.now() + EMAIL_BRUTE_LOCKOUT_S * 1000)
+
+    const user = await prisma.user.findUnique({ where: { email } })
+    if (user) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { accountLockedUntil: lockedUntil, failedLoginAttempts: emailFailCount }
+      })
+      await logSecurityEvent({
+        userId: user.id,
+        type: 'account_locked',
+        action: 'success',
+        ipAddress,
+        userAgent,
+        metadata: { reason: 'distributed_brute_force', totalAttempts: emailFailCount, lockedUntil },
+        severity: 'critical'
+      })
+    }
+
+    return { isLocked: true, remainingAttempts: 0, lockedUntil }
+  }
+
+  // Per-IP lockout (existing logic)
   const attempt = await prisma.failedLoginAttempt.upsert({
     where: {
       email_ipAddress: { email, ipAddress }
@@ -237,7 +297,7 @@ export async function trackFailedLoginAttempt(
   // Check if account should be locked
   if (attempt.attempts >= MAX_ATTEMPTS) {
     const lockedUntil = new Date(Date.now() + LOCKOUT_DURATION_MINUTES * 60 * 1000)
-    
+
     await prisma.failedLoginAttempt.update({
       where: { email_ipAddress: { email, ipAddress } },
       data: { lockedUntil }
@@ -282,6 +342,12 @@ export async function checkAccountLockout(
   email: string,
   ipAddress: string
 ): Promise<{ isLocked: boolean; lockedUntil?: Date }> {
+  // Check aggregate (cross-IP) lock first
+  if (await isEmailLockedGlobally(email)) {
+    const lockedUntil = new Date(Date.now() + EMAIL_BRUTE_LOCKOUT_S * 1000)
+    return { isLocked: true, lockedUntil }
+  }
+
   const attempt = await prisma.failedLoginAttempt.findUnique({
     where: { email_ipAddress: { email, ipAddress } }
   })
@@ -331,9 +397,10 @@ export async function checkAccountLockout(
 }
 
 export async function resetFailedLoginAttempts(email: string, ipAddress: string) {
-  await prisma.failedLoginAttempt.deleteMany({
-    where: { email, ipAddress }
-  })
+  await Promise.all([
+    prisma.failedLoginAttempt.deleteMany({ where: { email, ipAddress } }),
+    clearEmailFailures(email),
+  ])
 }
 
 // ============================================================================

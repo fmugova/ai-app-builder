@@ -71,8 +71,8 @@ const nextConfig: NextConfig = {
           key: 'Content-Security-Policy',
           value: [
             "default-src 'self'",
-            // Scripts: self + Next.js inline hydration + Stripe.js + Google Tag Manager + blob: for Next.js workers
-            "script-src 'self' 'unsafe-inline' https://js.stripe.com https://www.googletagmanager.com https://www.google-analytics.com blob:",
+            // Scripts: self + Next.js inline hydration + Stripe.js + Google Tag Manager + Monaco Editor CDN + blob: for Next.js workers
+            "script-src 'self' 'unsafe-inline' https://js.stripe.com https://www.googletagmanager.com https://www.google-analytics.com https://cdn.jsdelivr.net blob:",
             // Styles: self + inline (Tailwind/shadcn) + Google Fonts
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             // Fonts: self + data URIs + Google Fonts CDN

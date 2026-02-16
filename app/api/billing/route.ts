@@ -1,10 +1,20 @@
 // app/api/billing/route.ts
-// FIXED: Convert BigInt to Number for JSON serialization
 
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { stripe } from '@/lib/stripe'
+
+export const dynamic = 'force-dynamic'
+
+// Base generations included in each plan (used to compute extra credits purchased)
+const PLAN_BASE_GENERATIONS: Record<string, number> = {
+  free:       10,
+  pro:       100,
+  business:  500,
+  enterprise: -1, // unlimited
+}
 
 export async function GET() {
   try {
@@ -24,6 +34,7 @@ export async function GET() {
         projectsLimit: true,
         generationsUsed: true,
         generationsLimit: true,
+        stripeCustomerId: true,
       },
     })
 
@@ -42,28 +53,77 @@ export async function GET() {
     })
 
     const currentPeriodStart = subscription?.currentPeriodStart || new Date()
-    const currentPeriodEnd = subscription?.currentPeriodEnd || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    const currentPeriodEnd   = subscription?.currentPeriodEnd   || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
 
-    // ✅ Convert BigInt to Number for JSON serialization
+    // Days remaining in billing period
+    const daysRemaining = Math.max(0, Math.ceil((currentPeriodEnd.getTime() - Date.now()) / 86_400_000))
+
+    // Convert BigInt usage fields
+    const projectsUsed      = Number(user.projectsThisMonth)
+    const projectsLimit     = Number(user.projectsLimit)
+    const generationsUsed   = Number(user.generationsUsed)
+    const generationsLimit  = Number(user.generationsLimit)
+
+    // Extra credits = total limit minus the plan base (0 if equal or unknown)
+    const tier = user.subscriptionTier || 'free'
+    const basePlanGenerations = PLAN_BASE_GENERATIONS[tier] ?? 0
+    const extraCreditsPurchased = generationsLimit > basePlanGenerations && basePlanGenerations !== -1
+      ? generationsLimit - basePlanGenerations
+      : 0
+
+    // Fetch recent invoices from Stripe (best-effort)
+    let invoices: Array<{ id: string; amount: number; status: string; date: string; period: string; url: string | null }> = []
+    if (user.stripeCustomerId) {
+      try {
+        const stripeInvoices = await stripe.invoices.list({
+          customer: user.stripeCustomerId,
+          limit: 12,
+        })
+        invoices = stripeInvoices.data.map((inv) => ({
+          id:     inv.id,
+          amount: inv.amount_paid / 100,
+          status: inv.status ?? 'unknown',
+          date:   new Date(inv.created * 1000).toISOString(),
+          period: inv.lines.data[0]?.description || (
+            inv.lines.data[0]?.period
+              ? `${new Date(inv.lines.data[0].period.start * 1000).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} subscription`
+              : 'Subscription'
+          ),
+          url: inv.hosted_invoice_url ?? null,
+        }))
+      } catch (err) {
+        console.error('Failed to fetch Stripe invoices:', err)
+      }
+    }
+
     return NextResponse.json({
-      tier: user.subscriptionTier,
-      status: user.subscriptionStatus,
-      currentPeriodStart: currentPeriodStart.toISOString(),
-      currentPeriodEnd: currentPeriodEnd.toISOString(),
-      cancelAtPeriodEnd: subscription?.cancelAtPeriodEnd || false,
+      // Flat fields (used by BillingClient)
+      tier,
+      status:              user.subscriptionStatus,
+      currentPeriodStart:  currentPeriodStart.toISOString(),
+      currentPeriodEnd:    currentPeriodEnd.toISOString(),
+      cancelAtPeriodEnd:   subscription?.cancelAtPeriodEnd ?? false,
+      daysRemaining,
+      projectsUsed,
+      projectsLimit,
+      generationsUsed,
+      generationsLimit,
+      extraCreditsPurchased,
+      invoices,
+      // Nested usage object (for UsageClient / future consumers)
       usage: {
         projects: {
-          used: Number(user.projectsThisMonth),
-          limit: Number(user.projectsLimit),
-          percentage: Number(user.projectsLimit) > 0
-            ? Math.min(100, Math.round((Number(user.projectsThisMonth) / Number(user.projectsLimit)) * 100))
+          used:       projectsUsed,
+          limit:      projectsLimit,
+          percentage: projectsLimit > 0
+            ? Math.min(100, Math.round((projectsUsed / projectsLimit) * 100))
             : 0,
         },
         generations: {
-          used: Number(user.generationsUsed),
-          limit: Number(user.generationsLimit),
-          percentage: Number(user.generationsLimit) > 0
-            ? Math.min(100, Math.round((Number(user.generationsUsed) / Number(user.generationsLimit)) * 100))
+          used:       generationsUsed,
+          limit:      generationsLimit,
+          percentage: generationsLimit > 0
+            ? Math.min(100, Math.round((generationsUsed / generationsLimit) * 100))
             : 0,
         },
       },

@@ -408,19 +408,20 @@ function ChatBuilderContent() {
               if (data.code) {
                 accumulatedCode += data.code;
                 chunkCount++;
-                
+
                 const progress = Math.min(80, 10 + (chunkCount * 0.5));
                 setState(prev => ({ ...prev, progress, currentStep: 'Generating code...' }));
-                
-                const { html, css, js } = parseCode(accumulatedCode);
-                
-                setState(prev => ({
-                  ...prev,
-                  html,
-                  css,
-                  js,
-                  fullCode: accumulatedCode,
-                }));
+
+                // Throttle parsing: only parse every 10 chunks and when content looks parseable
+                const shouldParse = chunkCount % 10 === 0 || accumulatedCode.length < 200;
+                const hasParseable = accumulatedCode.includes('<') || accumulatedCode.trim().startsWith('{');
+
+                if (shouldParse && hasParseable) {
+                  const { html, css, js } = parseCode(accumulatedCode);
+                  setState(prev => ({ ...prev, html, css, js, fullCode: accumulatedCode }));
+                } else {
+                  setState(prev => ({ ...prev, fullCode: accumulatedCode }));
+                }
               }
 
               if (data.validation) {
@@ -502,15 +503,21 @@ function ChatBuilderContent() {
               }
 
               if (data.done) {
+                // Final parse with full accumulated code
+                if (accumulatedCode) {
+                  const { html, css, js } = parseCode(accumulatedCode);
+                  setState(prev => ({ ...prev, html, css, js, fullCode: accumulatedCode }));
+                }
+
                 setState(prev => ({ ...prev, progress: 100, currentStep: 'Complete!' }));
                 toast.success('Generation complete!');
-                
+
                 // Auto-save if projectId was returned from backend
                 if (data.projectId && !currentProjectId) {
                   setCurrentProjectId(data.projectId);
                   console.log('✅ Project auto-saved with ID:', data.projectId);
                 }
-                
+
                 setTimeout(() => {
                   setState(prev => ({ ...prev, progress: 0, currentStep: '' }));
                 }, 2000);
@@ -614,19 +621,20 @@ function ChatBuilderContent() {
               if (data.code) {
                 accumulatedCode += data.code;
                 chunkCount++;
-                
+
                 const progress = Math.min(80, 10 + (chunkCount * 0.5));
                 setState(prev => ({ ...prev, progress, currentStep: 'Fixing issues...' }));
-                
-                const { html, css, js } = parseCode(accumulatedCode);
-                
-                setState(prev => ({
-                  ...prev,
-                  html,
-                  css,
-                  js,
-                  fullCode: accumulatedCode,
-                }));
+
+                // Throttle parsing: only parse every 10 chunks and when content looks parseable
+                const shouldParse = chunkCount % 10 === 0 || accumulatedCode.length < 200;
+                const hasParseable = accumulatedCode.includes('<') || accumulatedCode.trim().startsWith('{');
+
+                if (shouldParse && hasParseable) {
+                  const { html, css, js } = parseCode(accumulatedCode);
+                  setState(prev => ({ ...prev, html, css, js, fullCode: accumulatedCode }));
+                } else {
+                  setState(prev => ({ ...prev, fullCode: accumulatedCode }));
+                }
               }
 
               if (data.validation) {
@@ -640,10 +648,16 @@ function ChatBuilderContent() {
               }
 
               if (data.done) {
+                // Final parse with full accumulated code
+                if (accumulatedCode) {
+                  const { html, css, js } = parseCode(accumulatedCode);
+                  setState(prev => ({ ...prev, html, css, js, fullCode: accumulatedCode }));
+                }
+
                 setState(prev => ({ ...prev, progress: 100, currentStep: 'Complete!' }));
                 toast.dismiss();
                 toast.success('Code regenerated with validation fixes!');
-                
+
                 setTimeout(() => {
                   setState(prev => ({ ...prev, progress: 0, currentStep: '' }));
                 }, 2000);
@@ -1818,48 +1832,34 @@ export default function ChatBuilder() {
 
 // Helper Functions
 function parseCode(fullCode: string): { html: string; css: string; js: string } {
-  console.log('📝 Starting code parse...');
-  
-  // CRITICAL: Strip markdown code fences first using utility function
+  // Strip markdown code fences first using utility function
   const cleanedCode = stripMarkdownCodeFences(fullCode);
-  
+
   // Check if this is a multi-file project (JSON format)
   const trimmedCode = cleanedCode.trim();
   if (trimmedCode.startsWith('{') || trimmedCode.startsWith('[')) {
-    console.log('📦 Detected multi-file project JSON format');
     try {
-      // Try to parse as multi-file project
       const parseResult = parseMultiFileProject(cleanedCode);
       if (parseResult.success && parseResult.project) {
-        console.log('✅ Successfully parsed multi-file project:', parseResult.project.projectName);
-        // Convert to preview HTML
+        console.log('✅ Parsed multi-file project:', parseResult.project.projectName);
         const previewHtml = convertToSingleHTML(parseResult.project);
         return { html: previewHtml, css: '', js: '' };
-      } else {
-        console.warn('⚠️ Multi-file parsing failed:', parseResult.error);
-        // Fall through to regular HTML parsing
       }
-    } catch (err) {
-      console.warn('⚠️ Error parsing multi-file project:', err);
-      // Fall through to regular HTML parsing
+      // Incomplete JSON during streaming — return empty, will re-parse when done
+    } catch {
+      // Incomplete JSON during streaming — return empty, will re-parse when done
     }
+    return { html: '', css: '', js: '' };
   }
-  
-  // Regular HTML parsing
-  // CRITICAL: Check if we actually have HTML content
+
+  // Check if we actually have HTML content
   if (!cleanedCode.includes('<') || !cleanedCode.includes('>')) {
-    console.warn('⚠️ No HTML tags found in response - likely explanatory text or partial response');
-    console.log('📄 Response preview:', cleanedCode.substring(0, 200));
-    
-    // Try to extract HTML from markdown code blocks that might be buried in the text
+    // Try to extract HTML from markdown code blocks
     const htmlBlockMatch = cleanedCode.match(/```html\s*\n([\s\S]*?)\n```/);
     if (htmlBlockMatch) {
-      console.log('✅ Found HTML in markdown code block');
-      const extractedHtml = htmlBlockMatch[1].trim();
-      return parseCode(extractedHtml); // Recursive call with extracted HTML
+      return parseCode(htmlBlockMatch[1].trim());
     }
-    
-    // No HTML found - return empty to prevent Preview errors
+    // No HTML found — return empty (normal during early streaming)
     return { html: '', css: '', js: '' };
   }
   
@@ -1891,13 +1891,6 @@ function parseCode(fullCode: string): { html: string; css: string; js: string } 
   }
   
   const js = jsBlocks.join('\n\n');
-  
-  console.log('📝 Parsed code:', {
-    htmlLength: html.length,
-    cssLength: css.length,
-    jsLength: js.length,
-    jsBlocksFound: jsBlocks.length,
-  });
   
   return { html, css, js };
 }

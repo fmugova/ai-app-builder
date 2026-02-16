@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { redis } from '@/lib/rate-limit'
 import * as speakeasy from 'speakeasy'
 
 export async function POST(req: NextRequest) {
@@ -34,12 +35,18 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Replay protection: reject a token that has already been used
+    const replayKey = `totp:used:${user.id}:${token}`
+    if (await redis.get(replayKey)) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 400 })
+    }
+
     // Verify TOTP token
     const verified = speakeasy.totp.verify({
       secret: user.twoFactorSecret,
       encoding: 'base32',
       token: token,
-      window: 2 // Allow 2 time steps before/after
+      window: 1  // ±30s — was 2 (±60s replay window)
     })
 
     if (!verified) {
@@ -48,6 +55,9 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Mark token as used for 90s so it cannot be replayed
+    await redis.set(replayKey, '1', { ex: 90 })
 
     // Enable 2FA
     await prisma.user.update({

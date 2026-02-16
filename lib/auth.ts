@@ -14,6 +14,7 @@ import {
   resetFailedLoginAttempts,
   detectSuspiciousActivity
 } from './security'
+import { redis } from './rate-limit'
 
 // Define user roles
 export enum UserRole {
@@ -190,12 +191,25 @@ export const authOptions: NextAuthOptions = {
 
             // Verify 2FA token
             const speakeasy = await import('speakeasy')
+
+            // Replay protection: reject tokens already used within the TOTP validity window
+            const replayKey = `totp:used:${user.id}:${twoFactorToken}`
+            if (await redis.get(replayKey)) {
+              await trackFailedLoginAttempt(credentials.email, ipAddress, userAgent)
+              throw new Error('Invalid 2FA code')
+            }
+
             const verified = speakeasy.totp.verify({
               secret: user.twoFactorSecret,
               encoding: 'base32',
               token: twoFactorToken,
-              window: 2
+              window: 1  // ±30s — was 2 (±60s replay window)
             })
+
+            if (verified) {
+              // Mark token as used for 90s (one full TOTP step beyond the window)
+              await redis.set(replayKey, '1', { ex: 90 })
+            }
 
             if (!verified) {
               // Check if it's a backup code (hashed comparison)
