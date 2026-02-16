@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import Anthropic from "@anthropic-ai/sdk"
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { checkRateLimit, rateLimits } from '@/lib/rateLimit'
+import { checkRateLimitByIdentifier } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,16 +14,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Apply rate limiting
-    const rateLimitResult = checkRateLimit(`iterate:${session.user.email}`, rateLimits.aiGeneration)
-    if (!rateLimitResult.allowed) {
-      const resetIn = Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000)
+    // Rate limit: 30/min per user (Upstash — survives serverless cold starts)
+    const rl = await checkRateLimitByIdentifier(`iterate:${session.user.id || session.user.email}`, 'write')
+    if (!rl.success) {
+      const retryAfter = Math.ceil((rl.reset - Date.now()) / 1000)
       return NextResponse.json(
-        { 
-          error: 'Too many requests. Please try again later.',
-          resetIn 
-        },
-        { status: 429 }
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': retryAfter.toString() } }
       )
     }
 

@@ -11,10 +11,12 @@ const nextConfig: NextConfig = {
 
   images: {
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**',
-      },
+      { protocol: 'https', hostname: '*.public.blob.vercel-storage.com' }, // Vercel Blob
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },        // Google avatars
+      { protocol: 'https', hostname: 'avatars.githubusercontent.com' },    // GitHub avatars
+      { protocol: 'https', hostname: '*.supabase.co' },                    // Supabase storage
+      { protocol: 'https', hostname: 'images.unsplash.com' },              // Unsplash CDN
+      { protocol: 'https', hostname: 'picsum.photos' },                    // Lorem Picsum
     ],
     unoptimized: process.env.NODE_ENV === 'development',
   },
@@ -69,16 +71,18 @@ const nextConfig: NextConfig = {
           key: 'Content-Security-Policy',
           value: [
             "default-src 'self'",
-            // Scripts: self + Next.js inline hydration + Stripe.js (checkout)
-            "script-src 'self' 'unsafe-inline' https://js.stripe.com",
+            // Scripts: self + Next.js inline hydration + Stripe.js + Google Tag Manager + blob: for Next.js workers
+            "script-src 'self' 'unsafe-inline' https://js.stripe.com https://www.googletagmanager.com https://www.google-analytics.com blob:",
             // Styles: self + inline (Tailwind/shadcn) + Google Fonts
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             // Fonts: self + data URIs + Google Fonts CDN
             "font-src 'self' data: https://fonts.gstatic.com",
             // Images: self + data URIs + blobs (canvas) + any HTTPS host (CDN thumbnails)
             "img-src 'self' data: blob: https:",
-            // Fetch/XHR: self + Stripe + Anthropic (streaming) + Upstash
-            "connect-src 'self' https://api.stripe.com https://api.anthropic.com https://*.upstash.io",
+            // Fetch/XHR: self + Stripe + Anthropic + Upstash + Supabase + Sentry + PostHog + GTM
+            "connect-src 'self' https://api.stripe.com https://api.anthropic.com https://*.upstash.io https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://us.i.posthog.com https://eu.i.posthog.com https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com",
+            // Workers: Next.js Turbopack creates blob: workers at runtime
+            "worker-src 'self' blob:",
             // Frames: self only — preview iframes are on same origin at /preview/*
             "frame-src 'self'",
             // Clickjacking: only we can embed our own pages

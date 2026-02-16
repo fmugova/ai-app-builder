@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { sendEmail } from '@/lib/email'
-import { checkRateLimit } from '@/lib/rateLimit'
+import { checkRateLimitByIdentifier } from '@/lib/rate-limit'
 
 const schema = z.object({
   name:    z.string().min(1).max(100).trim(),
@@ -91,17 +91,18 @@ function confirmationHtml(name: string) {
 </html>`
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<NextResponse> {
   const ip = req.headers.get('cf-connecting-ip')
     || req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
     || 'unknown'
 
-  // Rate limit: 3 per 10 min per IP
-  const rl = checkRateLimit(`contact:${ip}`, { maxRequests: 3, windowMs: 10 * 60 * 1000 })
-  if (!rl.allowed) {
+  // Rate limit: 3 per 10 min per IP (Upstash — survives serverless cold starts)
+  const rl = await checkRateLimitByIdentifier(`contact:${ip}`, 'contact')
+  if (!rl.success) {
+    const retryAfter = Math.ceil((rl.reset - Date.now()) / 1000)
     return NextResponse.json(
       { error: 'Too many submissions. Please try again later.' },
-      { status: 429 }
+      { status: 429, headers: { 'Retry-After': retryAfter.toString() } }
     )
   }
 

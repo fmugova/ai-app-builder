@@ -16,15 +16,17 @@ export async function POST(request: NextRequest) {
 
     const { userIds, subscriptionTier } = await request.json()
 
+    const VALID_TIERS = ['free', 'pro', 'business', 'enterprise']
+    if (!subscriptionTier || !VALID_TIERS.includes(subscriptionTier)) {
+      return NextResponse.json({ error: 'Invalid subscriptionTier value' }, { status: 400 })
+    }
+    if (!Array.isArray(userIds) || userIds.length === 0 || userIds.length > 500) {
+      return NextResponse.json({ error: 'userIds must be an array of 1–500 IDs' }, { status: 400 })
+    }
+
     await prisma.user.updateMany({
-      where: {
-        id: {
-          in: userIds
-        }
-      },
-      data: {
-        subscriptionTier
-      }
+      where: { id: { in: userIds } },
+      data: { subscriptionTier }
     })
 
     return NextResponse.json({ success: true })

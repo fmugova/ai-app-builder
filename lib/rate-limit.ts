@@ -73,6 +73,22 @@ export const rateLimiters = {
     prefix: 'ratelimit:feedback',
   }),
 
+  // Public contact form — 3 submissions per 10 minutes per IP
+  contact: new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(3, '10 m'),
+    analytics: true,
+    prefix: 'ratelimit:contact',
+  }),
+
+  // User-generated site form submissions — 5 per minute per IP
+  formSubmit: new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(5, '1 m'),
+    analytics: true,
+    prefix: 'ratelimit:formsubmit',
+  }),
+
   preview: new Ratelimit({
     redis,
     limiter: Ratelimit.slidingWindow(10, '1 m'),

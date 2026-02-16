@@ -6,10 +6,10 @@ import crypto from 'crypto'
 // Ensure key is 32 bytes via SHA-256 derivation — validated at runtime, not module load
 function getEncryptionKey(): Buffer {
   const key = process.env.ENCRYPTION_KEY
-  if (!key && process.env.NODE_ENV === 'production') {
-    throw new Error('ENCRYPTION_KEY environment variable is required in production')
+  if (!key) {
+    throw new Error('ENCRYPTION_KEY environment variable is required')
   }
-  return crypto.createHash('sha256').update(key || 'dev-only-fallback-not-for-production-use').digest()
+  return crypto.createHash('sha256').update(key).digest()
 }
 
 /**

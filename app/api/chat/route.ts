@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import Anthropic from '@anthropic-ai/sdk'
-import { checkRateLimit, rateLimits } from '@/lib/rateLimit'
+import { checkRateLimitByIdentifier } from '@/lib/rate-limit'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -22,16 +22,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Apply rate limiting
-    const rateLimitResult = checkRateLimit(`chat:${session.user.email}`, rateLimits.aiGeneration)
-    if (!rateLimitResult.allowed) {
-      const resetIn = Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000)
+    // Rate limit: 30/min per user (Upstash — survives serverless cold starts)
+    const rl = await checkRateLimitByIdentifier(`chat:${session.user.id || session.user.email}`, 'write')
+    if (!rl.success) {
+      const retryAfter = Math.ceil((rl.reset - Date.now()) / 1000)
       return NextResponse.json(
-        { 
-          error: 'Too many requests. Please try again later.',
-          resetIn 
-        },
-        { status: 429 }
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': retryAfter.toString() } }
       )
     }
 

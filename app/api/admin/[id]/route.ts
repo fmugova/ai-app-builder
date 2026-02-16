@@ -5,21 +5,32 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { isAdmin } from '@/lib/admin'
 
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
 
-    // Check if user is admin
-    if (!session?.user?.email || !isAdmin(session.user.email)) {
+    // Check if user is admin (use DB role, not email allowlist)
+    if (!session?.user || session.user.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
     const { id } = await context.params
     const body = await request.json()
     const { subscriptionTier, projectsLimit, generationsLimit, role } = body
+
+    // Validate role to prevent arbitrary string injection
+    const VALID_ROLES = ['admin', 'user']
+    if (role !== undefined && !VALID_ROLES.includes(role)) {
+      return NextResponse.json({ error: 'Invalid role value' }, { status: 400 })
+    }
+
+    // Validate subscriptionTier
+    const VALID_TIERS = ['free', 'pro', 'business', 'enterprise']
+    if (subscriptionTier !== undefined && !VALID_TIERS.includes(subscriptionTier)) {
+      return NextResponse.json({ error: 'Invalid subscriptionTier value' }, { status: 400 })
+    }
 
     // Update user
     const updatedUser = await prisma.user.update({
@@ -33,17 +44,11 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
       }
     })
 
-    // Get admin user ID
-    const adminUser = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true }
-    })
-
     // Log activity using YOUR existing schema (type, action, metadata)
-    if (adminUser) {
+    if (session.user.id) {
       await prisma.activity.create({
         data: {
-          userId: adminUser.id,
+          userId: session.user.id,
           type: 'user_update',
           action: 'User Updated',
           metadata: {
@@ -72,8 +77,8 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
   try {
     const session = await getServerSession(authOptions)
 
-    // Check if user is admin
-    if (!session?.user?.email || !isAdmin(session.user.email)) {
+    // Check if user is admin (use DB role, not email allowlist)
+    if (!session?.user || session.user.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
@@ -94,17 +99,11 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
       where: { id: id as string }
     })
 
-    // Get admin user ID
-    const adminUser = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true }
-    })
-
     // Log activity using YOUR existing schema (type, action, metadata)
-    if (adminUser) {
+    if (session.user.id) {
       await prisma.activity.create({
         data: {
-          userId: adminUser.id,
+          userId: session.user.id,
           type: 'user_delete',
           action: 'User Deleted',
           metadata: {

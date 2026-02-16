@@ -111,13 +111,41 @@ function csrfOriginCheck(req: NextRequest): NextResponse | null {
   }
 
   const isDev = process.env.NODE_ENV === 'development'
-  const origin = req.headers.get('origin')
-  if (!origin) return null
-  if (origin === allowedOrigin) return null
-  if (isDev && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return null
 
-  console.warn(`[csrf] Blocked ${req.method} ${pathname} from origin: ${origin}`)
-  return NextResponse.json({ error: 'CSRF check failed: unexpected origin' }, { status: 403 })
+  // Accept both canonical domain and its www/non-www counterpart
+  // e.g. buildflow-ai.app ↔ www.buildflow-ai.app
+  const wwwVariant = allowedOrigin.includes('://www.')
+    ? allowedOrigin.replace('://www.', '://')
+    : allowedOrigin.replace('://', '://www.')
+
+  const isAllowedOrigin = (o: string) => {
+    if (o === allowedOrigin || o === wwwVariant) return true
+    if (isDev && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(o)) return true
+    return false
+  }
+
+  const origin = req.headers.get('origin')
+
+  // Origin present — primary CSRF signal
+  if (origin) {
+    if (isAllowedOrigin(origin)) return null
+    console.warn(`[csrf] Blocked ${req.method} ${pathname} from origin: ${origin}`)
+    return NextResponse.json({ error: 'CSRF check failed: unexpected origin' }, { status: 403 })
+  }
+
+  // Origin absent — fall back to Referer (sent by browsers on same-site form submits)
+  const referer = req.headers.get('referer')
+  if (referer) {
+    try {
+      if (isAllowedOrigin(new URL(referer).origin)) return null
+    } catch { /* malformed Referer — fall through */ }
+    console.warn(`[csrf] Blocked ${req.method} ${pathname} from referer: ${referer}`)
+    return NextResponse.json({ error: 'CSRF check failed: unexpected referer' }, { status: 403 })
+  }
+
+  // No Origin or Referer — block all mutations (legitimate server-to-server callers use API keys)
+  console.warn(`[csrf] Blocked ${req.method} ${pathname}: missing origin/referer`)
+  return NextResponse.json({ error: 'CSRF check failed: missing origin' }, { status: 403 })
 }
 
 // ── Main proxy function ───────────────────────────────────────────────────────

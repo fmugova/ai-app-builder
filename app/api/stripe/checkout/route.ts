@@ -4,7 +4,7 @@ export const runtime = 'nodejs'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { checkRateLimit } from '@/lib/rateLimit'
+import { checkRateLimitByIdentifier } from '@/lib/rate-limit'
 import Stripe from 'stripe'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -19,19 +19,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Rate limiting: 5 checkout attempts per hour per user
-    const rateLimitResult = checkRateLimit(
-      `checkout:${session.user.id || session.user.email}`,
-      {
-        maxRequests: 5,
-        windowMs: 60 * 60 * 1000
-      }
-    )
-
-    if (!rateLimitResult.allowed) {
+    // Rate limit: 5/hour per user (Upstash — survives serverless cold starts)
+    const rl = await checkRateLimitByIdentifier(`checkout:${session.user.id || session.user.email}`, 'feedback')
+    if (!rl.success) {
+      const retryAfter = Math.ceil((rl.reset - Date.now()) / 1000)
       return NextResponse.json(
         { error: 'Too many checkout attempts. Please try again later.' },
-        { status: 429 }
+        { status: 429, headers: { 'Retry-After': retryAfter.toString() } }
       )
     }
 

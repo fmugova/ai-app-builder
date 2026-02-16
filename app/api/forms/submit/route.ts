@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { checkRateLimit } from '@/lib/rateLimit'
+import { checkRateLimitByIdentifier } from '@/lib/rate-limit'
 import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
@@ -17,17 +17,16 @@ const formSubmitSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    // Apply rate limiting by IP to prevent spam
-    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
-    const rateLimitResult = checkRateLimit(`form:${ip}`, { maxRequests: 5, windowMs: 60000 }) // 5 per minute
-    if (!rateLimitResult.allowed) {
-      const resetIn = Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000)
+    // Rate limit: 5 per minute per IP (Upstash — survives serverless cold starts)
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      || request.headers.get('x-real-ip')
+      || 'unknown'
+    const rl = await checkRateLimitByIdentifier(`form:${ip}`, 'formSubmit')
+    if (!rl.success) {
+      const retryAfter = Math.ceil((rl.reset - Date.now()) / 1000)
       return NextResponse.json(
-        { 
-          error: 'Too many form submissions. Please try again later.',
-          resetIn 
-        },
-        { status: 429 }
+        { error: 'Too many form submissions. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': retryAfter.toString() } }
       )
     }
 
