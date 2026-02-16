@@ -250,49 +250,166 @@ export function getEntryFile(project: MultiFileProject): ProjectFile | null {
 }
 
 /**
- * Convert multi-file project to single HTML preview (for backward compatibility)
+ * Extract JSX body from a TSX/JSX page component and return HTML-safe content.
+ * Handles: `return (<div>...</div>)` or `return <div>...</div>`
  */
-export function convertToSingleHTML(project: MultiFileProject): string {
-  // For now, if it's a Next.js project, create a simple preview HTML
-  const pageFile = project.files.find(f => f.path === 'app/page.tsx');
-  
-  if (!pageFile) {
-    return `
-<!DOCTYPE html>
+function extractJSXBody(tsxContent: string): string {
+  // Try to find the main return statement in the default export function
+  // Patterns: return (\n  <div>...) or return <div>...
+  const returnMatch = tsxContent.match(
+    /return\s*\(\s*([\s\S]*?)\s*\)\s*;?\s*\}|return\s+(<[\s\S]*?)\s*;?\s*\}/
+  );
+
+  if (!returnMatch) return '';
+
+  let jsx = (returnMatch[1] || returnMatch[2] || '').trim();
+
+  // Convert common JSX-isms to plain HTML
+  jsx = jsx
+    // className → class
+    .replace(/\bclassName=/g, 'class=')
+    // Remove {` ... `} template literals → just the string
+    .replace(/\{`([^`]*)`\}/g, '$1')
+    // Remove simple JS expressions like {variable} → placeholder
+    .replace(/\{(\w+)\}/g, '...')
+    // Remove JSX map expressions but keep a placeholder
+    .replace(/\{[^}]*\.map\([^)]*\)\s*=>\s*\([\s\S]*?\)\)\}/g, '<!-- dynamic list -->')
+    // Remove other JSX expressions
+    .replace(/\{[^}]{0,200}\}/g, '')
+    // htmlFor → for
+    .replace(/\bhtmlFor=/g, 'for=')
+    // Self-closing tags that HTML doesn't support
+    .replace(/<(div|span|p|section|main|header|footer|nav|ul|ol|li|h[1-6]|form|table|tbody|thead|tr|td|th|article|aside)\s*\/>/g, '<$1></$1>')
+    // Remove onClick, onChange, etc. event handlers
+    .replace(/\s+on[A-Z]\w+=[{"][^}"]*[}"]/g, '');
+
+  return jsx;
+}
+
+/**
+ * Convert a single TSX page file to a complete HTML document for preview.
+ */
+export function convertTSXPageToHTML(
+  tsxContent: string,
+  pageTitle: string,
+  projectName: string,
+  globalCssContent?: string,
+): string {
+  const jsx = extractJSXBody(tsxContent);
+
+  if (!jsx) {
+    return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${pageTitle} - ${projectName}</title><script src="https://cdn.tailwindcss.com"><\/script></head>
+<body><div class="min-h-screen flex items-center justify-center"><p class="text-gray-500">Preview unavailable for this page</p></div></body></html>`;
+  }
+
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${project.projectName}</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>${pageTitle} - ${projectName}</title>
+  <script src="https://cdn.tailwindcss.com"><\/script>
+  ${globalCssContent ? `<style>${globalCssContent}</style>` : ''}
 </head>
 <body>
-  <div class="min-h-screen bg-gray-50 p-8">
-    <div class="max-w-4xl mx-auto">
-      <h1 class="text-4xl font-bold mb-4">${project.projectName}</h1>
-      <p class="text-gray-600 mb-8">${project.description}</p>
-      
-      <div class="bg-white rounded-lg shadow-md p-6">
-        <h2 class="text-2xl font-semibold mb-4">Project Files</h2>
-        <ul class="space-y-2">
-          ${project.files.map(f => `<li class="text-sm font-mono text-gray-700">${f.path}</li>`).join('\n')}
-        </ul>
-      </div>
-
-      <div class="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
-        <h3 class="text-lg font-semibold text-blue-900 mb-2">Setup Instructions</h3>
-        <ol class="list-decimal list-inside space-y-1 text-blue-800">
-          ${project.setupInstructions.map(i => `<li class="text-sm">${i}</li>`).join('\n')}
-        </ol>
-      </div>
-    </div>
-  </div>
+${jsx}
 </body>
-</html>
-    `.trim();
+</html>`;
+}
+
+/**
+ * Extract page routes from a multi-file project.
+ * Returns an array of { slug, title, content (HTML), isHomepage, order }.
+ */
+export function extractPagesFromProject(project: MultiFileProject): Array<{
+  slug: string;
+  title: string;
+  content: string;
+  isHomepage: boolean;
+  order: number;
+}> {
+  // Find global CSS (globals.css or similar)
+  const globalCssFile = project.files.find(f =>
+    f.path.includes('globals.css') || f.path.includes('global.css')
+  );
+  const globalCss = globalCssFile?.content || '';
+
+  // Find all page files: app/page.tsx, app/about/page.tsx, etc.
+  const pageFiles = project.files.filter(f =>
+    /^(app|src\/app)\/(.+\/)?page\.(tsx|jsx|ts|js)$/.test(f.path)
+  );
+
+  if (pageFiles.length === 0) return [];
+
+  const pages: Array<{
+    slug: string;
+    title: string;
+    content: string;
+    isHomepage: boolean;
+    order: number;
+  }> = [];
+
+  for (let i = 0; i < pageFiles.length; i++) {
+    const file = pageFiles[i];
+    // Extract route from path: app/page.tsx → home, app/about/page.tsx → about
+    const routeMatch = file.path.match(/^(?:src\/)?app\/(.+\/)?page\.\w+$/);
+    const routeSegment = routeMatch?.[1]?.replace(/\/$/, '') || '';
+    const isHome = routeSegment === '';
+    const slug = isHome ? 'home' : routeSegment.replace(/\//g, '-');
+    const title = isHome
+      ? 'Home'
+      : routeSegment
+          .split('/')
+          .pop()!
+          .replace(/[-_]/g, ' ')
+          .replace(/\[.*?\]/g, '')  // remove dynamic segments
+          .replace(/\b\w/g, c => c.toUpperCase())
+          .trim() || slug;
+
+    // Skip dynamic route segments like [id] — can't preview those
+    if (/\[/.test(routeSegment)) continue;
+
+    const htmlContent = convertTSXPageToHTML(file.content, title, project.projectName, globalCss);
+    pages.push({ slug, title, content: htmlContent, isHomepage: isHome, order: i });
   }
 
-  // Return basic preview
+  // Sort: homepage first, then alphabetically
+  pages.sort((a, b) => {
+    if (a.isHomepage) return -1;
+    if (b.isHomepage) return 1;
+    return a.title.localeCompare(b.title);
+  });
+
+  // Re-assign order after sort
+  pages.forEach((p, idx) => { p.order = idx; });
+
+  return pages;
+}
+
+/**
+ * Convert multi-file project to single HTML preview (for backward compatibility)
+ */
+export function convertToSingleHTML(project: MultiFileProject): string {
+  // Try to convert the home page TSX to HTML for a real preview
+  const pageFile = project.files.find(f => f.path === 'app/page.tsx' || f.path === 'src/app/page.tsx');
+
+  if (pageFile) {
+    const globalCssFile = project.files.find(f =>
+      f.path.includes('globals.css') || f.path.includes('global.css')
+    );
+    const preview = convertTSXPageToHTML(
+      pageFile.content,
+      'Home',
+      project.projectName,
+      globalCssFile?.content || '',
+    );
+    // Only use it if we got meaningful JSX content
+    if (preview.length > 300) return preview;
+  }
+
+  // Fallback: project summary page
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -300,15 +417,26 @@ export function convertToSingleHTML(project: MultiFileProject): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${project.projectName}</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com"><\/script>
 </head>
 <body>
   <div class="min-h-screen bg-gray-50 p-8">
-    <h1 class="text-4xl font-bold">${project.projectName}</h1>
-    <p class="text-gray-600 mt-4">${project.description}</p>
-    <div class="mt-8 bg-white rounded-lg shadow p-6">
-      <p class="text-gray-700">This is a Next.js application. Download the files to run locally.</p>
-      <p class="text-sm text-gray-500 mt-4">Files: ${project.files.length}</p>
+    <div class="max-w-4xl mx-auto">
+      <h1 class="text-4xl font-bold mb-4">${project.projectName}</h1>
+      <p class="text-gray-600 mb-8">${project.description}</p>
+      <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-2xl font-semibold mb-4">Project Files</h2>
+        <ul class="space-y-2">
+          ${project.files.map(f => `<li class="text-sm font-mono text-gray-700">${f.path}</li>`).join('\n')}
+        </ul>
+      </div>
+      ${project.setupInstructions.length > 0 ? `
+      <div class="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-blue-900 mb-2">Setup Instructions</h3>
+        <ol class="list-decimal list-inside space-y-1 text-blue-800">
+          ${project.setupInstructions.map(i => `<li class="text-sm">${i}</li>`).join('\n')}
+        </ol>
+      </div>` : ''}
     </div>
   </div>
 </body>

@@ -14,7 +14,7 @@ import { BUILDFLOW_ENHANCED_SYSTEM_PROMPT } from '@/lib/prompts/buildflow-enhanc
 import { ensureValidHTML } from '@/lib/templates/htmlTemplate'
 import { completeIncompleteHTML } from '@/lib/code-parser'
 import { enhanceGeneratedCode } from '@/lib/code-enhancer'
-import { parseMultiFileProject, convertToSingleHTML } from '@/lib/multi-file-parser'
+import { parseMultiFileProject, convertToSingleHTML, extractPagesFromProject } from '@/lib/multi-file-parser'
 import { extractProjectTitle } from '@/lib/utils/title-extraction'
 import { analyzePrompt } from '@/lib/utils/complexity-detection'
 import { z } from 'zod'
@@ -437,13 +437,50 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
           });
         }
 
+        // Extract page routes from TSX files and create Page records for multi-page preview
+        const extractedPages = extractPagesFromProject(parseResult.project);
+        let isMultiPage = false;
+
+        if (extractedPages.length > 0 && savedProjectId) {
+          // Delete any existing pages for this project
+          await prisma.page.deleteMany({ where: { projectId: savedProjectId } });
+
+          for (const page of extractedPages) {
+            await prisma.page.create({
+              data: {
+                projectId: savedProjectId,
+                slug: page.slug,
+                title: page.title,
+                content: page.content,
+                isHomepage: page.isHomepage,
+                order: page.order,
+                isPublished: true,
+              },
+            });
+          }
+
+          await prisma.project.update({
+            where: { id: savedProjectId },
+            data: { multiPage: true },
+          });
+
+          isMultiPage = true;
+          console.log(`✅ Multi-file project: created ${extractedPages.length} preview pages`);
+        }
+
         // Send success to client with validation
-        send(controller, { 
+        send(controller, {
           projectId: savedProjectId,
           isMultiFile: true,
           filesCount: parseResult.project.files.length,
           validation: validationData,
         });
+
+        // Signal multi-page preview if pages were created
+        if (isMultiPage) {
+          send(controller, { isMultiPage: true, pagesCount: extractedPages.length, projectId: savedProjectId });
+        }
+
         send(controller, { done: true });
         controller.close();
         return;
