@@ -65,6 +65,7 @@ const PUBLIC_PREFIXES = [
   '/examples',
   '/templates',
   '/api/health',
+  '/docs',              // Public documentation
   '/api/contact',       // Public contact form
   '/api/newsletter',    // Public newsletter sign-up
   '/api/forms',         // User-generated site forms
