@@ -299,14 +299,19 @@ export const authOptions: NextAuthOptions = {
         (token.id && (!token.roleRefreshedAt || Date.now() - (token.roleRefreshedAt as number) > ROLE_TTL_MS))
 
       if (shouldRefresh && token.id) {
-        const dbUser = await prisma.user.findUnique({
-          where: { id: token.id as string },
-          select: { emailVerified: true, role: true },
-        });
-        if (dbUser) {
-          token.emailVerified = dbUser.emailVerified;
-          token.role = dbUser.role;
-          token.roleRefreshedAt = Date.now();
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { emailVerified: true, role: true },
+          });
+          if (dbUser) {
+            token.emailVerified = dbUser.emailVerified;
+            token.role = dbUser.role;
+            token.roleRefreshedAt = Date.now();
+          }
+        } catch (err) {
+          // DB temporarily unavailable — return existing token rather than crashing the session endpoint
+          console.error('[auth] JWT token refresh failed, using cached token:', err)
         }
       }
 

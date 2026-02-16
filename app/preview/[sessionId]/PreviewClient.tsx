@@ -20,14 +20,14 @@ export default function PreviewClient({ code, projectName }: PreviewClientProps)
     // Check if Tailwind CDN is needed and missing
     const hasTailwindClasses = /class="[^"]*(?:flex|grid|p-|m-|text-|bg-|border|rounded|shadow|w-|h-)/i.test(sanitized);
     const hasTailwindCDN = sanitized.includes('tailwindcss.com') || sanitized.includes('tailwind.min.js');
-    
+
     if (hasTailwindClasses && !hasTailwindCDN) {
       const headEndIndex = sanitized.indexOf('</head>');
       if (headEndIndex !== -1) {
         const tailwindScript = '  <script src="https://cdn.tailwindcss.com"></script>\n';
-        sanitized = 
-          sanitized.substring(0, headEndIndex) + 
-          tailwindScript + 
+        sanitized =
+          sanitized.substring(0, headEndIndex) +
+          tailwindScript +
           sanitized.substring(headEndIndex);
         console.log('✅ Injected Tailwind CDN');
       }
@@ -36,14 +36,14 @@ export default function PreviewClient({ code, projectName }: PreviewClientProps)
     // Check if Babel is needed for React/JSX
     const needsBabel = sanitized.includes('type="text/babel"');
     const hasBabel = sanitized.includes('babel.min.js') || sanitized.includes('@babel/standalone');
-    
+
     if (needsBabel && !hasBabel) {
       const headEndIndex = sanitized.indexOf('</head>');
       if (headEndIndex !== -1) {
         const babelScript = '  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>\n';
-        sanitized = 
-          sanitized.substring(0, headEndIndex) + 
-          babelScript + 
+        sanitized =
+          sanitized.substring(0, headEndIndex) +
+          babelScript +
           sanitized.substring(headEndIndex);
         console.log('✅ Injected Babel standalone');
       }
@@ -55,9 +55,9 @@ export default function PreviewClient({ code, projectName }: PreviewClientProps)
       if (headEndIndex !== -1) {
         const reactScripts = `  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>\n`;
-        sanitized = 
-          sanitized.substring(0, headEndIndex) + 
-          reactScripts + 
+        sanitized =
+          sanitized.substring(0, headEndIndex) +
+          reactScripts +
           sanitized.substring(headEndIndex);
         console.log('✅ Injected React libraries');
       }

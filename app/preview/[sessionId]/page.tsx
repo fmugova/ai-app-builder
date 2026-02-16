@@ -8,12 +8,12 @@ import PreviewClient from './PreviewClient';
 export const dynamic = 'force-dynamic';
 
 interface PreviewPageProps {
-  params: Promise<{ id: string }>;
+  params: Promise<{ sessionId: string }>;
 }
 
 export default async function PreviewPage({ params }: PreviewPageProps) {
   // Await params (Next.js 15 requirement)
-  const { id } = await params;
+  const { sessionId: id } = await params;
 
   // Get headers for rate limiting
   const headersList = await headers();
@@ -23,7 +23,7 @@ export default async function PreviewPage({ params }: PreviewPageProps) {
 
   // Check rate limit (10 previews per minute)
   const rateLimit = await checkRateLimitByIdentifier(identifier, 'preview');
-  
+
   if (!rateLimit.success) {
     return (
       <div className="w-full h-screen flex items-center justify-center bg-gray-50">
