@@ -90,11 +90,11 @@ const nextConfig: NextConfig = {
             // Images: self + data URIs + blobs (canvas) + any HTTPS host (CDN thumbnails)
             "img-src 'self' data: blob: https:",
             // Fetch/XHR: self + Stripe + Anthropic + Upstash + Supabase + Sentry + PostHog + GTM
-            "connect-src 'self' https://api.stripe.com https://api.anthropic.com https://*.upstash.io https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://us.i.posthog.com https://eu.i.posthog.com https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com",
+            "connect-src 'self' https://api.stripe.com https://api.anthropic.com https://*.upstash.io https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://us.i.posthog.com https://eu.i.posthog.com https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://*.stackblitz.com https://*.webcontainer.io wss://*.webcontainer.io",
             // Workers: Next.js Turbopack creates blob: workers at runtime
             "worker-src 'self' blob:",
             // Frames: self only — preview iframes are on same origin at /preview/*
-            "frame-src 'self'",
+            "frame-src 'self' https://stackblitz.com https://*.stackblitz.com https://*.webcontainer.io",
             // Clickjacking: only we can embed our own pages
             "frame-ancestors 'self'",
             // Block <object> and <embed> entirely

@@ -322,69 +322,60 @@ export function getEntryFile(project: MultiFileProject): ProjectFile | null {
  */
 function extractJSXBody(tsxContent: string): string {
   // Strategy: find the return statement that belongs to the default export function.
-  // We look for `export default function` or the last top-level return with `(`.
-  // Then use parenthesis depth tracking to extract the full JSX body.
+  // Support both `return (jsx)` and `return <jsx>` patterns.
 
-  // Find all `return (` positions
-  const returnRegex = /\breturn\s*\(/g;
-  const returnPositions: number[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = returnRegex.exec(tsxContent)) !== null) {
-    returnPositions.push(m.index);
-  }
-
-  if (returnPositions.length === 0) return '';
-
-  // Prefer the return inside `export default function` if found
+  // Find the default export function position
   const exportDefaultMatch = tsxContent.match(/export\s+default\s+function\s+\w*/);
-  let targetReturnPos = returnPositions[returnPositions.length - 1]; // fallback: last return
+  const exportPos = exportDefaultMatch?.index ?? 0;
 
-  if (exportDefaultMatch && exportDefaultMatch.index !== undefined) {
-    // Find the first `return (` after the export default function declaration
-    const exportPos = exportDefaultMatch.index;
-    const afterExport = returnPositions.find(p => p > exportPos);
-    if (afterExport !== undefined) {
-      targetReturnPos = afterExport;
+  // Try approach 1: `return (` with parenthesis depth tracking
+  const returnParenRegex = /\breturn\s*\(/g;
+  const returnParenPositions: number[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = returnParenRegex.exec(tsxContent)) !== null) {
+    returnParenPositions.push(m.index);
+  }
+
+  // Prefer the return after export default
+  let jsx = '';
+
+  if (returnParenPositions.length > 0) {
+    let targetReturnPos = returnParenPositions[returnParenPositions.length - 1];
+    if (exportDefaultMatch && exportDefaultMatch.index !== undefined) {
+      const afterExport = returnParenPositions.find(p => p > exportPos);
+      if (afterExport !== undefined) targetReturnPos = afterExport;
+    }
+
+    const afterReturn = tsxContent.indexOf('(', targetReturnPos);
+    if (afterReturn !== -1) {
+      jsx = extractBalancedParens(tsxContent, afterReturn);
     }
   }
 
-  // Find the opening `(` after `return`
-  const afterReturn = tsxContent.indexOf('(', targetReturnPos);
-  if (afterReturn === -1) return '';
-
-  // Use depth tracking to find the matching closing `)`
-  let depth = 0;
-  let start = -1;
-  let end = -1;
-
-  for (let i = afterReturn; i < tsxContent.length; i++) {
-    const ch = tsxContent[i];
-    // Skip string literals
-    if (ch === '"' || ch === "'" || ch === '`') {
-      const quote = ch;
-      i++;
-      while (i < tsxContent.length) {
-        if (tsxContent[i] === '\\') { i++; } // skip escaped chars
-        else if (tsxContent[i] === quote) break;
-        i++;
-      }
-      continue;
+  // Try approach 2: `return <tag` without parentheses (find matching close tag via angle bracket depth)
+  if (!jsx) {
+    const returnTagRegex = /\breturn\s*(<)/g;
+    const returnTagPositions: number[] = [];
+    while ((m = returnTagRegex.exec(tsxContent)) !== null) {
+      returnTagPositions.push(m.index);
     }
-    if (ch === '(') {
-      if (depth === 0) start = i + 1; // content starts after opening paren
-      depth++;
-    } else if (ch === ')') {
-      depth--;
-      if (depth === 0) {
-        end = i;
-        break;
+
+    if (returnTagPositions.length > 0) {
+      let targetPos = returnTagPositions[returnTagPositions.length - 1];
+      if (exportDefaultMatch && exportDefaultMatch.index !== undefined) {
+        const afterExport = returnTagPositions.find(p => p > exportPos);
+        if (afterExport !== undefined) targetPos = afterExport;
+      }
+
+      // Find the `<` after return
+      const tagStart = tsxContent.indexOf('<', targetPos);
+      if (tagStart !== -1) {
+        jsx = extractBalancedJSX(tsxContent, tagStart);
       }
     }
   }
 
-  if (start === -1 || end === -1 || end <= start) return '';
-
-  let jsx = tsxContent.substring(start, end).trim();
+  if (!jsx) return '';
 
   // Sanity check: JSX should start with < (an HTML/JSX tag)
   if (!jsx.startsWith('<')) return '';
@@ -398,11 +389,124 @@ function extractJSXBody(tsxContent: string): string {
   return jsx;
 }
 
+/** Extract content inside balanced parentheses starting at `(` position. */
+function extractBalancedParens(src: string, openPos: number): string {
+  let depth = 0;
+  let start = -1;
+  let end = -1;
+
+  for (let i = openPos; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === '"' || ch === "'" || ch === '`') {
+      i = skipString(src, i);
+      continue;
+    }
+    if (ch === '(') {
+      if (depth === 0) start = i + 1;
+      depth++;
+    } else if (ch === ')') {
+      depth--;
+      if (depth === 0) { end = i; break; }
+    }
+  }
+  if (start === -1 || end === -1 || end <= start) return '';
+  return src.substring(start, end).trim();
+}
+
+/** Extract JSX starting at `<` by tracking tag depth (handles fragments `<>...</>`). */
+function extractBalancedJSX(src: string, startPos: number): string {
+  let depth = 0;
+  let i = startPos;
+  const len = src.length;
+
+  while (i < len) {
+    const ch = src[i];
+    if (ch === '"' || ch === "'" || ch === '`') {
+      i = skipString(src, i) + 1;
+      continue;
+    }
+    if (ch === '{') {
+      // Skip JSX expressions
+      let braceDepth = 1;
+      i++;
+      while (i < len && braceDepth > 0) {
+        if (src[i] === '"' || src[i] === "'" || src[i] === '`') {
+          i = skipString(src, i) + 1;
+          continue;
+        }
+        if (src[i] === '{') braceDepth++;
+        else if (src[i] === '}') braceDepth--;
+        i++;
+      }
+      continue;
+    }
+    if (ch === '<') {
+      // Check for closing tag </...> or fragment closer </>
+      if (src[i + 1] === '/') {
+        depth--;
+        // Find the `>`
+        const closeEnd = src.indexOf('>', i);
+        if (closeEnd === -1) break;
+        i = closeEnd + 1;
+        if (depth <= 0) return src.substring(startPos, i).trim();
+        continue;
+      }
+      // Self-closing tag or opening tag
+      depth++;
+      // Check if self-closing: find next `>` and check if preceded by `/`
+      let j = i + 1;
+      while (j < len && src[j] !== '>') {
+        if (src[j] === '"' || src[j] === "'" || src[j] === '`') {
+          j = skipString(src, j) + 1;
+          continue;
+        }
+        if (src[j] === '{') {
+          let bd = 1;
+          j++;
+          while (j < len && bd > 0) {
+            if (src[j] === '{') bd++;
+            else if (src[j] === '}') bd--;
+            j++;
+          }
+          continue;
+        }
+        j++;
+      }
+      if (j < len && src[j] === '>' && j > 0 && src[j - 1] === '/') {
+        depth--; // Self-closing
+      }
+      i = j + 1;
+      if (depth <= 0) return src.substring(startPos, i).trim();
+      continue;
+    }
+    i++;
+  }
+
+  // If we got some content, return what we found even if depth didn't close perfectly
+  if (i > startPos + 20) return src.substring(startPos, i).trim();
+  return '';
+}
+
+/** Skip a string literal and return index of closing quote. */
+function skipString(src: string, quotePos: number): number {
+  const quote = src[quotePos];
+  let i = quotePos + 1;
+  while (i < src.length) {
+    if (src[i] === '\\') { i++; }
+    else if (src[i] === quote) return i;
+    i++;
+  }
+  return i;
+}
+
 /**
  * Convert JSX string to plain HTML for preview.
  */
 function jsxToHtml(jsx: string): string {
   return jsx
+    // React fragments <> ... </> → just the content
+    .replace(/<>\s*/g, '')
+    .replace(/<\/>\s*/g, '')
     // className → class
     .replace(/\bclassName=/g, 'class=')
     // Remove {` ... `} template literals → just the string
@@ -424,6 +528,11 @@ function jsxToHtml(jsx: string): string {
     .replace(/\s+on[A-Z]\w+=[{"][^}"]*[}"]/g, '')
     // Remove React-specific attributes (ref, key, dangerouslySetInnerHTML)
     .replace(/\s+(ref|key|dangerouslySetInnerHTML)=[{"][^}"]*[}"]/g, '')
+    // Remove imported component tags that aren't HTML (e.g. <Link>, <Image>) — convert to <a>, <img>
+    .replace(/<Link\s+(?:href=)/g, '<a href=')
+    .replace(/<\/Link>/g, '</a>')
+    .replace(/<Image\s+/g, '<img ')
+    .replace(/<\/Image>/g, '')
     // Clean up any leftover empty attributes
     .replace(/\s+=/g, '');
 }
@@ -440,10 +549,24 @@ export function convertTSXPageToHTML(
   const jsx = extractJSXBody(tsxContent);
 
   if (!jsx) {
+    // Fallback: extract any string literals and text content from the TSX to create a basic preview
+    const strings: string[] = [];
+    const stringMatches = tsxContent.matchAll(/["'`]([A-Z][^"'`]{10,200})["'`]/g);
+    for (const sm of stringMatches) strings.push(sm[1]);
+    const fallbackContent = strings.length > 0
+      ? `<div class="max-w-4xl mx-auto p-8">
+          <h1 class="text-3xl font-bold mb-6">${pageTitle}</h1>
+          ${strings.slice(0, 8).map(s => `<p class="text-gray-600 mb-3">${s}</p>`).join('\n')}
+        </div>`
+      : `<div class="max-w-4xl mx-auto p-8 text-center">
+          <h1 class="text-3xl font-bold mb-4">${pageTitle}</h1>
+          <p class="text-gray-500">This page uses dynamic React components that require a live server to render.</p>
+        </div>`;
+
     return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${pageTitle} - ${projectName}</title><script src="https://cdn.tailwindcss.com"><\/script></head>
-<body><div class="min-h-screen flex items-center justify-center"><p class="text-gray-500">Preview unavailable for this page</p></div></body></html>`;
+<body>${fallbackContent}</body></html>`;
   }
 
   return `<!DOCTYPE html>

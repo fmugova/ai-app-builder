@@ -455,12 +455,27 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
             await prisma.page.deleteMany({ where: { projectId: savedProjectId } });
 
             for (const page of extractedPages) {
+              // Extract SEO metadata from each page's HTML content
+              const titleMatch = page.content.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+              const metaDescMatch = page.content.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i)
+                || page.content.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i);
+              const h1Match = page.content.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+              const pMatch = page.content.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+
+              const h1Text = h1Match ? h1Match[1].replace(/<[^>]*>/g, '').trim() : '';
+              const pText = pMatch ? pMatch[1].replace(/<[^>]*>/g, '').trim().slice(0, 160) : '';
+              const rawTitle = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, '').trim() : '';
+              const metaDesc = metaDescMatch ? metaDescMatch[1].trim() : '';
+
               await prisma.page.create({
                 data: {
                   projectId: savedProjectId,
                   slug: page.slug,
                   title: page.title,
                   content: page.content,
+                  description: pText || metaDesc || null,
+                  metaTitle: rawTitle || h1Text || page.title,
+                  metaDescription: metaDesc || pText || null,
                   isHomepage: page.isHomepage,
                   order: page.order,
                   isPublished: true,
@@ -481,6 +496,70 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
           }
         } else {
           console.log(`⚠️ No pages extracted (${extractedPages.length} pages, savedProjectId: ${savedProjectId})`);
+        }
+
+        // Auto-detect API endpoints from multi-file project files
+        if (savedProjectId && parseResult.project) {
+          try {
+            const apiRouteFiles = parseResult.project.files.filter(f =>
+              /^(?:src\/)?app\/api\/.*\/route\.(ts|js)$/.test(f.path) ||
+              /^(?:src\/)?pages\/api\/.*\.(ts|js)$/.test(f.path)
+            );
+
+            if (apiRouteFiles.length > 0) {
+              await prisma.apiEndpoint.deleteMany({ where: { projectId: savedProjectId, name: { startsWith: '[auto]' } } });
+
+              const endpoints: Array<{
+                projectId: string; name: string; description: string;
+                path: string; method: string; code: string;
+                requiresAuth: boolean; usesDatabase: boolean;
+                isActive: boolean; testsPassed: boolean;
+              }> = [];
+
+              for (const file of apiRouteFiles) {
+                // Extract route path from file path
+                const routePath = '/' + file.path
+                  .replace(/^(?:src\/)?(?:app|pages)\//, '')
+                  .replace(/\/route\.(ts|js)$/, '')
+                  .replace(/\.(ts|js)$/, '')
+                  .replace(/\[([^\]]+)\]/g, ':$1');
+
+                // Detect HTTP methods exported
+                const methodRegex = /export\s+(?:async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE)\b/g;
+                let methodMatch: RegExpExecArray | null;
+                const methods: string[] = [];
+                while ((methodMatch = methodRegex.exec(file.content)) !== null) {
+                  methods.push(methodMatch[1]);
+                }
+                if (methods.length === 0) methods.push('GET'); // default
+
+                const requiresAuth = /getServerSession|getToken|authorization/i.test(file.content);
+                const usesDatabase = /prisma\.|from\s+['"]@prisma\/client['"]/.test(file.content);
+
+                for (const method of methods) {
+                  endpoints.push({
+                    projectId: savedProjectId,
+                    name: `[auto] ${method} ${routePath}`,
+                    description: `Auto-detected from ${file.path}`,
+                    path: routePath,
+                    method,
+                    code: file.content.slice(0, 2000), // Store first 2KB of code
+                    requiresAuth,
+                    usesDatabase,
+                    isActive: true,
+                    testsPassed: false,
+                  });
+                }
+              }
+
+              if (endpoints.length > 0) {
+                await prisma.apiEndpoint.createMany({ data: endpoints, skipDuplicates: true });
+                console.log(`✅ Auto-detected ${endpoints.length} API endpoints from ${apiRouteFiles.length} route files`);
+              }
+            }
+          } catch (apiDetectionError) {
+            console.error('⚠️ API endpoint detection failed (non-fatal):', apiDetectionError);
+          }
         }
 
         // Send success to client with validation
@@ -610,14 +689,35 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
           const slug = rawSlug === 'index' ? 'home' : rawSlug
           const title = slug.charAt(0).toUpperCase() + slug.slice(1).replace(/-/g, ' ')
           const content = htmlFiles[i][2].trim()
+
+          // Extract SEO metadata from HTML content
+          const pageTitleMatch = content.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
+          const pageMetaDescMatch = content.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i)
+            || content.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i)
+          const pageH1Match = content.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)
+          const pagePMatch = content.match(/<p[^>]*>([\s\S]*?)<\/p>/i)
+
+          const pageRawTitle = pageTitleMatch ? pageTitleMatch[1].replace(/<[^>]*>/g, '').trim() : ''
+          const pageH1 = pageH1Match ? pageH1Match[1].replace(/<[^>]*>/g, '').trim() : ''
+          const pageMetaDesc = pageMetaDescMatch ? pageMetaDescMatch[1].trim() : ''
+          const pagePText = pagePMatch ? pagePMatch[1].replace(/<[^>]*>/g, '').trim().slice(0, 160) : ''
+
           await prisma.page.upsert({
             where: { projectId_slug: { projectId: savedMultiProjectId, slug } },
-            update: { content, title },
+            update: {
+              content, title: pageRawTitle || pageH1 || title,
+              metaTitle: pageRawTitle || pageH1 || title,
+              metaDescription: pageMetaDesc || pagePText || null,
+              description: pagePText || pageMetaDesc || null,
+            },
             create: {
               projectId: savedMultiProjectId,
               slug,
-              title,
+              title: pageRawTitle || pageH1 || title,
               content,
+              description: pagePText || pageMetaDesc || null,
+              metaTitle: pageRawTitle || pageH1 || title,
+              metaDescription: pageMetaDesc || pagePText || null,
               isHomepage: i === 0,
               order: i,
               isPublished: true,

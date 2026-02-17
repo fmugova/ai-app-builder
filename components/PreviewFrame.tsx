@@ -101,10 +101,7 @@ export default function PreviewFrame({ html, css, js, validation, onElementClick
       }
     }
     
-    // Detect if content contains markdown code fences
-    if (trimmedHtml.includes('```')) {
-      console.warn('⚠️ Markdown fences detected - stripping as safety measure');
-    }
+    // Strip markdown fences silently (common during streaming)
 
     try {
       // SAFETY NET: Strip markdown fences as last resort

@@ -24,12 +24,9 @@ export function stripMarkdownCodeFences(code: string): string {
   
   const hadFences = code.length !== cleaned.length;
   
-  if (hadFences) {
-    console.log('✅ Code cleaned:', {
-      originalLength: code.length,
-      cleanedLength: cleaned.length,
-      removed: code.length - cleaned.length,
-    });
+  if (hadFences && typeof window === 'undefined') {
+    // Only log on server to avoid flooding browser console during streaming
+    console.log('✅ Code cleaned:', code.length - cleaned.length, 'chars removed');
   }
   
   return cleaned.trim();
