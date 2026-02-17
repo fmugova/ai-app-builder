@@ -149,7 +149,7 @@ function csrfOriginCheck(req: NextRequest): NextResponse | null {
 }
 
 // ── Main proxy function ───────────────────────────────────────────────────────
-export async function proxy(request: NextRequest) {
+export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // 1. Maintenance mode — runs before everything
