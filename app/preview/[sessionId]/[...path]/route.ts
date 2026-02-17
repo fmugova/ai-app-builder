@@ -72,12 +72,22 @@ export async function GET(
   let content: string
   let mimeType: string
 
-  try {
-    const parsed = JSON.parse(stored) as { content: string; mimeType: string }
-    content = parsed.content
-    mimeType = parsed.mimeType
-  } catch {
-    content = stored
+  // Upstash Redis auto-deserializes JSON, so `stored` may already be an object
+  if (typeof stored === 'object' && stored !== null) {
+    const obj = stored as { content?: string; mimeType?: string }
+    content = obj.content || ''
+    mimeType = obj.mimeType || 'text/html; charset=utf-8'
+  } else if (typeof stored === 'string') {
+    try {
+      const parsed = JSON.parse(stored) as { content: string; mimeType: string }
+      content = parsed.content
+      mimeType = parsed.mimeType
+    } catch {
+      content = stored
+      mimeType = 'text/html; charset=utf-8'
+    }
+  } else {
+    content = String(stored)
     mimeType = 'text/html; charset=utf-8'
   }
 

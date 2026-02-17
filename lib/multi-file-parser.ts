@@ -34,6 +34,37 @@ export interface ParseResult {
 }
 
 /**
+ * Find the position after the last complete JSON key-value entry.
+ * Looks for the last `},` or `}]` or `"]` pattern that ends a complete file entry.
+ * Returns 0 if no safe truncation point found.
+ */
+function findLastCompleteJsonEntry(json: string): number {
+  // Look for the last occurrence of `}` followed by `,` or `]` or end of structure
+  // which indicates a complete object entry in an array.
+  // We search backwards for `},` or `}]` patterns.
+  // These indicate the end of a complete file object in the files array.
+
+  // Strategy: find the last `},` (end of a complete object in array)
+  // or `}` followed by whitespace and `]` (last object in array)
+  const patterns = [
+    /\}\s*,\s*(?=\s*\{|\s*\])/g,  // }, before next { or ]
+    /\}\s*\]/g,                     // }] end of array
+    /"\s*,\s*(?=\s*")/g,           // ", between string array items
+  ];
+
+  let bestPos = 0;
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(json)) !== null) {
+      const endPos = match.index + match[0].length;
+      if (endPos > bestPos) bestPos = endPos;
+    }
+  }
+
+  return bestPos;
+}
+
+/**
  * Parse AI response to extract multi-file project
  */
 export function parseMultiFileProject(aiResponse: string): ParseResult {
@@ -91,11 +122,17 @@ export function parseMultiFileProject(aiResponse: string): ParseResult {
         const validEscapes = ['\\', '"', '/', 'b', 'f', 'n', 'r', 't', 'u'];
         
         if (nextChar && validEscapes.includes(nextChar)) {
-          // Valid escape - keep as is
-          fixedString += char;
+          // Valid escape sequence (\\, \", \n, \t, etc.) — keep BOTH chars and skip past them
+          // Critical: we must skip the escape char too, otherwise \\ would cause the
+          // second \ to be re-examined and incorrectly modified
+          fixedString += char + nextChar;
+          i += 2;
+        } else if (nextChar === "'") {
+          // \' is invalid JSON — single quotes don't need escaping, just drop the backslash
+          // The next iteration will add the ' character normally
           i++;
         } else {
-          // Invalid escape - double the backslash
+          // Other invalid escape — double the backslash to preserve the literal \
           console.log(`⚠️ Fixing invalid escape at position ${i}, next char: "${nextChar}"`);
           fixedString += '\\\\';
           i++;
@@ -124,16 +161,45 @@ export function parseMultiFileProject(aiResponse: string): ParseResult {
       balanced: openBraces === closeBraces && openBrackets === closeBrackets
     });
 
-    // If JSON seems truncated, try to close it properly
+    // If JSON seems truncated, try to repair it
     if (openBraces > closeBraces || openBrackets > closeBrackets) {
       console.warn('⚠️ JSON appears truncated, attempting to repair...');
-      // Add missing closing brackets/braces
-      for (let i = 0; i < (openBrackets - closeBrackets); i++) {
-        jsonString += ']';
+
+      // Step 1: Close any unterminated string at the end.
+      // Find if we're inside an open string by scanning from the end.
+      // Truncation typically leaves a string value unclosed.
+      // Strategy: find the last complete key-value pair and truncate there.
+      const lastCompleteEntry = findLastCompleteJsonEntry(jsonString);
+      if (lastCompleteEntry > 0) {
+        jsonString = jsonString.substring(0, lastCompleteEntry);
+        console.log(`🔧 Truncated to last complete entry at position ${lastCompleteEntry}`);
+      } else {
+        // Fallback: try to close an unterminated string
+        // Check if we're inside an open string (odd number of unescaped quotes)
+        let quoteCount = 0;
+        for (let qi = 0; qi < jsonString.length; qi++) {
+          if (jsonString[qi] === '"') {
+            let bs = 0;
+            let bj = qi - 1;
+            while (bj >= 0 && jsonString[bj] === '\\') { bs++; bj--; }
+            if (bs % 2 === 0) quoteCount++;
+          }
+        }
+        if (quoteCount % 2 !== 0) {
+          // Odd quotes = unterminated string — close it
+          jsonString += '"';
+          console.log('🔧 Closed unterminated string');
+        }
       }
-      for (let i = 0; i < (openBraces - closeBraces); i++) {
-        jsonString += '}';
-      }
+
+      // Step 2: Recount and add missing closing brackets/braces
+      const ob = (jsonString.match(/{/g) || []).length;
+      const cb = (jsonString.match(/}/g) || []).length;
+      const oB = (jsonString.match(/\[/g) || []).length;
+      const cB = (jsonString.match(/\]/g) || []).length;
+
+      for (let i = 0; i < (oB - cB); i++) jsonString += ']';
+      for (let i = 0; i < (ob - cb); i++) jsonString += '}';
       console.log('🔧 Added missing closing characters');
     }
 
@@ -413,9 +479,10 @@ export function extractPagesFromProject(project: MultiFileProject): Array<{
   const globalCss = globalCssFile?.content || '';
 
   // Find all page files: app/page.tsx, app/about/page.tsx, app/(group)/page.tsx, etc.
-  // Also handle route groups like (dashboard), (auth), etc.
+  // Handle multiple route groups, nested segments, etc.
+  // Pattern: app/ followed by any mix of (group)/ or segment/ ending with page.tsx
   const pageFiles = project.files.filter(f =>
-    /^(?:src\/)?app\/(?:\([^)]+\)\/)?(?:[\w-]+\/)*page\.(tsx|jsx|ts|js)$/.test(f.path)
+    /^(?:src\/)?app\/(?:(?:\([^)]+\)|\w[\w-]*)\/)*page\.(tsx|jsx|ts|js)$/.test(f.path)
   );
 
   console.log(`📄 Found ${pageFiles.length} page files:`, pageFiles.map(f => f.path));
@@ -491,7 +558,9 @@ export function extractPagesFromProject(project: MultiFileProject): Array<{
  */
 export function convertToSingleHTML(project: MultiFileProject): string {
   // Try to convert the home page TSX to HTML for a real preview
-  const pageFile = project.files.find(f => f.path === 'app/page.tsx' || f.path === 'src/app/page.tsx');
+  // Check exact paths first, then route groups like app/(store)/page.tsx
+  const pageFile = project.files.find(f => f.path === 'app/page.tsx' || f.path === 'src/app/page.tsx')
+    || project.files.find(f => /^(?:src\/)?app\/\([^)]+\)\/page\.(tsx|jsx|ts|js)$/.test(f.path));
 
   if (pageFile) {
     const globalCssFile = project.files.find(f =>

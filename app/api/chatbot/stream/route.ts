@@ -171,7 +171,8 @@ export async function POST(req: NextRequest) {
       ? BUILDFLOW_ENHANCED_SYSTEM_PROMPT
       : STRICT_HTML_GENERATION_PROMPT;
 
-    const maxTokens = getOptimalTokenLimit(prompt)
+    // Multi-file projects need more tokens to avoid truncated JSON
+    const maxTokens = isMultiFileRequest ? 64000 : getOptimalTokenLimit(prompt)
 
     console.log('🚀 Starting generation:', {
       projectId: projectId || 'new',
@@ -300,10 +301,10 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
               type: parseResult.project.projectType,
               projectType: parseResult.project.projectType,
             isMultiFile: true,
-            dependencies: JSON.stringify(parseResult.project.dependencies),
-            devDependencies: JSON.stringify(parseResult.project.devDependencies),
-            envVars: JSON.stringify(parseResult.project.envVars),
-            setupInstructions: JSON.stringify(parseResult.project.setupInstructions),
+            dependencies: parseResult.project.dependencies || {},
+            devDependencies: parseResult.project.devDependencies || {},
+            envVars: (parseResult.project.envVars || []) as unknown as import('@prisma/client').Prisma.InputJsonValue,
+            setupInstructions: (parseResult.project.setupInstructions || []) as unknown as import('@prisma/client').Prisma.InputJsonValue,
             isComplete: true,
             status: 'COMPLETED',
             tokensUsed: BigInt(tokenCount),
@@ -328,7 +329,7 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
           console.log('✅ Multi-file project created:', savedProjectId);
         } else {
           console.log('🔄 Updating multi-file project:', savedProjectId);
-          
+
           // Delete old files
           await prisma.projectFile.deleteMany({
             where: { projectId: savedProjectId },
@@ -347,10 +348,10 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
               html: convertToSingleHTML(parseResult.project),
               projectType: parseResult.project.projectType,
               isMultiFile: true,
-              dependencies: JSON.stringify(parseResult.project.dependencies),
-              devDependencies: JSON.stringify(parseResult.project.devDependencies),
-              envVars: JSON.stringify(parseResult.project.envVars),
-              setupInstructions: JSON.stringify(parseResult.project.setupInstructions),
+              dependencies: parseResult.project.dependencies || {},
+              devDependencies: parseResult.project.devDependencies || {},
+              envVars: (parseResult.project.envVars || []) as unknown as import('@prisma/client').Prisma.InputJsonValue,
+              setupInstructions: (parseResult.project.setupInstructions || []) as unknown as import('@prisma/client').Prisma.InputJsonValue,
               updatedAt: new Date(),
             },
           });
@@ -438,34 +439,48 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
         }
 
         // Extract page routes from TSX files and create Page records for multi-page preview
-        const extractedPages = extractPagesFromProject(parseResult.project);
+        let extractedPages: Array<{ slug: string; title: string; content: string; isHomepage: boolean; order: number }> = [];
         let isMultiPage = false;
 
+        try {
+          extractedPages = extractPagesFromProject(parseResult.project);
+          console.log(`📄 extractPagesFromProject returned ${extractedPages.length} pages`);
+        } catch (pageExtractionError) {
+          console.error('❌ Page extraction failed:', pageExtractionError);
+        }
+
         if (extractedPages.length > 0 && savedProjectId) {
-          // Delete any existing pages for this project
-          await prisma.page.deleteMany({ where: { projectId: savedProjectId } });
+          try {
+            // Delete any existing pages for this project
+            await prisma.page.deleteMany({ where: { projectId: savedProjectId } });
 
-          for (const page of extractedPages) {
-            await prisma.page.create({
-              data: {
-                projectId: savedProjectId,
-                slug: page.slug,
-                title: page.title,
-                content: page.content,
-                isHomepage: page.isHomepage,
-                order: page.order,
-                isPublished: true,
-              },
+            for (const page of extractedPages) {
+              await prisma.page.create({
+                data: {
+                  projectId: savedProjectId,
+                  slug: page.slug,
+                  title: page.title,
+                  content: page.content,
+                  isHomepage: page.isHomepage,
+                  order: page.order,
+                  isPublished: true,
+                },
+              });
+            }
+
+            await prisma.project.update({
+              where: { id: savedProjectId },
+              data: { multiPage: true },
             });
+
+            isMultiPage = true;
+            console.log(`✅ Multi-file project: created ${extractedPages.length} preview pages`);
+          } catch (pageCreationError) {
+            console.error('❌ Page creation failed:', pageCreationError);
+            // Non-fatal: project was saved, just pages failed
           }
-
-          await prisma.project.update({
-            where: { id: savedProjectId },
-            data: { multiPage: true },
-          });
-
-          isMultiPage = true;
-          console.log(`✅ Multi-file project: created ${extractedPages.length} preview pages`);
+        } else {
+          console.log(`⚠️ No pages extracted (${extractedPages.length} pages, savedProjectId: ${savedProjectId})`);
         }
 
         // Send success to client with validation

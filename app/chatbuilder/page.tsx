@@ -323,6 +323,19 @@ function ChatBuilderContent() {
         toast.success(`Loaded project: ${project.name} (no code yet)`);
       }
 
+      // Load multi-file project data (files, deps, type) for WebContainer preview
+      if (project.isMultiFile && project.files && project.files.length > 0) {
+        setIsMultiFileProject(true);
+        setProjectFiles(project.files);
+        setProjectType(project.projectType || 'fullstack');
+        setProjectDependencies(
+          typeof project.dependencies === 'string'
+            ? JSON.parse(project.dependencies)
+            : project.dependencies || {}
+        );
+        setFilesCount(project.files.length);
+      }
+
       // Load pages if this is a multi-page project
       if (project.multiPage) {
         fetchProjectPages(project.id);
@@ -455,7 +468,7 @@ function ChatBuilderContent() {
                   setFilesCount(data.filesCount || 0);
                   console.log('📦 Multi-file project detected:', data.filesCount, 'files');
                   
-                  // Fetch full project data to get files
+                  // Fetch full project data to get files + update preview HTML
                   if (data.projectId) {
                     fetch(`/api/projects/${data.projectId}`)
                       .then(res => res.json())
@@ -463,7 +476,17 @@ function ChatBuilderContent() {
                         if (projectData.project?.files) {
                           setProjectFiles(projectData.project.files);
                           setProjectType(projectData.project.projectType || 'fullstack');
-                          setProjectDependencies(projectData.project.dependencies || {});
+                          setProjectDependencies(
+                            typeof projectData.project.dependencies === 'string'
+                              ? JSON.parse(projectData.project.dependencies)
+                              : projectData.project.dependencies || {}
+                          );
+                        }
+                        // Update preview HTML with the server-generated content
+                        // (replaces the garbage from parsing raw JSON during streaming)
+                        if (projectData.project?.code) {
+                          const { html, css, js } = parseCode(projectData.project.code);
+                          setState(prev => ({ ...prev, html, css, js, fullCode: projectData.project.code }));
                         }
                       })
                       .catch(err => console.error('Failed to fetch project files:', err));

@@ -58,7 +58,13 @@ export async function GET(
     }
 
     const project = await prisma.project.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        ProjectFile: {
+          select: { path: true, content: true, language: true },
+          orderBy: { order: 'asc' },
+        },
+      },
     })
 
     if (!project) {
@@ -70,7 +76,11 @@ export async function GET(
     }
 
     // ✅ Convert BigInt to Number before returning
-    const serializedProject = serializeProject(project)
+    const { ProjectFile: files, ...rest } = project
+    const serializedProject = {
+      ...serializeProject(rest),
+      files: files || [],
+    }
 
     return NextResponse.json({ project: serializedProject })
 
