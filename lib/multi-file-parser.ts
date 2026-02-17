@@ -39,29 +39,90 @@ export interface ParseResult {
  * Returns 0 if no safe truncation point found.
  */
 function findLastCompleteJsonEntry(json: string): number {
-  // Look for the last occurrence of `}` followed by `,` or `]` or end of structure
-  // which indicates a complete object entry in an array.
-  // We search backwards for `},` or `}]` patterns.
-  // These indicate the end of a complete file object in the files array.
+  // Properly track string context to find the last complete file object.
+  // We need to distinguish structural `}` from `}` inside string values.
+  //
+  // Strategy: scan the JSON tracking whether we're inside a string.
+  // Record positions of structural `}` that are followed by `,` or whitespace.
+  // The last such position marks the end of the last complete file object.
 
-  // Strategy: find the last `},` (end of a complete object in array)
-  // or `}` followed by whitespace and `]` (last object in array)
-  const patterns = [
-    /\}\s*,\s*(?=\s*\{|\s*\])/g,  // }, before next { or ]
-    /\}\s*\]/g,                     // }] end of array
-    /"\s*,\s*(?=\s*")/g,           // ", between string array items
-  ];
+  let inString = false;
+  let depth = 0;
+  let lastCompleteObjectEnd = 0;
 
-  let bestPos = 0;
-  for (const pattern of patterns) {
-    let match;
-    while ((match = pattern.exec(json)) !== null) {
-      const endPos = match.index + match[0].length;
-      if (endPos > bestPos) bestPos = endPos;
+  for (let i = 0; i < json.length; i++) {
+    const ch = json[i];
+
+    if (inString) {
+      if (ch === '\\') {
+        i++; // skip escaped character
+        continue;
+      }
+      if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    // Not inside a string
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (ch === '{' || ch === '[') {
+      depth++;
+    } else if (ch === '}' || ch === ']') {
+      depth--;
+
+      // A `}` at depth 2 is the end of a file object in the files array:
+      // depth 0 = root object, depth 1 = files array, depth 2 = file object
+      // After closing, depth becomes 1, so check for depth === 1 after decrement
+      if (ch === '}' && depth === 1) {
+        // Look ahead past whitespace for `,` (more objects follow) or `]` (array end)
+        let j = i + 1;
+        while (j < json.length && /\s/.test(json[j])) j++;
+        if (j < json.length && (json[j] === ',' || json[j] === ']')) {
+          // Include the comma if present
+          lastCompleteObjectEnd = json[j] === ',' ? j + 1 : i + 1;
+        }
+      }
     }
   }
 
-  return bestPos;
+  return lastCompleteObjectEnd;
+}
+
+/**
+ * Repair common JSON formatting errors from AI generation
+ */
+function repairCommonJsonErrors(jsonString: string): string {
+  let repaired = jsonString;
+  
+  // Fix 1: Double colon in dependencies (e.g., "pkg1": "pkg2": "version")
+  // Pattern: "key": "value": "version" should be split into two entries
+  // Match: "anykey": "@scope/pkg": "^version",
+  repaired = repaired.replace(
+    /"([^"]+)":\s*"(@[^"]+)":\s*"([^"]+)"/g,
+    (match, key, scopedPkg, version) => {
+      console.log(`🔧 Fixing double colon: ${key} / ${scopedPkg}`);
+      // Keep the scoped package with its version, remove the first key
+      return `"${scopedPkg}": "${version}"`;
+    }
+  );
+  
+  // Fix 2: Missing commas between object properties (common AI error)
+  // Pattern: }"key": should be },"key":
+  repaired = repaired.replace(/}(\s*)"([^"]+)":/g, '},$1"$2":');
+  
+  // Fix 3: Missing commas between array elements
+  // Pattern: ][ should be ],[
+  repaired = repaired.replace(/\]\s*\[/g, '],[');
+  
+  // Fix 4: Trailing commas before closing brackets (valid in JS, invalid in JSON)
+  repaired = repaired.replace(/,(\s*[}\]])/g, '$1');
+  
+  return repaired;
 }
 
 /**
@@ -165,17 +226,24 @@ export function parseMultiFileProject(aiResponse: string): ParseResult {
     if (openBraces > closeBraces || openBrackets > closeBrackets) {
       console.warn('⚠️ JSON appears truncated, attempting to repair...');
 
-      // Step 1: Close any unterminated string at the end.
-      // Find if we're inside an open string by scanning from the end.
-      // Truncation typically leaves a string value unclosed.
-      // Strategy: find the last complete key-value pair and truncate there.
+      // Find the last complete file object in the files array (string-context-aware)
       const lastCompleteEntry = findLastCompleteJsonEntry(jsonString);
       if (lastCompleteEntry > 0) {
         jsonString = jsonString.substring(0, lastCompleteEntry);
         console.log(`🔧 Truncated to last complete entry at position ${lastCompleteEntry}`);
+
+        // Now properly close the JSON structure: close files array + root object
+        // The truncated string should end right after a complete file object + comma
+        // We need: ] to close files array, then } to close root object
+        // But there may be other top-level fields after files (dependencies, etc.)
+        // that are now lost — that's OK, they're optional.
+        const trimmed = jsonString.trimEnd();
+        // Remove trailing comma if present
+        const cleaned = trimmed.endsWith(',') ? trimmed.slice(0, -1) : trimmed;
+        jsonString = cleaned + ']}';
+        console.log(`🔧 Closed files array and root object`);
       } else {
         // Fallback: try to close an unterminated string
-        // Check if we're inside an open string (odd number of unescaped quotes)
         let quoteCount = 0;
         for (let qi = 0; qi < jsonString.length; qi++) {
           if (jsonString[qi] === '"') {
@@ -186,25 +254,43 @@ export function parseMultiFileProject(aiResponse: string): ParseResult {
           }
         }
         if (quoteCount % 2 !== 0) {
-          // Odd quotes = unterminated string — close it
           jsonString += '"';
           console.log('🔧 Closed unterminated string');
         }
+
+        // Recount and add missing closing brackets/braces
+        const ob = (jsonString.match(/{/g) || []).length;
+        const cb = (jsonString.match(/}/g) || []).length;
+        const oB = (jsonString.match(/\[/g) || []).length;
+        const cB = (jsonString.match(/\]/g) || []).length;
+
+        for (let i = 0; i < (oB - cB); i++) jsonString += ']';
+        for (let i = 0; i < (ob - cb); i++) jsonString += '}';
+        console.log('🔧 Added missing closing characters');
       }
-
-      // Step 2: Recount and add missing closing brackets/braces
-      const ob = (jsonString.match(/{/g) || []).length;
-      const cb = (jsonString.match(/}/g) || []).length;
-      const oB = (jsonString.match(/\[/g) || []).length;
-      const cB = (jsonString.match(/\]/g) || []).length;
-
-      for (let i = 0; i < (oB - cB); i++) jsonString += ']';
-      for (let i = 0; i < (ob - cb); i++) jsonString += '}';
-      console.log('🔧 Added missing closing characters');
     }
 
-    // Parse JSON
-    const parsed = JSON.parse(jsonString.trim());
+    // Repair common JSON malformations before parsing
+    jsonString = repairCommonJsonErrors(jsonString);
+
+    // Parse JSON with better error context
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonString.trim());
+    } catch (parseError) {
+      // Enhanced error context for debugging
+      const error = parseError as SyntaxError;
+      const match = error.message.match(/position (\d+)/);
+      if (match) {
+        const pos = parseInt(match[1]);
+        const start = Math.max(0, pos - 100);
+        const end = Math.min(jsonString.length, pos + 100);
+        const context = jsonString.substring(start, end);
+        console.error('❌ JSON parse error at position', pos);
+        console.error('Context:', context);
+      }
+      throw parseError;
+    }
 
     // Validate required fields
     if (!parsed.projectName || !parsed.files || !Array.isArray(parsed.files)) {
@@ -214,13 +300,17 @@ export function parseMultiFileProject(aiResponse: string): ParseResult {
       };
     }
 
-    // Ensure all files have path and content
-    const validFiles = parsed.files.every((f: { path?: string; content?: string }) => f.path && f.content);
-    if (!validFiles) {
+    // Filter out any incomplete files (may happen from JSON truncation repair)
+    const originalCount = parsed.files.length;
+    parsed.files = parsed.files.filter((f: { path?: string; content?: string }) => f.path && typeof f.content === 'string');
+    if (parsed.files.length === 0) {
       return {
         success: false,
-        error: 'Invalid files: each file must have path and content',
+        error: 'Invalid files: no files have both path and content',
       };
+    }
+    if (parsed.files.length < originalCount) {
+      console.log(`⚠️ Filtered out ${originalCount - parsed.files.length} incomplete files (truncation artifact)`);
     }
 
     // Infer language from file extension
@@ -503,23 +593,16 @@ function skipString(src: string, quotePos: number): number {
  * Convert JSX string to plain HTML for preview.
  */
 function jsxToHtml(jsx: string): string {
-  return jsx
+  // Step 1: Remove all JSX expressions {...} with proper nesting support
+  // This handles nested braces like {items.filter(i => i.active).map(i => (...))}
+  let result = removeJsxExpressions(jsx);
+
+  result = result
     // React fragments <> ... </> → just the content
     .replace(/<>\s*/g, '')
     .replace(/<\/>\s*/g, '')
     // className → class
     .replace(/\bclassName=/g, 'class=')
-    // Remove {` ... `} template literals → just the string
-    .replace(/\{`([^`]*)`\}/g, '$1')
-    // Remove simple string literal expressions like {"text"}
-    .replace(/\{"([^"]{0,200})"\}/g, '$1')
-    .replace(/\{'([^']{0,200})'\}/g, '$1')
-    // Remove JSX map/filter expressions — replace with placeholder items
-    .replace(/\{[\s\S]{0,500}?\.map\([\s\S]*?\)\s*\}/g, '<!-- dynamic list -->')
-    // Remove ternary expressions {cond ? <A/> : <B/>} — keep first branch
-    .replace(/\{[^{}]*\?\s*(<[^{}]*>)\s*:\s*<[^{}]*>\s*\}/g, '$1')
-    // Remove remaining JS expressions like {variable}
-    .replace(/\{[^{}]{0,300}\}/g, '')
     // htmlFor → for
     .replace(/\bhtmlFor=/g, 'for=')
     // Self-closing tags that HTML doesn't support
@@ -528,13 +611,86 @@ function jsxToHtml(jsx: string): string {
     .replace(/\s+on[A-Z]\w+=[{"][^}"]*[}"]/g, '')
     // Remove React-specific attributes (ref, key, dangerouslySetInnerHTML)
     .replace(/\s+(ref|key|dangerouslySetInnerHTML)=[{"][^}"]*[}"]/g, '')
-    // Remove imported component tags that aren't HTML (e.g. <Link>, <Image>) — convert to <a>, <img>
+    // Convert Next.js components to HTML equivalents
     .replace(/<Link\s+(?:href=)/g, '<a href=')
     .replace(/<\/Link>/g, '</a>')
     .replace(/<Image\s+/g, '<img ')
     .replace(/<\/Image>/g, '')
-    // Clean up any leftover empty attributes
-    .replace(/\s+=/g, '');
+    // Clean up any leftover empty attributes or braces
+    .replace(/\s+=/g, '')
+    // Clean up any remaining stray braces/parens from expressions
+    .replace(/[{}()]\s*[{}()]/g, '')
+    .replace(/^\s*[})]\s*$/gm, '');
+
+  return result;
+}
+
+/**
+ * Remove JSX expressions {...} from JSX string, properly handling nesting.
+ * Preserves simple string literals like {"text"} and {`template`} as plain text.
+ * Replaces everything else with empty string or placeholder.
+ */
+function removeJsxExpressions(jsx: string): string {
+  let result = '';
+  let i = 0;
+
+  while (i < jsx.length) {
+    if (jsx[i] !== '{') {
+      result += jsx[i];
+      i++;
+      continue;
+    }
+
+    // Found `{` — extract the full expression with nested brace tracking
+    const exprStart = i;
+    let depth = 1;
+    i++; // skip opening `{`
+
+    while (i < jsx.length && depth > 0) {
+      const ch = jsx[i];
+      if (ch === '{') depth++;
+      else if (ch === '}') depth--;
+      else if (ch === '"' || ch === "'" || ch === '`') {
+        // Skip string literals inside expression
+        const quote = ch;
+        i++;
+        while (i < jsx.length) {
+          if (jsx[i] === '\\') { i++; }
+          else if (jsx[i] === quote) break;
+          // Handle ${...} inside template literals
+          else if (quote === '`' && jsx[i] === '$' && i + 1 < jsx.length && jsx[i + 1] === '{') {
+            depth++;
+            i++;
+          }
+          i++;
+        }
+      }
+      i++;
+    }
+
+    const expr = jsx.substring(exprStart + 1, i - 1).trim();
+
+    // Preserve simple string literals as plain text
+    if (/^"([^"]*)"$/.test(expr)) {
+      result += expr.slice(1, -1);
+    } else if (/^'([^']*)'$/.test(expr)) {
+      result += expr.slice(1, -1);
+    } else if (/^`([^`]*)`$/.test(expr) && !expr.includes('${')) {
+      // Simple template literal without interpolation
+      result += expr.slice(1, -1);
+    }
+    // JSX inside expression (e.g., ternary with JSX) — try to extract HTML tags
+    else if (expr.includes('<') && expr.includes('>')) {
+      const htmlMatch = expr.match(/<[a-zA-Z][^]*>/);
+      if (htmlMatch) {
+        result += '<!-- dynamic content -->';
+      }
+    }
+    // Everything else (variables, function calls, .map(), etc.) — remove
+    // Leave empty to avoid leaking JS code into HTML
+  }
+
+  return result;
 }
 
 /**
@@ -647,15 +803,32 @@ export function extractPagesFromProject(project: MultiFileProject): Array<{
           .replace(/\b\w/g, c => c.toUpperCase())
           .trim() || slug;
 
-    const htmlContent = convertTSXPageToHTML(file.content, title, project.projectName, globalCss);
+    let htmlContent = convertTSXPageToHTML(file.content, title, project.projectName, globalCss);
 
-    // Validate: skip pages with no meaningful content (< 100 chars of body)
-    // or that contain raw JSON fragments (corrupted parse)
+    // Validate: if body content is too short or contains raw JSON fragments,
+    // generate a fallback page instead of skipping entirely
     const bodyMatch = htmlContent.match(/<body>([\s\S]*)<\/body>/i);
     const bodyContent = bodyMatch?.[1]?.trim() || '';
     if (bodyContent.length < 20 || /"\s*:\s*"/.test(bodyContent) || /\{\s*"path"\s*:/.test(bodyContent)) {
-      console.log(`⏭️ Skipping page with invalid content: ${file.path} (body: ${bodyContent.length} chars)`);
-      continue;
+      console.log(`⚠️ Page body too short or corrupted: ${file.path} (${bodyContent.length} chars), using fallback`);
+      // Generate fallback with text extracted from the original TSX
+      const strings: string[] = [];
+      const stringMatches = file.content.matchAll(/["'`]([A-Z][^"'`\n]{10,200})["'`]/g);
+      for (const sm of stringMatches) strings.push(sm[1]);
+      const fallbackBody = strings.length > 0
+        ? `<div class="max-w-4xl mx-auto p-8">
+            <h1 class="text-3xl font-bold mb-6">${title}</h1>
+            ${strings.slice(0, 10).map(s => `<p class="text-gray-600 mb-3">${s}</p>`).join('\n')}
+          </div>`
+        : `<div class="max-w-4xl mx-auto p-8 text-center">
+            <h1 class="text-3xl font-bold mb-4">${title}</h1>
+            <p class="text-gray-500">This page uses interactive React components that require a live server to render.</p>
+            <p class="text-gray-400 text-sm mt-2">Use the WebContainer preview or download the project to see this page in action.</p>
+          </div>`;
+      htmlContent = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${title} - ${project.projectName}</title><script src="https://cdn.tailwindcss.com"><\/script></head>
+<body>${fallbackBody}</body></html>`;
     }
 
     pages.push({ slug, title, content: htmlContent, isHomepage: isHome, order: i });
