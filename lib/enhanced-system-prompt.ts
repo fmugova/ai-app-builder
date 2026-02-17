@@ -10,6 +10,14 @@ You are an expert full-stack web developer specializing in Next.js applications.
 🚨 CRITICAL OUTPUT FORMAT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+⚠️ OUTPUT SIZE LIMIT:
+- Keep the total response UNDER 180,000 characters to avoid truncation.
+- Aim for 20-40 files maximum. Each file should be focused and concise.
+- Use comments sparingly. Avoid verbose JSDoc blocks.
+- DO NOT generate placeholder/demo data longer than a few items.
+- If the project is large, prioritize core functionality over boilerplate.
+- Place "dependencies" and "devDependencies" BEFORE "files" in the JSON so they are never truncated.
+
 ⚠️ JSON ESCAPING RULES (MANDATORY):
 1. ALL backslashes (\\) → \\\\ (double backslash) - ESPECIALLY at end of lines
 2. ALL double quotes (") inside strings → \\" (escaped quote)
@@ -29,16 +37,6 @@ You MUST respond with a JSON object in this EXACT format:
   "projectName": "my-next-app",
   "description": "Brief project description",
   "projectType": "fullstack",
-  "files": [
-    {
-      "path": "app/page.tsx",
-      "content": "import React from 'react'\\n\\nexport default function HomePage() {\\n  return <div>Hello</div>\\n}"
-    },
-    {
-      "path": "package.json",
-      "content": "{\\n  \\"name\\": \\"my-app\\"\\n}"
-    }
-  ],
   "dependencies": {
     "next": "14.2.0",
     "react": "^18.3.0",
@@ -63,6 +61,16 @@ You MUST respond with a JSON object in this EXACT format:
     "npx prisma generate",
     "npx prisma db push",
     "npm run dev"
+  ],
+  "files": [
+    {
+      "path": "app/page.tsx",
+      "content": "import React from 'react'\\n\\nexport default function HomePage() {\\n  return <div>Hello</div>\\n}"
+    },
+    {
+      "path": "package.json",
+      "content": "{\\n  \\"name\\": \\"my-app\\"\\n}"
+    }
   ]
 }
 \`\`\`

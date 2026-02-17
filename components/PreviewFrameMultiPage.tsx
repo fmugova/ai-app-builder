@@ -33,6 +33,63 @@ export default function PreviewFrameMultiPage({
   const [currentPath, setCurrentPath] = useState('index.html')
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
+  // Navigation containment script — prevents links from escaping the preview iframe
+  const NAV_GUARD_SCRIPT = `
+<script>
+(function(){
+  // Map of known page slugs → .html files for in-preview navigation
+  var pageFiles = ${JSON.stringify(
+    Object.fromEntries(pages.map(p => [
+      p.slug,
+      p.isHomepage ? 'index.html' : `${p.slug}.html`
+    ]))
+  )};
+  var slugList = Object.keys(pageFiles);
+
+  document.addEventListener('click', function(e) {
+    var a = e.target;
+    while (a && a.tagName !== 'A') a = a.parentElement;
+    if (!a || !a.href) return;
+
+    var url;
+    try { url = new URL(a.href, location.href); } catch(_) { return; }
+
+    // Allow hash anchors on same page
+    if (url.pathname === location.pathname && url.hash) return;
+
+    // Allow .html navigation within the preview session
+    if (url.pathname.match(/\\.html$/)) return;
+
+    // Try to map app paths like /dashboard, /login to preview .html files
+    var path = url.pathname.replace(/^\\//, '').replace(/\\/$/, '') || 'index';
+    if (path === '' || path === '/') path = 'index';
+    // Check if this path matches a known page slug
+    var match = slugList.find(function(s) { return s === path || path.endsWith('/' + s); });
+    if (match) {
+      e.preventDefault();
+      e.stopPropagation();
+      location.href = pageFiles[match];
+      return;
+    }
+
+    // Block all other navigation (external links, app routes)
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
+
+  // Block form submissions
+  document.addEventListener('submit', function(e) { e.preventDefault(); }, true);
+
+  // Block window.open
+  window.open = function() { return null; };
+
+  // Block top-level navigation attempts
+  try {
+    Object.defineProperty(window, 'top', { get: function() { return window; } });
+  } catch(_) {}
+})();
+</script>`;
+
   // Build individual HTML files for each page
   const buildPageFile = useCallback((page: Page): string => {
     // Build a nav that links to other pages as real .html files
@@ -62,15 +119,16 @@ export default function PreviewFrameMultiPage({
       const navScript = `<script>${sharedJS}</script>`
 
       return page.content
-        .replace(/<head>/i, `<head>${injectedStyle}`)
+        .replace(/<head>/i, `<head><base target="_self">${injectedStyle}`)
         .replace(/<body[^>]*>/i, match => `${match}\n${nav}`)
-        .replace(/<\/body>/i, `${navScript}\n</body>`)
+        .replace(/<\/body>/i, `${navScript}\n${NAV_GUARD_SCRIPT}\n</body>`)
     }
 
     // Otherwise wrap in full HTML shell
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
+  <base target="_self">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${page.metaTitle || page.title}</title>
@@ -92,10 +150,11 @@ export default function PreviewFrameMultiPage({
   <main>
     ${page.content}
   </main>
+  ${NAV_GUARD_SCRIPT}
   <script>${sharedJS}</script>
 </body>
 </html>`
-  }, [pages, sharedCSS, sharedJS])
+  }, [pages, sharedCSS, sharedJS, NAV_GUARD_SCRIPT])
 
   // Upload all page files to the preview session server
   const createPreviewSession = useCallback(async () => {

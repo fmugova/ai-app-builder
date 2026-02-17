@@ -222,14 +222,10 @@ export default function WebContainerPreview({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [files]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      import('@/lib/webcontainer').then(({ teardownWebContainer }) => {
-        teardownWebContainer();
-      });
-    };
-  }, []);
+  // Note: We intentionally do NOT teardown the WebContainer on unmount.
+  // The SDK only allows one boot() per page lifetime, and React strict mode
+  // double-mounts components. The singleton persists at module scope and is
+  // reused if the user navigates back to chatbuilder.
 
   // ── Render ─────────────────────────────────────────────────────────────
 
