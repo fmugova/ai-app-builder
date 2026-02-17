@@ -82,10 +82,17 @@ async function maintenanceModeCheck(req: NextRequest): Promise<NextResponse | nu
   if (!redisUrl || !redisToken) return null
 
   try {
+    // Create abort controller for timeout (edge-compatible)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 500)
+    
     const res = await fetch(`${redisUrl}/get/maintenance:enabled`, {
       headers: { Authorization: `Bearer ${redisToken}` },
-      signal: AbortSignal.timeout(500),
+      signal: controller.signal,
     })
+    
+    clearTimeout(timeoutId)
+    
     if (!res.ok) return null
     const data = await res.json() as { result: string | null }
     if (data.result !== '1') return null
