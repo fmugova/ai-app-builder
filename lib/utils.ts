@@ -10,7 +10,6 @@ export function cn(...inputs: ClassValue[]) {
  * This is critical because AI often wraps code in ```html, ```javascript, etc.
  */
 export function stripMarkdownCodeFences(code: string): string {
-  console.log('🧹 Cleaning markdown code fences...');
   
   // Remove markdown code fences (```html, ```javascript, etc.)
   let cleaned = code

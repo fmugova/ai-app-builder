@@ -260,6 +260,9 @@ export default function DashboardClient({
               <Link href="/dashboard/database" className={`flex items-center gap-2 ${isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition text-sm`}>
                 <span>🗄️</span> Database
               </Link>
+              <Link href="/docs" className={`flex items-center gap-2 ${isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition text-sm`}>
+                <span>📚</span> Docs
+              </Link>
             </nav>
 
             {/* Right Section */}
@@ -426,11 +429,7 @@ export default function DashboardClient({
           </div>
         </div>
 
-        {/* TEST BUTTON - visibility check before Quick Actions */}
-        <button className="w-full p-4 bg-green-500 text-white text-xl mb-4">
-          TEST BUTTON - Can you see this?
-        </button>
-        {/* Quick Actions - CORRECT LOCATION! */}
+        {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Link 
             href="/builder"
@@ -471,16 +470,16 @@ export default function DashboardClient({
             </div>
           </Link>
 
-          <Link 
-            href="/contact"
+          <Link
+            href="/docs"
             className={`flex items-center gap-3 p-4 rounded-xl transition group ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-50'} border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}
           >
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center group-hover:scale-110 transition ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
-              <span className="text-2xl">💬</span>
+              <span className="text-2xl">📚</span>
             </div>
             <div className="text-left">
-              <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Get Help</p>
-              <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Email support</p>
+              <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Docs & Guides</p>
+              <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Tutorials & help</p>
             </div>
           </Link>
         </div>
