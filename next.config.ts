@@ -60,6 +60,16 @@ const nextConfig: NextConfig = {
 
   headers: async () => [
     {
+      // ── WebContainer headers (chatbuilder only) ──────────────────────
+      // Required for SharedArrayBuffer which WebContainers needs.
+      // Scoped to /chatbuilder to avoid breaking OAuth popups + Stripe on other pages.
+      source: '/chatbuilder/:path*',
+      headers: [
+        { key: 'Cross-Origin-Embedder-Policy', value: 'credentialless' },
+        { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+      ],
+    },
+    {
       // ── Global security headers (all routes) ───────────────────────────
       source: '/:path*',
       headers: [

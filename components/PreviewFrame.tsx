@@ -122,7 +122,7 @@ export default function PreviewFrame({ html, css, js, validation, onElementClick
       });
       // 3. Empty or hash-only src on img tags
       cleanHtml = cleanHtml.replace(/(<img\b[^>]*)\bsrc=["'](?:|#)["']/gi, '$1src="https://picsum.photos/seed/placeholder/800/600"');
-      
+
       // Verify we have actual HTML after cleaning
       if (!cleanHtml.includes('<') && !cleanHtml.includes('>')) {
         // Only log error if there's actual content (not just empty/whitespace)
@@ -130,6 +130,39 @@ export default function PreviewFrame({ html, css, js, validation, onElementClick
           console.warn('⚠️ No HTML tags found - likely streaming explanatory text:', cleanHtml.substring(0, 100));
         }
         return '';
+      }
+
+      // DOUBLE-NESTING FIX: If cleanHtml is already a full HTML document,
+      // extract head styles and body content to avoid wrapping <html> inside <html>
+      let extractedHeadContent = '';
+      let bodyContent = cleanHtml;
+      const isFullDocument = /<!DOCTYPE\s+html|<html[\s>]/i.test(cleanHtml);
+
+      if (isFullDocument) {
+        // Extract styles and links from <head>
+        const headMatch = cleanHtml.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
+        if (headMatch) {
+          const headInner = headMatch[1];
+          // Keep <style>, <link rel="stylesheet">, and Tailwind/CDN <script> tags
+          const styleMatches = headInner.match(/<style[\s\S]*?<\/style>/gi) || [];
+          const linkMatches = headInner.match(/<link[^>]*rel=["']stylesheet["'][^>]*\/?>/gi) || [];
+          const cdnScriptMatches = headInner.match(/<script[^>]*src=["']https:\/\/[^"']+["'][^>]*><\/script>/gi) || [];
+          extractedHeadContent = [...styleMatches, ...linkMatches, ...cdnScriptMatches].join('\n  ');
+        }
+
+        // Extract <body> content
+        const bodyMatch = cleanHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+        if (bodyMatch) {
+          bodyContent = bodyMatch[1];
+        } else {
+          // Fallback: strip the document wrapper tags
+          bodyContent = cleanHtml
+            .replace(/<!DOCTYPE[^>]*>/i, '')
+            .replace(/<\/?html[^>]*>/gi, '')
+            .replace(/<head[^>]*>[\s\S]*?<\/head>/i, '')
+            .replace(/<\/?body[^>]*>/gi, '')
+            .trim();
+        }
       }
 
       // SECURITY FIX: Inject navigation prevention script
@@ -222,10 +255,10 @@ export default function PreviewFrame({ html, css, js, validation, onElementClick
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Preview</title>
-  
+
   <!-- SECURITY: Base tag to contain navigation -->
   <base target="_self">
-  
+
   <!-- SECURITY: Content Security Policy -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:;
@@ -239,15 +272,16 @@ export default function PreviewFrame({ html, css, js, validation, onElementClick
     base-uri 'self';
     form-action 'none';
   ">
-  
+
+  ${extractedHeadContent}
   <style>${cleanCss}</style>
 </head>
 <body>
   <!-- SECURITY: Initialize security before any other scripts -->
   <script>${securityScript}</script>
-  
-  ${cleanHtml}
-  
+
+  ${bodyContent}
+
   <script>
     // Error handling
     window.addEventListener('error', (e) => {

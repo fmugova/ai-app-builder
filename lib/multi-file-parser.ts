@@ -251,39 +251,115 @@ export function getEntryFile(project: MultiFileProject): ProjectFile | null {
 
 /**
  * Extract JSX body from a TSX/JSX page component and return HTML-safe content.
- * Handles: `return (<div>...</div>)` or `return <div>...</div>`
+ * Uses parenthesis depth tracking to find the correct return statement
+ * from the default export (not inner helper functions).
  */
 function extractJSXBody(tsxContent: string): string {
-  // Try to find the main return statement in the default export function
-  // Patterns: return (\n  <div>...) or return <div>...
-  const returnMatch = tsxContent.match(
-    /return\s*\(\s*([\s\S]*?)\s*\)\s*;?\s*\}|return\s+(<[\s\S]*?)\s*;?\s*\}/
-  );
+  // Strategy: find the return statement that belongs to the default export function.
+  // We look for `export default function` or the last top-level return with `(`.
+  // Then use parenthesis depth tracking to extract the full JSX body.
 
-  if (!returnMatch) return '';
+  // Find all `return (` positions
+  const returnRegex = /\breturn\s*\(/g;
+  const returnPositions: number[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = returnRegex.exec(tsxContent)) !== null) {
+    returnPositions.push(m.index);
+  }
 
-  let jsx = (returnMatch[1] || returnMatch[2] || '').trim();
+  if (returnPositions.length === 0) return '';
+
+  // Prefer the return inside `export default function` if found
+  const exportDefaultMatch = tsxContent.match(/export\s+default\s+function\s+\w*/);
+  let targetReturnPos = returnPositions[returnPositions.length - 1]; // fallback: last return
+
+  if (exportDefaultMatch && exportDefaultMatch.index !== undefined) {
+    // Find the first `return (` after the export default function declaration
+    const exportPos = exportDefaultMatch.index;
+    const afterExport = returnPositions.find(p => p > exportPos);
+    if (afterExport !== undefined) {
+      targetReturnPos = afterExport;
+    }
+  }
+
+  // Find the opening `(` after `return`
+  const afterReturn = tsxContent.indexOf('(', targetReturnPos);
+  if (afterReturn === -1) return '';
+
+  // Use depth tracking to find the matching closing `)`
+  let depth = 0;
+  let start = -1;
+  let end = -1;
+
+  for (let i = afterReturn; i < tsxContent.length; i++) {
+    const ch = tsxContent[i];
+    // Skip string literals
+    if (ch === '"' || ch === "'" || ch === '`') {
+      const quote = ch;
+      i++;
+      while (i < tsxContent.length) {
+        if (tsxContent[i] === '\\') { i++; } // skip escaped chars
+        else if (tsxContent[i] === quote) break;
+        i++;
+      }
+      continue;
+    }
+    if (ch === '(') {
+      if (depth === 0) start = i + 1; // content starts after opening paren
+      depth++;
+    } else if (ch === ')') {
+      depth--;
+      if (depth === 0) {
+        end = i;
+        break;
+      }
+    }
+  }
+
+  if (start === -1 || end === -1 || end <= start) return '';
+
+  let jsx = tsxContent.substring(start, end).trim();
+
+  // Sanity check: JSX should start with < (an HTML/JSX tag)
+  if (!jsx.startsWith('<')) return '';
+
+  // Reject if it contains raw JSON structure (corrupted content)
+  if (/"\s*:\s*"/.test(jsx) || /\{\s*"path"\s*:/.test(jsx)) return '';
 
   // Convert common JSX-isms to plain HTML
-  jsx = jsx
+  jsx = jsxToHtml(jsx);
+
+  return jsx;
+}
+
+/**
+ * Convert JSX string to plain HTML for preview.
+ */
+function jsxToHtml(jsx: string): string {
+  return jsx
     // className → class
     .replace(/\bclassName=/g, 'class=')
     // Remove {` ... `} template literals → just the string
     .replace(/\{`([^`]*)`\}/g, '$1')
-    // Remove simple JS expressions like {variable} → placeholder
-    .replace(/\{(\w+)\}/g, '...')
-    // Remove JSX map expressions but keep a placeholder
-    .replace(/\{[^}]*\.map\([^)]*\)\s*=>\s*\([\s\S]*?\)\)\}/g, '<!-- dynamic list -->')
-    // Remove other JSX expressions
-    .replace(/\{[^}]{0,200}\}/g, '')
+    // Remove simple string literal expressions like {"text"}
+    .replace(/\{"([^"]{0,200})"\}/g, '$1')
+    .replace(/\{'([^']{0,200})'\}/g, '$1')
+    // Remove JSX map/filter expressions — replace with placeholder items
+    .replace(/\{[\s\S]{0,500}?\.map\([\s\S]*?\)\s*\}/g, '<!-- dynamic list -->')
+    // Remove ternary expressions {cond ? <A/> : <B/>} — keep first branch
+    .replace(/\{[^{}]*\?\s*(<[^{}]*>)\s*:\s*<[^{}]*>\s*\}/g, '$1')
+    // Remove remaining JS expressions like {variable}
+    .replace(/\{[^{}]{0,300}\}/g, '')
     // htmlFor → for
     .replace(/\bhtmlFor=/g, 'for=')
     // Self-closing tags that HTML doesn't support
     .replace(/<(div|span|p|section|main|header|footer|nav|ul|ol|li|h[1-6]|form|table|tbody|thead|tr|td|th|article|aside)\s*\/>/g, '<$1></$1>')
-    // Remove onClick, onChange, etc. event handlers
-    .replace(/\s+on[A-Z]\w+=[{"][^}"]*[}"]/g, '');
-
-  return jsx;
+    // Remove onClick, onChange, onSubmit, etc. event handlers
+    .replace(/\s+on[A-Z]\w+=[{"][^}"]*[}"]/g, '')
+    // Remove React-specific attributes (ref, key, dangerouslySetInnerHTML)
+    .replace(/\s+(ref|key|dangerouslySetInnerHTML)=[{"][^}"]*[}"]/g, '')
+    // Clean up any leftover empty attributes
+    .replace(/\s+=/g, '');
 }
 
 /**
@@ -336,10 +412,13 @@ export function extractPagesFromProject(project: MultiFileProject): Array<{
   );
   const globalCss = globalCssFile?.content || '';
 
-  // Find all page files: app/page.tsx, app/about/page.tsx, etc.
+  // Find all page files: app/page.tsx, app/about/page.tsx, app/(group)/page.tsx, etc.
+  // Also handle route groups like (dashboard), (auth), etc.
   const pageFiles = project.files.filter(f =>
-    /^(app|src\/app)\/(.+\/)?page\.(tsx|jsx|ts|js)$/.test(f.path)
+    /^(?:src\/)?app\/(?:\([^)]+\)\/)?(?:[\w-]+\/)*page\.(tsx|jsx|ts|js)$/.test(f.path)
   );
+
+  console.log(`📄 Found ${pageFiles.length} page files:`, pageFiles.map(f => f.path));
 
   if (pageFiles.length === 0) return [];
 
@@ -353,10 +432,21 @@ export function extractPagesFromProject(project: MultiFileProject): Array<{
 
   for (let i = 0; i < pageFiles.length; i++) {
     const file = pageFiles[i];
-    // Extract route from path: app/page.tsx → home, app/about/page.tsx → about
-    const routeMatch = file.path.match(/^(?:src\/)?app\/(.+\/)?page\.\w+$/);
-    const routeSegment = routeMatch?.[1]?.replace(/\/$/, '') || '';
-    const isHome = routeSegment === '';
+
+    // Skip dynamic route segments like [id], [slug] — can't preview those
+    if (/\[/.test(file.path)) {
+      console.log(`⏭️ Skipping dynamic route: ${file.path}`);
+      continue;
+    }
+
+    // Extract route from path, stripping src/app prefix and route groups like (dashboard)
+    const cleanPath = file.path
+      .replace(/^(?:src\/)?app\//, '')    // strip app/ prefix
+      .replace(/\([^)]+\)\//g, '')         // strip route groups like (dashboard)/
+      .replace(/\/?page\.\w+$/, '');       // strip page.tsx suffix (with or without leading /)
+
+    const isHome = cleanPath === '';
+    const routeSegment = isHome ? '' : cleanPath;
     const slug = isHome ? 'home' : routeSegment.replace(/\//g, '-');
     const title = isHome
       ? 'Home'
@@ -364,15 +454,22 @@ export function extractPagesFromProject(project: MultiFileProject): Array<{
           .split('/')
           .pop()!
           .replace(/[-_]/g, ' ')
-          .replace(/\[.*?\]/g, '')  // remove dynamic segments
           .replace(/\b\w/g, c => c.toUpperCase())
           .trim() || slug;
 
-    // Skip dynamic route segments like [id] — can't preview those
-    if (/\[/.test(routeSegment)) continue;
-
     const htmlContent = convertTSXPageToHTML(file.content, title, project.projectName, globalCss);
+
+    // Validate: skip pages with no meaningful content (< 100 chars of body)
+    // or that contain raw JSON fragments (corrupted parse)
+    const bodyMatch = htmlContent.match(/<body>([\s\S]*)<\/body>/i);
+    const bodyContent = bodyMatch?.[1]?.trim() || '';
+    if (bodyContent.length < 20 || /"\s*:\s*"/.test(bodyContent) || /\{\s*"path"\s*:/.test(bodyContent)) {
+      console.log(`⏭️ Skipping page with invalid content: ${file.path} (body: ${bodyContent.length} chars)`);
+      continue;
+    }
+
     pages.push({ slug, title, content: htmlContent, isHomepage: isHome, order: i });
+    console.log(`✅ Extracted page: ${title} (${slug}) from ${file.path}`);
   }
 
   // Sort: homepage first, then alphabetically
@@ -385,6 +482,7 @@ export function extractPagesFromProject(project: MultiFileProject): Array<{
   // Re-assign order after sort
   pages.forEach((p, idx) => { p.order = idx; });
 
+  console.log(`📊 Total valid pages extracted: ${pages.length}`);
   return pages;
 }
 

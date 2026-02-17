@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import { stripMarkdownCodeFences } from '@/lib/utils';
 import { generateSmartProjectName } from '@/lib/utils/project-name-generator';
+import dynamic from 'next/dynamic';
 import PreviewFrame from '@/components/PreviewFrame'
 import PreviewFrameMultiPage from '@/components/PreviewFrameMultiPage'
 import MediaLibrary from '@/components/MediaLibrary';
@@ -14,6 +15,12 @@ import MonacoCodeEditor from '@/components/MonacoCodeEditor';
 import MultiFileProjectSetup from '@/components/MultiFileProjectSetup';
 import CodeFileViewer from '@/components/CodeFileViewer';
 import PromptTemplates from '@/components/PromptTemplates';
+
+// WebContainerPreview must be client-only (uses SharedArrayBuffer, Service Workers)
+const WebContainerPreview = dynamic(
+  () => import('@/components/WebContainerPreview'),
+  { ssr: false },
+);
 import { parseMultiFileProject, convertToSingleHTML } from '@/lib/multi-file-parser';
 import { parseGeneratedCode } from '@/lib/code-parser';
 import { AlertTriangle, CheckCircle, XCircle, Download, Copy, Github, ExternalLink, Save, Sparkles, RefreshCw, Upload, Link as LinkIcon, Code2, Lightbulb, Menu, X, Wand2, ImageIcon } from 'lucide-react';
@@ -274,6 +281,8 @@ function ChatBuilderContent() {
   const [showCodeQuality, setShowCodeQuality] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isMultiFileProject, setIsMultiFileProject] = useState(false);
+  const [useWebContainer, setUseWebContainer] = useState(true);
+  const [webContainerFailed, setWebContainerFailed] = useState(false);
 
   // Auth check
   useEffect(() => {
@@ -1517,6 +1526,16 @@ Generate complete, production-ready code that fixes ALL issues above.`;
                     <p className="text-sm text-blue-800">
                       <strong>Multi-file project detected!</strong> This project was automatically saved with {currentProjectId ? 'all files stored in the database' : 'multiple files'}.
                     </p>
+                    {/* Live / Static preview toggle */}
+                    <button
+                      onClick={() => {
+                        setUseWebContainer(v => !v);
+                        if (webContainerFailed) setWebContainerFailed(false);
+                      }}
+                      className="mt-2 text-xs px-3 py-1 rounded-full border border-blue-300 text-blue-700 hover:bg-blue-100 transition-colors"
+                    >
+                      {useWebContainer && !webContainerFailed ? 'Switch to Static Preview' : 'Switch to Live Preview'}
+                    </button>
                   </div>
                 )}
                 
@@ -1709,9 +1728,19 @@ Generate complete, production-ready code that fixes ALL issues above.`;
           <div className="flex flex-col min-h-[400px] lg:min-h-0">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex-1 overflow-hidden relative">
               <ErrorBoundary>
-                {projectPages.length > 0 ? (
+                {/* Branch 1: Multi-file fullstack → WebContainer live preview */}
+                {isMultiFileProject && projectFiles.length > 0 && useWebContainer && !webContainerFailed ? (
+                  <WebContainerPreview
+                    files={projectFiles}
+                    dependencies={projectDependencies}
+                    projectType={projectType}
+                    onFallback={() => setWebContainerFailed(true)}
+                  />
+                ) : /* Branch 2: Multi-page HTML → tabbed preview */
+                projectPages.length > 0 ? (
                   <PreviewFrameMultiPage pages={projectPages} />
-                ) : (
+                ) : /* Branch 3: Single HTML → standard preview */
+                (
                   <PreviewFrame
                     html={state.html}
                     css={state.css}
