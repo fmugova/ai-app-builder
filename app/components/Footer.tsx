@@ -39,6 +39,11 @@ export default function Footer() {
                   Templates
                 </Link>
               </li>
+              <li>
+                <Link href="/docs" className="text-gray-400 hover:text-white text-sm transition">
+                  Docs & Guides
+                </Link>
+              </li>
             </ul>
           </div>
           
@@ -64,7 +69,7 @@ export default function Footer() {
             <h4 className="text-white font-semibold mb-4">Legal</h4>
             <ul className="space-y-2">
               <li>
-                <Link href="/Privacy" className="text-gray-400 hover:text-white text-sm transition">
+                <Link href="/privacy" className="text-gray-400 hover:text-white text-sm transition">
                   Privacy Policy
                 </Link>
               </li>

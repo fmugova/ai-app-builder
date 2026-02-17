@@ -289,6 +289,7 @@ export const authOptions: NextAuthOptions = {
             name: user.name,
             role: user.role,
             image: user.image,
+            emailVerified: user.emailVerified,
           }
         } catch (error) {
           console.error('[AUTH ERROR]', error)
@@ -342,35 +343,35 @@ export const authOptions: NextAuthOptions = {
   },
   events: {
     async signIn({ user, isNewUser, account }) {
-      // Log security event for all sign-ins
-      await logSecurityEvent({
-        userId: user.id,
-        type: isNewUser ? 'signup' : 'login',
-        action: 'success',
-        metadata: {
-          provider: account?.provider || 'credentials',
-          isNewUser,
-        },
-        severity: 'info',
-      })
-
-      if (isNewUser) {
-        // New user signed in for the first time — handled via security event logging above
-        
-        // Send welcome email (implement this)
-        // await sendWelcomeEmail(user.email)
+      try {
+        await logSecurityEvent({
+          userId: user.id,
+          type: isNewUser ? 'signup' : 'login',
+          action: 'success',
+          metadata: {
+            provider: account?.provider || 'credentials',
+            isNewUser,
+          },
+          severity: 'info',
+        })
+      } catch (err) {
+        // Event logging must never crash the sign-in flow
+        console.error('[auth] Failed to log signIn event:', err)
       }
     },
     async signOut({ token }) {
-      if (token.id) {
-        await logSecurityEvent({
-          userId: token.id as string,
-          type: 'logout',
-          action: 'success',
-          severity: 'info',
-        })
+      try {
+        if (token.id) {
+          await logSecurityEvent({
+            userId: token.id as string,
+            type: 'logout',
+            action: 'success',
+            severity: 'info',
+          })
+        }
+      } catch (err) {
+        console.error('[auth] Failed to log signOut event:', err)
       }
-      console.log(`User signed out: ${token.email}`)
     },
   },
 }

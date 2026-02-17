@@ -1,4 +1,6 @@
 import Footer from '../components/Footer'
+import Link from 'next/link'
+import { Navigation } from '@/components/Navigation'
 import { Zap, Code, Smartphone, Download, Github, Lock } from 'lucide-react'
 
 export default function FeaturesPage() {
@@ -38,6 +40,20 @@ export default function FeaturesPage() {
   return (
     <>
       <div className="min-h-screen bg-gray-950">
+        <header className="border-b border-gray-800 sticky top-0 z-30 bg-gray-950/80 backdrop-blur-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-16">
+              <Link href="/" className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
+                  <span className="text-white text-xl font-bold">B</span>
+                </div>
+                <span className="text-xl font-bold text-white">BuildFlow</span>
+              </Link>
+              <Navigation variant="landing" />
+            </div>
+          </div>
+        </header>
+
         {/* Hero Section */}
         <div className="bg-gradient-to-b from-purple-900/20 to-gray-950 py-20">
           <div className="max-w-7xl mx-auto px-4 text-center">

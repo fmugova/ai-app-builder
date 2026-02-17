@@ -125,9 +125,10 @@ export const metadata: Metadata = {
     title: 'BuildFlow',
   },
   
-  // Verification (replace with actual codes when available)
+  // Verification — replace with actual code from Google Search Console
+  // See: https://search.google.com/search-console → Settings → Ownership verification
   verification: {
-    google: 'your-google-verification-code',
+    google: process.env.GOOGLE_SITE_VERIFICATION || '',
   },
   
   // Robots

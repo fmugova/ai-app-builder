@@ -1,14 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Footer from '../components/Footer'
-import { Mail, MessageSquare, Send, ArrowLeft, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
+import { Mail, MessageSquare, Send, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
+import Link from 'next/link'
+import { Navigation } from '@/components/Navigation'
 
 type Status = 'idle' | 'loading' | 'success' | 'error'
 
 export default function ContactPage() {
-  const router = useRouter()
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -55,17 +55,21 @@ export default function ContactPage() {
   return (
     <>
       <div className="min-h-screen bg-gray-950">
-        <div className="max-w-4xl mx-auto px-4 py-16">
-          <div className="mb-8">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span>Back</span>
-            </button>
+        <header className="border-b border-gray-800 sticky top-0 z-30 bg-gray-950/80 backdrop-blur-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-16">
+              <Link href="/" className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
+                  <span className="text-white text-xl font-bold">B</span>
+                </div>
+                <span className="text-xl font-bold text-white">BuildFlow</span>
+              </Link>
+              <Navigation variant="landing" />
+            </div>
           </div>
+        </header>
 
+        <div className="max-w-4xl mx-auto px-4 py-16">
           <div className="text-center mb-12">
             <h1 className="text-5xl font-bold text-white mb-4">Get in Touch</h1>
             <p className="text-xl text-gray-300">
