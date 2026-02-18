@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { AlertTriangle, Eye, Home, RefreshCw, Loader2 } from 'lucide-react'
 
 interface Page {
@@ -33,13 +33,33 @@ export default function PreviewFrameMultiPage({
   const [currentPath, setCurrentPath] = useState('index.html')
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
+  // Filter out pages with no meaningful content
+  const validPages = useMemo(() => {
+    const filtered = pages.filter(page => {
+      const content = page.content?.trim() || ''
+      // Skip if content is empty, too short, or looks like a placeholder
+      if (!content || content.length < 50) {
+        console.log(`[PreviewFrameMultiPage] Filtering out page "${page.title}" (${page.slug}): content too short (${content.length} chars)`)
+        return false
+      }
+      // Skip if content looks like JSON fragments or error messages
+      if (content.startsWith('{') || content.startsWith('[') || content.includes('"error"')) {
+        console.log(`[PreviewFrameMultiPage] Filtering out page "${page.title}" (${page.slug}): looks like JSON/error`)
+        return false
+      }
+      return true
+    })
+    console.log(`[PreviewFrameMultiPage] Filtered ${pages.length} pages → ${filtered.length} valid pages`)
+    return filtered
+  }, [pages])
+
   // Navigation containment script — prevents links from escaping the preview iframe
   const NAV_GUARD_SCRIPT = `
 <script>
 (function(){
   // Map of known page slugs → .html files for in-preview navigation
   var pageFiles = ${JSON.stringify(
-    Object.fromEntries(pages.map(p => [
+    Object.fromEntries(validPages.map((p: Page) => [
       p.slug,
       p.isHomepage ? 'index.html' : `${p.slug}.html`
     ]))
@@ -93,7 +113,7 @@ export default function PreviewFrameMultiPage({
   // Build individual HTML files for each page
   const buildPageFile = useCallback((page: Page): string => {
     // Build a nav that links to other pages as real .html files
-    const navLinks = pages.map(p => {
+    const navLinks = validPages.map((p: Page) => {
       const filename = p.isHomepage ? 'index.html' : `${p.slug}.html`
       return `<a href="${filename}" class="nav-link${p.slug === page.slug ? ' active' : ''}">${p.isHomepage ? '🏠 ' : ''}${p.title}</a>`
     }).join('\n      ')
@@ -112,7 +132,7 @@ export default function PreviewFrameMultiPage({
   body { padding-top:40px!important; }
   ${sharedCSS}
 </style>`
-      const nav = `<div class="__bf-nav">${pages.map(p => {
+      const nav = `<div class="__bf-nav">${validPages.map((p: Page) => {
         const filename = p.isHomepage ? 'index.html' : `${p.slug}.html`
         return `<a href="${filename}"${p.slug === page.slug ? ' class="active"' : ''}>${p.isHomepage ? '🏠 ' : ''}${p.title}</a>`
       }).join('')}</div>`
@@ -154,14 +174,14 @@ export default function PreviewFrameMultiPage({
   <script>${sharedJS}</script>
 </body>
 </html>`
-  }, [pages, sharedCSS, sharedJS, NAV_GUARD_SCRIPT])
+  }, [validPages, sharedCSS, sharedJS, NAV_GUARD_SCRIPT])
 
   // Upload all page files to the preview session server
   const createPreviewSession = useCallback(async () => {
-    if (!pages || pages.length === 0) return
+    if (!validPages || validPages.length === 0) return
     setLoading(true)
     try {
-      const files = pages.map(page => ({
+      const files = validPages.map(page => ({
         filename: page.isHomepage ? 'index.html' : `${page.slug}.html`,
         content: buildPageFile(page),
         mimeType: 'text/html',
@@ -182,7 +202,7 @@ export default function PreviewFrameMultiPage({
     } finally {
       setLoading(false)
     }
-  }, [pages, buildPageFile])
+  }, [validPages, buildPageFile])
 
   useEffect(() => {
     createPreviewSession()
@@ -222,7 +242,7 @@ export default function PreviewFrameMultiPage({
     ? `/preview/${sessionId}/index.html`
     : undefined
 
-  const currentPageInfo = pages.find(p => {
+  const currentPageInfo = validPages.find((p: Page) => {
     const filename = p.isHomepage ? 'index.html' : `${p.slug}.html`
     return filename === currentPath
   })
@@ -246,7 +266,7 @@ export default function PreviewFrameMultiPage({
 
         {/* Page count */}
         <span className="text-xs text-gray-500 whitespace-nowrap">
-          {pages.length} page{pages.length !== 1 ? 's' : ''}
+          {validPages.length} page{validPages.length !== 1 ? 's' : ''}
         </span>
 
         {/* Reload */}
@@ -265,7 +285,7 @@ export default function PreviewFrameMultiPage({
 
       {/* Page navigation tabs */}
       <div className="bg-gray-50 border-b border-gray-200 px-3 flex items-center gap-0.5 overflow-x-auto">
-        {pages.map(page => {
+        {validPages.map((page: Page) => {
           const filename = page.isHomepage ? 'index.html' : `${page.slug}.html`
           const isActive = currentPath === filename
           return (
