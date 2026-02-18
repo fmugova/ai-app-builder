@@ -259,7 +259,26 @@ ${sanitized.replace('<!DOCTYPE html>', '').trim()}
         sbFiles['index.html'] = currentContent;
       }
 
-      // Use `npx serve` to serve static files — no npm install needed
+      // Zero-dependency static file server using Node.js built-ins
+      sbFiles['server.js'] = [
+        "const http = require('http');",
+        "const fs = require('fs');",
+        "const path = require('path');",
+        "const port = process.env.PORT || 3000;",
+        "const mime = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml' };",
+        "http.createServer((req, res) => {",
+        "  let p = req.url.split('?')[0];",
+        "  if (p === '/' || p === '') p = '/index.html';",
+        "  if (!path.extname(p)) p += '.html';",
+        "  const file = path.join(__dirname, p);",
+        "  fs.readFile(file, (err, data) => {",
+        "    if (err) { res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not found'); return; }",
+        "    res.writeHead(200, { 'Content-Type': mime[path.extname(file)] || 'text/plain' });",
+        "    res.end(data);",
+        "  });",
+        "}).listen(port, () => console.log('Server running on http://localhost:' + port));",
+      ].join('\n');
+
       sbFiles['package.json'] = JSON.stringify({
         name: (projectName || 'web-app')
           .toLowerCase()
@@ -267,7 +286,7 @@ ${sanitized.replace('<!DOCTYPE html>', '').trim()}
           .replace(/^-+|-+$/g, '')
           .slice(0, 40) || 'web-app',
         version: '1.0.0',
-        scripts: { dev: 'npx serve -p 3000 .' },
+        scripts: { dev: 'node server.js' },
         dependencies: {},
       }, null, 2);
 
