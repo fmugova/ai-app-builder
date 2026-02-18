@@ -314,24 +314,27 @@ class CodeValidator {
   // JAVASCRIPT VALIDATION
   // ==========================================================================
   public validateJavaScript(js: string): void {
-    if (!js || js.trim().length === 0) {
-      this.addInfo('performance', 'No JavaScript provided', 'low')
-      return
-    }
+    if (!js.trim()) return
 
     // Security checks
     if (js.includes('eval(')) {
-      this.addError('security', 'Security risk: eval() usage detected', 'critical')
+      this.addError('security', 'Use of eval() is forbidden for security reasons')
     }
 
-    if (js.includes('Function(')) {
-      this.addError('security', 'Security risk: Function constructor detected', 'critical')
+    if (/new\s+Function\s*\(/.test(js)) {
+      this.addError('security', 'Use of Function constructor is forbidden')
     }
 
-    // innerHTML XSS check is handled in validateSecurity to avoid double-flagging
+    // Check for innerHTML without sanitization
+    if (/\.innerHTML\s*=/.test(js)) {
+      // Check if DOMPurify.sanitize is NOT present nearby
+      if (!js.includes('DOMPurify.sanitize')) {
+        this.addError('security', 'Use of innerHTML without sanitization (DOMPurify) is a security risk')
+      }
+    }
 
-    if (js.includes('document.write')) {
-      this.addError('security', 'Security risk: document.write() can be dangerous', 'high')
+    if (/document\.write/.test(js)) {
+      this.addError('security', 'Use of document.write is forbidden')
     }
 
     // Code quality

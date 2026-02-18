@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
-import { FileText, ChevronRight, Home } from 'lucide-react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { FileText, ChevronRight, Home, ExternalLink, AlertCircle, Download } from 'lucide-react';
+import { openInStackBlitz } from '@/lib/stackblitz-helpers';
 
 interface Page {
   id: string;
@@ -36,6 +37,8 @@ export default function PreviewClient({
 }: PreviewClientProps) {
   const [currentPage, setCurrentPage] = useState<string>('main');
   const [showNav, setShowNav] = useState(true);
+  const [iframeError, setIframeError] = useState<string | null>(null);
+  const [isLoadingStackBlitz, setIsLoadingStackBlitz] = useState(false);
 
   // Get HTML files from project files
   const htmlFiles = useMemo(() => {
@@ -47,32 +50,128 @@ export default function PreviewClient({
 
   // Get current content to display
   const currentContent = useMemo(() => {
-    if (currentPage === 'main') {
+    try {
+      if (currentPage === 'main') {
+        return sanitizeCode(code);
+      }
+
+      // Check if it's a page
+      const page = pages.find(p => p.slug === currentPage);
+      if (page) {
+        return sanitizeCode(page.content);
+      }
+
+      // Check if it's a file
+      const file = htmlFiles.find(f => f.path === currentPage);
+      if (file) {
+        return sanitizeCode(file.content);
+      }
+
       return sanitizeCode(code);
+    } catch (error) {
+      console.error('Error preparing content:', error);
+      setIframeError(error instanceof Error ? error.message : 'Unknown error');
+      return createErrorPage('Failed to prepare content for preview');
     }
-
-    // Check if it's a page
-    const page = pages.find(p => p.slug === currentPage);
-    if (page) {
-      return sanitizeCode(page.content);
-    }
-
-    // Check if it's a file
-    const file = htmlFiles.find(f => f.path === currentPage);
-    if (file) {
-      return sanitizeCode(file.content);
-    }
-
-    return sanitizeCode(code);
   }, [currentPage, code, pages, htmlFiles]);
+
+  // Monitor iframe for errors
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'iframe-error') {
+        setIframeError(event.data.message);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  // Log preview info on mount
+  useEffect(() => {
+    console.log('🎨 Preview Client Initialized:', {
+      projectName,
+      codeLength: code.length,
+      pagesCount: pages.length,
+      filesCount: files.length,
+      isMultiPage,
+      hasMultiplePages,
+      currentPage
+    });
+  }, []);
+
+  // Create error page
+  function createErrorPage(message: string): string {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Preview Error</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: #f3f4f6;
+    }
+    .error-container {
+      background: white;
+      padding: 2rem;
+      border-radius: 0.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      max-width: 500px;
+      text-align: center;
+    }
+    .error-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+    }
+    h1 { color: #dc2626; margin: 0 0 0.5rem; }
+    p { color: #6b7280; }
+  </style>
+</head>
+<body>
+  <div class="error-container">
+    <div class="error-icon">⚠️</div>
+    <h1>Preview Error</h1>
+    <p>${message}</p>
+  </div>
+</body>
+</html>`;
+  }
 
   // Sanitize and prepare code for iframe
   function sanitizeCode(rawCode: string): string {
+    if (!rawCode || rawCode.trim().length === 0) {
+      console.warn('⚠️ Empty code provided to sanitizeCode');
+      return createErrorPage('No content available');
+    }
+
     let sanitized = rawCode.trim();
 
     // Ensure DOCTYPE exists
     if (!sanitized.startsWith('<!DOCTYPE')) {
       sanitized = `<!DOCTYPE html>\n${sanitized}`;
+    }
+
+    // Ensure basic HTML structure
+    if (!sanitized.includes('<html')) {
+      console.warn('⚠️ Missing <html> tag, wrapping content');
+      sanitized = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${projectName}</title>
+</head>
+<body>
+${sanitized.replace('<!DOCTYPE html>', '').trim()}
+</body>
+</html>`;
     }
 
     // Check if Tailwind CDN is needed and missing
@@ -121,7 +220,42 @@ export default function PreviewClient({
       }
     }
 
+    // Add error reporting script
+    const errorReportScript = `
+  <script>
+    window.addEventListener('error', function(e) {
+      console.error('Preview error:', e.error || e.message);
+      window.parent.postMessage({
+        type: 'iframe-error',
+        message: e.error?.message || e.message || 'Unknown error'
+      }, '*');
+    });
+  </script>`;
+    
+    sanitized = sanitized.replace('</body>', `${errorReportScript}\n</body>`);
+
     return sanitized;
+  }
+
+  // Handle StackBlitz export
+  async function handleStackBlitzExport() {
+    setIsLoadingStackBlitz(true);
+    try {
+      // Extract CSS and JS from current content
+      const cssMatch = currentContent.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+      const jsMatch = currentContent.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+      
+      const css = cssMatch ? cssMatch[1] : '';
+      const js = jsMatch ? jsMatch[1] : '';
+      
+      await openInStackBlitz(currentContent, css, js);
+      console.log('✅ StackBlitz opened successfully');
+    } catch (error) {
+      console.error('❌ Failed to open StackBlitz:', error);
+      alert('Failed to open in StackBlitz. Please try downloading the HTML instead.');
+    } finally {
+      setIsLoadingStackBlitz(false);
+    }
   }
 
   return (
@@ -219,6 +353,15 @@ export default function PreviewClient({
           </div>
           <div className="flex items-center gap-3">
             <button
+              onClick={handleStackBlitzExport}
+              disabled={isLoadingStackBlitz}
+              className="px-4 py-2 text-sm bg-orange-600 hover:bg-orange-700 disabled:bg-orange-400 text-white rounded-lg transition-colors flex items-center gap-2"
+              title="Open in StackBlitz"
+            >
+              <ExternalLink className="w-4 h-4" />
+              {isLoadingStackBlitz ? 'Opening...' : 'StackBlitz'}
+            </button>
+            <button
               onClick={() => {
                 const blob = new Blob([currentContent], { type: 'text/html' });
                 const url = URL.createObjectURL(blob);
@@ -228,9 +371,10 @@ export default function PreviewClient({
                 a.click();
                 URL.revokeObjectURL(url);
               }}
-              className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
             >
-              Download HTML
+              <Download className="w-4 h-4" />
+              Download
             </button>
             <button
               onClick={() => window.close()}
@@ -241,14 +385,35 @@ export default function PreviewClient({
           </div>
         </div>
 
+        {/* Error Banner */}
+        {iframeError && (
+          <div className="bg-red-50 border-b border-red-200 px-6 py-3 flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-800">Preview Error</p>
+              <p className="text-xs text-red-600">{iframeError}</p>
+            </div>
+            <button
+              onClick={() => setIframeError(null)}
+              className="text-red-600 hover:text-red-800 text-sm"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
         {/* Preview iframe */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden bg-white">
           <iframe
             key={currentPage}
             srcDoc={currentContent}
             className="w-full h-full border-0"
-            sandbox="allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox"
+            sandbox="allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin"
             title={`Preview: ${projectName}`}
+            onError={(e) => {
+              console.error('Iframe error:', e);
+              setIframeError('Failed to load preview');
+            }}
           />
         </div>
       </div>

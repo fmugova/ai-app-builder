@@ -83,3 +83,87 @@ export function testExtraction(text: string): void {
     console.log('HTML preview:', result.html.substring(0, 100));
   }
 }
+
+// Add detailed error logging for JSX extraction
+function extractJSXFromComponent(content: string, componentName: string): string {
+  try {
+    const jsxMatch = content.match(/<>[\s\S]*?<\/>|<[A-Z][\s\S]*?>[\s\S]*?<\/[A-Z][^>]*?>/)
+    
+    if (!jsxMatch) {
+      console.error(`❌ No JSX found in ${componentName}`, {
+        contentPreview: content.substring(0, 200),
+        contentLength: content.length,
+        hasReturnStatement: content.includes('return'),
+        hasJSXElements: /<[A-Z]/.test(content)
+      })
+      return ''
+    }
+    
+    const extracted = jsxMatch[0]
+    console.log(`✅ JSX extracted from ${componentName}: ${extracted.length} chars`)
+    return extracted
+    
+  } catch (error) {
+    console.error(`❌ JSX extraction error in ${componentName}:`, error)
+    return ''
+  }
+}
+
+// Dummy implementation for convertTSXToHTML
+async function convertTSXToHTML(tsxContent: string, pageName: string): Promise<string> {
+  // Replace with actual conversion logic as needed
+  return `<div>Converted HTML for ${pageName}</div>`;
+}
+
+// Add validation of converted HTML
+async function convertAndValidate(tsxContent: string, pageName: string): Promise<string> {
+  const html = await convertTSXToHTML(tsxContent, pageName)
+  
+  // Log conversion result
+  console.log(`🔍 Conversion result for ${pageName}:`, {
+    inputLength: tsxContent.length,
+    outputLength: html.length,
+    htmlPreview: html.substring(0, 100),
+    ratio: (html.length / tsxContent.length * 100).toFixed(1) + '%'
+  })
+  
+  // Warn if output is suspiciously short
+  if (html.length < 200 && tsxContent.length > 500) {
+    console.warn(`⚠️ ${pageName}: Output (${html.length}) much shorter than input (${tsxContent.length})`)
+  }
+  
+  return html
+}
+
+// Always log validation errors/warnings
+interface ValidationResult {
+  score: number;
+  passed: boolean;
+  errors: Array<{ category: string; message: string; line: number }>;
+  warnings: Array<{ category: string; message: string; line: number }>;
+}
+
+function logValidationResults(results: ValidationResult, filename: string): void {
+  console.log(`📊 Validation for ${filename}:`, {
+    score: results.score,
+    passed: results.passed,
+    errorCount: results.errors.length,
+    warningCount: results.warnings.length
+  })
+  
+  if (results.errors.length > 0) {
+    console.error(`❌ Errors in ${filename}:`, results.errors.map((e: { category: string; message: string; line: number }) => ({
+      category: e.category,
+      message: e.message,
+      line: e.line
+    })))
+  }
+  
+  if (results.warnings.length > 0) {
+    console.warn(`⚠️ Warnings in ${filename}:`, results.warnings.map((w: { category: string; message: string; line: number }) => ({
+      category: w.category,
+      message: w.message,
+      line: w.line
+    })))
+  }
+}
