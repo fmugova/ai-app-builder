@@ -96,7 +96,28 @@ export function toFileSystemTree(files: WebContainerFile[]): FileSystemTree {
   const tree: FileSystemTree = {};
 
   for (const { path, content } of files) {
+    // Validate file has required properties
+    if (!path || typeof path !== 'string') {
+      console.warn('[WebContainer] Skipping file with invalid path:', path);
+      continue;
+    }
+    
+    if (content === null || content === undefined) {
+      console.warn('[WebContainer] Skipping file with null/undefined content:', path);
+      continue;
+    }
+
+    // Ensure content is a string
+    const fileContent = typeof content === 'string' ? content : String(content);
+
+    // Split path and filter out empty segments
     const segments = path.split('/').filter(Boolean);
+    
+    if (segments.length === 0) {
+      console.warn('[WebContainer] Skipping file with empty path after processing:', path);
+      continue;
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let current: any = tree;
 
@@ -105,10 +126,16 @@ export function toFileSystemTree(files: WebContainerFile[]): FileSystemTree {
       const isLast = i === segments.length - 1;
 
       if (isLast) {
-        current[segment] = { file: { contents: content } };
+        // Create file entry
+        current[segment] = { file: { contents: fileContent } };
       } else {
+        // Create directory if doesn't exist
         if (!current[segment]) {
           current[segment] = { directory: {} };
+        } else if (!current[segment].directory) {
+          // Path conflict: segment exists as file but we need it as directory
+          console.error('[WebContainer] Path conflict: cannot create directory, file exists at:', segments.slice(0, i + 1).join('/'));
+          continue;
         }
         current = current[segment].directory;
       }

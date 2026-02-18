@@ -147,7 +147,23 @@ export default function WebContainerPreview({
         appendTerminal(`\x1b[90mMounting ${files.length} project files...\x1b[0m`);
         const allFiles = ensureRequiredFiles(files, dependencies, devDependencies);
         const tree = toFileSystemTree(allFiles);
-        await wc.mount(tree);
+        
+        // Validate tree is not empty
+        if (Object.keys(tree).length === 0) {
+          throw new Error('File system tree is empty - no valid files to mount');
+        }
+        
+        console.log('[WebContainer] Mounting file tree:', Object.keys(tree));
+        
+        try {
+          await wc.mount(tree);
+        } catch (mountError) {
+          const err = mountError as Error;
+          console.error('[WebContainer] Mount failed:', err);
+          console.error('[WebContainer] Tree structure:', JSON.stringify(tree, null, 2).slice(0, 500));
+          throw new Error(`Failed to mount files: ${err.message}`);
+        }
+        
         if (cancelledRef.current) return;
         appendTerminal(`\x1b[32m${allFiles.length} files mounted.\x1b[0m\r\n`);
 
@@ -211,10 +227,18 @@ export default function WebContainerPreview({
         const wc = await getWebContainer();
         const allFiles = ensureRequiredFiles(files, dependencies, devDependencies);
         const tree = toFileSystemTree(allFiles);
+        
+        // Validate tree before remounting
+        if (Object.keys(tree).length === 0) {
+          console.warn('[WebContainer] Skipping remount - tree is empty');
+          return;
+        }
+        
         await wc.mount(tree);
         appendTerminal('\x1b[90mFiles updated — HMR should pick up changes.\x1b[0m');
       } catch (err) {
         console.error('File remount error:', err);
+        appendTerminal(`\x1b[31mFile update failed: ${err instanceof Error ? err.message : 'Unknown error'}\x1b[0m`);
       }
     }
 
