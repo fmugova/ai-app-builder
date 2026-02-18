@@ -21,6 +21,7 @@ const MIME_TYPES: Record<string, string> = {
   html: 'text/html; charset=utf-8',
   css:  'text/css; charset=utf-8',
   js:   'application/javascript; charset=utf-8',
+  mjs:  'application/javascript; charset=utf-8',
   json: 'application/json',
   svg:  'image/svg+xml',
   png:  'image/png',
@@ -29,6 +30,13 @@ const MIME_TYPES: Record<string, string> = {
   gif:  'image/gif',
   webp: 'image/webp',
   ico:  'image/x-icon',
+  woff:  'font/woff',
+  woff2: 'font/woff2',
+  ttf:   'font/ttf',
+  otf:   'font/otf',
+  eot:   'application/vnd.ms-fontobject',
+  map:   'application/json',
+  txt:   'text/plain; charset=utf-8',
 }
 
 export async function GET(
@@ -42,8 +50,11 @@ export async function GET(
     return new NextResponse('Not Found', { status: 404 })
   }
 
-  // Reconstruct filename from path segments
-  const filename = path.join('/')
+  // Reconstruct filename from path segments, preventing path traversal
+  const filename = path
+    .map(seg => seg.replace(/\.\./g, '').replace(/[^a-zA-Z0-9._\-]/g, ''))
+    .filter(Boolean)
+    .join('/')
 
   // Find matching key in Redis — we stored under preview:{userId}:{sessionId}
   // We can't know userId here, so scan for the key by pattern

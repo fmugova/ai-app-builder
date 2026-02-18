@@ -135,8 +135,10 @@ export default function WebContainerPreview({
         // 1. Boot
         setPhase('booting');
         appendTerminal('\x1b[90mBooting WebContainer...\x1b[0m');
-        const { getWebContainer, toFileSystemTree, ensureRequiredFiles, runNpmInstall, runDevServer } =
-          await import('@/lib/webcontainer');
+        const {
+          getWebContainer, toFileSystemTree, ensureRequiredFiles,
+          runNpmInstall, runDevServer, getWebContainerServerUrl,
+        } = await import('@/lib/webcontainer');
 
         const wc = await getWebContainer();
         if (cancelledRef.current) return;
@@ -202,8 +204,10 @@ export default function WebContainerPreview({
         if (cancelledRef.current) return;
         appendTerminal(`\x1b[32m${validFiles.length} files mounted successfully.\x1b[0m\r\n`);
 
-        // 3. npm install (skip if deps unchanged and we already ran)
-        const needsInstall = prevDepsHash.current !== depsHash || !serverUrl;
+        // 3. npm install — skip if deps unchanged AND dev server already running
+        // (handles the case where user toggled to static preview and back)
+        const serverAlreadyRunning = !!getWebContainerServerUrl();
+        const needsInstall = !serverAlreadyRunning || prevDepsHash.current !== depsHash;
         prevDepsHash.current = depsHash;
 
         if (needsInstall) {
@@ -409,6 +413,10 @@ export default function WebContainerPreview({
             <p className="text-gray-400 text-xs max-w-md text-center mb-4">{errorMsg}</p>
             <button
               onClick={() => {
+                // Clear cached server URL so the retry spawns a fresh dev server
+                import('@/lib/webcontainer').then(({ clearWebContainerServerUrl }) => {
+                  clearWebContainerServerUrl();
+                });
                 setPhase('idle');
                 setErrorMsg('');
                 setTerminalLines([]);

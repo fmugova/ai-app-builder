@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { FileText, ChevronRight, Home, ExternalLink, AlertCircle, Download } from 'lucide-react';
-import { openInStackBlitz } from '@/lib/stackblitz-helpers';
 
 interface Page {
   id: string;
@@ -237,22 +236,54 @@ ${sanitized.replace('<!DOCTYPE html>', '').trim()}
     return sanitized;
   }
 
-  // Handle StackBlitz export
+  // Handle StackBlitz export — exports ALL pages, not just the current one
   async function handleStackBlitzExport() {
     setIsLoadingStackBlitz(true);
     try {
-      // Extract CSS and JS from current content
-      const cssMatch = currentContent.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
-      const jsMatch = currentContent.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
-      
-      const css = cssMatch ? cssMatch[1] : '';
-      const js = jsMatch ? jsMatch[1] : '';
-      
-      await openInStackBlitz(currentContent, css, js);
-      console.log('✅ StackBlitz opened successfully');
+      const { default: sdk } = await import('@stackblitz/sdk');
+
+      const sbFiles: Record<string, string> = {};
+
+      if (pages.length > 0) {
+        // Multi-page: export every page as its own HTML file
+        for (const page of pages) {
+          const filename = page.isHomepage ? 'index.html' : `${page.slug}.html`;
+          sbFiles[filename] = page.content || '';
+        }
+        // Ensure index.html exists
+        if (!sbFiles['index.html']) {
+          sbFiles['index.html'] = pages[0]?.content || currentContent;
+        }
+      } else {
+        // Single-page fallback
+        sbFiles['index.html'] = currentContent;
+      }
+
+      // Use `npx serve` to serve static files — no npm install needed
+      sbFiles['package.json'] = JSON.stringify({
+        name: (projectName || 'web-app')
+          .toLowerCase()
+          .replace(/[^a-z0-9-]/g, '-')
+          .replace(/^-+|-+$/g, '')
+          .slice(0, 40) || 'web-app',
+        version: '1.0.0',
+        scripts: { dev: 'npx serve -p 3000 .' },
+        dependencies: {},
+      }, null, 2);
+
+      await sdk.openProject(
+        {
+          title: projectName || 'Web App',
+          description: `Preview of ${projectName}`,
+          template: 'node',
+          files: sbFiles,
+        },
+        { newWindow: true, openFile: 'index.html' },
+      );
+      console.log('✅ StackBlitz opened with', Object.keys(sbFiles).length, 'files');
     } catch (error) {
       console.error('❌ Failed to open StackBlitz:', error);
-      alert('Failed to open in StackBlitz. Please try downloading the HTML instead.');
+      alert('Failed to open in StackBlitz. Please try the Download button instead.');
     } finally {
       setIsLoadingStackBlitz(false);
     }

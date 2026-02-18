@@ -104,7 +104,7 @@ function repairCommonJsonErrors(jsonString: string): string {
   // Match: "anykey": "@scope/pkg": "^version",
   repaired = repaired.replace(
     /"([^"]+)":\s*"(@[^"]+)":\s*"([^"]+)"/g,
-    (match, key, scopedPkg, version) => {
+    (_match, key, scopedPkg, version) => {
       console.log(`🔧 Fixing double colon: ${key} / ${scopedPkg}`);
       // Keep the scoped package with its version, remove the first key
       return `"${scopedPkg}": "${version}"`;
@@ -414,8 +414,11 @@ function extractJSXBody(tsxContent: string): string {
   // Strategy: find the return statement that belongs to the default export function.
   // Support both `return (jsx)` and `return <jsx>` patterns.
 
-  // Find the default export function position
-  const exportDefaultMatch = tsxContent.match(/export\s+default\s+function\s+\w*/);
+  // Find the default export function position.
+  // Match: export default function, export default async function, export default () =>, etc.
+  const exportDefaultMatch = tsxContent.match(
+    /export\s+default\s+(?:async\s+)?(?:function\s*\w*|\(\s*\)|[A-Z]\w*\s*=>|\()/
+  );
   const exportPos = exportDefaultMatch?.index ?? 0;
 
   // Try approach 1: `return (` with parenthesis depth tracking
@@ -705,9 +708,20 @@ export function convertTSXPageToHTML(
 ): string {
   const jsx = extractJSXBody(tsxContent);
 
-  if (!jsx || jsx.trim().length < 20) {
+  // Consider extraction failed if:
+  // - Nothing was extracted at all
+  // - Result has no actual HTML tags (e.g., just whitespace after expression removal)
+  // - Result is extremely short (< 50 chars) — less than a single meaningful tag
+  const hasHtmlTags = jsx ? /<[a-zA-Z]/.test(jsx) : false;
+  const extractionFailed = !jsx || !hasHtmlTags || jsx.trim().length < 50;
+
+  if (extractionFailed) {
     // Enhanced fallback: Try to extract more meaningful content
-    console.log('⚠️ JSX extraction failed or too short, creating enhanced fallback');
+    if (jsx) {
+      console.log(`⚠️ JSX extraction too short/empty after conversion (${jsx.trim().length} chars), creating enhanced fallback`);
+    } else {
+      console.log('⚠️ JSX extraction failed, creating enhanced fallback');
+    }
     
     const strings: string[] = [];
     // Extract string literals with better filtering

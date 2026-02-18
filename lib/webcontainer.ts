@@ -24,6 +24,7 @@ export type ServerReadyCallback = (port: number, url: string) => void;
 interface WCGlobal {
   __wc_instance?: WebContainer | null;
   __wc_booting?: Promise<WebContainer> | null;
+  __wc_server_url?: string | null;
 }
 
 const _g = (typeof globalThis !== 'undefined' ? globalThis : window) as unknown as WCGlobal;
@@ -59,6 +60,16 @@ export async function getWebContainer(): Promise<WebContainer> {
 
 export function isWebContainerBooted(): boolean {
   return _g.__wc_instance != null;
+}
+
+/** Returns the cached dev server URL if the server is already running. */
+export function getWebContainerServerUrl(): string | null {
+  return _g.__wc_server_url ?? null;
+}
+
+/** Clear the cached server URL (call before Retry to force a fresh dev server start). */
+export function clearWebContainerServerUrl(): void {
+  _g.__wc_server_url = null;
 }
 
 /** Tear down the singleton. Only call on full page navigation. */
@@ -276,9 +287,11 @@ export function ensureRequiredFiles(
         pkg.devDependencies = cleaned;
         allRemoved.push(...removed);
       }
-      // Ensure dev script uses --turbo for faster starts
-      if (pkg.scripts?.dev && !pkg.scripts.dev.includes('--turbo')) {
-        pkg.scripts.dev = pkg.scripts.dev.replace('next dev', 'next dev --turbo');
+      // Strip --turbo flag: Turbopack can output startup messages in a format
+      // that the WebContainer SDK's port-detection doesn't recognise, causing
+      // the server-ready event to never fire.
+      if (pkg.scripts?.dev) {
+        pkg.scripts.dev = pkg.scripts.dev.replace(/\s*--turbo/g, '');
       }
       // Remove prisma-specific scripts
       if (pkg.scripts) {
@@ -306,7 +319,7 @@ export function ensureRequiredFiles(
       name: 'buildflow-preview',
       version: '0.1.0',
       private: true,
-      scripts: { dev: 'next dev --turbo', build: 'next build', start: 'next start' },
+      scripts: { dev: 'next dev', build: 'next build', start: 'next start' },
       dependencies: {
         next: '^14.0.0',
         react: '^18.2.0',
@@ -367,10 +380,29 @@ export function ensureRequiredFiles(
       }
     }
 
-    console.warn(`[WebContainer] Stripped: ${allRemoved.join(', ')} — injected mocks`);
+    console.warn(`[WebContainer] Stripped: ${allRemoved.join(', ')} — injected Prisma mocks`);
   }
 
-  if (allRemoved.length > 0 && !hadPrisma) {
+  // ── 4. Inject bcrypt mock if native bcrypt was stripped ───────────────
+  const hadBcrypt = allRemoved.includes('bcrypt');
+  if (hadBcrypt) {
+    const mockPath = 'lib/bcrypt-mock.ts';
+    result.push({ path: mockPath, content: MOCK_BCRYPT });
+    // Redirect any `import ... from 'bcrypt'` to the mock
+    for (let i = 0; i < result.length; i++) {
+      const f = result[i];
+      if (f.content.includes("from 'bcrypt'") || f.content.includes('from "bcrypt"')) {
+        result[i] = {
+          ...f,
+          content: f.content
+            .replace(/from\s+['"]bcrypt['"]/g, "from '@/lib/bcrypt-mock'"),
+        };
+      }
+    }
+    console.warn('[WebContainer] bcrypt stripped — injected pure-JS mock');
+  }
+
+  if (allRemoved.length > 0 && !hadPrisma && !hadBcrypt) {
     console.warn(`[WebContainer] Stripped incompatible packages: ${allRemoved.join(', ')}`);
   }
 
@@ -425,20 +457,46 @@ export async function runNpmInstall(
   return exitCode;
 }
 
-/** Run `npm run dev` and stream output. Fires onServerReady when the dev server is listening. */
+/** Run `npm run dev` and stream output. Fires onServerReady when the dev server is listening.
+ *
+ * If the dev server is already running from a previous component mount (e.g. user toggled
+ * to static preview and back), we skip spawning a second process — port 3000 would conflict —
+ * and immediately fire onServerReady with the cached URL instead.
+ *
+ * Returns a reject promise if the server doesn't become ready within `timeoutMs`.
+ */
 export async function runDevServer(
   wc: WebContainer,
   onOutput: OutputCallback,
   onServerReady: ServerReadyCallback,
+  timeoutMs: number = 180_000,
 ): Promise<void> {
-  onOutput('\r\n\x1b[36m$ npm run dev\x1b[0m\r\n');
-  const process = await wc.spawn('npm', ['run', 'dev']);
+  // Short-circuit: server already running from a previous mount
+  if (_g.__wc_server_url) {
+    onOutput('\x1b[90mDev server already running — reconnecting.\x1b[0m\r\n');
+    onServerReady(3000, _g.__wc_server_url);
+    return;
+  }
 
-  process.output.pipeTo(
+  onOutput('\r\n\x1b[36m$ npm run dev\x1b[0m\r\n');
+  const proc = await wc.spawn('npm', ['run', 'dev']);
+
+  proc.output.pipeTo(
     new WritableStream({ write(data) { onOutput(data); } }),
   );
 
-  wc.on('server-ready', (port, url) => {
-    onServerReady(port, url);
+  // Race: server-ready event vs timeout
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      proc.kill();
+      reject(new Error('Dev server did not start within 3 minutes. Check the terminal for errors.'));
+    }, timeoutMs);
+
+    wc.on('server-ready', (port, url) => {
+      clearTimeout(timer);
+      _g.__wc_server_url = url;
+      onServerReady(port, url);
+      resolve();
+    });
   });
 }

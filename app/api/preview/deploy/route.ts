@@ -48,6 +48,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Cap files to prevent abuse — Vercel has its own limits too
+    if (files.length > 200) {
+      return NextResponse.json({ error: 'Too many files (max 200)' }, { status: 413 })
+    }
+
+    const totalBytes = files.reduce((acc: number, f: { content?: string }) => acc + (f.content?.length ?? 0), 0)
+    if (totalBytes > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: 'Total file size too large (max 10 MB)' }, { status: 413 })
+    }
+
     // 3. Verify project ownership
     const project = await prisma.project.findUnique({
       where: {
@@ -123,13 +133,8 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Preview deployment error:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    
     return NextResponse.json(
-      { 
-        error: 'Deployment failed',
-        details: errorMessage 
-      },
+      { error: 'Deployment failed' },
       { status: 500 }
     )
   }
@@ -145,10 +150,22 @@ export async function POST(request: NextRequest) {
 function prepareFilesForVercel(
   files: Array<{ path: string; content: string }>
 ): VercelFile[] {
-  return files.map(file => ({
-    file: file.path,
-    data: Buffer.from(file.content).toString('base64'),
-  }))
+  return files
+    .filter(file => typeof file.path === 'string' && typeof file.content === 'string')
+    .map(file => {
+      // Sanitise path: resolve away traversal attempts, enforce relative path
+      const safePath = file.path
+        .replace(/\\/g, '/')                           // normalise backslashes
+        .split('/')
+        .filter(seg => seg !== '..' && seg !== '.')    // strip traversal
+        .filter(Boolean)
+        .join('/')
+      return {
+        file: safePath,
+        data: Buffer.from(file.content).toString('base64'),
+      }
+    })
+    .filter(file => file.file.length > 0)
 }
 
 /**

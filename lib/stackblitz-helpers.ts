@@ -206,7 +206,8 @@ export async function openInStackBlitz(
     console.log('📄 HTML preview:', html.substring(0, 200))
     
     // Open in new window
-    const sdk = await import('@stackblitz/sdk')
+    // SDK methods are on the default export (StackBlitzSDK object), not named exports
+    const { default: sdk } = await import('@stackblitz/sdk')
     await sdk.openProject(project, {
       newWindow: true,
       openFile: 'index.html',
@@ -231,14 +232,14 @@ export async function embedStackBlitz(
 ): Promise<void> {
   try {
     const project = createStackBlitzProject(html, css, js, dependencies)
-    const sdk = await import('@stackblitz/sdk')
-    
+    const { default: sdk } = await import('@stackblitz/sdk')
+
     const element = document.getElementById(elementId)
     if (!element) {
       throw new Error(`Element with id "${elementId}" not found`)
     }
-    
-    await sdk.embed(element, project, {
+
+    await sdk.embedProject(element, project, {
       openFile: 'index.html',
       view: 'preview',
       height: 600,
