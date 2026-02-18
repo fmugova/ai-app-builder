@@ -803,13 +803,13 @@ ${issuesList}
 MANDATORY FIXES:
 ${errors.length > 0 ? `
 ERRORS (must fix):
-` + errors.map((e, i) => `- ${e}`).join('\n') : ''}
+` + errors.map(e => `- ${e}`).join('\n') : ''}
 ${warnings.length > 0 ? `
 WARNINGS (should fix):
-` + warnings.map((w, i) => `- ${w}`).join('\n') : ''}
+` + warnings.map(w => `- ${w}`).join('\n') : ''}
 ${cspIssues.length > 0 ? `
 CSP VIOLATIONS (critical security issues):
-` + cspIssues.map((c, i) => `- ${c}`).join('\n') : ''}
+` + cspIssues.map(c => `- ${c}`).join('\n') : ''}
 
 REQUIREMENTS:
 - Fix ALL errors and CSP violations
@@ -829,6 +829,64 @@ Please regenerate the complete, fixed code.`;
       handleGenerate();
     }, 100);
   }, [state.validation, projectName, handleGenerate]);
+
+  // Auto-fix function - Automatically fixes common issues without regenerating
+  const handleAutoFix = useCallback(async () => {
+    if (!currentProjectId) {
+      toast.error('Please save your project first');
+      return;
+    }
+
+    const loadingToast = toast.loading('🔧 Auto-fixing code quality issues...');
+
+    try {
+      const response = await fetch('/api/auto-fix', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: currentProjectId }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Auto-fix failed');
+      }
+
+      const data = await response.json();
+      
+      if (data.success) {
+        toast.success(data.message, { id: loadingToast });
+        
+        if (data.fixesApplied.length > 0) {
+          console.log('✅ Fixes applied:', data.fixesApplied);
+        }
+
+        // Reload the project to show the fixed code
+        if (currentProjectId) {
+          const projectResponse = await fetch(`/api/projects/${currentProjectId}`);
+          if (projectResponse.ok) {
+            const projectData = await projectResponse.json();
+            const project = projectData.project;
+            
+            // Update state with fixed code
+            if (project.isMultiFile && project.files) {
+              setProjectFiles(project.files);
+              setIsMultiFileProject(true);
+            } else if (project.html) {
+              setState(prev => ({
+                ...prev,
+                fullCode: project.html,
+                html: project.html,
+              }));
+            }
+          }
+        }
+      } else {
+        toast.error('No fixes were needed', { id: loadingToast });
+      }
+    } catch (error) {
+      console.error('Auto-fix error:', error);
+      toast.error('Failed to auto-fix code', { id: loadingToast });
+    }
+  }, [currentProjectId]);
 
   const handleSave = useCallback(async () => {
     if (!state.fullCode) {
@@ -1329,13 +1387,24 @@ Please regenerate the complete, fixed code.`;
               </div>
 
               {(state.validation.errors.length > 0 || state.validation.cspViolations.length > 0) && (
-                <button
-                  onClick={handleRegenerateWithFixes}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  Fix & Regenerate
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={handleAutoFix}
+                    disabled={!currentProjectId}
+                    className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
+                    title={!currentProjectId ? 'Save project first to enable auto-fix' : 'Automatically fix common issues'}
+                  >
+                    <Wand2 className="w-4 h-4" />
+                    Auto-Fix
+                  </button>
+                  <button
+                    onClick={handleRegenerateWithFixes}
+                    className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Fix & Regenerate
+                  </button>
+                </div>
               )}
             </div>
           </div>
