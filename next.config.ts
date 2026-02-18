@@ -90,8 +90,8 @@ const nextConfig: NextConfig = {
             "font-src 'self' data: https://fonts.gstatic.com",
             // Images: self + data URIs + blobs (canvas) + any HTTPS host (CDN thumbnails)
             "img-src 'self' data: blob: https:",
-            // Fetch/XHR: self + Stripe + Anthropic + Upstash + Supabase + Sentry + PostHog + GTM
-            "connect-src 'self' https://api.stripe.com https://api.anthropic.com https://*.upstash.io https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://us.i.posthog.com https://eu.i.posthog.com https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://*.stackblitz.com https://*.webcontainer.io wss://*.webcontainer.io https://*.webcontainer-api.io wss://*.webcontainer-api.io https://*.staticblitz.com",
+            // Fetch/XHR: self + Stripe + Anthropic + Upstash + Supabase + Sentry + PostHog + GTM + Vercel Analytics + WebContainer
+            "connect-src 'self' https://api.stripe.com https://api.anthropic.com https://*.upstash.io https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://us.i.posthog.com https://eu.i.posthog.com https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://*.stackblitz.com https://*.webcontainer.io wss://*.webcontainer.io https://*.webcontainer-api.io wss://*.webcontainer-api.io https://*.staticblitz.com wss://*.staticblitz.com https://vitals.vercel-insights.com",
             // Workers: Next.js Turbopack creates blob: workers at runtime
             "worker-src 'self' blob:",
             // Frames: WebContainer dev server runs on *.webcontainer-api.io subdomains
