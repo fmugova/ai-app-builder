@@ -400,7 +400,54 @@ export default config;
 💡 CODE QUALITY RULES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📋 HTML/SEO REQUIREMENTS (CRITICAL)
+� CRITICAL: CSP-COMPLIANT EVENT HANDLING (MANDATORY)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ FORBIDDEN - These will cause Content Security Policy violations:
+   <button onclick="handleClick()">       ← NEVER USE
+   <img onerror="handleError()" />        ← NEVER USE
+   <body onload="init()" />               ← NEVER USE
+   <div onmouseover="showTooltip()" />    ← NEVER USE
+   ANY inline event handler is FORBIDDEN
+
+✅ REQUIRED - Use addEventListener for ALL events:
+
+**React/Next.js Components:**
+\`\`\`tsx
+// ✅ CORRECT in React
+export default function MyComponent() {
+  const handleClick = () => {
+    // Handle click
+  };
+  
+  return <button onClick={handleClick}>Click Me</button>;
+}
+\`\`\`
+
+**HTML files with vanilla JavaScript:**
+\`\`\`html
+<!-- ✅ CORRECT in plain HTML -->
+<button id="myBtn">Click Me</button>
+
+<script>
+  // ALWAYS wrap in DOMContentLoaded
+  document.addEventListener('DOMContentLoaded', function() {
+    const btn = document.getElementById('myBtn');
+    if (btn) {
+      btn.addEventListener('click', function() {
+        // Handle click
+      });
+    }
+  });
+</script>
+\`\`\`
+
+**Why this is critical:**
+- Content Security Policy (CSP) blocks inline event handlers for security
+- Prevents XSS attacks
+- Modern browser requirement for production applications
+
+�📋 HTML/SEO REQUIREMENTS (CRITICAL)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Every HTML document MUST include:

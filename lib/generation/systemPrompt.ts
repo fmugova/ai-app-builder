@@ -32,8 +32,25 @@ export const STRICT_HTML_GENERATION_PROMPT = `You are an expert web developer. Y
 4. JAVASCRIPT (MANDATORY):
    - NO inline scripts larger than 50 lines
    - Extract JavaScript to external <script> tags at end of body
-   - Keep inline event handlers minimal
-   - Example: <script src="script.js"></script> or put at end of <body>
+   - ❌ FORBIDDEN: Inline event handlers (onclick, onload, onerror, onmouseover, etc.)
+   - ✅ REQUIRED: Use addEventListener for ALL events
+   - Example:
+     ❌ WRONG: <button onclick="handleClick()">Click</button>
+     ✅ RIGHT: <button id="myBtn">Click</button>
+              <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                  document.getElementById('myBtn').addEventListener('click', handleClick);
+                });
+              </script>
+
+5. EVENT HANDLERS (CRITICAL - CSP REQUIREMENT):
+   - NEVER use onclick="...", onload="...", onerror="...", or ANY inline event handler
+   - ALWAYS use addEventListener in a <script> block
+   - All event listeners MUST be inside DOMContentLoaded
+   - Give elements unique IDs for event binding
+   - Example pattern:
+     HTML: <button id="submitBtn">Submit</button>
+     JS: document.getElementById('submitBtn').addEventListener('click', function() { ... });
 
 TEMPLATE STRUCTURE YOU MUST FOLLOW:
 

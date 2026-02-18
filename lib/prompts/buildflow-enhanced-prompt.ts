@@ -186,29 +186,64 @@ Step 5: PRESENT CHANGES
 **JavaScript Requirements:**
 - ✅ Each inline script block < 50 lines (extract larger logic to functions or separate files)
 - ✅ Modern ES6+ syntax
-- ✅ Proper event listeners (not inline onclick)
+- ✅ NEVER use inline event handlers (onclick, onload, etc.) - use addEventListener
+- ✅ All event listeners must be in <script> blocks or external .js files
+- ✅ Wrap all DOM manipulation in DOMContentLoaded event
 - ✅ Error handling for async operations
 - ✅ Clear, commented code for complex logic
 
-**⚠️ CSP COMPLIANCE — MANDATORY:**
-NEVER use inline event handlers. They violate Content-Security-Policy and will be stripped automatically.
-❌ NEVER:
+**🚨 CSP COMPLIANCE — MANDATORY — VIOLATIONS WILL BREAK YOUR APP:**
+NEVER use inline event handlers. They violate Content-Security-Policy and will cause your code to fail validation.
+
+❌ FORBIDDEN - These will be auto-removed and cause CSP errors:
 \`\`\`html
-<button onclick="doSomething()">Click</button>
-<form onsubmit="handleForm(event)">
-<input onchange="update(this.value)">
+<button onclick="doSomething()">Click</button>  ← NEVER
+<form onsubmit="handleForm(event)">           ← NEVER
+<input onchange="update(this.value)">          ← NEVER 
+<body onload="init()">                         ← NEVER
+<img onerror="fallback()">                     ← NEVER
+<div onmouseover="showTooltip()">              ← NEVER
+<a href="javascript:void(0)">                   ← NEVER
 \`\`\`
-✅ ALWAYS use addEventListener inside a <script> block:
+
+✅ REQUIRED - Use addEventListener pattern:
 \`\`\`html
-<button id="myBtn">Click</button>
+<!-- HTML: Give elements IDs -->
+<button id="submitBtn">Click</button>
+<form id="myForm">...</form>
+<input id="searchInput" type="text">
+
+<!-- JavaScript: Use addEventListener in <script> block -->
 <script>
-document.getElementById('myBtn').addEventListener('click', function() {
-  doSomething();
-});
+  document.addEventListener('DOMContentLoaded', function() {
+    // Button click
+    const btn = document.getElementById('submitBtn');
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      doSomething();
+    });
+    
+    // Form submit
+    const form = document.getElementById('myForm');
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      handleForm(e);
+    });
+    
+    // Input change
+    const input = document.getElementById('searchInput');
+    input.addEventListener('input', function(e) {
+      update(e.target.value);
+    });
+  });
 </script>
 \`\`\`
-Also NEVER use javascript: URIs in href or src attributes:
-❌ <a href="javascript:void(0)">  →  ✅ <a href="#" role="button">
+
+**Why this is critical:**
+- Modern browsers REQUIRE CSP for security
+- Prevents XSS (Cross-Site Scripting) attacks
+- Required for production deployment
+- Auto-fixer will convert onclick to addEventListener, but it's better to generate correctly from the start
 
 **Responsive Design:**
 \`\`\`css
