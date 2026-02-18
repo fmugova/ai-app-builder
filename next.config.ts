@@ -91,7 +91,7 @@ const nextConfig: NextConfig = {
             "default-src 'self'",
             // Scripts: self + Next.js inline hydration + Stripe.js + Google Tag Manager + Monaco Editor CDN + blob: for Next.js workers
             // unsafe-eval required for WebContainers WASM runtime on /chatbuilder
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://www.googletagmanager.com https://www.google-analytics.com https://cdn.jsdelivr.net blob:",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://www.googletagmanager.com https://www.google-analytics.com https://cdn.jsdelivr.net https://cdn.tailwindcss.com blob:",
             // Styles: self + inline (Tailwind/shadcn) + Google Fonts
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             // Fonts: self + data URIs + Google Fonts CDN
