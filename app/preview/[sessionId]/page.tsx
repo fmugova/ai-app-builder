@@ -47,7 +47,7 @@ export default async function PreviewPage({ params }: PreviewPageProps) {
   let dbError = false;
 
   try {
-    // Fetch project from database
+    // Fetch project from database with pages and files
     project = await prisma.project.findUnique({
       where: { id },
       select: {
@@ -56,6 +56,26 @@ export default async function PreviewPage({ params }: PreviewPageProps) {
         code: true,
         userId: true,
         createdAt: true,
+        isMultiPage: true,
+        pages: {
+          orderBy: { order: 'asc' },
+          select: {
+            id: true,
+            slug: true,
+            title: true,
+            content: true,
+            isHomepage: true,
+            order: true,
+          },
+        },
+        files: {
+          select: {
+            id: true,
+            path: true,
+            content: true,
+            language: true,
+          },
+        },
       },
     });
   } catch (error) {
@@ -98,7 +118,13 @@ export default async function PreviewPage({ params }: PreviewPageProps) {
 
   // Render preview
   if (project && project.code) {
-    return <PreviewClient code={project.code} projectName={project.name} />;
+    return <PreviewClient 
+      code={project.code} 
+      projectName={project.name}
+      pages={project.pages || []}
+      files={project.files || []}
+      isMultiPage={project.isMultiPage || false}
+    />;
   }
 
   // Fallback
