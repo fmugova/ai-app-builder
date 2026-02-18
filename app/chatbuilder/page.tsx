@@ -794,22 +794,33 @@ function ChatBuilderContent() {
     // Create detailed fix instructions
     const issuesList = allIssues.map((issue, i) => `${i + 1}. ${issue}`).join('\n');
 
-    const improvedPrompt = `${prompt}
+    // Create a focused fix prompt that instructs Claude to fix the EXISTING code
+    const improvedPrompt = `I need you to fix the code quality issues in my "${projectName || 'project'}" that was just generated.
 
-CRITICAL FIXES REQUIRED from previous generation:
+CRITICAL ISSUES TO FIX:
 ${issuesList}
 
-MANDATORY REQUIREMENTS:
-- Add exactly ONE <h1> tag with the main page title
-- Add viewport meta tag: <meta name="viewport" content="width=device-width, initial-scale=1.0">
-- Use ONLY Tailwind CSS classes (NO inline styles)
-- Use addEventListener for events (NO inline event handlers like onclick)
-- Use textContent instead of innerHTML for dynamic content
-- Add charset meta tag: <meta charset="UTF-8">
-- Use proper semantic HTML5 elements
-- All CSS must use CSS variables for maintainability
+MANDATORY FIXES:
+${errors.length > 0 ? `
+ERRORS (must fix):
+` + errors.map((e, i) => `- ${e}`).join('\n') : ''}
+${warnings.length > 0 ? `
+WARNINGS (should fix):
+` + warnings.map((w, i) => `- ${w}`).join('\n') : ''}
+${cspIssues.length > 0 ? `
+CSP VIOLATIONS (critical security issues):
+` + cspIssues.map((c, i) => `- ${c}`).join('\n') : ''}
 
-Generate complete, production-ready code that fixes ALL issues above.`;
+REQUIREMENTS:
+- Fix ALL errors and CSP violations
+- Use exactly ONE <h1> tag (convert extras to <h2>)
+- NO inline event handlers (onclick, onload, etc.) - use addEventListener instead
+- NO inline styles - use Tailwind CSS classes or <style> tag
+- All meta tags must be present (charset, viewport, description)
+- Keep the same design and functionality
+- Maintain all existing features
+
+Please regenerate the complete, fixed code.`;
 
     setPrompt(improvedPrompt);
     
@@ -817,7 +828,7 @@ Generate complete, production-ready code that fixes ALL issues above.`;
     setTimeout(() => {
       handleGenerate();
     }, 100);
-  }, [state.validation, prompt, handleGenerate]);
+  }, [state.validation, projectName, handleGenerate]);
 
   const handleSave = useCallback(async () => {
     if (!state.fullCode) {

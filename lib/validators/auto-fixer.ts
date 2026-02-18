@@ -32,7 +32,9 @@ export class CodeAutoFixer {
     
     // NEW MANDATORY FIXES for h1 and meta description
     fixed = this.fixMissingH1(fixed)
+    fixed = this.fixMultipleH1Elements(fixed)
     fixed = this.fixMissingMetaDescription(fixed)
+    fixed = this.fixInlineEventHandlers(fixed)
     fixed = this.addCSSVariables(fixed)
     fixed = this.extractLargeScripts(fixed)
     
@@ -241,6 +243,98 @@ export class CodeAutoFixer {
     }
 
     return html
+  }
+
+  private fixMultipleH1Elements(html: string): string {
+    // Find all h1 elements
+    const h1Matches = html.match(/<h1[^>]*>.*?<\/h1>/gi)
+    
+    if (!h1Matches || h1Matches.length <= 1) {
+      return html // No issue or only one h1
+    }
+
+    console.log(`🔧 Found ${h1Matches.length} h1 elements, converting extras to h2...`)
+    
+    let fixed = html
+    // Keep the first h1, convert the rest to h2
+    for (let i = 1; i < h1Matches.length; i++) {
+      const h1 = h1Matches[i]
+      const h2 = h1.replace(/<h1/gi, '<h2').replace(/<\/h1>/gi, '</h2>')
+      fixed = fixed.replace(h1, h2)
+    }
+    
+    this.appliedFixes.push(`Converted ${h1Matches.length - 1} duplicate h1 element(s) to h2`)
+    return fixed
+  }
+
+  private fixInlineEventHandlers(html: string): string {
+    let fixed = html
+    let fixedCount = 0
+    
+    // Find all inline event handlers (onclick, onload, onmouseover, etc.)
+    const eventHandlerPattern = /(<[^>]+)\s+(on\w+)="([^"]+)"([^>]*>)/gi
+    const matches = Array.from(html.matchAll(eventHandlerPattern))
+    
+    if (matches.length === 0) {
+      return html
+    }
+    
+    console.log(`🔧 Found ${matches.length} inline event handler(s), converting to addEventListener...`)
+    
+    // Generate unique IDs for elements without an id
+    let idCounter = 1
+    const scriptSegments: string[] = []
+    
+    for (const match of matches) {
+      const fullMatch = match[0]
+      const beforeHandler = match[1]
+      const eventType = match[2]
+      const handlerCode = match[3]
+      const afterHandler = match[4]
+      
+      // Check if element already has an id
+      const idMatch = fullMatch.match(/id="([^"]+)"/)
+      const elementId = idMatch ? idMatch[1] : `elem-${idCounter++}`
+      
+      // Build the fixed element tag
+      let fixedElement: string
+      if (idMatch) {
+        // Remove the inline handler
+        fixedElement = fullMatch.replace(new RegExp(`\\s+${eventType}="[^"]+"`), '')
+      } else {
+        // Add id and remove inline handler
+        fixedElement = `${beforeHandler} id="${elementId}"${afterHandler}`.replace(new RegExp(`\\s+${eventType}="[^"]+"`), '')
+      }
+      
+      // Create event listener script
+      const event = eventType.replace(/^on/, '')
+      const listenerScript = `document.getElementById('${elementId}').addEventListener('${event}', function(e) { ${handlerCode} });`
+      scriptSegments.push(listenerScript)
+      
+      // Replace in HTML
+      fixed = fixed.replace(fullMatch, fixedElement)
+      fixedCount++
+    }
+    
+    // Add all event listeners in a DOMContentLoaded block
+    if (scriptSegments.length > 0) {
+      const eventListenerScript = `
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      ${scriptSegments.join('\n      ')}
+    });
+  </script>`
+      
+      // Insert before closing body tag
+      const bodyCloseMatch = fixed.match(/<\/body>/i)
+      if (bodyCloseMatch) {
+        fixed = fixed.replace(/<\/body>/i, `${eventListenerScript}\n</body>`)
+      }
+      
+      this.appliedFixes.push(`Converted ${fixedCount} inline event handler(s) to addEventListener`)
+    }
+    
+    return fixed
   }
 
   private fixMissingMetaDescription(html: string): string {
