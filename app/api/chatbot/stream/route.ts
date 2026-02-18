@@ -444,7 +444,7 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
 
         try {
           extractedPages = extractPagesFromProject(parseResult.project);
-          console.log(`📄 extractPagesFromProject returned ${extractedPages.length} pages`);
+          console.log(`📄 extractPagesFromProject returned ${extractedPages.length} pages:`, extractedPages.map(p => ({ slug: p.slug, title: p.title, isHomepage: p.isHomepage })));
         } catch (pageExtractionError) {
           console.error('❌ Page extraction failed:', pageExtractionError);
         }
@@ -683,6 +683,8 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
         multiHtml.matchAll(/<!--\s*File:\s*(.+?)\s*-->([\s\S]*?)(?=<!--\s*File:|$)/gi)
       )
       const htmlFiles = fileMatches.filter(m => m[1].trim().endsWith('.html'))
+      console.log(`📁 Multi-HTML approach: found ${htmlFiles.length} HTML file sections in output`);
+      
       if (htmlFiles.length > 0) {
         for (let i = 0; i < htmlFiles.length; i++) {
           const rawSlug = htmlFiles[i][1].trim().replace(/\.html$/, '')

@@ -765,6 +765,12 @@ export function extractPagesFromProject(project: MultiFileProject): Array<{
   );
 
   console.log(`📄 Found ${pageFiles.length} page files:`, pageFiles.map(f => f.path));
+  
+  // Also check for HTML files as fallback
+  const htmlFiles = project.files.filter(f => f.path.toLowerCase().endsWith('.html'));
+  if (htmlFiles.length > 0 && pageFiles.length === 0) {
+    console.log(`📄 No page.tsx files found, but found ${htmlFiles.length} HTML files. These won't be auto-extracted.`);
+  }
 
   if (pageFiles.length === 0) return [];
 
@@ -781,7 +787,7 @@ export function extractPagesFromProject(project: MultiFileProject): Array<{
 
     // Skip dynamic route segments like [id], [slug] — can't preview those
     if (/\[/.test(file.path)) {
-      console.log(`⏭️ Skipping dynamic route: ${file.path}`);
+      console.log(`⏭️ Skipping dynamic route: ${file.path} (contains parameter)`);
       continue;
     }
 

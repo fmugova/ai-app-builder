@@ -263,7 +263,10 @@ function ChatBuilderContent() {
     try {
       const res = await fetch(`/api/projects/${pid}/pages`);
       const data = await res.json();
-      if (Array.isArray(data)) setProjectPages(data);
+      if (Array.isArray(data)) {
+        setProjectPages(data);
+        console.log(`📊 Fetched ${data.length} pages for project ${pid}:`, data.map(p => ({ title: p.title, slug: p.slug, isHomepage: p.isHomepage })));
+      }
     } catch { /* non-fatal */ }
   }, []);
   
@@ -494,6 +497,7 @@ function ChatBuilderContent() {
                 }
                 // Check if multi-page HTML pages were created
                 if (data.isMultiPage) {
+                  console.log(`📄 Multi-page signal received with ${data.pagesCount || '?'} pages`);
                   fetchProjectPages(data.projectId);
                 }
               }
