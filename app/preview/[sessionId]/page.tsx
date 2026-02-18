@@ -56,8 +56,8 @@ export default async function PreviewPage({ params }: PreviewPageProps) {
         code: true,
         userId: true,
         createdAt: true,
-        isMultiPage: true,
-        pages: {
+        multiPage: true,
+        Page: {
           orderBy: { order: 'asc' },
           select: {
             id: true,
@@ -68,7 +68,7 @@ export default async function PreviewPage({ params }: PreviewPageProps) {
             order: true,
           },
         },
-        files: {
+        ProjectFile: {
           select: {
             id: true,
             path: true,
@@ -121,9 +121,9 @@ export default async function PreviewPage({ params }: PreviewPageProps) {
     return <PreviewClient 
       code={project.code} 
       projectName={project.name}
-      pages={project.pages || []}
-      files={project.files || []}
-      isMultiPage={project.isMultiPage || false}
+      pages={project.Page || []}
+      files={project.ProjectFile || []}
+      isMultiPage={project.multiPage || false}
     />;
   }
 
