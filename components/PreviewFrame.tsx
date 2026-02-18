@@ -136,30 +136,37 @@ export default function PreviewFrame({ html, css, js, validation, onElementClick
       const isFullDocument = /<!DOCTYPE\s+html|<html[\s>]/i.test(cleanHtml);
 
       if (isFullDocument) {
-        // Extract styles and links from <head>
+        console.log('📄 Full HTML document detected - extracting head and body to prevent double nesting');
+        
+        // Extract ALL content from <head> except meta tags we'll add ourselves
         const headMatch = cleanHtml.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
         if (headMatch) {
           const headInner = headMatch[1];
-          // Keep <style>, <link rel="stylesheet">, and Tailwind/CDN <script> tags
+          // Keep <style>, <link rel="stylesheet">, and ALL <script> tags (including CDN)
           const styleMatches = headInner.match(/<style[\s\S]*?<\/style>/gi) || [];
-          const linkMatches = headInner.match(/<link[^>]*rel=["']stylesheet["'][^>]*\/?>/gi) || [];
-          const cdnScriptMatches = headInner.match(/<script[^>]*src=["']https:\/\/[^"']+["'][^>]*><\/script>/gi) || [];
-          extractedHeadContent = [...styleMatches, ...linkMatches, ...cdnScriptMatches].join('\n  ');
+          const linkMatches = headInner.match(/<link[^>]*\/?>/gi) || [];
+          const scriptMatches = headInner.match(/<script[\s\S]*?<\/script>/gi) || [];
+          extractedHeadContent = [...styleMatches, ...linkMatches, ...scriptMatches].join('\n  ');
+          console.log(`  ✓ Extracted ${styleMatches.length} <style>, ${linkMatches.length} <link>, ${scriptMatches.length} <script>`);
         }
 
-        // Extract <body> content
+        // Extract <body> content INCLUDING inline scripts at the end
         const bodyMatch = cleanHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
         if (bodyMatch) {
           bodyContent = bodyMatch[1];
+          console.log(`  ✓ Extracted ${bodyContent.length} chars from <body>`);
         } else {
-          // Fallback: strip the document wrapper tags
+          // Fallback: strip the document wrapper tags manually
+          console.log('  ⚠️ No <body> tag found - using fallback extraction');
           bodyContent = cleanHtml
-            .replace(/<!DOCTYPE[^>]*>/i, '')
+            .replace(/<!DOCTYPE[^>]*>/gi, '')
             .replace(/<\/?html[^>]*>/gi, '')
-            .replace(/<head[^>]*>[\s\S]*?<\/head>/i, '')
+            .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '')
             .replace(/<\/?body[^>]*>/gi, '')
             .trim();
         }
+      } else {
+        console.log('📝 HTML fragment detected - wrapping in full document structure');
       }
 
       // SECURITY FIX: Inject navigation prevention script

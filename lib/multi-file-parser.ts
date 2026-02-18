@@ -695,6 +695,7 @@ function removeJsxExpressions(jsx: string): string {
 
 /**
  * Convert a single TSX page file to a complete HTML document for preview.
+ * Enhanced to better extract HTML structure and preserve Tailwind classes.
  */
 export function convertTSXPageToHTML(
   tsxContent: string,
@@ -704,27 +705,78 @@ export function convertTSXPageToHTML(
 ): string {
   const jsx = extractJSXBody(tsxContent);
 
-  if (!jsx) {
-    // Fallback: extract any string literals and text content from the TSX to create a basic preview
+  if (!jsx || jsx.trim().length < 20) {
+    // Enhanced fallback: Try to extract more meaningful content
+    console.log('⚠️ JSX extraction failed or too short, creating enhanced fallback');
+    
     const strings: string[] = [];
-    const stringMatches = tsxContent.matchAll(/["'`]([A-Z][^"'`]{10,200})["'`]/g);
-    for (const sm of stringMatches) strings.push(sm[1]);
-    const fallbackContent = strings.length > 0
+    // Extract string literals with better filtering
+    const stringMatches = tsxContent.matchAll(/["'`]([A-Z][^"'`\n]{3,200})["'`]/g);
+    for (const sm of stringMatches) {
+      const str = sm[1].trim();
+      // Filter out obvious code fragments, imports, etc
+      if (!/^(import|export|const|let|var|function|class|interface|type|from|return)/.test(str) &&
+          !str.includes('*/') &&
+          !str.includes('//')) {
+        strings.push(str);
+      }
+    }
+
+    // Extract any existing JSX tags as hints
+    const htmlTags: string[] = [];
+    const tagMatches = tsxContent.matchAll(/<([a-z][a-z0-9]*)[^>]*className=["']([^"']+)["'][^>]*>(.*?)<\/\1>/gi);
+    for (const tm of tagMatches) {
+      const tag = tm[1];
+      const classes = tm[2];
+      const content = tm[3];
+      if (content && content.length > 3 && content.length < 200) {
+        htmlTags.push(`<${tag} class="${classes}">${content}</${tag}>`);
+      }
+    }
+
+    const fallbackContent = htmlTags.length > 0
       ? `<div class="max-w-4xl mx-auto p-8">
           <h1 class="text-3xl font-bold mb-6">${pageTitle}</h1>
-          ${strings.slice(0, 8).map(s => `<p class="text-gray-600 mb-3">${s}</p>`).join('\n')}
+          <div class="space-y-4">
+            ${htmlTags.slice(0, 12).join('\n            ')}
+          </div>
+        </div>`
+      : strings.length > 0
+      ? `<div class="max-w-4xl mx-auto p-8">
+          <h1 class="text-3xl font-bold mb-6">${pageTitle}</h1>
+          <div class="space-y-3">
+            ${strings.slice(0, 10).map(s => `<p class="text-gray-700">${s}</p>`).join('\n            ')}
+          </div>
         </div>`
       : `<div class="max-w-4xl mx-auto p-8 text-center">
           <h1 class="text-3xl font-bold mb-4">${pageTitle}</h1>
-          <p class="text-gray-500">This page uses dynamic React components that require a live server to render.</p>
+          <p class="text-gray-600 mb-6">This page uses interactive React components that require a live server to render.</p>
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 inline-block text-left">
+            <p class="font-medium text-blue-900 mb-2">To see this page:</p>
+            <ul class="text-sm text-blue-700 space-y-1 list-disc list-inside">
+              <li>Use the <strong>WebContainer live preview</strong> (if available)</li>
+              <li>Or <strong>download the project</strong> and run it locally</li>
+            </ul>
+          </div>
         </div>`;
 
     return `<!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${pageTitle} - ${projectName}</title><script src="https://cdn.tailwindcss.com"><\/script></head>
-<body>${fallbackContent}</body></html>`;
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${pageTitle} - ${projectName}</title>
+  <script src="https://cdn.tailwindcss.com"><\/script>
+  ${globalCssContent ? `<style>${globalCssContent}</style>` : ''}
+</head>
+<body class="bg-gray-50">
+${fallbackContent}
+</body>
+</html>`;
   }
 
+  console.log(`✅ TSX→HTML conversion successful for ${pageTitle}: ${jsx.length} chars`);
+  
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -811,30 +863,137 @@ export function extractPagesFromProject(project: MultiFileProject): Array<{
 
     let htmlContent = convertTSXPageToHTML(file.content, title, project.projectName, globalCss);
 
-    // Validate: if body content is too short or contains raw JSON fragments,
-    // generate a fallback page instead of skipping entirely
-    const bodyMatch = htmlContent.match(/<body>([\s\S]*)<\/body>/i);
+    // Enhanced validation: Check for quality issues in the generated HTML
+    const bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*)<\/body>/i);
     const bodyContent = bodyMatch?.[1]?.trim() || '';
-    if (bodyContent.length < 20 || /"\s*:\s*"/.test(bodyContent) || /\{\s*"path"\s*:/.test(bodyContent)) {
-      console.log(`⚠️ Page body too short or corrupted: ${file.path} (${bodyContent.length} chars), using fallback`);
-      // Generate fallback with text extracted from the original TSX
-      const strings: string[] = [];
-      const stringMatches = file.content.matchAll(/["'`]([A-Z][^"'`\n]{10,200})["'`]/g);
-      for (const sm of stringMatches) strings.push(sm[1]);
-      const fallbackBody = strings.length > 0
-        ? `<div class="max-w-4xl mx-auto p-8">
-            <h1 class="text-3xl font-bold mb-6">${title}</h1>
-            ${strings.slice(0, 10).map(s => `<p class="text-gray-600 mb-3">${s}</p>`).join('\n')}
+    
+    // Detect corrupted or low-quality content
+    const hasMinimalContent = bodyContent.length < 50;
+    const hasJSONFragments = /["']\s*:\s*["']/.test(bodyContent) || /\{\s*["']path["']\s*:/.test(bodyContent);
+    const hasOnlyFallbackMessage = bodyContent.includes('require a live server to render');
+    const hasMostlyDynamicComments = (bodyContent.match(/<!--\s*dynamic\s*content\s*-->/gi) || []).length > 5;
+    
+    const needsEnhancedFallback = hasMinimalContent || hasJSONFragments || (hasOnlyFallbackMessage && bodyContent.length < 300) || hasMostlyDynamicComments;
+    
+    if (needsEnhancedFallback) {
+      console.log(`⚠️ Page quality issue for ${file.path}:`, {
+        bodyLength: bodyContent.length,
+        hasJSON: hasJSONFragments,
+        hasFallback: hasOnlyFallbackMessage,
+        dynamicComments: hasMostlyDynamicComments
+      });
+      console.log('  → Creating enhanced fallback with extracted content');
+      
+      // Extract all meaningful text strings from the original TSX
+      const extractedStrings: string[] = [];
+      const stringMatches = file.content.matchAll(/["'`]([A-Z][^"'`\n]{3,300})["'`]/g);
+      for (const sm of stringMatches) {
+        const str = sm[1].trim();
+        // Filter out code keywords, imports, and fragments
+        if (!/^(import|export|const|let|var|function|return|from|interface|type|class)/.test(str) &&
+            !str.includes('*/') && !str.includes('//') && !str.includes('className') &&
+            str.length > 5 && str.length < 150) {
+          extractedStrings.push(str);
+        }
+      }
+
+      // Extract JSX elements with their classes for better preview
+      const jsxElements: string[] = [];
+      const elementMatches = file.content.matchAll(/<(div|section|article|header|nav|h[1-6]|p|span|button|a)[^>]*className=["']([^"']+)["'][^>]*>((?:(?!<\/\1>).)*)<\/\1>/gis);
+      for (const em of elementMatches) {
+        const tag = em[1];
+        const classes = em[2];
+        let content = em[3].trim();
+        // Remove nested JSX tags and expressions
+        content = content.replace(/{[^}]+}/g, '').replace(/<[^>]+>/g, ' ').trim();
+        if (content && content.length > 2 && content.length < 200 && !/^(import|export|const|let|var|function)/.test(content)) {
+          jsxElements.push(`<${tag} class="${classes}">${content}</${tag}>`);
+        }
+      }
+
+      const hasExtractedContent = extractedStrings.length > 0 || jsxElements.length > 0;
+      
+      const enhancedFallback = hasExtractedContent
+        ? `<div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+            <div class="max-w-5xl mx-auto p-8">
+              <h1 class="text-4xl font-bold text-gray-900 mb-2">${title}</h1>
+              <p class="text-sm text-gray-500 mb-8">Preview extracted from React components</p>
+              
+              ${jsxElements.length > 0 ? `
+              <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Page Components</h2>
+                <div class="space-y-3">
+                  ${jsxElements.slice(0, 15).join('\n                  ')}
+                </div>
+              </div>` : ''}
+              
+              ${extractedStrings.length > 0 ? `
+              <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Page Content</h2>
+                <div class="prose prose-gray max-w-none space-y-2">
+                  ${extractedStrings.slice(0, 20).map((s, i) => 
+                    i === 0 ? `<p class="text-lg font-medium text-gray-900">${s}</p>` : 
+                    `<p class="text-gray-700">${s}</p>`
+                  ).join('\n                  ')}
+                </div>
+              </div>` : ''}
+              
+              <div class="mt-8 bg-blue-50 border-l-4 border-blue-500 p-6 rounded-r-lg">
+                <div class="flex items-start">
+                  <div class="flex-shrink-0">
+                    <svg class="h-6 w-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                  </div>
+                  <div class="ml-3">
+                    <h3 class="text-sm font-medium text-blue-900">Interactive Preview Unavailable</h3>
+                    <p class="mt-1 text-sm text-blue-700">This page uses React components and requires a live development server.</p>
+                    <p class="mt-2 text-sm text-blue-600">→ Use <strong>WebContainer preview</strong> or <strong>download the project</strong> to see full functionality.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>`
-        : `<div class="max-w-4xl mx-auto p-8 text-center">
-            <h1 class="text-3xl font-bold mb-4">${title}</h1>
-            <p class="text-gray-500">This page uses interactive React components that require a live server to render.</p>
-            <p class="text-gray-400 text-sm mt-2">Use the WebContainer preview or download the project to see this page in action.</p>
+        : `<div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-8">
+            <div class="max-w-2xl w-full">
+              <div class="bg-white rounded-2xl shadow-xl border border-gray-200 p-12 text-center">
+                <div class="text-6xl mb-6">⚡</div>
+                <h1 class="text-3xl font-bold text-gray-900 mb-4">${title}</h1>
+                <p class="text-lg text-gray-600 mb-8">This React page requires a live server to display interactive components.</p>
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-6 text-left">
+                  <h3 class="font-semibold text-blue-900 mb-3">How to view this page:</h3>
+                  <ul class="space-y-2 text-sm text-blue-800">
+                    <li class="flex items-start gap-2">
+                      <svg class="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                      </svg>
+                      <span><strong>WebContainer Preview:</strong> If available, switch to live preview mode</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                      <svg class="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                      </svg>
+                      <span><strong>Download Project:</strong> Run <code class="bg-blue-100 px-1.5 py-0.5 rounded text-xs">npm install && npm run dev</code> locally</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
           </div>`;
+          
       htmlContent = `<!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${title} - ${project.projectName}</title><script src="https://cdn.tailwindcss.com"><\/script></head>
-<body>${fallbackBody}</body></html>`;
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title} - ${project.projectName}</title>
+  <script src="https://cdn.tailwindcss.com"><\/script>
+  ${globalCss ? `<style>${globalCss}</style>` : ''}
+</head>
+<body class="antialiased">
+${enhancedFallback}
+</body>
+</html>`;
     }
 
     pages.push({ slug, title, content: htmlContent, isHomepage: isHome, order: i });

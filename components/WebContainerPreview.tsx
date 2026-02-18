@@ -146,7 +146,34 @@ export default function WebContainerPreview({
         setPhase('mounting');
         appendTerminal(`\x1b[90mMounting ${files.length} project files...\x1b[0m`);
         const allFiles = ensureRequiredFiles(files, dependencies, devDependencies);
-        const tree = toFileSystemTree(allFiles);
+        
+        // Validate files before creating tree
+        const validFiles = allFiles.filter(f => {
+          if (!f.path || typeof f.path !== 'string') {
+            console.warn(`[WebContainer] Skipping invalid file: missing or invalid path`, f);
+            return false;
+          }
+          if (f.content === undefined || f.content === null) {
+            console.warn(`[WebContainer] Skipping file with no content: ${f.path}`);
+            return false;
+          }
+          // Ensure content is a string
+          if (typeof f.content !== 'string') {
+            console.warn(`[WebContainer] Converting ${f.path} content to string`);
+            f.content = String(f.content);
+          }
+          return true;
+        });
+        
+        if (validFiles.length === 0) {
+          throw new Error('No valid files to mount - all files failed validation');
+        }
+        
+        if (validFiles.length < allFiles.length) {
+          appendTerminal(`\x1b[33m⚠ Skipped ${allFiles.length - validFiles.length} invalid file(s)\x1b[0m`);
+        }
+        
+        const tree = toFileSystemTree(validFiles);
         
         // Validate tree is not empty
         if (Object.keys(tree).length === 0) {
@@ -154,6 +181,7 @@ export default function WebContainerPreview({
         }
         
         console.log('[WebContainer] Mounting file tree:', Object.keys(tree));
+        console.log('[WebContainer] File count:', { total: allFiles.length, valid: validFiles.length, tree: Object.keys(tree).length });
         
         try {
           await wc.mount(tree);
@@ -161,11 +189,18 @@ export default function WebContainerPreview({
           const err = mountError as Error;
           console.error('[WebContainer] Mount failed:', err);
           console.error('[WebContainer] Tree structure:', JSON.stringify(tree, null, 2).slice(0, 500));
+          // Log first few files for debugging
+          const sampleFiles = validFiles.slice(0, 3).map(f => ({
+            path: f.path,
+            contentLength: f.content?.length || 0,
+            contentType: typeof f.content
+          }));
+          console.error('[WebContainer] Sample files:', sampleFiles);
           throw new Error(`Failed to mount files: ${err.message}`);
         }
         
         if (cancelledRef.current) return;
-        appendTerminal(`\x1b[32m${allFiles.length} files mounted.\x1b[0m\r\n`);
+        appendTerminal(`\x1b[32m${validFiles.length} files mounted successfully.\x1b[0m\r\n`);
 
         // 3. npm install (skip if deps unchanged and we already ran)
         const needsInstall = prevDepsHash.current !== depsHash || !serverUrl;
@@ -226,7 +261,26 @@ export default function WebContainerPreview({
 
         const wc = await getWebContainer();
         const allFiles = ensureRequiredFiles(files, dependencies, devDependencies);
-        const tree = toFileSystemTree(allFiles);
+        
+        // Validate files before remounting (same as initial mount)
+        const validFiles = allFiles.filter(f => {
+          if (!f.path || typeof f.path !== 'string' || !f.content) {
+            console.warn(`[WebContainer Remount] Skipping invalid file:`, f.path || 'unknown');
+            return false;
+          }
+          if (typeof f.content !== 'string') {
+            f.content = String(f.content);
+          }
+          return true;
+        });
+        
+        if (validFiles.length === 0) {
+          console.warn('[WebContainer] Remount skipped - no valid files');
+          appendTerminal('\x1b[33m⚠ File update skipped - no valid files\x1b[0m');
+          return;
+        }
+        
+        const tree = toFileSystemTree(validFiles);
         
         // Validate tree before remounting
         if (Object.keys(tree).length === 0) {
@@ -235,7 +289,7 @@ export default function WebContainerPreview({
         }
         
         await wc.mount(tree);
-        appendTerminal('\x1b[90mFiles updated — HMR should pick up changes.\x1b[0m');
+        appendTerminal(`\x1b[90mFiles updated (${validFiles.length} files) — HMR should pick up changes.\x1b[0m`);
       } catch (err) {
         console.error('File remount error:', err);
         appendTerminal(`\x1b[31mFile update failed: ${err instanceof Error ? err.message : 'Unknown error'}\x1b[0m`);
