@@ -406,17 +406,91 @@ export function ensureRequiredFiles(
     console.warn(`[WebContainer] Stripped incompatible packages: ${allRemoved.join(', ')}`);
   }
 
-  // ── 5. Ensure tsconfig.json ───────────────────────────────────────────
+  // ── 5. Ensure .npmrc (disable postinstall scripts & native binary downloads) ──
+  if (!paths.has('.npmrc')) {
+    result.push({
+      path: '.npmrc',
+      content: [
+        'ignore-scripts=true',
+        'legacy-peer-deps=true',
+      ].join('\n') + '\n',
+    });
+  }
+
+  // ── 5b. Inject .env.local with stub values so the app doesn't crash on boot ──
+  // Generated fullstack apps crash silently when NEXTAUTH_SECRET, DATABASE_URL
+  // etc. are undefined (e.g. string.split() on undefined). Mock values let the
+  // app boot and render — actual data comes from the Prisma mock above.
+  if (!paths.has('.env.local') && !paths.has('.env')) {
+    result.push({
+      path: '.env.local',
+      content: [
+        '# Stub env vars for WebContainer preview — not real credentials',
+        'NEXTAUTH_SECRET=webcontainer-preview-secret-not-real',
+        'NEXTAUTH_URL=http://localhost:3000',
+        'DATABASE_URL=postgresql://mock:mock@localhost:5432/mockdb',
+        'DIRECT_URL=postgresql://mock:mock@localhost:5432/mockdb',
+        'NEXT_PUBLIC_APP_URL=http://localhost:3000',
+        'NEXT_PUBLIC_SITE_URL=http://localhost:3000',
+        'ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000001',
+      ].join('\n') + '\n',
+    });
+  }
+
+  // ── 5c. Neutralize lib/auth.ts if it uses PrismaAdapter (already stripped) ──
+  // After PrismaAdapter is removed, the NextAuth config may still export authOptions
+  // that reference it. Patch any `lib/auth.ts` or `app/api/auth/[...nextauth]/route.ts`
+  // that export authOptions with a minimal working config so next-auth doesn't crash.
+  for (let i = 0; i < result.length; i++) {
+    const f = result[i];
+    // Only patch files that had the adapter removed but still export authOptions
+    if (
+      (f.path === 'lib/auth.ts' || f.path === 'lib/auth.js' ||
+       f.path === 'src/lib/auth.ts' || f.path === 'src/lib/auth.js') &&
+      !f.content.includes('PrismaAdapter') && // adapter was already stripped
+      (f.content.includes('authOptions') || f.content.includes('NextAuth'))
+    ) {
+      // Ensure NEXTAUTH_SECRET won't throw (some configs do process.env.X!)
+      let patched = f.content;
+      // Replace `process.env.NEXTAUTH_SECRET!` (non-null assertion that crashes if undefined)
+      patched = patched.replace(
+        /process\.env\.NEXTAUTH_SECRET!/g,
+        "process.env.NEXTAUTH_SECRET ?? 'preview-secret'"
+      );
+      if (patched !== f.content) {
+        result[i] = { ...f, content: patched };
+      }
+    }
+  }
+
+  // ── 5e. Neutralize middleware.ts so auth guards don't redirect every page ──
+  // In a real deployed app the middleware protects routes. In the WebContainer
+  // sandbox there's no session, so all pages would redirect to /login and the
+  // preview would show blank. Replace with a no-op pass-through.
+  const middlewareIdx = result.findIndex(
+    (f) => f.path === 'middleware.ts' || f.path === 'middleware.js' ||
+            f.path === 'src/middleware.ts' || f.path === 'src/middleware.js',
+  );
+  const PASSTHROUGH_MIDDLEWARE = `// WebContainer preview — pass-through middleware (no auth guards)
+export function middleware() {}
+export const config = { matcher: [] };
+`;
+  if (middlewareIdx !== -1) {
+    result[middlewareIdx] = { ...result[middlewareIdx], content: PASSTHROUGH_MIDDLEWARE };
+    console.log('[WebContainer] Replaced middleware with pass-through for preview');
+  }
+
+  // ── 6. Ensure tsconfig.json ───────────────────────────────────────────
   if (!paths.has('tsconfig.json')) {
     result.push({ path: 'tsconfig.json', content: DEFAULT_TSCONFIG });
   }
 
-  // ── 6. Ensure next.config ─────────────────────────────────────────────
+  // ── 7. Ensure next.config ─────────────────────────────────────────────
   if (!paths.has('next.config.js') && !paths.has('next.config.ts') && !paths.has('next.config.mjs')) {
     result.push({ path: 'next.config.js', content: DEFAULT_NEXT_CONFIG });
   }
 
-  // ── 7. Strip Prisma schema file (causes postinstall errors) ───────────
+  // ── 8. Strip Prisma schema file (causes postinstall errors) ───────────
   const prismaSchemaIdx = result.findIndex((f) =>
     f.path === 'prisma/schema.prisma' || f.path.endsWith('/schema.prisma')
   );
@@ -436,7 +510,11 @@ export async function runNpmInstall(
   timeoutMs: number = 120_000,
 ): Promise<number> {
   onOutput('\x1b[36m$ npm install\x1b[0m\r\n');
-  const proc = await wc.spawn('npm', ['install', '--prefer-offline', '--legacy-peer-deps']);
+  // --ignore-scripts: prevents postinstall hooks that download native binaries
+  //   (e.g. @next/swc-*, esbuild, lightningcss) from running and failing in the
+  //   browser sandbox. Next.js falls back to Babel compilation without SWC.
+  // --legacy-peer-deps: avoids peer dep conflicts in generated project manifests.
+  const proc = await wc.spawn('npm', ['install', '--legacy-peer-deps', '--ignore-scripts']);
 
   proc.output.pipeTo(
     new WritableStream({ write(data) { onOutput(data); } }),

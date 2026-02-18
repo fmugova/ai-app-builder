@@ -216,11 +216,12 @@ export default function WebContainerPreview({
           if (cancelledRef.current) return;
 
           if (exitCode !== 0) {
-            setPhase('error');
-            setErrorMsg(`npm install failed (exit code ${exitCode}). Check the terminal for details.`);
-            return;
+            // Non-zero exit often means an optional package (e.g. @next/swc-* native
+            // binary) failed to resolve — not fatal. Next.js falls back to Babel.
+            appendTerminal(`\r\n\x1b[33m⚠ npm install exited ${exitCode} (optional deps may have failed — continuing)\x1b[0m\r\n`);
+          } else {
+            appendTerminal('\r\n\x1b[32mDependencies installed.\x1b[0m\r\n');
           }
-          appendTerminal('\r\n\x1b[32mDependencies installed.\x1b[0m\r\n');
         } else {
           appendTerminal('\x1b[90mDependencies unchanged — skipping install.\x1b[0m\r\n');
         }
