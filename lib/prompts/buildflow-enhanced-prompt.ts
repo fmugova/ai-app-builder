@@ -1,3 +1,5 @@
+import { MULTIPAGE_HTML_EXAMPLE } from '@/lib/templates/multipage-html-example'
+
 /**
  * BuildFlow AI - Multi-Page HTML System Prompt
  * Used for multi-page website generation (HTML/CSS/JS, not Next.js)
@@ -355,4 +357,14 @@ Before outputting, verify:
 - [ ] All JavaScript uses addEventListener (zero inline handlers)
 - [ ] Mobile responsive with working hamburger menu
 - [ ] Each page has at least 5 substantial sections of real content
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 EXAMPLE OUTPUT — MATCH THIS FORMAT AND QUALITY EXACTLY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The following is a complete, correct 2-page example. Your output must follow this exact format (<!-- File: name.html --> delimiters, complete HTML per file, same design patterns) and meet or exceed this quality level.
+
+Adapt the content, colors, and sections to match the user's specific request — but replicate the structure, CSS approach, JavaScript patterns, and content density shown below.
+
+${MULTIPAGE_HTML_EXAMPLE}
 `;

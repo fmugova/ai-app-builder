@@ -1,3 +1,5 @@
+import { MULTIFILE_JSON_EXAMPLE } from '@/lib/templates/multifile-json-example'
+
 /**
  * FULL-STACK NEXT.JS GENERATION SYSTEM PROMPT
  * Generates complete multi-file Next.js applications (not single HTML files)
@@ -882,6 +884,18 @@ any file that only one page uses. Those go in Stage 2.
 Use real Unsplash image URLs (https://images.unsplash.com/photo-XXXXX?w=800&auto=format).
 Use lucide-react for ALL icons.
 Use Tailwind CSS exclusively for styling.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 EXAMPLE OUTPUT — MATCH THIS JSON FORMAT AND ESCAPING EXACTLY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The following is a complete, correctly-escaped Stage 1 JSON output. Match this format exactly — pay close attention to:
+- Field order: dependencies + devDependencies BEFORE files
+- Newlines in file content: \\n (not literal newlines)
+- Double quotes inside strings: \\" (not unescaped ")
+- No trailing commas
+
+${MULTIFILE_JSON_EXAMPLE}
 `;
 
 /**
