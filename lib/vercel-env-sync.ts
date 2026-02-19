@@ -27,6 +27,21 @@ export async function syncSupabaseEnvVarsToVercel(
   const synced: string[] = []
   const errors: string[] = []
 
+  // Defensive validation of vercelProjectId to ensure only expected formats reach the Vercel API
+  const vercelProjectIdPattern = /^[a-zA-Z0-9_-]+$/
+  if (
+    typeof vercelProjectId !== 'string' ||
+    !vercelProjectIdPattern.test(vercelProjectId) ||
+    vercelProjectId.length > 100
+  ) {
+    errors.push('Invalid Vercel project ID format')
+    return {
+      success: false,
+      synced,
+      errors
+    }
+  }
+
   const envVars: VercelEnvVariable[] = [
     {
       key: 'NEXT_PUBLIC_SUPABASE_URL',
