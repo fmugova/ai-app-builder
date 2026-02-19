@@ -65,7 +65,7 @@ export function detectPageStructure(html: string): PageStructureDetection {
   // Check for multi-file project indicators
   const hasHtmlFileLinks = /<a[^>]*href="[\w-]+\.html"[^>]*>/gi.test(html)
   const hasMultipleHtmlTags = (html.match(/<html[^>]*>/gi) || []).length > 1
-  const hasFileComments = /##\s*(\w+\.html|File:\s*\w+\.html)/i.test(html)
+  const hasFileComments = /##\s*[\w-]+\.html/i.test(html) || /<!-- File:\s*[\w.-]+\.html\s*-->/i.test(html)
   
   // Single-file SPA detection
   if (hasPageComments || (hasPageDivs && hasShowPageFunction)) {
@@ -201,11 +201,55 @@ function parsePageContent(slug: string, content: string, order: number): ParsedP
 }
 
 /**
- * Extract multiple HTML files from multi-file format
- * Format: ## filename.html\n<!DOCTYPE html>...
+ * Extract multiple HTML files from <!-- File: name.html --> delimiter format
+ * (format used by BUILDFLOW_ENHANCED_SYSTEM_PROMPT)
+ */
+function extractFileCommentPages(content: string): ParsedPage[] {
+  // Match <!-- File: name.html --> ... up to next delimiter or end
+  const filePattern = /<!-- File:\s*([\w.-][\w.-]*\.html)\s*-->([\s\S]*?)(?=<!-- File:|$)/gi
+  const pages: ParsedPage[] = []
+  let match
+  let order = 0
+
+  while ((match = filePattern.exec(content)) !== null) {
+    const [, filename, htmlContent] = match
+    const trimmed = htmlContent.trim()
+    if (!trimmed) continue
+    const slug = filename.replace(/\.html$/, '')
+
+    const titleTagMatch = trimmed.match(/<title>(.*?)<\/title>/i)
+    const h1Match = trimmed.match(/<h1[^>]*>(.*?)<\/h1>/i)
+    const title = titleTagMatch
+      ? stripHTML(titleTagMatch[1]).split(' - ')[0]
+      : h1Match
+      ? stripHTML(h1Match[1])
+      : slugToTitle(slug)
+
+    const metaDescMatch = trimmed.match(/<meta[^>]*name="description"[^>]*content="([^"]+)"/i)
+    const metaDescription = metaDescMatch ? metaDescMatch[1] : extractFirstParagraph(trimmed)
+
+    pages.push({
+      slug,
+      title,
+      content: trimmed,
+      description: metaDescription,
+      metaTitle: titleTagMatch ? stripHTML(titleTagMatch[1]) : title,
+      metaDescription,
+      isHomepage: slug === 'index' || order === 0,
+      order,
+    })
+    order++
+  }
+
+  return pages
+}
+
+/**
+ * Extract multiple HTML files from ## filename.html format
  */
 function extractMultipleFiles(content: string): ParsedPage[] {
-  const filePattern = /##\s*(\w+\.html)\s*\n([\s\S]*?)(?=##\s*\w+\.html|$)/gi
+  // Allow hyphens and dots in filenames ([\w-]+)
+  const filePattern = /##\s*([\w-]+\.html)\s*\n([\s\S]*?)(?=##\s*[\w-]+\.html|$)/gi
   const pages: ParsedPage[] = []
   let match
   let order = 0
@@ -322,10 +366,14 @@ export function parseMultiPageHTML(html: string): MultiPageParseResult {
     
     // Parse based on detected structure type
     if (detection.type === 'MULTI_FILE') {
-      // Extract multiple HTML files
-      pages = extractMultipleFiles(html)
-      
-      // If file extraction failed, try other methods
+      // Try <!-- File: name.html --> format first (used by BUILDFLOW_ENHANCED_SYSTEM_PROMPT)
+      pages = extractFileCommentPages(html)
+
+      // Fallback: ## filename.html format
+      if (pages.length === 0) {
+        pages = extractMultipleFiles(html)
+      }
+      // Fallback: <!-- PAGE: slug --> format
       if (pages.length === 0) {
         pages = extractCommentPages(html)
       }
