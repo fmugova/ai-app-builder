@@ -186,6 +186,15 @@ next-env.d.ts`
     // Create repository name (lowercase, no spaces)
     const repoName = finalProjectName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
 
+    // Validate repository name to prevent unsafe values in the GitHub API URL
+    const repoNamePattern = /^[a-z0-9-]+$/
+    if (!repoName || repoName.length > 100 || !repoNamePattern.test(repoName)) {
+      return NextResponse.json(
+        { error: 'Invalid repository name derived from project name' },
+        { status: 400 }
+      )
+    }
+
     // Step 1: Create the repository
     console.log('Creating GitHub repository:', repoName)
     
