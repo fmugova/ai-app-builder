@@ -18,7 +18,11 @@ import { IterationDetector } from '@/lib/services/iterationDetector'
 import { PromptBuilder, buildUserMessageWithContext } from '@/lib/services/promptBuilder'
 import { saveProjectFiles, updateProjectMetadata } from '@/lib/services/projectService'
 import { BUILDFLOW_ENHANCED_SYSTEM_PROMPT } from '@/lib/prompts/buildflow-enhanced-prompt'
-import { ENHANCED_GENERATION_SYSTEM_PROMPT } from '@/lib/enhanced-system-prompt'
+import {
+  ENHANCED_GENERATION_SYSTEM_PROMPT,
+  STAGE1_CORE_SYSTEM_PROMPT,
+  STAGE2_REMAINING_SYSTEM_PROMPT,
+} from '@/lib/enhanced-system-prompt'
 import { parseMultiFileProject } from '@/lib/multi-file-parser'
 import { 
   GENERATED_APP_ITERATION_DETECTOR, 
@@ -47,11 +51,12 @@ const generateRequestSchema = z.object({
 // ============================================================================
 
 interface StreamEvent {
-  type: 'content' | 'html' | 'multifile' | 'complete' | 'error' | 'retry'
+  type: 'content' | 'html' | 'multifile' | 'complete' | 'error' | 'retry' | 'status'
   text?: string
   content?: string
   totalLength?: number
   message?: string
+  statusMessage?: string
   attempt?: number
   error?: string
   parsed?: {
@@ -275,7 +280,7 @@ async function createMessageWithRetry(
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      return await anthropic.messages.stream(params)
+      return anthropic.messages.stream(params)
     } catch (error) {
       lastError = error as Error
       
@@ -469,81 +474,112 @@ export async function POST(req: NextRequest) {
             ? `${prompt}\n\nCONTINUATION CONTEXT: You previously generated:\n${continuationContext}\n\nPlease complete the generation, focusing on what's missing.`
             : prompt
 
-          // Create message with streaming using retry logic
-          const messageStream = await apiQueue.add(() =>
-            createMessageWithRetry(anthropic, {
-              model: 'claude-sonnet-4-20250514',
-              max_tokens: getOptimalTokenLimit(prompt, generationType),
-              messages: [{ role: 'user', content: enhancedPrompt }],
-              system: systemPrompt,
-              stream: true,
-            })
-          )
-
-          // Process streaming response
-          for await (const event of messageStream) {
-            if (event.type === 'message_start') {
-              inputTokens = event.message.usage.input_tokens
-              if (process.env.NODE_ENV === 'development') {
-                console.log('📝 Input tokens:', inputTokens)
-              }
-            }
-
-            if (event.type === 'content_block_delta') {
-              if (event.delta.type === 'text_delta') {
-                const text = event.delta.text
-                fullContent += text
-
-                // Stream content to client
-                const streamEvent: StreamEvent = {
-                  type: 'content',
-                  text,
-                  totalLength: fullContent.length,
-                }
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify(streamEvent)}\n\n`))
-              }
-            }
-
-            if (event.type === 'message_delta') {
-              if (event.delta.stop_reason && process.env.NODE_ENV === 'development') {
-                console.log('⏹️ Stop reason:', event.delta.stop_reason)
-              }
-            }
-
-            if (event.type === 'message_stop') {
-              console.log('✅ Stream complete. Total characters:', fullContent.length)
-            }
-          }
-
           // ============================================================================
-          // FULLSTACK JSON PIPELINE — parse multi-file Next.js project from JSON output
+          // GENERATION — staged (fullstack) or single-pass (HTML / multi-page)
           // ============================================================================
           if (isFullstackGeneration) {
-            console.log('🏗️ Attempting fullstack JSON parse...')
-            const parseResult = parseMultiFileProject(fullContent)
+            // ── STAGE 1: Core architecture ──────────────────────────────────────────
+            const s1Status: StreamEvent = { type: 'status', statusMessage: 'Stage 1/2: Generating core architecture...' }
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(s1Status)}\n\n`))
 
-            if (parseResult.success && parseResult.project) {
-              console.log('✅ Fullstack project parsed:', {
-                name: parseResult.project.projectName,
-                files: parseResult.project.files.length,
-                type: parseResult.project.projectType,
+            const stage1Stream = await apiQueue.add(() =>
+              createMessageWithRetry(anthropic, {
+                model: 'claude-sonnet-4-20250514',
+                max_tokens: 32000,
+                temperature: 0.3,
+                messages: [{ role: 'user', content: enhancedPrompt }],
+                system: STAGE1_CORE_SYSTEM_PROMPT,
+                stream: true,
               })
+            )
 
-              // Stream the structured project to the client
-              const multifileEvent: StreamEvent = {
-                type: 'multifile',
-                content: JSON.stringify(parseResult.project),
+            let stage1Content = ''
+            for await (const event of stage1Stream) {
+              if (event.type === 'message_start') inputTokens += event.message.usage.input_tokens
+              if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+                stage1Content += event.delta.text
+                const se: StreamEvent = { type: 'content', text: event.delta.text, totalLength: stage1Content.length }
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify(se)}\n\n`))
               }
+            }
+            console.log('✅ Stage 1 complete:', stage1Content.length, 'chars')
+
+            // Parse Stage 1 to extract core file list for Stage 2 context
+            const stage1Result = parseMultiFileProject(stage1Content)
+            const stage1Files = stage1Result.success && stage1Result.project ? stage1Result.project.files : []
+            const stage1FileList = stage1Files.map(f => `  - ${f.path}`).join('\n')
+
+            // ── STAGE 2: Remaining pages, API routes, components ─────────────────────
+            const s2Status: StreamEvent = {
+              type: 'status',
+              statusMessage: `Stage 2/2: Generating remaining pages & features (${stage1Files.length} core files done)...`,
+            }
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(s2Status)}\n\n`))
+
+            const stage2UserPrompt = stage1Files.length > 0
+              ? `${enhancedPrompt}\n\n---\nSTAGE 2 CONTEXT — Core files already generated in Stage 1:\n${stage1FileList}\n\nNow generate ALL remaining pages, API routes, feature components, hooks, and stores. DO NOT regenerate any file listed above.`
+              : enhancedPrompt
+
+            const stage2Stream = await apiQueue.add(() =>
+              createMessageWithRetry(anthropic, {
+                model: 'claude-sonnet-4-20250514',
+                max_tokens: 32000,
+                temperature: 0.3,
+                messages: [{ role: 'user', content: stage2UserPrompt }],
+                system: STAGE2_REMAINING_SYSTEM_PROMPT,
+                stream: true,
+              })
+            )
+
+            let stage2Content = ''
+            for await (const event of stage2Stream) {
+              if (event.type === 'message_start') inputTokens += event.message.usage.input_tokens
+              if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+                stage2Content += event.delta.text
+                const se: StreamEvent = {
+                  type: 'content',
+                  text: event.delta.text,
+                  totalLength: stage1Content.length + stage2Content.length,
+                }
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify(se)}\n\n`))
+              }
+            }
+            console.log('✅ Stage 2 complete:', stage2Content.length, 'chars')
+
+            // ── Merge Stage 1 + Stage 2 results ─────────────────────────────────────
+            const stage2Result = parseMultiFileProject(stage2Content)
+            const stage2Files = stage2Result.success && stage2Result.project ? stage2Result.project.files : []
+
+            // Base project metadata from Stage 1 (has full dep list)
+            const baseProject = (stage1Result.success && stage1Result.project)
+              ? stage1Result.project
+              : (stage2Result.success && stage2Result.project ? stage2Result.project : null)
+
+            if (baseProject && (stage1Files.length > 0 || stage2Files.length > 0)) {
+              const stage1Paths = new Set(stage1Files.map(f => f.path))
+              const mergedFiles = [
+                ...stage1Files,
+                ...stage2Files.filter(f => !stage1Paths.has(f.path)),
+              ]
+              // Merge any additional deps declared in Stage 2
+              const stage2Deps = (stage2Result.success && stage2Result.project)
+                ? (stage2Result.project.dependencies ?? {})
+                : {}
+              const mergedProject = {
+                ...baseProject,
+                dependencies: { ...baseProject.dependencies, ...stage2Deps },
+                files: mergedFiles,
+              }
+
+              console.log(`✅ Staged fullstack merged: ${mergedFiles.length} files (S1: ${stage1Files.length}, S2: ${stage2Files.length})`)
+
+              const multifileEvent: StreamEvent = { type: 'multifile', content: JSON.stringify(mergedProject) }
               controller.enqueue(encoder.encode(`data: ${JSON.stringify(multifileEvent)}\n\n`))
 
-              // Save files to DB if project exists
               if (projectId) {
                 try {
-                  await saveProjectFiles(projectId, parseResult.project.files)
-                  await updateProjectMetadata(projectId, {
-                    multiPage: true,
-                    isMultiFile: true,
-                  })
+                  await saveProjectFiles(projectId, mergedProject.files)
+                  await updateProjectMetadata(projectId, { multiPage: true, isMultiFile: true })
                   await prisma.project.update({
                     where: { id: projectId },
                     data: {
@@ -553,9 +589,9 @@ export async function POST(req: NextRequest) {
                       updatedAt: new Date(),
                     },
                   })
-                  console.log('✅ Fullstack project saved to DB')
+                  console.log('✅ Staged fullstack project saved to DB')
                 } catch (dbErr) {
-                  console.error('❌ Fullstack DB save error:', dbErr)
+                  console.error('❌ Staged fullstack DB save error:', dbErr)
                 }
               }
 
@@ -574,8 +610,55 @@ export async function POST(req: NextRequest) {
               return
             }
 
-            // JSON parse failed — log and fall through to HTML pipeline as safety net
-            console.warn('⚠️ Fullstack JSON parse failed, falling back to HTML pipeline')
+            // Both stages failed to produce parseable JSON → fall back to HTML pipeline
+            console.warn('⚠️ Staged fullstack parse failed, falling back to HTML pipeline')
+            fullContent = stage1Content + '\n' + stage2Content
+
+          } else {
+            // ── SINGLE-PASS GENERATION (HTML / multi-page HTML) ──────────────────────
+            const messageStream = await apiQueue.add(() =>
+              createMessageWithRetry(anthropic, {
+                model: 'claude-sonnet-4-20250514',
+                max_tokens: getOptimalTokenLimit(prompt, generationType),
+                temperature: 0.3,
+                messages: [{ role: 'user', content: enhancedPrompt }],
+                system: systemPrompt,
+                stream: true,
+              })
+            )
+
+            for await (const event of messageStream) {
+              if (event.type === 'message_start') {
+                inputTokens = event.message.usage.input_tokens
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('📝 Input tokens:', inputTokens)
+                }
+              }
+
+              if (event.type === 'content_block_delta') {
+                if (event.delta.type === 'text_delta') {
+                  const text = event.delta.text
+                  fullContent += text
+
+                  const streamEvent: StreamEvent = {
+                    type: 'content',
+                    text,
+                    totalLength: fullContent.length,
+                  }
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(streamEvent)}\n\n`))
+                }
+              }
+
+              if (event.type === 'message_delta') {
+                if (event.delta.stop_reason && process.env.NODE_ENV === 'development') {
+                  console.log('⏹️ Stop reason:', event.delta.stop_reason)
+                }
+              }
+
+              if (event.type === 'message_stop') {
+                console.log('✅ Stream complete. Total characters:', fullContent.length)
+              }
+            }
           }
 
           // ============================================================================
