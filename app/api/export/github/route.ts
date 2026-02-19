@@ -232,9 +232,13 @@ async function createOrUpdateFile(
   path: string,
   content: string
 ) {
+  // Normalize and validate repo and path to prevent malformed URLs
+  const safeRepo = normalizeGithubRepoName(repo);
+  const safePath = normalizeGithubFilePath(path);
+
   // Check if file exists to get its SHA
   const checkResponse = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
+    `https://api.github.com/repos/${owner}/${safeRepo}/contents/${safePath}`,
     {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -251,7 +255,7 @@ async function createOrUpdateFile(
   
   // Create or update the file
   const response = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
+    `https://api.github.com/repos/${owner}/${safeRepo}/contents/${safePath}`,
     {
       method: 'PUT',
       headers: {
@@ -260,7 +264,7 @@ async function createOrUpdateFile(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        message: sha ? `Update ${path}` : `Create ${path}`,
+        message: sha ? `Update ${safePath}` : `Create ${safePath}`,
         content: Buffer.from(content).toString('base64'),
         ...(sha && { sha }),
       }),
@@ -269,11 +273,27 @@ async function createOrUpdateFile(
   
   if (!response.ok) {
     const errorData = await response.json();
-    console.error(`❌ Failed to create/update ${path}:`, errorData);
-    throw new Error(`Failed to create/update ${path}: ${errorData.message}`);
+    console.error(`❌ Failed to create/update ${safePath}:`, errorData);
+    throw new Error(`Failed to create/update ${safePath}: ${errorData.message}`);
   }
   
-  console.log(`✅ ${sha ? 'Updated' : 'Created'} ${path}`);
+  console.log(`✅ ${sha ? 'Updated' : 'Created'} ${safePath}`);
+
+  function normalizeGithubRepoName(input: string): string {
+    const trimmed = (input || '').trim();
+    // GitHub repo names may contain letters, numbers, dots, underscores, and hyphens
+    const validRepoPattern = /^[a-zA-Z0-9._-]{1,100}$/;
+    if (!validRepoPattern.test(trimmed)) {
+      throw new Error('Invalid repository name');
+    }
+    return trimmed;
+  }
+
+  function normalizeGithubFilePath(input: string): string {
+    const raw = (input || '').trim();
+    // Avoid leading slash so that the path is always relative within the repo
+    return raw.replace(/^\/+/, '');
+  }
 }
 
 function generateProjectFiles(projectName: string, code: string) {
