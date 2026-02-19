@@ -85,6 +85,23 @@ export async function POST(
       )
     }
 
+    // Validate Vercel project ID to prevent misuse in outbound requests
+    if (typeof vercelProjectId !== 'string') {
+      return NextResponse.json(
+        { error: 'Vercel project ID must be a string' },
+        { status: 400 }
+      )
+    }
+
+    // Allow only a conservative set of characters and length for project IDs
+    const vercelProjectIdPattern = /^[a-zA-Z0-9_-]{1,64}$/
+    if (!vercelProjectIdPattern.test(vercelProjectId)) {
+      return NextResponse.json(
+        { error: 'Invalid Vercel project ID format' },
+        { status: 400 }
+      )
+    }
+
     // Sync environment variables
     const result = await syncSupabaseEnvVarsToVercel({
       vercelProjectId,
