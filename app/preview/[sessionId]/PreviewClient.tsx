@@ -81,16 +81,37 @@ export default function PreviewClient({
     }
   }, [currentPage, code, pages, htmlFiles]);
 
-  // Monitor iframe for errors
+  // Monitor iframe messages: errors + in-app navigation
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'iframe-error') {
         setIframeError(event.data.message);
       }
+
+      // Intercept in-app link clicks posted from the injected nav interceptor
+      if (event.data?.type === 'navigate') {
+        const href = (event.data.href as string) || '';
+        // Normalise href → slug: /auth/login → auth-login, / → home
+        const raw = href.replace(/^\/+/, '').replace(/\/+$/, '');
+        const hyphenated = raw.replace(/\//g, '-');
+
+        const match =
+          pages.find(p => p.slug === raw) ||
+          pages.find(p => p.slug === hyphenated) ||
+          pages.find(p => '/' + p.slug === href) ||
+          (raw === '' ? pages.find(p => p.isHomepage) : undefined);
+
+        if (match) {
+          setCurrentPage(match.slug);
+          setIframeError(null);
+        }
+      }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
+  // pages is a stable server-rendered prop — no need to re-register on change
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Log preview info on mount
@@ -226,6 +247,32 @@ ${sanitized.replace('<!DOCTYPE html>', '').trim()}
       }
     }
 
+    // Inject navigation interceptor: catches relative link clicks inside the
+    // preview iframe and posts a 'navigate' message to the parent instead of
+    // letting the browser navigate to the BuildFlow app's own routes.
+    const navInterceptorScript = `
+  <script>
+    (function () {
+      document.addEventListener('click', function (e) {
+        var link = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+        if (!link) return;
+        var href = link.getAttribute('href');
+        if (!href) return;
+        // External links: open in a new tab (safe)
+        if (/^(https?:)?\/\//.test(href) || /^mailto:|^tel:/.test(href)) {
+          link.setAttribute('target', '_blank');
+          link.setAttribute('rel', 'noopener noreferrer');
+          return;
+        }
+        // Hash anchors: allow normal scroll behaviour
+        if (href.charAt(0) === '#') return;
+        // Relative / absolute app paths: hand off to preview parent
+        e.preventDefault();
+        window.parent.postMessage({ type: 'navigate', href: href }, '*');
+      }, true);
+    })();
+  </script>`;
+
     // Add error reporting script
     const errorReportScript = `
   <script>
@@ -237,8 +284,8 @@ ${sanitized.replace('<!DOCTYPE html>', '').trim()}
       }, '*');
     });
   </script>`;
-    
-    sanitized = sanitized.replace('</body>', `${errorReportScript}\n</body>`);
+
+    sanitized = sanitized.replace('</body>', `${navInterceptorScript}\n${errorReportScript}\n</body>`);
 
     return sanitized;
   }
