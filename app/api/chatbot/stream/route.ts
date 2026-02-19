@@ -217,7 +217,8 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
           const response = await anthropic.messages.create({
             model: 'claude-sonnet-4-20250514',
             max_tokens: maxTokens,
-            temperature: 1,
+            // Lower temperature for JSON multi-file output — consistency matters more than creativity
+            temperature: isMultiFileRequest ? 0.3 : 1,
             system: systemPrompt,
             messages: [
               {
@@ -579,16 +580,22 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
         controller.close();
         return;
       } else {
-        console.warn('⚠️ Multi-file parsing failed, falling back to single HTML:', parseResult.error);
-        console.log('🔄 Processing as single HTML file...');
-        // Continue to single HTML processing below (don't return)
+        console.warn('⚠️ Multi-file parsing failed:', parseResult.error);
+        // Don't fall through to single-HTML processing — raw JSON stored as code
+        // would render as garbage in the preview. Send a graceful error instead.
+        send(controller, {
+          error: 'The AI generated a fullstack project but the output could not be parsed. Please try again.',
+          done: true,
+        });
+        controller.close();
+        return;
       }
     }
 
-    // SINGLE HTML PROCESSING - runs if not multi-file OR if multi-file parsing failed
+    // SINGLE HTML PROCESSING - runs only for non-multi-file requests
     // Clean and process code
     let html = generatedHtml.trim()
-      .replace(/^```html?\n?/i, '')
+      .replace(/^```(?:html?)?\n?/i, '')  // strips ```html or ``` (but not ```json — handled above)
       .replace(/\n?```$/i, '')
       .trim()
 

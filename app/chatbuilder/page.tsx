@@ -360,6 +360,14 @@ function ChatBuilderContent() {
     }
   }, [searchParams, status, loadProject]);
 
+  // Pre-fill prompt from URL parameter (e.g. from templates page ?prompt=...)
+  useEffect(() => {
+    const urlPrompt = searchParams.get('prompt');
+    if (urlPrompt) {
+      setPrompt(urlPrompt);
+    }
+  }, [searchParams]);
+
   // Generation function with progress tracking
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) {
@@ -437,9 +445,15 @@ function ChatBuilderContent() {
                 const progress = Math.min(80, 10 + (chunkCount * 0.5));
                 setState(prev => ({ ...prev, progress, currentStep: 'Generating code...' }));
 
+                // Don't try to render JSON multi-file responses as HTML during streaming —
+                // the server will send a projectId event with converted HTML when done.
+                const looksLikeJson = accumulatedCode.trimStart().startsWith('{') ||
+                  accumulatedCode.trimStart().startsWith('```json') ||
+                  accumulatedCode.trimStart().startsWith('```\n{');
+
                 // Throttle parsing: only parse every 10 chunks and when content looks parseable
                 const shouldParse = chunkCount % 10 === 0 || accumulatedCode.length < 200;
-                const hasParseable = accumulatedCode.includes('<') || accumulatedCode.trim().startsWith('{');
+                const hasParseable = !looksLikeJson && accumulatedCode.includes('<');
 
                 if (shouldParse && hasParseable) {
                   const { html, css, js } = parseCode(accumulatedCode);
@@ -663,7 +677,9 @@ function ChatBuilderContent() {
 
                 // Throttle parsing: only parse every 10 chunks and when content looks parseable
                 const shouldParse = chunkCount % 10 === 0 || accumulatedCode.length < 200;
-                const hasParseable = accumulatedCode.includes('<') || accumulatedCode.trim().startsWith('{');
+                const looksLikeJsonRetry = accumulatedCode.trimStart().startsWith('{') ||
+                  accumulatedCode.trimStart().startsWith('```json');
+                const hasParseable = !looksLikeJsonRetry && accumulatedCode.includes('<');
 
                 if (shouldParse && hasParseable) {
                   const { html, css, js } = parseCode(accumulatedCode);

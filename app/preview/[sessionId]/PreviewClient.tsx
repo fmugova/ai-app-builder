@@ -34,7 +34,14 @@ export default function PreviewClient({
   files = [],
   isMultiPage = false 
 }: PreviewClientProps) {
-  const [currentPage, setCurrentPage] = useState<string>('main');
+  const [currentPage, setCurrentPage] = useState<string>(() => {
+    // Default to homepage for multi-page projects so we don't show raw `code`
+    if (isMultiPage && pages.length > 0) {
+      const home = pages.find(p => p.isHomepage);
+      return home?.slug || pages[0].slug;
+    }
+    return 'main';
+  });
   const [showNav, setShowNav] = useState(true);
   const [iframeError, setIframeError] = useState<string | null>(null);
   const [isLoadingStackBlitz, setIsLoadingStackBlitz] = useState(false);
