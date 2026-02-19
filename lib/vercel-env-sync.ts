@@ -17,6 +17,16 @@ interface SyncEnvVarsParams {
 }
 
 /**
+ * Basic validation for Vercel project IDs to prevent unsafe values
+ * being used in request URLs. Restricts to a conservative character set.
+ */
+function isValidVercelProjectId(projectId: string): boolean {
+  // Vercel project IDs / names are typically slugs or IDs without path separators.
+  // Allow only alphanumerics, underscore and hyphen, up to a reasonable length.
+  return /^[a-zA-Z0-9_-]{1,100}$/.test(projectId)
+}
+
+/**
  * Sync Supabase credentials to Vercel project environment variables
  */
 export async function syncSupabaseEnvVarsToVercel(
@@ -26,6 +36,14 @@ export async function syncSupabaseEnvVarsToVercel(
 
   const synced: string[] = []
   const errors: string[] = []
+
+  if (!isValidVercelProjectId(vercelProjectId)) {
+    return {
+      success: false,
+      synced,
+      errors: ['Invalid Vercel project ID']
+    }
+  }
 
   const envVars: VercelEnvVariable[] = [
     {
