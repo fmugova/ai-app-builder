@@ -172,6 +172,130 @@ function isIncompatible(pkg: string): boolean {
   return INCOMPATIBLE_PACKAGES.some((p) => pkg === p || pkg.startsWith(p + '/'));
 }
 
+// ── Auto-detect missing npm dependencies from import statements ────────────
+
+/** Node.js built-in module names — skip these when scanning imports */
+const NODE_BUILTINS = new Set([
+  'fs', 'path', 'http', 'https', 'url', 'crypto', 'stream', 'util', 'events',
+  'os', 'child_process', 'buffer', 'querystring', 'zlib', 'net', 'dns', 'tls',
+  'cluster', 'worker_threads', 'readline', 'timers', 'assert', 'console',
+  'process', 'module', 'vm', 'perf_hooks', 'async_hooks', 'string_decoder',
+]);
+
+/**
+ * Well-known packages with their latest stable versions.
+ * Used when the package isn't already in package.json — avoids resolving "latest"
+ * at install time (unreliable in the WebContainer npm proxy).
+ */
+const KNOWN_VERSIONS: Record<string, string> = {
+  'zustand': '^4.5.0',
+  'jotai': '^2.7.0',
+  'recoil': '^0.7.7',
+  'framer-motion': '^11.0.0',
+  'axios': '^1.6.0',
+  'swr': '^2.2.0',
+  '@tanstack/react-query': '^5.0.0',
+  '@tanstack/react-table': '^8.0.0',
+  'date-fns': '^3.3.0',
+  'dayjs': '^1.11.0',
+  'lodash': '^4.17.21',
+  'lodash-es': '^4.17.21',
+  'clsx': '^2.1.0',
+  'class-variance-authority': '^0.7.0',
+  'tailwind-merge': '^2.2.0',
+  'react-hot-toast': '^2.4.0',
+  'react-toastify': '^10.0.0',
+  'sonner': '^1.4.0',
+  'react-icons': '^5.0.0',
+  'lucide-react': '^0.344.0',
+  'react-hook-form': '^7.50.0',
+  '@hookform/resolvers': '^3.3.0',
+  'zod': '^3.22.0',
+  'yup': '^1.3.0',
+  'next-themes': '^0.3.0',
+  'cmdk': '^1.0.0',
+  'embla-carousel-react': '^8.0.0',
+  'react-dropzone': '^14.2.0',
+  'react-select': '^5.8.0',
+  'react-datepicker': '^6.6.0',
+  'recharts': '^2.12.0',
+  'chart.js': '^4.4.0',
+  'react-chartjs-2': '^5.2.0',
+  'react-dnd': '^16.0.0',
+  'react-dnd-html5-backend': '^16.0.0',
+  '@dnd-kit/core': '^6.1.0',
+  '@dnd-kit/sortable': '^8.0.0',
+  'uuid': '^9.0.0',
+  'nanoid': '^5.0.0',
+  'stripe': '^14.0.0',
+  '@stripe/stripe-js': '^3.0.0',
+  '@stripe/react-stripe-js': '^2.0.0',
+  'resend': '^3.0.0',
+  'nodemailer': '^6.9.0',
+  '@radix-ui/react-accordion': '^1.1.0',
+  '@radix-ui/react-alert-dialog': '^1.0.0',
+  '@radix-ui/react-avatar': '^1.0.0',
+  '@radix-ui/react-badge': '^1.0.0',
+  '@radix-ui/react-button': '^1.0.0',
+  '@radix-ui/react-checkbox': '^1.0.0',
+  '@radix-ui/react-collapsible': '^1.0.0',
+  '@radix-ui/react-context-menu': '^2.1.0',
+  '@radix-ui/react-dialog': '^1.0.0',
+  '@radix-ui/react-dropdown-menu': '^2.0.0',
+  '@radix-ui/react-hover-card': '^1.0.0',
+  '@radix-ui/react-icons': '^1.3.0',
+  '@radix-ui/react-label': '^2.0.0',
+  '@radix-ui/react-menubar': '^1.0.0',
+  '@radix-ui/react-navigation-menu': '^1.1.0',
+  '@radix-ui/react-popover': '^1.0.0',
+  '@radix-ui/react-progress': '^1.0.0',
+  '@radix-ui/react-radio-group': '^1.1.0',
+  '@radix-ui/react-scroll-area': '^1.0.0',
+  '@radix-ui/react-select': '^2.0.0',
+  '@radix-ui/react-separator': '^1.0.0',
+  '@radix-ui/react-slider': '^1.1.0',
+  '@radix-ui/react-slot': '^1.0.0',
+  '@radix-ui/react-switch': '^1.0.0',
+  '@radix-ui/react-tabs': '^1.0.0',
+  '@radix-ui/react-toast': '^1.1.0',
+  '@radix-ui/react-toggle': '^1.0.0',
+  '@radix-ui/react-tooltip': '^1.0.0',
+  'react-markdown': '^9.0.0',
+  'remark-gfm': '^4.0.0',
+  'highlight.js': '^11.9.0',
+  'prismjs': '^1.29.0',
+  'react-syntax-highlighter': '^15.5.0',
+  '@supabase/supabase-js': '^2.39.0',
+  '@supabase/auth-helpers-nextjs': '^0.10.0',
+  'next-auth': '^4.24.0',
+  'jose': '^5.2.0',
+  'jsonwebtoken': '^9.0.0',
+};
+
+/**
+ * Scan JS/TS file contents and return all third-party package names imported.
+ * Skips relative paths, Node.js built-ins, Next.js internal paths, and `@/` aliases.
+ */
+function extractImportedPackages(content: string): string[] {
+  const packages = new Set<string>();
+  // Match: from 'pkg' / from "pkg" and require('pkg') / require("pkg")
+  const re = /(?:from|require)\s*\(\s*['"]([^'"]+)['"]\s*\)|from\s+['"]([^'"]+)['"]/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(content)) !== null) {
+    const spec = m[1] ?? m[2];
+    if (!spec) continue;
+    // Skip relative, absolute, and internal alias imports
+    if (spec.startsWith('.') || spec.startsWith('/') || spec.startsWith('@/')) continue;
+    // Extract bare package name (handle scoped packages)
+    const pkgName = spec.startsWith('@')
+      ? spec.split('/').slice(0, 2).join('/')
+      : spec.split('/')[0];
+    if (!pkgName || NODE_BUILTINS.has(pkgName)) continue;
+    packages.add(pkgName);
+  }
+  return Array.from(packages);
+}
+
 function stripIncompatibleDeps(deps: Record<string, string>): { cleaned: Record<string, string>; removed: string[] } {
   const cleaned: Record<string, string> = {};
   const removed: string[] = [];
@@ -338,6 +462,68 @@ export function ensureRequiredFiles(
 
   hadPrisma = allRemoved.some((p) => p.includes('prisma'));
 
+  // ── 2b. Auto-inject missing dependencies found in source files ────────
+  // The AI often generates code that imports packages not listed in package.json
+  // (e.g. zustand, framer-motion, recharts). Scan all JS/TS files, find any
+  // undeclared packages, and add them before npm install runs.
+  {
+    const pkgFileIdx = result.findIndex((f) => f.path === 'package.json');
+    if (pkgFileIdx !== -1) {
+      try {
+        const pkg = JSON.parse(result[pkgFileIdx].content);
+        const declared = new Set([
+          ...Object.keys(pkg.dependencies ?? {}),
+          ...Object.keys(pkg.devDependencies ?? {}),
+        ]);
+        const missing: Record<string, string> = {};
+
+        for (const f of result) {
+          if (!/\.(ts|tsx|js|jsx|mjs|cjs)$/.test(f.path)) continue;
+          for (const pkgName of extractImportedPackages(f.content)) {
+            if (!declared.has(pkgName) && !isIncompatible(pkgName) && !missing[pkgName]) {
+              missing[pkgName] = KNOWN_VERSIONS[pkgName] ?? 'latest';
+            }
+          }
+        }
+
+        if (Object.keys(missing).length > 0) {
+          pkg.dependencies = { ...(pkg.dependencies ?? {}), ...missing };
+          result[pkgFileIdx] = { path: 'package.json', content: JSON.stringify(pkg, null, 2) };
+          console.log('[WebContainer] Auto-added missing deps:', Object.keys(missing).join(', '));
+        }
+      } catch {
+        // package.json parse failed — skip auto-detect
+      }
+    }
+  }
+
+  // ── 2c. Patch lib/supabase.ts to not throw on missing env vars ────────
+  // Generated Supabase clients call `throw new Error('Missing ...')` at module
+  // load time if the env vars aren't set — crashing the entire Next.js boot.
+  // Replace with graceful fallbacks so the app can render without real Supabase.
+  for (let i = 0; i < result.length; i++) {
+    const f = result[i];
+    if (
+      (f.path === 'lib/supabase.ts' || f.path === 'lib/supabase.js' ||
+       f.path === 'src/lib/supabase.ts' || f.path === 'src/lib/supabase.js') &&
+      f.content.includes('createClient') &&
+      (f.content.includes('throw new Error') || f.content.includes('Missing '))
+    ) {
+      // Replace the whole file with a no-op Supabase stub
+      result[i] = {
+        ...f,
+        content: `// WebContainer preview — Supabase stub (no real credentials)
+import { createClient } from '@supabase/supabase-js';
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://placeholder.supabase.co';
+const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'placeholder-anon-key';
+export const supabase = createClient(url, key);
+export default supabase;
+`,
+      };
+      console.log('[WebContainer] Replaced lib/supabase with stub (no throw on missing env)');
+    }
+  }
+
   // ── 3. Inject mocks for stripped packages ───────────────────────────
   if (hadPrisma) {
     // Replace the real lib/prisma.ts with a mock
@@ -433,6 +619,12 @@ export function ensureRequiredFiles(
         'NEXT_PUBLIC_APP_URL=http://localhost:3000',
         'NEXT_PUBLIC_SITE_URL=http://localhost:3000',
         'ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000001',
+        'NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co',
+        'NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder-anon-key',
+        'SUPABASE_SERVICE_ROLE_KEY=placeholder-service-role-key',
+        'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_placeholder',
+        'STRIPE_SECRET_KEY=sk_test_placeholder',
+        'RESEND_API_KEY=re_placeholder',
       ].join('\n') + '\n',
     });
   }
