@@ -9,6 +9,7 @@ export interface Project {
   updatedAt: string | Date
   isPublished?: boolean
   publicUrl?: string | null
+  publicSlug?: string | null
   isPublic?: boolean
   shareToken?: string | null
   views?: number

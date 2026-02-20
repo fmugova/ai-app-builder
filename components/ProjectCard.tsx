@@ -353,13 +353,7 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
 
             {/* Preview Button - Always available */}
             <a
-              href={
-                project.publicSlug
-                  ? `/preview/${project.publicSlug}`
-                  : project.id
-                  ? `/preview/${project.id}`
-                  : '#'
-              }
+              href={project.id ? `/preview/${project.id}` : '#'}
               className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors"
               title="Preview project code and site"
               target="_blank"
@@ -461,12 +455,15 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
       </div>
 
       {/* Share Modal */}
-      {project.isPublished && project.publicUrl && (
+      {project.isPublished && shareModalOpen && (
         <ShareModal
           isOpen={shareModalOpen}
           onClose={() => setShareModalOpen(false)}
           projectName={project.name}
-          publicUrl={project.publicUrl ?? ''}
+          publicUrl={
+            project.publicUrl ||
+            (project.publicSlug ? `https://buildflow-ai.app/p/${project.publicSlug}` : '')
+          }
           views={project.views}
         />
       )}
