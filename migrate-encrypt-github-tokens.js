@@ -49,7 +49,7 @@ async function migrateGitHubTokens() {
         }
 
         // Encrypt the token
-        const encryptedToken = encrypt(user.githubAccessToken!);
+        const encryptedToken = encrypt(user.githubAccessToken);
 
         // Update in database
         await prisma.user.update({
