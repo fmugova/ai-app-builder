@@ -98,13 +98,22 @@ export async function POST(request: NextRequest) {
         id: true,
         name: true,
         code: true,
-        userId: true,
-      },
-    });
-    
-    if (!project) {
-      return NextResponse.json(
-        { error: 'Project not found' },
+      const { projectId, redirectUrl } = await request.json();
+      if (!projectId) {
+        console.warn('Suspicious request: missing projectId', { ip: request.ip });
+        return NextResponse.json(
+          { error: 'Project ID is required' },
+          { status: 400 }
+        );
+      }
+      // SSRF/open redirect protection: Only allow redirectUrl within own domain/api
+      if (redirectUrl && !/^https?:\/\/(localhost|buildflow-ai\.app|yourdomain\.com)(\/|$)/.test(redirectUrl)) {
+        console.warn('Blocked SSRF/open redirect attempt', { redirectUrl, ip: request.ip });
+        return NextResponse.json(
+          { error: 'Invalid redirect URL' },
+          { status: 400 }
+        );
+      }
         { status: 404 }
       );
     }

@@ -9,6 +9,7 @@ import { sendEmail, getWelcomeEmailHTML } from '@/lib/email'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { signupSchema, validateSchema } from '@/lib/schemas'
 import { randomBytes } from 'crypto'
+import { getPostHogClient } from '@/lib/posthog-server'
 
 // Server-side analytics logging (GA tracking happens client-side)
 const logAnalyticsEvent = (event: string, properties?: Record<string, unknown>) => {
@@ -72,6 +73,14 @@ export async function POST(request: NextRequest) {
     })
     // Log signup analytics event (server-side)
     logAnalyticsEvent('sign_up', { method: 'email', userId: user.id })
+    // PostHog server-side: identify and capture sign-up
+    try {
+      const ph = getPostHogClient()
+      ph.identify({ distinctId: user.id, properties: { email: user.email, name: user.name } })
+      ph.capture({ distinctId: user.id, event: 'user_signed_up', properties: { method: 'email' } })
+    } catch {
+      // Non-fatal: analytics should not block the response
+    }
     // Auto-enroll in welcome drip campaign
     try {
       await prisma.dripEnrollment.create({

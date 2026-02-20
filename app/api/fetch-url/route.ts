@@ -37,6 +37,7 @@ export async function POST(request: NextRequest) {
     const { url } = await request.json()
 
     if (!url || typeof url !== 'string') {
+      console.warn('Suspicious request: missing or malformed URL', { url, ip: request.ip });
       return NextResponse.json({ error: 'URL is required' }, { status: 400 })
     }
 
@@ -45,11 +46,13 @@ export async function POST(request: NextRequest) {
     try {
       parsedUrl = new URL(url)
     } catch {
+      console.warn('Malformed URL parsing attempt', { url, ip: request.ip });
       return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
     }
 
     // 2. Enforce allowed protocols — blocks file://, ftp://, data://, javascript:, etc.
     if (!ALLOWED_PROTOCOLS.has(parsedUrl.protocol)) {
+      console.warn('Blocked protocol in fetch-url', { protocol: parsedUrl.protocol, url, ip: request.ip });
       return NextResponse.json(
         { error: 'Only http:// and https:// URLs are allowed' },
         { status: 400 }
@@ -59,6 +62,7 @@ export async function POST(request: NextRequest) {
     // 3. Pre-check obvious static hostnames (belt-and-braces before agent check)
     const hostname = parsedUrl.hostname.toLowerCase()
     if (hostname === 'localhost' || hostname === '0.0.0.0') {
+      console.warn('Blocked private/local hostname in fetch-url', { hostname, url, ip: request.ip });
       return NextResponse.json(
         { error: 'Access to private/local URLs is not allowed' },
         { status: 403 }
@@ -84,15 +88,18 @@ export async function POST(request: NextRequest) {
       const msg = err instanceof Error ? err.message : String(err)
       // ssrf-req-filter throws "Call to <ip> is blocked." for private IPs
       if (msg.includes('is blocked') || msg.includes('private')) {
+        console.warn('Blocked SSRF attempt in fetch-url', { url, ip: request.ip, error: msg });
         return NextResponse.json(
           { error: 'Access to private/local URLs is not allowed' },
           { status: 403 }
         )
       }
+      console.error('Fetch error in fetch-url', { url, ip: request.ip, error: msg });
       throw err
     }
 
     if (!response.ok) {
+      console.error('Fetch failed in fetch-url', { url, status: response.status, statusText: response.statusText, ip: request.ip });
       return NextResponse.json(
         { error: `Failed to fetch: ${response.statusText}` },
         { status: response.status }
@@ -113,6 +120,7 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Failed to fetch URL'
     console.error('URL fetch error:', error)
+    console.warn('Malformed or suspicious fetch-url request', { error, ip: request.ip });
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

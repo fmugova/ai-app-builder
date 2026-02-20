@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { isAdminAsync } from '@/lib/admin'
 import { prisma } from '@/lib/prisma'
 import { sendEmail } from '@/lib/email'
+import { getPostHogClient } from '@/lib/posthog-server'
 
 export async function POST(
   request: NextRequest,
@@ -96,9 +97,27 @@ export async function POST(
       }
     })
 
-    return NextResponse.json({ 
-      success: true, 
-      sentCount 
+    // PostHog server-side: track campaign sent
+    try {
+      const adminId = (session.user as { id?: string }).id || session.user.email!
+      const ph = getPostHogClient()
+      ph.capture({
+        distinctId: adminId,
+        event: 'campaign_sent',
+        properties: {
+          campaign_id: id,
+          campaign_name: campaign.subject,
+          segment: campaign.segment,
+          sent_count: sentCount,
+        },
+      })
+    } catch {
+      // Non-fatal
+    }
+
+    return NextResponse.json({
+      success: true,
+      sentCount
     })
   } catch (error) {
     console.error('Send campaign error:', error)

@@ -45,36 +45,10 @@ function IdentitySync() {
   return null
 }
 
-// ── Init + Provider ─────────────────────────────────────────────────────────
+// ── Provider ─────────────────────────────────────────────────────────────────
+// PostHog is initialised in instrumentation-client.ts (Next.js 15.3+ approach).
+// This component provides the React context and wires up identity + pageview tracking.
 export default function PostHogProvider({ children }: { children: React.ReactNode }) {
-  const key = process.env.NEXT_PUBLIC_POSTHOG_KEY
-  const host = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com'
-
-  useEffect(() => {
-    if (!key) return
-    posthog.init(key, {
-      api_host: host,
-      ui_host: 'https://us.posthog.com',
-      // Capture pageviews manually via PageviewTracker for accurate SPA tracking
-      capture_pageview: false,
-      // Capture pageleave events for session duration
-      capture_pageleave: true,
-      // Persist across sessions
-      persistence: 'localStorage+cookie',
-      // Autocapture clicks/inputs (disable if CSP strict)
-      autocapture: false,
-      // Don't send data in development unless explicitly enabled
-      loaded: (phInstance) => {
-        if (process.env.NODE_ENV === 'development') phInstance.debug()
-      },
-    })
-  }, [key, host])
-
-  if (!key) {
-    // PostHog not configured — render children without wrapping
-    return <>{children}</>
-  }
-
   return (
     <PHProvider client={posthog}>
       <Suspense fallback={null}>

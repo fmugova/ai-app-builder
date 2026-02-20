@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { headers } from 'next/headers';
 import { getGithubOAuthCredentials } from '@/lib/github-oauth';
+import { getPostHogClient } from '@/lib/posthog-server';
 
 const { clientId: githubClientId, clientSecret: githubClientSecret } = getGithubOAuthCredentials();
 
@@ -143,7 +144,20 @@ export async function GET(request: NextRequest) {
     });
     
     console.log('✅ GitHub connected for user:', session.user.email);
-    
+
+    // PostHog server-side: track GitHub connection
+    try {
+      const distinctId = (session.user as { id?: string }).id || session.user.email!;
+      const ph = getPostHogClient();
+      ph.capture({
+        distinctId,
+        event: 'github_connected',
+        properties: { github_username: githubUser.login },
+      });
+    } catch {
+      // Non-fatal
+    }
+
     // Decode state to get projectId
     let redirectPath = '/dashboard?github_connected=true';
     if (state) {

@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import Anthropic from '@anthropic-ai/sdk'
 import { checkRateLimitByIdentifier } from '@/lib/rate-limit'
+import { getPostHogClient } from '@/lib/posthog-server'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -116,6 +117,24 @@ Generate ONLY the complete HTML code. No explanations, no markdown, just the cod
 
     const claudeData = await claudeRes.json();
     const generatedCode = claudeData.content[0].text;
+
+    // PostHog server-side: track AI generation
+    try {
+      const distinctId = (session.user as { id?: string }).id || session.user.email!
+      const ph = getPostHogClient()
+      ph.capture({
+        distinctId,
+        event: 'ai_generation_completed',
+        properties: {
+          project_type: projectType,
+          has_files: files.length > 0,
+          has_urls: urls.length > 0,
+          source: 'chat',
+        },
+      })
+    } catch {
+      // Non-fatal
+    }
 
     return NextResponse.json({
       code: generatedCode,

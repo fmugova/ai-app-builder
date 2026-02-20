@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import posthog from 'posthog-js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -121,6 +122,7 @@ export default function BillingClient({ userEmail }: { userEmail: string }) {
 
   async function buyCredits(packageId: string) {
     setBuyingPackage(packageId)
+    posthog.capture('credits_purchase_started', { package_id: packageId })
     try {
       const res = await fetch('/api/stripe/credits', {
         method: 'POST',
@@ -130,7 +132,8 @@ export default function BillingClient({ userEmail }: { userEmail: string }) {
       const data = await res.json()
       if (data.url) router.push(data.url)
       else alert(data.error || 'Failed to start checkout')
-    } catch {
+    } catch (err) {
+      posthog.captureException(err)
       alert('Failed to start checkout. Please try again.')
     } finally {
       setBuyingPackage(null)
@@ -232,6 +235,7 @@ export default function BillingClient({ userEmail }: { userEmail: string }) {
               {tier === 'free' ? (
                 <Link
                   href="/pricing"
+                  onClick={() => posthog.capture('upgrade_clicked', { current_tier: tier, source: 'billing_page' })}
                   className="px-5 py-2 bg-white hover:bg-gray-100 text-gray-900 rounded-lg font-semibold text-sm transition"
                 >
                   Upgrade Plan
@@ -423,6 +427,7 @@ export default function BillingClient({ userEmail }: { userEmail: string }) {
                   ) : (
                     <Link
                       href="/pricing"
+                      onClick={() => posthog.capture('upgrade_clicked', { current_tier: tier, target_tier: t, source: 'billing_plans' })}
                       className="block w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-center text-sm font-medium transition"
                     >
                       {tier === 'free' || UPGRADE_PLANS.indexOf(t) > UPGRADE_PLANS.indexOf(tier as typeof UPGRADE_PLANS[number]) ? 'Upgrade' : 'Downgrade'}

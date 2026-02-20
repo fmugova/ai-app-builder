@@ -10,6 +10,7 @@ import { signOut } from 'next-auth/react'
 import ProjectCard from '@/components/ProjectCard'
 import type { Project } from '@/types/project'
 import { useSession } from 'next-auth/react'
+import posthog from 'posthog-js'
 
 // Icons
 const SunIcon = () => (
@@ -87,6 +88,7 @@ export default function DashboardClient({
 
   const handleCloseOnboarding = async () => {
     setShowOnboarding(false)
+    posthog.capture('onboarding_completed')
     await fetch('/api/user/onboarding-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -157,12 +159,14 @@ export default function DashboardClient({
 
       if (res.ok) {
         setProjects(projects.filter(p => p.id !== projectId))
+        posthog.capture('project_deleted', { project_id: projectId })
         addToast('Project deleted successfully', 'success')
       } else {
         addToast('Failed to delete project', 'error')
       }
     } catch (error) {
       console.error('Delete error:', error)
+      posthog.captureException(error)
       addToast('Failed to delete project', 'error')
     }
   }

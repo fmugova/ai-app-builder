@@ -4,6 +4,23 @@ const nextConfig: NextConfig = {
   experimental: {
   },
 
+  async rewrites() {
+    return [
+      {
+        // PostHog reverse proxy – routes analytics requests through this domain
+        // to avoid ad blockers and improve data quality.
+        source: '/ingest/static/:path*',
+        destination: 'https://eu-assets.i.posthog.com/static/:path*',
+      },
+      {
+        source: '/ingest/:path*',
+        destination: 'https://eu.i.posthog.com/:path*',
+      },
+    ]
+  },
+  // Required to support PostHog trailing-slash API requests
+  skipTrailingSlashRedirect: true,
+
   typescript: {
     ignoreBuildErrors: false,
   },
@@ -91,7 +108,7 @@ const nextConfig: NextConfig = {
             "default-src 'self'",
             // Scripts: self + Next.js inline hydration + Stripe.js + Google Tag Manager + Monaco Editor CDN + blob: for Next.js workers
             // unsafe-eval required for WebContainers WASM runtime on /chatbuilder
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://www.googletagmanager.com https://www.google-analytics.com https://cdn.jsdelivr.net https://cdn.tailwindcss.com blob:",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://www.googletagmanager.com https://www.google-analytics.com https://cdn.jsdelivr.net https://cdn.tailwindcss.com https://eu-assets.i.posthog.com blob:",
             // Styles: self + inline (Tailwind/shadcn) + Google Fonts
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             // Fonts: self + data URIs + Google Fonts CDN

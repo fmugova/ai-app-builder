@@ -7,7 +7,7 @@ export async function GET() {
     const session = await getServerSession(authOptions);
     
     if (!session?.user?.email) {
-      return NextResponse.redirect('/auth/signin');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const githubClientId = process.env.GITHUB_CLIENT_ID;
@@ -29,11 +29,11 @@ export async function GET() {
 
     const githubAuthUrl = `https://github.com/login/oauth/authorize?${params.toString()}`;
 
-    return NextResponse.redirect(githubAuthUrl);
+    return NextResponse.json({ success: true, url: githubAuthUrl });
   } catch (error) {
     console.error('GitHub OAuth initiation error:', error);
     return NextResponse.json(
-      { error: 'Failed to initiate GitHub OAuth' },
+      { error: 'Failed to initiate GitHub OAuth', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }

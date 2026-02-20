@@ -6,6 +6,7 @@ import { signIn } from 'next-auth/react'
 import Link from 'next/link'
 import { Toaster, toast } from 'react-hot-toast'
 import { Loader2, Eye, EyeOff, Mail, Lock } from 'lucide-react'
+import posthog from 'posthog-js'
 
 export default function SignInClient() {
   const router = useRouter()
@@ -68,11 +69,13 @@ export default function SignInClient() {
         }
 
         if (errorName === 'EMAIL_NOT_VERIFIED' || result.error.includes('verify your email')) {
+          posthog.capture('sign_in_failed', { reason: 'email_not_verified', method: 'email' })
           toast.error('You must verify your email before signing in.')
           setTimeout(() => {
             router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`)
           }, 1000)
         } else if (errorName === 'TWO_FACTOR_ONBOARDING_REQUIRED' || result.error.includes('Two-factor authentication setup required')) {
+          posthog.capture('sign_in_failed', { reason: '2fa_onboarding_required', method: 'email' })
           toast.error('You must set up 2FA before accessing your account.')
           setTimeout(() => {
             router.push('/account/security/2fa?onboarding=1')
@@ -83,15 +86,19 @@ export default function SignInClient() {
           setLoading(false)
           return
         } else if (result.error.includes('Invalid 2FA')) {
+          posthog.capture('sign_in_failed', { reason: 'invalid_2fa', method: 'email' })
           toast.error('Invalid 2FA code. Please try again.')
           setFormData({ ...formData, twoFactorToken: '' })
         } else if (result.error.includes('locked')) {
+          posthog.capture('sign_in_failed', { reason: 'account_locked', method: 'email' })
           toast.error(result.error)
           setShow2FA(false)
         } else if (errorName === 'INVALID_CREDENTIALS' || result.error.includes('Invalid credentials')) {
+          posthog.capture('sign_in_failed', { reason: 'invalid_credentials', method: 'email' })
           toast.error('Invalid email or password')
           setShow2FA(false)
         } else {
+          posthog.capture('sign_in_failed', { reason: 'unknown', method: 'email' })
           toast.error(result.error || 'Invalid email or password')
           setShow2FA(false)
         }
@@ -100,6 +107,9 @@ export default function SignInClient() {
           duration: 2000,
           id: 'signin-welcome',
         })
+        // Identify user and capture sign-in event
+        posthog.identify(formData.email, { email: formData.email })
+        posthog.capture('user_signed_in', { method: 'email' })
         router.push(callbackUrl)
         router.refresh()
       }
@@ -259,7 +269,7 @@ export default function SignInClient() {
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => signIn('google', { callbackUrl })}
+                  onClick={() => { posthog.capture('user_signed_in', { method: 'google' }); signIn('google', { callbackUrl }) }}
                   className="flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
                 >
                   <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -273,7 +283,7 @@ export default function SignInClient() {
 
                 <button
                   type="button"
-                  onClick={() => signIn('github', { callbackUrl })}
+                  onClick={() => { posthog.capture('user_signed_in', { method: 'github' }); signIn('github', { callbackUrl }) }}
                   className="flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
                 >
                   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
