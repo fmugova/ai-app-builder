@@ -1008,11 +1008,21 @@ ANTHROPIC_API_KEY=your-anthropic-key`
           controller.close()
 
         } catch (error) {
+          // Client navigated away / cancelled — AbortError is expected, not a real failure
+          if (
+            error instanceof Error &&
+            (error.name === 'AbortError' || error.message.toLowerCase().includes('aborted'))
+          ) {
+            console.log('Stream cancelled by client (AbortError)')
+            try { controller.close() } catch { /* already closed */ }
+            return
+          }
+
           console.error('Stream error:', error)
 
           // Check if it's an overload error
           let errorMessage = 'An error occurred during generation'
-          
+
           if (error instanceof Error) {
             if (error.message.includes('overloaded') || error.message.includes('Overloaded')) {
               errorMessage = 'Anthropic API is currently experiencing high load. Please try again in a moment.'
@@ -1021,12 +1031,16 @@ ANTHROPIC_API_KEY=your-anthropic-key`
             }
           }
 
-          const errorEvent: StreamEvent = {
-            type: 'error',
-            error: errorMessage,
+          try {
+            const errorEvent: StreamEvent = {
+              type: 'error',
+              error: errorMessage,
+            }
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorEvent)}\n\n`))
+            controller.close()
+          } catch {
+            // Controller already closed (client disconnected mid-error)
           }
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorEvent)}\n\n`))
-          controller.close()
         }
       },
     })

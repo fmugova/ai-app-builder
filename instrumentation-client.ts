@@ -15,6 +15,16 @@ Sentry.init({
   // Enable logs to be sent to Sentry
   enableLogs: true,
 
+  // Drop AbortErrors — these are normal client-side cancellations (user navigates away
+  // mid-stream, fetch cancelled, etc.) and should not pollute the error feed.
+  beforeSend(event, hint) {
+    const err = hint?.originalException;
+    if (err instanceof Error && (err.name === 'AbortError' || err.message?.toLowerCase().includes('aborted'))) {
+      return null;
+    }
+    return event;
+  },
+
   // Define how likely Replay events are sampled.
   // This sets the sample rate to be 10%. You may want this to be 100% while
   // in development and sample at a lower rate in production
