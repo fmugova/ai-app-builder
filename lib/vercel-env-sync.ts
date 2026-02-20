@@ -186,3 +186,55 @@ export async function syncSupabaseEnvVarsToVercel(
     errors
   }
 }
+
+/**
+ * Look up a Vercel project ID by project name.
+ * Returns the project ID string, or null if not found / on error.
+ */
+export async function getVercelProjectId(
+  token: string,
+  projectName: string
+): Promise<string | null> {
+  try {
+    const response = await fetch(
+      `https://api.vercel.com/v9/projects?name=${encodeURIComponent(projectName)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+    if (!response.ok) return null
+    const data = await response.json()
+    const project = (data.projects as { id: string; name: string }[])?.find(
+      (p) => p.name === projectName
+    )
+    return project?.id ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Trigger a new production deployment for an existing Vercel project.
+ * Returns true on success, false on failure.
+ */
+export async function triggerVercelRedeployment(
+  token: string,
+  deploymentUrl: string
+): Promise<boolean> {
+  try {
+    const response = await fetch('https://api.vercel.com/v13/deployments', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name: deploymentUrl, target: 'production' }),
+    })
+    return response.ok
+  } catch {
+    return false
+  }
+}
