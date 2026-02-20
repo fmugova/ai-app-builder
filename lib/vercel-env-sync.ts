@@ -1,6 +1,20 @@
 // lib/vercel-env-sync.ts
 // Auto-sync environment variables to Vercel when Supabase is connected
 
+// Validate input
+function isValidProjectId(id: string) {
+  return /^[a-zA-Z0-9_-]+$/.test(id) && id.length > 0;
+}
+function isValidEnvKey(key: string) {
+  return /^[A-Z0-9_]+$/.test(key) && key.length > 0;
+}
+function isValidToken(token: string) {
+  return typeof token === 'string' && token.length > 20 && /^[a-zA-Z0-9\-_]+$/.test(token);
+}
+function isValidURL(url: string) {
+  return /^https:\/\/[a-zA-Z0-9.\-\/]+$/.test(url);
+}
+
 interface VercelEnvVariable {
   key: string
   value: string
@@ -16,6 +30,22 @@ interface SyncEnvVarsParams {
   supabaseServiceKey?: string
 }
 
+// Enhanced error handler
+function handleSyncError(error: unknown, context?: string) {
+  let message = 'Unknown error';
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    message = (error as Error).message;
+  } else if (typeof error === 'string') {
+    message = error;
+  }
+  if (context) {
+    console.error(`[Vercel Env Sync ERROR] ${context}:`, error);
+  } else {
+    console.error('[Vercel Env Sync ERROR]:', error);
+  }
+  return { error: 'Unexpected error while syncing environment variables. Please contact support.' };
+}
+
 /**
  * Sync Supabase credentials to Vercel project environment variables
  */
@@ -24,9 +54,22 @@ export async function syncSupabaseEnvVarsToVercel(
 ): Promise<{ success: boolean; synced: string[]; errors: string[] }> {
   const { vercelProjectId, vercelToken, supabaseUrl, supabaseAnonKey, supabaseServiceKey } = params
 
+  // Parameter validation
+  if (!isValidProjectId(vercelProjectId)) {
+    console.warn('Invalid Vercel project ID:', vercelProjectId);
+    return { success: false, synced: [], errors: ['Invalid Vercel project ID.'] };
+  }
+  if (!isValidToken(vercelToken)) {
+    console.warn('Invalid Vercel token provided');
+    return { success: false, synced: [], errors: ['Invalid Vercel token.'] };
+  }
+  if (!isValidURL(supabaseUrl)) {
+    console.warn('Invalid Supabase URL:', supabaseUrl);
+    return { success: false, synced: [], errors: ['Invalid Supabase URL.'] };
+  }
+
   const synced: string[] = []
   const errors: string[] = []
-
   const envVars: VercelEnvVariable[] = [
     {
       key: 'NEXT_PUBLIC_SUPABASE_URL',
@@ -52,8 +95,20 @@ export async function syncSupabaseEnvVarsToVercel(
     })
   }
 
+  // Validate envKeys
+  for (const envVar of envVars) {
+    if (!isValidEnvKey(envVar.key)) {
+      console.warn(`Invalid env variable key: ${envVar.key}`);
+      errors.push(`Invalid environment variable key: ${envVar.key}`);
+      continue;
+    }
+  }
+
   // Sync each variable to Vercel
   for (const envVar of envVars) {
+    // skip invalid keys
+    if (!isValidEnvKey(envVar.key)) continue;
+
     try {
       // Check if variable already exists
       const existingVars = await fetch(
@@ -121,6 +176,7 @@ export async function syncSupabaseEnvVarsToVercel(
       }
     } catch (error) {
       errors.push(`Error syncing ${envVar.key}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      handleSyncError(error, `Syncing env ${envVar.key}`)
     }
   }
 
@@ -128,61 +184,5 @@ export async function syncSupabaseEnvVarsToVercel(
     success: errors.length === 0,
     synced,
     errors
-  }
-}
-
-/**
- * Get Vercel project ID for a deployment
- */
-export async function getVercelProjectId(
-  vercelToken: string,
-  projectName: string
-): Promise<string | null> {
-  try {
-    const response = await fetch('https://api.vercel.com/v9/projects', {
-      headers: {
-        Authorization: `Bearer ${vercelToken}`
-      }
-    })
-
-    if (!response.ok) return null
-
-    const data = await response.json()
-    const project = data.projects?.find((p: any) => p.name === projectName)
-    
-    return project?.id || null
-  } catch (error) {
-    console.error('Error getting Vercel project ID:', error)
-    return null
-  }
-}
-
-/**
- * Trigger redeployment after env vars update
- */
-export async function triggerVercelRedeployment(
-  vercelToken: string,
-  deploymentUrl: string
-): Promise<boolean> {
-  try {
-    const response = await fetch(
-      `https://api.vercel.com/v13/deployments`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${vercelToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: deploymentUrl,
-          target: 'production'
-        })
-      }
-    )
-
-    return response.ok
-  } catch (error) {
-    console.error('Error triggering redeployment:', error)
-    return false
   }
 }
