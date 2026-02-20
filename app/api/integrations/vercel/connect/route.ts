@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     console.log('Vercel connect - Session:', JSON.stringify(session, null, 2))
     
     if (!session?.user?.email) {
-      console.warn('Suspicious request: missing session or email', { ip: request.ip, session });
+      console.warn('Suspicious request: missing session or email', { ip: request.headers.get('x-forwarded-for') ?? 'unknown', session });
       const redirectUrl = new URL('/auth/signin', request.url)
       redirectUrl.searchParams.set('callbackUrl', '/settings?connect=vercel')
       return NextResponse.redirect(redirectUrl)
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(vercelAuthUrl.toString())
   } catch (error) {
     console.error('Vercel connect error:', error);
-    console.warn('Malformed request or error during Vercel connect', { error, ip: request.ip });
+    console.warn('Malformed request or error during Vercel connect', { error, ip: request.headers.get('x-forwarded-for') ?? 'unknown' });
     return NextResponse.redirect(new URL('/settings?error=vercel_connect_failed', request.url));
   }
 }

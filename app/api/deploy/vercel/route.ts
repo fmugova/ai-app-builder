@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
-      console.warn('Suspicious request: missing session or email', { ip: request.ip, session });
+      console.warn('Suspicious request: missing session or email', { ip: request.headers.get('x-forwarded-for') ?? 'unknown', session });
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
 
     // CRITICAL: Require GitHub repo
     if (!githubRepoName) {
-      console.warn('Suspicious request: missing githubRepoName', { ip: request.ip });
+      console.warn('Suspicious request: missing githubRepoName', { ip: request.headers.get('x-forwarded-for') ?? 'unknown' });
       return NextResponse.json(
         { 
           error: 'GitHub repository required',
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!user) {
-      console.warn('Suspicious request: user not found', { ip: request.ip });
+      console.warn('Suspicious request: user not found', { ip: request.headers.get('x-forwarded-for') ?? 'unknown' });
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     // Check Vercel connection
     if (!user.VercelConnection) {
-      console.warn('Suspicious request: Vercel not connected', { ip: request.ip });
+      console.warn('Suspicious request: Vercel not connected', { ip: request.headers.get('x-forwarded-for') ?? 'unknown' });
       return NextResponse.json(
         { 
           error: 'Vercel not connected', 
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     // Check GitHub connection
     if (!user.githubAccessToken || !user.githubUsername) {
-      console.warn('Suspicious request: GitHub not connected', { ip: request.ip });
+      console.warn('Suspicious request: GitHub not connected', { ip: request.headers.get('x-forwarded-for') ?? 'unknown' });
       return NextResponse.json(
         { 
           error: 'GitHub not connected',
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     if (!vercelRes.ok) {
       const errorText = await vercelRes.text();
       console.error('Vercel API error:', errorText);
-      console.warn('Vercel deployment fetch failed', { errorText, ip: request.ip });
+      console.warn('Vercel deployment fetch failed', { errorText, ip: request.headers.get('x-forwarded-for') ?? 'unknown' });
       let errorMessage = 'Vercel deployment failed';
       try {
         const errorJson = JSON.parse(errorText);
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: unknown) {
     console.error('Vercel deploy error:', error);
-    console.warn('Malformed or suspicious deploy-vercel request', { error, ip: request.ip });
+    console.warn('Malformed or suspicious deploy-vercel request', { error, ip: request.headers.get('x-forwarded-for') ?? 'unknown' });
     return NextResponse.json(
       { 
         error: 'Deployment failed', 

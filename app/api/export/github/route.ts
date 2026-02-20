@@ -140,24 +140,6 @@ export async function POST(request: NextRequest) {
         id: true,
         name: true,
         code: true,
-<<<<<<< HEAD
-      const { projectId, redirectUrl } = await request.json();
-      if (!projectId) {
-        console.warn('Suspicious request: missing projectId', { ip: request.ip });
-        return NextResponse.json(
-          { error: 'Project ID is required' },
-          { status: 400 }
-        );
-      }
-      // SSRF/open redirect protection: Only allow redirectUrl within own domain/api
-      if (redirectUrl && !/^https?:\/\/(localhost|buildflow-ai\.app|yourdomain\.com)(\/|$)/.test(redirectUrl)) {
-        console.warn('Blocked SSRF/open redirect attempt', { redirectUrl, ip: request.ip });
-        return NextResponse.json(
-          { error: 'Invalid redirect URL' },
-          { status: 400 }
-        );
-      }
-=======
         userId: true,
       },
     });
@@ -166,7 +148,6 @@ export async function POST(request: NextRequest) {
       console.warn(`Project not found: ${projectId}`);
       return NextResponse.json(
         { error: 'Project not found' },
->>>>>>> ec21b88be3894000a0788718980db2767c444c06
         { status: 404 }
       );
     }
@@ -360,4 +341,145 @@ async function createOrUpdateFile(
   }
 }
 
-// ...generateProjectFiles stays unchanged
+function generateProjectFiles(projectName: string, code: string) {
+  return [
+    {
+      path: 'package.json',
+      content: JSON.stringify({
+        name: projectName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        version: '0.1.0',
+        private: true,
+        scripts: {
+          dev: 'next dev',
+          build: 'next build',
+          start: 'next start',
+          lint: 'next lint',
+        },
+        dependencies: {
+          next: '^14.0.0',
+          react: '^18.2.0',
+          'react-dom': '^18.2.0',
+        },
+        devDependencies: {
+          '@types/node': '^20.0.0',
+          '@types/react': '^18.2.0',
+          '@types/react-dom': '^18.2.0',
+          typescript: '^5.0.0',
+          tailwindcss: '^3.4.0',
+          postcss: '^8.0.0',
+          autoprefixer: '^10.0.0',
+        },
+      }, null, 2),
+    },
+    {
+      path: 'tsconfig.json',
+      content: JSON.stringify({
+        compilerOptions: {
+          target: 'es5',
+          lib: ['dom', 'dom.iterable', 'esnext'],
+          allowJs: true,
+          skipLibCheck: true,
+          strict: true,
+          noEmit: true,
+          esModuleInterop: true,
+          module: 'esnext',
+          moduleResolution: 'bundler',
+          resolveJsonModule: true,
+          isolatedModules: true,
+          jsx: 'preserve',
+          incremental: true,
+          plugins: [{ name: 'next' }],
+          paths: { '@/*': ['./*'] },
+        },
+        include: ['next-env.d.ts', '**/*.ts', '**/*.tsx', '.next/types/**/*.ts'],
+        exclude: ['node_modules'],
+      }, null, 2),
+    },
+    {
+      path: 'tailwind.config.js',
+      content: `/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    './pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './components/**/*.{js,ts,jsx,tsx,mdx}',
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}`,
+    },
+    {
+      path: 'postcss.config.js',
+      content: `module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}`,
+    },
+    {
+      path: 'next.config.js',
+      content: `/** @type {import('next').NextConfig} */
+const nextConfig = {}
+
+module.exports = nextConfig`,
+    },
+    {
+      path: 'app/layout.tsx',
+      content: `import type { Metadata } from 'next'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: '${projectName}',
+  description: 'Created with BuildFlow',
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  )
+}`,
+    },
+    {
+      path: 'app/globals.css',
+      content: `@tailwind base;
+@tailwind components;
+@tailwind utilities;`,
+    },
+    {
+      path: 'app/page.tsx',
+      content: code || `export default function Home() {
+  return (
+    <main className="min-h-screen p-8">
+      <h1 className="text-4xl font-bold">${projectName}</h1>
+      <p className="mt-4 text-gray-600">Created with BuildFlow</p>
+    </main>
+  )
+}`,
+    },
+    {
+      path: 'README.md',
+      content: `# ${projectName}
+
+Created with [BuildFlow](https://buildflow-ai.app)
+
+## Getting Started
+
+\`\`\`bash
+npm install
+npm run dev
+\`\`\`
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`,
+    },
+  ];
+}
