@@ -17,7 +17,7 @@ export async function GET(
     type ProjectWithPages = {
       id: string; name: string; code: string; type: string; createdAt: Date;
       User: { name: string | null } | null;
-      pages: PageRow[];
+      Page: PageRow[];
     }
 
     const project = await (prisma.project.findFirst as (args: unknown) => Promise<ProjectWithPages | null>)({
@@ -28,7 +28,7 @@ export async function GET(
       },
       include: {
         User: { select: { name: true } },
-        pages: {
+        Page: {
           where: { isPublished: true },
           orderBy: { order: 'asc' },
           select: { slug: true, title: true, content: true, isHomepage: true },
@@ -43,7 +43,7 @@ export async function GET(
       )
     }
 
-    const pages = project.pages ?? []
+    const pages = project.Page ?? []
     const isMultiPage = pages.length > 1
 
     // For multi-page: serve the homepage page's content as the root code
