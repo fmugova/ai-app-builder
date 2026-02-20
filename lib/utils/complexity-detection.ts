@@ -27,31 +27,34 @@ export interface ComplexityAnalysis {
 const FULLSTACK_KEYWORDS = {
   // Database & Persistence
   database: ['database', 'db', 'data persistence', 'store data', 'save data', 'crud', 'orm', 'prisma', 'supabase', 'mongodb', 'postgresql', 'mysql'],
-  
+
   // Authentication
   auth: ['authentication', 'auth', 'login', 'signup', 'sign up', 'sign in', 'user accounts', 'user management', 'auth0', 'clerk', 'nextauth', 'jwt', 'session'],
-  
+
   // Payments & Billing
-  payments: ['payment', 'stripe', 'billing', 'subscription', 'checkout', 'credit card', 'paypal', 'revenue', 'invoice'],
-  
+  payments: ['payment', 'stripe', 'billing', 'subscription', 'checkout', 'credit card', 'paypal', 'revenue', 'invoice', 'cart', 'shopping cart', 'add to cart'],
+
+  // E-commerce
+  ecommerce: ['e-commerce', 'ecommerce', 'online store', 'online shop', 'product catalog', 'product listing', 'inventory', 'order management', 'storefront'],
+
   // APIs & Integrations
   api: ['api integration', 'external api', 'rest api', 'graphql', 'webhook', 'third-party', 'integration'],
-  
+
   // Real-time Features
   realtime: ['real-time', 'realtime', 'websocket', 'socket.io', 'live updates', 'notifications', 'chat'],
-  
+
   // Complex Business Logic
   logic: ['calculation', 'algorithm', 'tax calculation', 'financial', 'analytics', 'reporting', 'dashboard with data'],
-  
+
   // Backend Specific
   backend: ['backend', 'server-side', 'api route', 'endpoint', 'middleware', 'cron job', 'scheduled task'],
-  
+
   // Admin & Management
-  admin: ['admin panel', 'admin dashboard', 'user management', 'role-based', 'permissions', 'access control'],
-  
+  admin: ['admin panel', 'admin dashboard', 'admin section', 'admin area', 'user management', 'role-based', 'permissions', 'access control'],
+
   // File Uploads
   files: ['file upload', 'image upload', 'file storage', 's3', 'cloudinary'],
-  
+
   // Email & Communications
   email: ['send email', 'email notification', 'smtp', 'sendgrid', 'mailgun', 'transactional email'],
 };
@@ -135,6 +138,7 @@ export function detectComplexity(prompt: string): ComplexityAnalysis {
         database: 30,
         auth: 25,
         payments: 25,
+        ecommerce: 25,
         api: 20,
         realtime: 20,
         logic: 15,
@@ -148,11 +152,16 @@ export function detectComplexity(prompt: string): ComplexityAnalysis {
     }
   }
 
-  // Check for simple keywords (negative weight for fullstack)
+  // Check for simple keywords — only penalise when no fullstack signals detected.
+  // "e-commerce website" should not be downgraded just because it contains "website".
   const simpleMatches = SIMPLE_KEYWORDS.filter(keyword => lowerPrompt.includes(keyword));
   if (simpleMatches.length > 0) {
-    simpleScore += 20 * simpleMatches.length;
     detectedFeatures.push(...simpleMatches.map(k => `simple:${k}`));
+    if (fullstackScore === 0) {
+      // Pure simple prompt — apply the penalty
+      simpleScore += 20 * simpleMatches.length;
+    }
+    // When fullstack signals exist, simple keywords are irrelevant — don't penalise
   }
 
   // Check for complexity indicators in sentence structure
@@ -162,7 +171,11 @@ export function detectComplexity(prompt: string): ComplexityAnalysis {
     { pattern: /connect\s+to/i, score: 15 },
     { pattern: /automatically\s+(?:calculate|process|send)/i, score: 15 },
     { pattern: /real-time/i, score: 20 },
-    { pattern: /admin\s+(?:panel|dashboard)/i, score: 20 },
+    { pattern: /admin\s+(?:panel|dashboard|section|area|page)?/i, score: 20 },
+    { pattern: /e[\s-]?commerce/i, score: 25 },
+    { pattern: /\bshop\b|\bstore\b/i, score: 15 },
+    { pattern: /\bcart\b/i, score: 20 },
+    { pattern: /\bproduct(?:s)?\s+(?:page|listing|catalog)/i, score: 15 },
   ];
 
   complexityIndicators.forEach(({ pattern, score }) => {
@@ -176,7 +189,7 @@ export function detectComplexity(prompt: string): ComplexityAnalysis {
   const confidence = Math.min(95, Math.max(50, Math.abs(totalScore)));
 
   // Determine mode based on threshold
-  const FULLSTACK_THRESHOLD = 30; // Scores above this = fullstack
+  const FULLSTACK_THRESHOLD = 20; // Scores above this = fullstack
 
   const mode: ProjectMode = totalScore >= FULLSTACK_THRESHOLD ? 'fullstack-nextjs' : 'simple-html';
 
