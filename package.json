@@ -73,6 +73,7 @@
     "jszip": "^3.10.1",
     "lucide-react": "^0.562.0",
     "marked": "^17.0.1",
+    "minimatch": "^10.2.2",
     "nanoid": "^5.1.6",
     "next": "^16.1.6",
     "next-auth": "^4.24.13",
