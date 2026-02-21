@@ -21,6 +21,12 @@ const WebContainerPreview = dynamic(
   () => import('@/components/WebContainerPreview'),
   { ssr: false },
 );
+
+// GenerationExperience: plan-first HTML generation UI (client-only, large bundle)
+const GenerationExperience = dynamic(
+  () => import('@/components/GenerationExperience').then(m => ({ default: m.GenerationExperience })),
+  { ssr: false },
+);
 import { parseMultiFileProject, convertToSingleHTML } from '@/lib/multi-file-parser';
 import { parseGeneratedCode } from '@/lib/code-parser';
 import { AlertTriangle, CheckCircle, XCircle, Download, Copy, Github, ExternalLink, Save, Sparkles, RefreshCw, Upload, Link as LinkIcon, Code2, Lightbulb, Menu, X, Wand2, ImageIcon, Loader2 } from 'lucide-react';
@@ -286,6 +292,7 @@ function ChatBuilderContent() {
   const [isMultiFileProject, setIsMultiFileProject] = useState(false);
   const [useWebContainer, setUseWebContainer] = useState(true);
   const [webContainerFailed, setWebContainerFailed] = useState(false);
+  const [showGenExperience, setShowGenExperience] = useState(false);
 
   // Auth check
   useEffect(() => {
@@ -367,6 +374,25 @@ function ChatBuilderContent() {
       setPrompt(urlPrompt);
     }
   }, [searchParams]);
+
+  // Detect if the prompt describes a multi-page static HTML site (→ use GenerationExperience)
+  function isMultiPageHtmlPrompt(p: string): boolean {
+    const lower = p.toLowerCase();
+    const multiPageSignals = [
+      'multi-page', 'multiple pages', 'home page', 'about page', 'contact page',
+      'landing page', 'homepage', 'website with', 'site with', 'portfolio site',
+      'business website', 'restaurant website', 'agency website', 'personal website',
+      'blog site', 'company website', 'marketing site', 'saas landing',
+    ];
+    const rejectSignals = [
+      'react', 'next.js', 'nextjs', 'vue', 'angular', 'svelte',
+      'dashboard', 'app', 'spa', 'database', 'auth', 'prisma', 'supabase',
+      'fullstack', 'full-stack', 'api', 'backend',
+    ];
+    const hasMultiPage = multiPageSignals.some(s => lower.includes(s));
+    const hasReject = rejectSignals.some(s => lower.includes(s));
+    return hasMultiPage && !hasReject;
+  }
 
   // Generation function with progress tracking
   const handleGenerate = useCallback(async () => {
@@ -1623,7 +1649,16 @@ Please regenerate the complete, fixed code.`;
               </div>
               
               <button
-                onClick={handleGenerate}
+                onClick={() => {
+                  if (!state.fullCode && !currentProjectId && isMultiPageHtmlPrompt(prompt)) {
+                    if (!projectName || projectName.trim() === '') {
+                      setProjectName(generateSmartProjectName(prompt));
+                    }
+                    setShowGenExperience(true);
+                  } else {
+                    handleGenerate();
+                  }
+                }}
                 disabled={state.isGenerating || !prompt.trim()}
                 className="mt-4 w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-4 sm:px-6 py-3 rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
               >
@@ -1981,6 +2016,41 @@ Please regenerate the complete, fixed code.`;
         onClose={() => setShowMediaLibrary(false)}
         onSelectAsset={handleAssetSelected}
       />
+
+      {/* Generation Experience Overlay — plan-first HTML multi-page builder */}
+      {showGenExperience && (
+        <div className="fixed inset-0 z-50 bg-gray-950">
+          <GenerationExperience
+            prompt={prompt}
+            siteName={projectName || generateSmartProjectName(prompt)}
+            generationApiUrl="/api/generate/stream"
+            onComplete={(files, score, projectId) => {
+              setShowGenExperience(false);
+
+              // Update project state so the rest of the UI reflects the new project
+              if (projectId) {
+                setCurrentProjectId(projectId);
+                fetchProjectPages(projectId);
+              }
+
+              // Surface the index.html as the current code/html for single-page fallback
+              const indexHtml = files['index.html'] ?? Object.values(files).find(v => v.startsWith('<!DOCTYPE')) ?? '';
+              if (indexHtml) {
+                setState(prev => ({
+                  ...prev,
+                  html: indexHtml,
+                  css: files['style.css'] ?? '',
+                  js: files['script.js'] ?? '',
+                  fullCode: indexHtml,
+                }));
+              }
+
+              toast.success(`Site generated! Quality score: ${score}/100`);
+            }}
+            onCancel={() => setShowGenExperience(false)}
+          />
+        </div>
+      )}
 
       {/* Code File Viewer Modal */}
       {showCodeViewer && projectFiles.length > 0 && (

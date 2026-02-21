@@ -24,7 +24,7 @@ interface GenerationState {
 interface Props {
   prompt: string;
   siteName: string;
-  onComplete?: (files: Record<string, string>, score: number) => void;
+  onComplete?: (files: Record<string, string>, score: number, projectId?: string) => void;
   onCancel?: () => void;
   /** Your generation SSE endpoint, e.g. "/api/generate/stream" */
   generationApiUrl: string;
@@ -159,7 +159,7 @@ export function GenerationExperience({
         files: data.files ?? prev.files,
       }));
       es.close();
-      onComplete?.(data.files, data.qualityScore);
+      onComplete?.(data.files, data.qualityScore, data.projectId);
     });
 
     es.addEventListener("error_event", (e) => {

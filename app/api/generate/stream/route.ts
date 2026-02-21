@@ -7,6 +7,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { createGenerationPlan } from "@/lib/api/planGeneration";
 import { runGenerationPipeline } from "@/lib/pipeline/htmlGenerationPipeline";
+import prisma from "@/lib/prisma";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // 5 min for large projects
@@ -22,6 +23,15 @@ export async function GET(req: NextRequest) {
 
   if (!prompt.trim()) {
     return new Response("Missing prompt", { status: 400 });
+  }
+
+  // Resolve user ID once (needed for DB save)
+  const dbUser = await prisma.user.findUnique({
+    where: { email: session.user.email },
+    select: { id: true },
+  });
+  if (!dbUser) {
+    return new Response("User not found", { status: 401 });
   }
 
   const encoder = new TextEncoder();
@@ -98,12 +108,80 @@ export async function GET(req: NextRequest) {
         // 3. Quality score
         send("quality", { score: result.qualityScore });
 
-        // 4. Done
+        // 4. Save project + pages to DB
+        let savedProjectId: string | undefined;
+        try {
+          const htmlFiles = Object.entries(result.files).filter(([p]) => p.endsWith(".html"));
+          const combinedHtml = result.files["index.html"] ?? htmlFiles[0]?.[1] ?? "";
+
+          const project = await prisma.project.create({
+            data: {
+              userId: dbUser.id,
+              name: siteName,
+              prompt,
+              type: "html",
+              projectType: "multi-page-html",
+              code: combinedHtml,
+              html: combinedHtml,
+              css: result.files["style.css"] ?? "",
+              javascript: result.files["script.js"] ?? "",
+              multiPage: htmlFiles.length > 1,
+              isMultiFile: false,
+              validationScore: BigInt(result.qualityScore),
+              validationPassed: result.qualityScore >= 70,
+              status: "DRAFT",
+            },
+          });
+          savedProjectId = project.id;
+
+          // Create Page records for each HTML file
+          if (htmlFiles.length > 0) {
+            await prisma.page.deleteMany({ where: { projectId: project.id } });
+
+            for (let pi = 0; pi < htmlFiles.length; pi++) {
+              const [filename, content] = htmlFiles[pi];
+              const slug = filename.replace(".html", "") || "index";
+              const titleMatch = content.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+              const h1Match = content.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+              const metaDescMatch =
+                content.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i) ??
+                content.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i);
+              const pMatch = content.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+
+              const rawTitle = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, "").trim() : "";
+              const h1Text = h1Match ? h1Match[1].replace(/<[^>]*>/g, "").trim() : "";
+              const metaDesc = metaDescMatch ? metaDescMatch[1].trim() : "";
+              const pText = pMatch ? pMatch[1].replace(/<[^>]*>/g, "").trim().slice(0, 160) : "";
+              const pageTitle = rawTitle || h1Text || (slug === "index" ? siteName : slug.charAt(0).toUpperCase() + slug.slice(1));
+
+              await prisma.page.create({
+                data: {
+                  projectId: project.id,
+                  slug,
+                  title: pageTitle,
+                  content,
+                  description: pText || metaDesc || null,
+                  metaTitle: pageTitle,
+                  metaDescription: metaDesc || pText || null,
+                  isHomepage: slug === "index",
+                  order: pi,
+                  isPublished: true,
+                },
+              });
+            }
+          }
+        } catch (dbErr) {
+          console.error("[generate/stream] DB save failed:", dbErr);
+          // Non-fatal — still send done event
+        }
+
+        // 5. Done
         send("done", {
           files: result.files,
           qualityScore: result.qualityScore,
           pages: result.pages,
           warnings: result.warnings,
+          projectId: savedProjectId,
         });
       } catch (e: unknown) {
         const message = e instanceof Error ? e.message : "Generation failed";
