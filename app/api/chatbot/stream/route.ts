@@ -17,6 +17,7 @@ import { enhanceGeneratedCode } from '@/lib/code-enhancer'
 import { parseMultiFileProject, convertToSingleHTML, extractPagesFromProject } from '@/lib/multi-file-parser'
 import { extractProjectTitle } from '@/lib/utils/title-extraction'
 import { analyzePrompt } from '@/lib/utils/complexity-detection'
+import { runGenerationPipeline } from '@/lib/pipeline/htmlGenerationPipeline'
 import { z } from 'zod'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
@@ -211,6 +212,155 @@ MANDATORY FIXES YOU MUST APPLY:
 ${previousErrors.some(e => e.includes('h1')) ? '✅ Add exactly ONE <h1>Page Title</h1> in the page\n' : ''}${previousErrors.some(e => e.includes('description')) ? '✅ Add <meta name="description" content="..."> in <head>\n' : ''}${previousErrors.some(e => e.includes('CSS') || e.includes('variable')) ? '✅ Define CSS variables in :root { --primary: ...; --text: ...; }\n' : ''}${previousErrors.some(e => e.includes('script')) ? '✅ Keep inline scripts under 50 lines or extract to external file\n' : ''}${previousErrors.some(e => e.includes('charset')) ? '✅ Add <meta charset="UTF-8"> in <head>\n' : ''}${previousErrors.some(e => e.includes('viewport')) ? '✅ Add <meta name="viewport" content="width=device-width, initial-scale=1.0">\n' : ''}
 DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
           }
+
+          // ── MULTI-PAGE HTML PIPELINE ──────────────────────────────────────────
+          // Uses sequential per-page API calls instead of a single streaming call.
+          // Fixes: JSX-in-HTML, blank pages from token exhaustion, stray > artifact.
+          if (isMultiPageHTMLRequest) {
+            const user = await prisma.user.findUnique({
+              where: { email: session.user.email },
+              select: { id: true },
+            })
+            if (!user) throw new Error('User not found')
+
+            const siteName = extractProjectTitle(prompt, prompt)
+
+            // Run the pipeline; send progress events while it works
+            const pipelineResult = await runGenerationPipeline(prompt, siteName, (step, detail) => {
+              send(controller, { progress: step, progressDetail: detail })
+            })
+
+            // HTML pages from pipeline result (excludes _nav_html, _footer_html, style.css, script.js)
+            const htmlPages = Object.entries(pipelineResult.files)
+              .filter(([k]) => k.endsWith('.html'))
+
+            // Use index.html as the main preview, fall back to first page
+            const previewHtml = pipelineResult.files['index.html'] || htmlPages[0]?.[1] || ''
+
+            // Build combined HTML with <!-- File: --> markers (compatible with existing page parser)
+            const combinedHtml = htmlPages
+              .map(([filename, content]) => `<!-- File: ${filename} -->\n${content}`)
+              .join('\n\n')
+
+            // Create or update project
+            if (!savedProjectId) {
+              const project = await prisma.project.create({
+                data: {
+                  userId: user.id,
+                  name: siteName,
+                  description: prompt.slice(0, 200) || '',
+                  code: previewHtml,
+                  html: previewHtml,
+                  htmlCode: combinedHtml,
+                  css: pipelineResult.files['style.css'] || '',
+                  cssCode: pipelineResult.files['style.css'] || '',
+                  type: 'landing-page',
+                  hasHtml: true,
+                  hasCss: !!pipelineResult.files['style.css'],
+                  hasJavaScript: !!pipelineResult.files['script.js'],
+                  isComplete: true,
+                  jsValid: true,
+                  jsError: null,
+                  validationScore: BigInt(pipelineResult.qualityScore),
+                  validationPassed: pipelineResult.success,
+                  validationErrors: JSON.stringify([]),
+                  validationWarnings: JSON.stringify(pipelineResult.warnings),
+                  cspViolations: JSON.stringify([]),
+                  status: 'COMPLETED',
+                  tokensUsed: BigInt(0),
+                  generationTime: BigInt(Date.now()),
+                  retryCount: BigInt(0),
+                },
+              })
+              savedProjectId = project.id
+            } else {
+              await prisma.project.update({
+                where: { id: savedProjectId },
+                data: {
+                  code: previewHtml,
+                  html: previewHtml,
+                  htmlCode: combinedHtml,
+                  validationScore: BigInt(pipelineResult.qualityScore),
+                  validationPassed: pipelineResult.success,
+                  status: 'COMPLETED',
+                  updatedAt: new Date(),
+                },
+              })
+            }
+
+            // Send preview HTML to client
+            send(controller, {
+              html: combinedHtml,
+              validation: {
+                isComplete: true,
+                hasHtml: true,
+                hasCss: !!pipelineResult.files['style.css'],
+                hasJs: !!pipelineResult.files['script.js'],
+                validationScore: pipelineResult.qualityScore,
+                validationPassed: pipelineResult.success,
+                errors: [],
+                warnings: pipelineResult.warnings.map((w) => ({ message: w })),
+                cspViolations: [],
+                passed: pipelineResult.success,
+              },
+            })
+
+            // Save pages to DB
+            if (htmlPages.length > 0 && savedProjectId) {
+              try {
+                await prisma.page.deleteMany({ where: { projectId: savedProjectId } })
+
+                for (let i = 0; i < htmlPages.length; i++) {
+                  const [filename, content] = htmlPages[i]
+                  const rawSlug = filename.replace('.html', '')
+                  const slug = rawSlug === 'index' ? 'home' : rawSlug
+                  const title = slug.charAt(0).toUpperCase() + slug.slice(1).replace(/-/g, ' ')
+
+                  const pageTitleMatch = content.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
+                  const metaDescMatch =
+                    content.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i) ||
+                    content.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i)
+                  const h1Match = content.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)
+                  const pMatch = content.match(/<p[^>]*>([\s\S]*?)<\/p>/i)
+
+                  const rawTitle = pageTitleMatch ? pageTitleMatch[1].replace(/<[^>]*>/g, '').trim() : ''
+                  const h1Text = h1Match ? h1Match[1].replace(/<[^>]*>/g, '').trim() : ''
+                  const metaDesc = metaDescMatch ? metaDescMatch[1].trim() : ''
+                  const pText = pMatch ? pMatch[1].replace(/<[^>]*>/g, '').trim().slice(0, 160) : ''
+
+                  await prisma.page.create({
+                    data: {
+                      projectId: savedProjectId,
+                      slug,
+                      title: rawTitle || h1Text || title,
+                      content,
+                      description: pText || metaDesc || null,
+                      metaTitle: rawTitle || h1Text || title,
+                      metaDescription: metaDesc || pText || null,
+                      isHomepage: i === 0,
+                      order: i,
+                      isPublished: true,
+                    },
+                  })
+                }
+
+                await prisma.project.update({
+                  where: { id: savedProjectId },
+                  data: { multiPage: true },
+                })
+
+                send(controller, { isMultiPage: true, pagesCount: htmlPages.length, projectId: savedProjectId })
+              } catch (pageCreationError) {
+                console.error('❌ Pipeline page creation failed (non-fatal):', pageCreationError)
+              }
+            }
+
+            send(controller, { projectId: savedProjectId })
+            send(controller, { done: true })
+            controller.close()
+            return
+          }
+          // ── END MULTI-PAGE HTML PIPELINE ───────────────────────────────────────
 
           console.log('📝 Streaming from Claude with strict validation requirements...');
 
