@@ -32,6 +32,7 @@ export interface PipelineResult {
 }
 
 export type ProgressCallback = (step: string, detail?: string) => void;
+export type FileCallback = (path: string, content: string) => void;
 
 /**
  * Main entry point -- detects mode, generates, validates, fixes blank pages
@@ -39,7 +40,8 @@ export type ProgressCallback = (step: string, detail?: string) => void;
 export async function runGenerationPipeline(
   userPrompt: string,
   siteName: string,
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  onFile?: FileCallback
 ): Promise<PipelineResult> {
   const warnings: string[] = [];
   const errors: string[] = [];
@@ -62,6 +64,10 @@ export async function runGenerationPipeline(
   onProgress?.("generating-styles", "Generating design system...");
   const sharedFiles = await generateSharedAssets(siteName, userPrompt, pages, onProgress);
 
+  // Fire onFile for shared assets immediately
+  if (sharedFiles["style.css"]) onFile?.("style.css", sharedFiles["style.css"]);
+  if (sharedFiles["script.js"]) onFile?.("script.js", sharedFiles["script.js"]);
+
   // Step 3: Generate each page individually
   const generatedPages: Record<string, string> = {};
 
@@ -79,6 +85,7 @@ export async function runGenerationPipeline(
     );
 
     generatedPages[filename] = pageContent;
+    onFile?.(filename, pageContent); // fire as each page completes
 
     // Quick check -- if page is clearly broken, log it
     const bodyTextLength = extractBodyText(pageContent).length;
@@ -117,7 +124,10 @@ export async function runGenerationPipeline(
       );
 
       const fixed = await regeneratePage(brokenPage.filename, regenPrompt);
-      if (fixed) allFiles[brokenPage.filename] = fixed;
+      if (fixed) {
+        allFiles[brokenPage.filename] = fixed;
+        onFile?.(brokenPage.filename, fixed);
+      }
     }
   }
 
