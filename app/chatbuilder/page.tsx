@@ -23,7 +23,7 @@ const WebContainerPreview = dynamic(
 );
 import { parseMultiFileProject, convertToSingleHTML } from '@/lib/multi-file-parser';
 import { parseGeneratedCode } from '@/lib/code-parser';
-import { AlertTriangle, CheckCircle, XCircle, Download, Copy, Github, ExternalLink, Save, Sparkles, RefreshCw, Upload, Link as LinkIcon, Code2, Lightbulb, Menu, X, Wand2, ImageIcon } from 'lucide-react';
+import { AlertTriangle, CheckCircle, XCircle, Download, Copy, Github, ExternalLink, Save, Sparkles, RefreshCw, Upload, Link as LinkIcon, Code2, Lightbulb, Menu, X, Wand2, ImageIcon, Loader2 } from 'lucide-react';
 
 // Types remain the same as before...
 interface ValidationMessage {
@@ -555,8 +555,15 @@ function ChatBuilderContent() {
               if (data.done) {
                 // Final parse with full accumulated code
                 if (accumulatedCode) {
+                  const trimmed = accumulatedCode.trimStart();
+                  const looksLikeJsonCode = trimmed.startsWith('{') || trimmed.startsWith('[');
                   const { html, css, js } = parseCode(accumulatedCode);
-                  setState(prev => ({ ...prev, html, css, js, fullCode: accumulatedCode }));
+                  // For multifile JSON: only update state if parseCode returned valid HTML.
+                  // Prevents clearing state.html to '' when client-side JSON parsing fails —
+                  // the isMultiFile fetch will set the correct preview HTML anyway.
+                  if (!looksLikeJsonCode || html) {
+                    setState(prev => ({ ...prev, html, css, js, fullCode: accumulatedCode }));
+                  }
                 }
 
                 setState(prev => ({ ...prev, progress: 100, currentStep: 'Complete!' }));
@@ -1851,14 +1858,40 @@ Please regenerate the complete, fixed code.`;
           <div className="flex flex-col min-h-[400px] lg:min-h-0">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex-1 overflow-hidden relative">
               <ErrorBoundary>
-                {/* Branch 1: Multi-file fullstack → WebContainer live preview */}
-                {isMultiFileProject && projectFiles.length > 0 && useWebContainer && !webContainerFailed ? (
+                {/* Branch 0: Multifile project detected but files still loading */}
+                {isMultiFileProject && projectFiles.length === 0 ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-950">
+                    <div className="text-center">
+                      <Loader2 className="w-8 h-8 animate-spin text-purple-400 mx-auto mb-3" />
+                      <p className="text-sm text-gray-300 font-medium">Loading project files…</p>
+                      <p className="text-xs text-gray-500 mt-1">Preparing WebContainer preview</p>
+                    </div>
+                  </div>
+                ) : /* Branch 1: Multi-file fullstack → WebContainer live preview */
+                isMultiFileProject && projectFiles.length > 0 && useWebContainer && !webContainerFailed ? (
                   <WebContainerPreview
                     files={projectFiles}
                     dependencies={projectDependencies}
                     projectType={projectType}
                     onFallback={() => setWebContainerFailed(true)}
                   />
+                ) : /* Branch 1b: WebContainer failed for multifile → show preview HTML or helpful message */
+                isMultiFileProject && webContainerFailed && !state.html ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+                    <div className="text-center max-w-sm p-6">
+                      <AlertTriangle className="w-10 h-10 text-amber-400 mx-auto mb-3" />
+                      <p className="text-sm font-semibold text-gray-700 mb-2">Live Preview Unavailable</p>
+                      <p className="text-xs text-gray-500 mb-4">
+                        WebContainer couldn&apos;t boot in this browser. Your project was saved successfully.
+                      </p>
+                      <button
+                        onClick={() => { setWebContainerFailed(false); }}
+                        className="px-4 py-2 bg-purple-600 text-white text-xs rounded-lg hover:bg-purple-700 transition-colors"
+                      >
+                        Retry Live Preview
+                      </button>
+                    </div>
+                  </div>
                 ) : /* Branch 2: Multi-page HTML → tabbed preview */
                 projectPages.length > 0 ? (
                   <PreviewFrameMultiPage pages={projectPages} />
