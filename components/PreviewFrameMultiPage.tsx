@@ -30,7 +30,7 @@ export default function PreviewFrameMultiPage({
 }: PreviewFrameMultiPageProps) {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [currentPath, setCurrentPath] = useState('index.html')
+  const [currentPath, setCurrentPath] = useState('')
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
   // Filter out pages with no meaningful content
@@ -196,7 +196,12 @@ export default function PreviewFrameMultiPage({
       if (!res.ok) throw new Error('Failed to create preview session')
       const { sessionId: id } = await res.json()
       setSessionId(id)
-      setCurrentPath('index.html')
+      // Start at the homepage file; fall back to the first uploaded file
+      const homePage = validPages.find(p => p.isHomepage) ?? validPages[0]
+      const startPath = homePage
+        ? (homePage.isHomepage ? 'index.html' : `${homePage.slug}.html`)
+        : files[0].filename
+      setCurrentPath(startPath)
     } catch {
       setSessionId(null)
     } finally {
@@ -238,8 +243,8 @@ export default function PreviewFrameMultiPage({
     )
   }
 
-  const iframeSrc = sessionId
-    ? `/preview/${sessionId}/index.html`
+  const iframeSrc = sessionId && currentPath
+    ? `/preview/${sessionId}/${currentPath}`
     : undefined
 
   const currentPageInfo = validPages.find((p: Page) => {

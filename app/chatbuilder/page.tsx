@@ -2033,13 +2033,42 @@ Please regenerate the complete, fixed code.`;
             onComplete={(files, score, projectId) => {
               setShowGenExperience(false);
 
-              // Update project state so the rest of the UI reflects the new project
-              if (projectId) {
-                setCurrentProjectId(projectId);
-                fetchProjectPages(projectId);
+              // Build projectPages directly from the generated files — no DB round-trip,
+              // no race condition, works even when DB save fails
+              const htmlPages: ProjectPage[] = Object.entries(files)
+                .filter(([path]) => path.endsWith('.html') && !path.startsWith('_'))
+                .map(([path, content], idx) => {
+                  const slug = path.replace('.html', '') || 'index';
+                  const isHome = slug === 'index';
+                  const titleMatch = content.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+                  const h1Match = content.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+                  const rawTitle = (titleMatch?.[1] ?? h1Match?.[1] ?? '').replace(/<[^>]+>/g, '').trim();
+                  const title = rawTitle || (isHome ? 'Home' : slug.charAt(0).toUpperCase() + slug.slice(1));
+                  return {
+                    id: `gen-${slug}`,
+                    slug,
+                    title,
+                    content,
+                    description: null,
+                    metaTitle: title,
+                    metaDescription: null,
+                    isHomepage: isHome,
+                    order: isHome ? 0 : idx + 1,
+                    isPublished: true,
+                  };
+                })
+                .sort((a, b) => a.order - b.order);
+
+              if (htmlPages.length > 0) {
+                setProjectPages(htmlPages);
               }
 
-              // Surface the index.html as the current code/html for single-page fallback
+              // Store projectId for future iterations (save to DB happened server-side)
+              if (projectId) {
+                setCurrentProjectId(projectId);
+              }
+
+              // Also set state.html for single-page fallback (Branch 3)
               const indexHtml = files['index.html'] ?? Object.values(files).find(v => v.startsWith('<!DOCTYPE')) ?? '';
               if (indexHtml) {
                 setState(prev => ({
