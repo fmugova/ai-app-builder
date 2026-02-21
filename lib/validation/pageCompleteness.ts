@@ -28,7 +28,7 @@ export interface PageIssue {
 // Minimum content length for a page to be considered "populated"
 // A real page should have substantial HTML -- empty template = ~500 chars
 const MIN_CONTENT_LENGTH = 800;
-const MIN_BODY_TEXT = 200; // Text visible to user (not tags/code)
+const MIN_BODY_TEXT = 300; // Text visible to user in <main> body (nav/footer excluded)
 
 /**
  * Check all generated pages for completeness before showing to user
@@ -248,11 +248,15 @@ function getJsxComponents(content: string): string[] {
 }
 
 function extractVisibleText(html: string): string {
-  // Remove script, style, head blocks
+  // Remove chrome that doesn't count as page content: scripts, styles, head, nav, footer
+  // Nav/footer text was padding the count for otherwise empty pages
   const text = html
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
     .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, "")
+    .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, "")
+    .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, "")
+    .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, "")
     // Remove all remaining tags
     .replace(/<[^>]+>/g, " ")
     // Collapse whitespace

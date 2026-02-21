@@ -290,7 +290,7 @@ function ChatBuilderContent() {
   const [showCodeQuality, setShowCodeQuality] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isMultiFileProject, setIsMultiFileProject] = useState(false);
-  const [useWebContainer, setUseWebContainer] = useState(true);
+  const [useWebContainer, setUseWebContainer] = useState(false); // off by default — WebContainer build failures are worse UX than static fallback
   const [webContainerFailed, setWebContainerFailed] = useState(false);
   const [showGenExperience, setShowGenExperience] = useState(false);
 
@@ -375,23 +375,29 @@ function ChatBuilderContent() {
     }
   }, [searchParams]);
 
-  // Detect if the prompt describes a multi-page static HTML site (→ use GenerationExperience)
+  // Detect if the prompt should use GenerationExperience (HTML multi-page pipeline).
+  // Explicit "Pages:" listings always qualify — WebContainer can't run Next.js anyway.
   function isMultiPageHtmlPrompt(p: string): boolean {
     const lower = p.toLowerCase();
+
+    // Explicit page list (e.g. "Pages: Home, About, Contact") → always use HTML pipeline
+    if (/pages?\s*:/i.test(p)) return true;
+
     const multiPageSignals = [
       'multi-page', 'multiple pages', 'home page', 'about page', 'contact page',
       'landing page', 'homepage', 'website with', 'site with', 'portfolio site',
       'business website', 'restaurant website', 'agency website', 'personal website',
       'blog site', 'company website', 'marketing site', 'saas landing',
+      'portfolio website', 'corporate site',
     ];
-    const rejectSignals = [
-      'react', 'next.js', 'nextjs', 'vue', 'angular', 'svelte',
-      'dashboard', 'app', 'spa', 'database', 'auth', 'prisma', 'supabase',
-      'fullstack', 'full-stack', 'api', 'backend',
+    // Only reject if the prompt is clearly about a real SPA/server app with NO page list
+    const hardRejectSignals = [
+      'real-time', 'websocket', 'socket.io', 'graphql', 'trpc',
+      'mobile app', 'react native', 'flutter', 'electron',
     ];
     const hasMultiPage = multiPageSignals.some(s => lower.includes(s));
-    const hasReject = rejectSignals.some(s => lower.includes(s));
-    return hasMultiPage && !hasReject;
+    const hasHardReject = hardRejectSignals.some(s => lower.includes(s));
+    return hasMultiPage && !hasHardReject;
   }
 
   // Generation function with progress tracking
