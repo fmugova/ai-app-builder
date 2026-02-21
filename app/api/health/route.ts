@@ -194,3 +194,9 @@ export async function GET() {
 export async function POST() {
   return GET()
 }
+
+// For monitoring probes that use HEAD (UptimeRobot, Vercel, etc.)
+// Returns 200 with no body — no DB queries needed.
+export async function HEAD() {
+  return new Response(null, { status: 200 })
+}
