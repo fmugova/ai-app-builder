@@ -35,8 +35,9 @@ export default function PreviewClient({
   isMultiPage = false 
 }: PreviewClientProps) {
   const [currentPage, setCurrentPage] = useState<string>(() => {
-    // Default to homepage for multi-page projects so we don't show raw `code`
-    if (isMultiPage && pages.length > 0) {
+    // Always default to homepage when pages exist — regardless of isMultiPage flag,
+    // which can be false even when Page records exist due to DB inconsistencies.
+    if (pages.length > 0) {
       const home = pages.find(p => p.isHomepage);
       return home?.slug || pages[0].slug;
     }
@@ -179,6 +180,25 @@ export default function PreviewClient({
     }
 
     let sanitized = rawCode.trim();
+
+    // Detect raw JSON (fullstack project — server-side code, can't render as HTML)
+    if (sanitized.startsWith('{') && (sanitized.includes('"projectType"') || sanitized.includes('"files"'))) {
+      return createErrorPage(
+        'This project generates server-side code and cannot be previewed as static HTML. ' +
+        'Use the Fast Preview (WebContainer) or deploy to Vercel for a live preview.'
+      );
+    }
+
+    // Unescape JSON-encoded sequences stored literally in the DB
+    // (happens when AI output is extracted without JSON.parse — \n stays as two chars)
+    if (sanitized.includes('\\n') || sanitized.includes('\\t')) {
+      sanitized = sanitized
+        .replace(/\\n/g, '\n')
+        .replace(/\\t/g, '\t')
+        .replace(/\\r/g, '')
+        .replace(/\\'/g, "'")
+        .replace(/\\"/g, '"');
+    }
 
     // Ensure DOCTYPE exists
     if (!sanitized.startsWith('<!DOCTYPE')) {

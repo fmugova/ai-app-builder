@@ -104,8 +104,13 @@ export default async function PreviewPage({ params }: PreviewPageProps) {
     );
   }
 
-  // Project has no code
-  if (project && !project.code) {
+  // Detect fullstack projects where code is raw JSON (server-side, can't render as HTML)
+  const codeIsJson = !!(project?.code?.trimStart().startsWith('{') || project?.code?.trimStart().startsWith('['));
+  const hasPages = (project?.Page?.length ?? 0) > 0;
+  const hasFiles = (project?.ProjectFile?.length ?? 0) > 0;
+
+  // Project has no renderable content
+  if (project && !project.code && !hasPages) {
     return (
       <div className="w-full h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -116,14 +121,33 @@ export default async function PreviewPage({ params }: PreviewPageProps) {
     );
   }
 
-  // Render preview
-  if (project && project.code) {
-    return <PreviewClient 
-      code={project.code} 
+  // Fullstack project with no HTML pages — show deploy prompt
+  if (project && codeIsJson && !hasPages) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center max-w-md p-6">
+          <div className="text-4xl mb-4">🚀</div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Full-Stack Project</h2>
+          <p className="text-gray-600 mb-4">
+            This project uses server-side code ({hasFiles ? `${project!.ProjectFile!.length} files` : 'Next.js/Node.js'})
+            and cannot be previewed as static HTML.
+          </p>
+          <p className="text-sm text-gray-500">
+            Use the <strong>Fast Preview</strong> (WebContainer) in the builder, or deploy to Vercel for a live URL.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Render preview — pass empty string for code when it's JSON so PreviewClient uses pages instead
+  if (project && (project.code || hasPages)) {
+    return <PreviewClient
+      code={codeIsJson ? '' : (project.code ?? '')}
       projectName={project.name}
       pages={project.Page || []}
       files={project.ProjectFile || []}
-      isMultiPage={project.multiPage || false}
+      isMultiPage={project.multiPage || hasPages}
     />;
   }
 
