@@ -118,7 +118,7 @@ const nextConfig: NextConfig = {
             "default-src 'self'",
             // Scripts: self + Next.js inline hydration + Stripe.js + Google Tag Manager + Monaco Editor CDN + blob: for Next.js workers
             // unsafe-eval required for WebContainers WASM runtime on /chatbuilder
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://www.googletagmanager.com https://www.google-analytics.com https://cdn.jsdelivr.net https://cdn.tailwindcss.com https://eu-assets.i.posthog.com blob:",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://www.googletagmanager.com https://www.google-analytics.com https://cdn.jsdelivr.net https://cdn.tailwindcss.com https://eu-assets.i.posthog.com https://vercel.live blob:",
             // Styles: self + inline (Tailwind/shadcn) + Google Fonts
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             // Fonts: self + data URIs + Google Fonts CDN
@@ -126,7 +126,7 @@ const nextConfig: NextConfig = {
             // Images: self + data URIs + blobs (canvas) + any HTTPS host (CDN thumbnails)
             "img-src 'self' data: blob: https:",
             // Fetch/XHR: self + Stripe + Anthropic + Upstash + Supabase + Sentry + PostHog + GTM + Vercel Analytics + WebContainer
-            "connect-src 'self' https://api.stripe.com https://api.anthropic.com https://*.upstash.io https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://us.i.posthog.com https://eu.i.posthog.com https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://*.stackblitz.com https://*.webcontainer.io wss://*.webcontainer.io https://*.webcontainer-api.io wss://*.webcontainer-api.io https://*.staticblitz.com wss://*.staticblitz.com https://vitals.vercel-insights.com",
+            "connect-src 'self' https://api.stripe.com https://api.anthropic.com https://*.upstash.io https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://us.i.posthog.com https://eu.i.posthog.com https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://*.stackblitz.com https://*.webcontainer.io wss://*.webcontainer.io https://*.webcontainer-api.io wss://*.webcontainer-api.io https://*.staticblitz.com wss://*.staticblitz.com https://vitals.vercel-insights.com https://vercel.live wss://vercel.live",
             // Workers: Next.js Turbopack creates blob: workers at runtime
             "worker-src 'self' blob:",
             // Frames: WebContainer dev server runs on *.webcontainer-api.io subdomains
