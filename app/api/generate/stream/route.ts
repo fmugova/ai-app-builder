@@ -50,6 +50,17 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      // Send SSE comment pings every 15s so Vercel/proxies don't kill idle connections
+      // between AI calls. SSE comments (": ping\n\n") are invisible to EventSource listeners.
+      const keepAlive = setInterval(() => {
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(": ping\n\n"));
+        } catch {
+          // Stream closed
+        }
+      }, 15_000);
+
       try {
         // 1. Generate plan (fast -- uses haiku, ~1s)
         const plan = await createGenerationPlan(prompt, siteName);
@@ -187,6 +198,7 @@ export async function GET(req: NextRequest) {
         const message = e instanceof Error ? e.message : "Generation failed";
         send("error_event", { message });
       } finally {
+        clearInterval(keepAlive);
         closed = true;
         controller.close();
       }

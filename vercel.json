@@ -2,21 +2,5 @@
   "buildCommand": "prisma generate && prisma migrate deploy && next build",
   "env": {
     "SKIP_ENV_VALIDATION": "true"
-  },
-  "headers": [
-    {
-      "source": "/chatbuilder",
-      "headers": [
-        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
-        { "key": "Cross-Origin-Embedder-Policy", "value": "credentialless" }
-      ]
-    },
-    {
-      "source": "/chatbuilder/(.*)",
-      "headers": [
-        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
-        { "key": "Cross-Origin-Embedder-Policy", "value": "credentialless" }
-      ]
-    }
-  ]
+  }
 }

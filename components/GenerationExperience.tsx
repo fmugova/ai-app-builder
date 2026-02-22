@@ -90,6 +90,7 @@ export function GenerationExperience({
   );
   const [activeTab, setActiveTab] = useState<"preview" | "code">("preview");
   const sseRef = useRef<EventSource | null>(null);
+  const doneRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Elapsed timer
@@ -110,6 +111,7 @@ export function GenerationExperience({
   }, [state.phase, state.startedAt]);
 
   function start() {
+    doneRef.current = false;
     setState((prev) => ({ ...prev, phase: "planning" }));
 
     const es = new EventSource(
@@ -155,6 +157,7 @@ export function GenerationExperience({
     });
 
     es.addEventListener("done", (e) => {
+      doneRef.current = true;
       const data = JSON.parse((e as MessageEvent).data);
       setState((prev) => ({
         ...prev,
@@ -173,6 +176,9 @@ export function GenerationExperience({
     });
 
     es.onerror = () => {
+      // doneRef guards against the TCP close firing before the done state update
+      // commits — a race that causes false "Connection lost" errors on success.
+      if (doneRef.current) return;
       setState((prev) => {
         if (prev.phase === "done") return prev;
         return { ...prev, phase: "error", errorMessage: "Connection lost — please retry" };
