@@ -26,6 +26,8 @@ interface Props {
   siteName: string;
   onComplete?: (files: Record<string, string>, score: number, projectId?: string) => void;
   onCancel?: () => void;
+  /** Called when the user explicitly clicks "Open in Editor" after generation finishes */
+  onOpenInBuilder?: () => void;
   /** Your generation SSE endpoint, e.g. "/api/generate/stream" */
   generationApiUrl: string;
 }
@@ -65,6 +67,7 @@ export function GenerationExperience({
   siteName,
   onComplete,
   onCancel,
+  onOpenInBuilder,
   generationApiUrl,
 }: Props) {
   const [state, setState] = useState<GenerationState>({
@@ -378,12 +381,13 @@ export function GenerationExperience({
         >
           {isDone && (
             <button
+              onClick={() => onOpenInBuilder?.()}
               style={{
                 flex: 1,
                 padding: "7px 0",
                 borderRadius: 8,
                 border: "none",
-                background: "#6366f1",
+                background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
                 color: "#fff",
                 cursor: "pointer",
                 fontSize: 12,
@@ -391,11 +395,12 @@ export function GenerationExperience({
                 fontFamily: ff,
               }}
             >
-              Download Files
+              Open in Editor →
             </button>
           )}
           {isDone && (
             <button
+              onClick={() => start()}
               style={{
                 flex: 1,
                 padding: "7px 0",

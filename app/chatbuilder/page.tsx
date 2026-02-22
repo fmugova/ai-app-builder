@@ -2034,8 +2034,12 @@ Please regenerate the complete, fixed code.`;
             prompt={prompt}
             siteName={projectName || generateSmartProjectName(prompt)}
             generationApiUrl="/api/generate/stream"
+            onOpenInBuilder={() => setShowGenExperience(false)}
             onComplete={(files, score, projectId) => {
-              setShowGenExperience(false);
+              // ⚠ Do NOT close the overlay here — let the user click "Open in Editor →"
+              // which calls onOpenInBuilder. This preserves the beautiful GenerationExperience
+              // UX (plan tree + live preview) in the "done" state so users can review their
+              // site before transitioning to the builder.
 
               // Build projectPages directly from the generated files — no DB round-trip,
               // no race condition, works even when DB save fails
