@@ -49,7 +49,7 @@ export async function runGenerationPipeline(
   // Step 1: Detect what kind of site to generate
   onProgress?.("detecting", "Analysing your prompt...");
   const detection = detectOutputMode(userPrompt);
-  const pages = detection.pages.length > 0 ? detection.pages : extractPages(userPrompt);
+  const pages = detection.pages.length > 0 ? detection.pages : extractPages(userPrompt, detection.mode);
 
   onProgress?.(
     "detected",
@@ -312,7 +312,7 @@ Output ONLY the HTML file. Start with <!DOCTYPE html>:`;
   }
 }
 
-async function regeneratePage(filename: string, regenPrompt: string): Promise<string | null> {
+async function regeneratePage(_filename: string, regenPrompt: string): Promise<string | null> {
   try {
     const response = await anthropic.messages.create({
       model: "claude-opus-4-6",

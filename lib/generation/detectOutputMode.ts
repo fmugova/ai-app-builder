@@ -1,198 +1,280 @@
 // lib/generation/detectOutputMode.ts
-// Reads the user's prompt and determines what kind of output to generate.
-// This is the #1 source of the JSX-in-HTML bug -- mode is not being detected.
+// KEY FIX: Explicit framework declarations in prompt now hard-override inference.
+// "Next.js 14 App Router, TypeScript" → nextjs, period. No ambiguity.
 
 export type OutputMode = "html" | "react-spa" | "nextjs";
 
 export interface ModeDetectionResult {
   mode: OutputMode;
-  confidence: "high" | "medium" | "low";
+  confidence: "explicit" | "high" | "medium" | "low";
   reason: string;
   pages: DetectedPage[];
-  techStack: string[];
+  techStack: DetectedStack;
 }
 
 export interface DetectedPage {
   name: string;
-  slug: string; // e.g. "about" -> "about.html" or "app/about/page.tsx"
+  slug: string;
   description: string;
+  routePath: string; // Next.js: "app/about/page.tsx" | HTML: "about.html"
 }
 
-// --- Keywords that signal each mode ---
+export interface DetectedStack {
+  framework: OutputMode;
+  database?: "prisma" | "supabase-js" | "none";
+  auth?: "nextauth" | "clerk" | "supabase-auth" | "none";
+  styling?: "tailwind" | "css" | "styled-components";
+  language: "typescript" | "javascript";
+  hasStripe: boolean;
+}
 
-const HTML_SIGNALS = [
-  "html", "vanilla js", "vanilla javascript", "plain html", "static",
-  "separate html pages", "shared css", "no framework", "pure html",
-  "html file", "html pages", "cdn", "just html", "simple html",
-  "html/css/js", "html, css", "html css js",
+// ── Explicit override patterns ───────────────────────────────────────────────
+// If ANY of these appear verbatim in the prompt, mode is locked immediately.
+// User said it → we respect it, no inference needed.
+
+const EXPLICIT_NEXTJS: RegExp[] = [
+  /next\.?js\s*1[34]/i,         // "Next.js 14", "nextjs 13"
+  /next\.?js\s*app\s*router/i,  // "Next.js App Router"
+  /app\s*router/i,              // "App Router" alone
+  /next\.?js/i,                 // any "Next.js" or "nextjs"
+  /server\s*component/i,        // "Server Components"
+  /server\s*action/i,           // "Server Actions"
 ];
 
-const NEXTJS_SIGNALS = [
-  "next.js", "nextjs", "next js", "app router", "server component",
-  "server action", "prisma", "supabase", "full-stack", "fullstack",
-  "full stack", "api route", "database", "auth", "authentication",
-  "login", "signup", "dashboard", "saas",
+const EXPLICIT_REACT: RegExp[] = [
+  /\breact\b/i,                 // "React" (broad match)
+  /\bvite\b/i,                  // "Vite"
+  /create\s*react\s*app/i,      // "Create React App"
+  /\bspa\b/i,                   // "SPA"
+  /react\s*router/i,            // "React Router"
 ];
 
-const REACT_SPA_SIGNALS = [
-  "react", "vite", "create react app", "single page", "spa",
-  "react router", "react app",
+const EXPLICIT_HTML: RegExp[] = [
+  /\bvanilla\s*js\b/i,
+  /\bplain\s*html\b/i,
+  /separate\s*html\s*page/i,    // "separate HTML pages"
+  /\bstatic\s*site\b/i,
+  /html\s*[,+\/]\s*css\s*[,+\/]\s*js/i, // "HTML/CSS/JS" or "HTML, CSS, JS"
+  /no\s*framework/i,
+  /shared\s*css/i,              // "shared CSS" (static site pattern)
 ];
 
-/**
- * Primary export -- call this before generation to pick the right strategy
- */
-export function detectOutputMode(prompt: string): ModeDetectionResult {
+// ── Stack detection ──────────────────────────────────────────────────────────
+
+function detectStack(prompt: string): DetectedStack {
   const lower = prompt.toLowerCase();
 
-  const htmlScore = HTML_SIGNALS.filter((s) => lower.includes(s)).length;
-  const nextjsScore = NEXTJS_SIGNALS.filter((s) => lower.includes(s)).length;
-  const reactScore = REACT_SPA_SIGNALS.filter((s) => lower.includes(s)).length;
+  let framework: OutputMode = "html";
 
-  let mode: OutputMode;
-  let confidence: ModeDetectionResult["confidence"];
-  let reason: string;
-
-  if (nextjsScore >= 2) {
-    mode = "nextjs";
-    confidence = nextjsScore >= 4 ? "high" : "medium";
-    reason = `Full-stack signals detected: ${NEXTJS_SIGNALS.filter((s) => lower.includes(s)).join(", ")}`;
-  } else if (htmlScore >= 1 && nextjsScore === 0 && reactScore === 0) {
-    mode = "html";
-    confidence = htmlScore >= 2 ? "high" : "medium";
-    reason = `Plain HTML signals: ${HTML_SIGNALS.filter((s) => lower.includes(s)).join(", ")}`;
-  } else if (reactScore >= 1) {
-    mode = "react-spa";
-    confidence = reactScore >= 2 ? "high" : "medium";
-    reason = `React SPA signals: ${REACT_SPA_SIGNALS.filter((s) => lower.includes(s)).join(", ")}`;
-  } else {
-    // Default: if prompt mentions pages/database/auth -> Next.js, otherwise HTML
-    const hasComplexity = lower.includes("page") && (
-      lower.includes("form") || lower.includes("filter") || lower.includes("search")
-    );
-    mode = hasComplexity ? "nextjs" : "html";
-    confidence = "low";
-    reason = "No clear framework signal -- inferred from complexity";
+  // Check explicit in priority order: Next.js > React > HTML
+  if (EXPLICIT_NEXTJS.some((r) => r.test(prompt))) {
+    framework = "nextjs";
+  } else if (EXPLICIT_REACT.some((r) => r.test(prompt))) {
+    framework = "react-spa";
+  } else if (EXPLICIT_HTML.some((r) => r.test(prompt))) {
+    framework = "html";
   }
 
-  const pages = extractPages(prompt);
-  const techStack = extractTechStack(prompt, mode);
+  // Database
+  const database: DetectedStack["database"] =
+    lower.includes("prisma") ? "prisma" :
+    lower.includes("supabase") ? "supabase-js" :
+    "none";
 
-  return { mode, confidence, reason, pages, techStack };
+  // Auth
+  const auth: DetectedStack["auth"] =
+    lower.includes("nextauth") || lower.includes("next-auth") ? "nextauth" :
+    lower.includes("clerk") ? "clerk" :
+    lower.includes("supabase auth") ? "supabase-auth" :
+    "none";
+
+  // Styling
+  const styling: DetectedStack["styling"] =
+    lower.includes("tailwind") ? "tailwind" :
+    lower.includes("styled-components") || lower.includes("css-in-js") ? "styled-components" :
+    "css";
+
+  // Language
+  const language: DetectedStack["language"] =
+    lower.includes("typescript") || lower.includes(" ts ") || lower.includes(".tsx") ? "typescript" : "javascript";
+
+  return {
+    framework,
+    database,
+    auth,
+    styling,
+    language,
+    hasStripe: lower.includes("stripe"),
+  };
 }
 
 /**
- * Extract all page names from the prompt
- * e.g. "Home page, About page, Contact page" -> [{name:"Home", slug:"index"}, ...]
+ * PRIMARY EXPORT — always call this before choosing a generation strategy
  */
-export function extractPages(prompt: string): DetectedPage[] {
-  const pages: DetectedPage[] = [];
-  const lower = prompt.toLowerCase();
+export function detectOutputMode(prompt: string): ModeDetectionResult {
+  const stack = detectStack(prompt);
+  const mode = stack.framework;
 
-  // Pattern 1: numbered list "1. Home page - ..."
-  const numberedPattern = /\d+\.\s+([\w\s]+?)(?:\s*[-–—]\s*(.*?))?(?=\n|\d+\.|$)/g;
-  let match;
-  while ((match = numberedPattern.exec(prompt)) !== null) {
-    const name = match[1].trim().replace(/\s*page\s*/i, "").trim();
-    const description = match[2]?.trim() ?? "";
-    if (name && name.length < 30) {
-      pages.push({ name: titleCase(name), slug: toSlug(name), description });
+  // Determine confidence level
+  let confidence: ModeDetectionResult["confidence"] = "low";
+  let reason = "";
+
+  const isExplicitNextjs = EXPLICIT_NEXTJS.some((r) => r.test(prompt));
+  const isExplicitReact = EXPLICIT_REACT.some((r) => r.test(prompt));
+  const isExplicitHtml = EXPLICIT_HTML.some((r) => r.test(prompt));
+
+  if (isExplicitNextjs) {
+    confidence = "explicit";
+    reason = `User explicitly specified Next.js`;
+  } else if (isExplicitReact && !isExplicitNextjs) {
+    confidence = "explicit";
+    reason = `User explicitly specified React`;
+  } else if (isExplicitHtml) {
+    confidence = "explicit";
+    reason = `User explicitly specified HTML/vanilla JS`;
+  } else {
+    // Inference mode — use complexity signals
+    const lower = prompt.toLowerCase();
+    const hasDB = stack.database !== "none";
+    const hasAuth = stack.auth !== "none";
+    const hasAPI = lower.includes("api") || lower.includes("backend") || lower.includes("server");
+
+    if (hasDB && hasAuth) {
+      confidence = "high";
+      reason = "Database + auth detected — Next.js is strongly recommended";
+    } else if (hasDB || hasAPI) {
+      confidence = "medium";
+      reason = "Backend requirements detected — defaulting to Next.js";
+    } else if (lower.includes("dashboard") || lower.includes("app") || lower.includes("tracker")) {
+      confidence = "medium";
+      reason = "Interactive app detected — defaulting to React SPA";
+    } else {
+      confidence = "low";
+      reason = "No framework signals — defaulting to plain HTML";
     }
   }
 
-  if (pages.length > 0) return dedupPages(pages);
+  const pages = extractPages(prompt, mode);
 
-  // Pattern 2: "Pages: Home, About, Contact" or "pages include Home, About"
-  const pagesListPattern = /pages?\s*[:–—]\s*([^\n.]+)/i;
-  const pagesMatch = pagesListPattern.exec(prompt);
-  if (pagesMatch) {
-    const items = pagesMatch[1].split(/[,;]/);
+  return { mode, confidence, reason, pages, techStack: stack };
+}
+
+// ── Page extraction ──────────────────────────────────────────────────────────
+
+export function extractPages(prompt: string, mode: OutputMode = "html"): DetectedPage[] {
+  const pages: DetectedPage[] = [];
+
+  // Pattern 1: Numbered list — "1. Home page – ..."
+  const numbered = /^\s*\d+\.\s+([\w\s]+?)(?:\s*[-–—]\s*(.*?))?$/gm;
+  let match: RegExpExecArray | null;
+  while ((match = numbered.exec(prompt)) !== null) {
+    const raw = match[1].trim().replace(/\s*page\s*/i, "").trim();
+    if (raw && raw.length < 40) {
+      const name = toTitleCase(raw);
+      const slug = toSlug(raw);
+      pages.push({
+        name,
+        slug,
+        description: match[2]?.trim() ?? "",
+        routePath: buildRoutePath(slug, mode),
+      });
+    }
+  }
+  if (pages.length > 0) return dedup(ensureHome(pages, mode));
+
+  // Pattern 2: "Pages: X, Y, Z" or "Pages:\n- X\n- Y"
+  const pagesListMatch = /pages?\s*[:–—]\s*([^\n]+)/i.exec(prompt);
+  if (pagesListMatch) {
+    const items = pagesListMatch[1].split(/[,;]/);
     for (const item of items) {
-      const name = item.trim().replace(/\(.*?\)/g, "").replace(/\s*page\s*/i, "").trim();
-      if (name && name.length < 40 && name.length > 1) {
-        pages.push({ name: titleCase(name), slug: toSlug(name), description: item.trim() });
+      const raw = item.trim().replace(/\(.*?\)/g, "").replace(/\s*page\s*/i, "").trim();
+      if (raw && raw.length < 50 && raw.length > 1) {
+        const name = toTitleCase(raw);
+        const slug = toSlug(raw);
+        pages.push({ name, slug, description: item.trim(), routePath: buildRoutePath(slug, mode) });
       }
     }
   }
+  if (pages.length > 0) return dedup(ensureHome(pages, mode));
 
-  if (pages.length > 0) return dedupPages(pages);
-
-  // Pattern 3: Common page mentions anywhere in the prompt
-  const commonPages = [
-    { keywords: ["home", "landing", "hero", "index"], name: "Home", slug: "index" },
-    { keywords: ["about", "story", "our story", "bio", "team"], name: "About", slug: "about" },
-    { keywords: ["contact", "booking form", "book", "reach us"], name: "Contact", slug: "contact" },
-    { keywords: ["services", "service", "menu", "pricing"], name: "Services", slug: "services" },
-    { keywords: ["portfolio", "projects", "work", "gallery"], name: "Projects", slug: "projects" },
-    { keywords: ["products", "shop", "store", "catalogue"], name: "Products", slug: "products" },
-    { keywords: ["blog", "articles", "posts"], name: "Blog", slug: "blog" },
+  // Pattern 3: Keyword detection
+  const lower = prompt.toLowerCase();
+  const KNOWN: Array<{ keywords: string[]; name: string; slug: string }> = [
+    { keywords: ["home", "landing", "hero", "banner"], name: "Home", slug: "index" },
+    { keywords: ["service", "menu", "pricing", "price"], name: "Services", slug: "services" },
+    { keywords: ["about", "story", "our story", "team"], name: "About", slug: "about" },
+    { keywords: ["contact", "booking", "book", "reach"], name: "Contact", slug: "contact" },
+    { keywords: ["basket", "cart", "checkout", "shop"], name: "Basket", slug: "basket" },
+    { keywords: ["product", "store", "catalogue"], name: "Products", slug: "products" },
     { keywords: ["dashboard", "admin"], name: "Dashboard", slug: "dashboard" },
+    { keywords: ["blog", "article", "post"], name: "Blog", slug: "blog" },
     { keywords: ["login", "sign in", "signin"], name: "Login", slug: "login" },
     { keywords: ["signup", "sign up", "register"], name: "Signup", slug: "signup" },
     { keywords: ["onboarding", "wizard", "setup"], name: "Onboarding", slug: "onboarding" },
-    { keywords: ["cart", "basket"], name: "Cart", slug: "cart" },
-    { keywords: ["checkout"], name: "Checkout", slug: "checkout" },
     { keywords: ["profile", "account", "settings"], name: "Profile", slug: "profile" },
   ];
 
-  for (const pg of commonPages) {
+  for (const pg of KNOWN) {
     if (pg.keywords.some((k) => lower.includes(k))) {
-      pages.push({ name: pg.name, slug: pg.slug, description: "" });
+      pages.push({ name: pg.name, slug: pg.slug, description: "", routePath: buildRoutePath(pg.slug, mode) });
     }
   }
 
-  // Always ensure Home/index is first
-  const homeIdx = pages.findIndex((p) => p.slug === "index");
-  if (homeIdx > 0) {
-    const [home] = pages.splice(homeIdx, 1);
-    pages.unshift(home);
-  }
-  if (homeIdx === -1 && pages.length > 0) {
-    pages.unshift({ name: "Home", slug: "index", description: "Landing page" });
-  }
-
-  return dedupPages(pages);
+  return dedup(ensureHome(pages, mode));
 }
 
-function extractTechStack(prompt: string, mode: OutputMode): string[] {
-  const lower = prompt.toLowerCase();
-  const stack: string[] = [];
+// ── Route path builders ──────────────────────────────────────────────────────
 
-  if (mode === "html") stack.push("HTML5", "CSS3", "Vanilla JS");
-  if (mode === "nextjs") stack.push("Next.js 14", "TypeScript", "Tailwind CSS");
-  if (mode === "react-spa") stack.push("React", "Vite", "TypeScript");
-
-  if (lower.includes("tailwind")) stack.push("Tailwind CSS");
-  if (lower.includes("animation") || lower.includes("gsap")) stack.push("CSS Animations");
-  if (lower.includes("glassmorphism")) stack.push("Glassmorphism CSS");
-  if (lower.includes("prisma")) stack.push("Prisma");
-  if (lower.includes("supabase")) stack.push("Supabase");
-  if (lower.includes("stripe")) stack.push("Stripe");
-  if (lower.includes("clerk")) stack.push("Clerk Auth");
-
-  return [...new Set(stack)];
+function buildRoutePath(slug: string, mode: OutputMode): string {
+  if (mode === "html") {
+    return slug === "index" ? "index.html" : `${slug}.html`;
+  }
+  // Next.js App Router
+  if (slug === "index") return "app/page.tsx";
+  return `app/${slug}/page.tsx`;
 }
 
-// --- Helpers ---
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function toSlug(name: string): string {
-  const slug = name.toLowerCase()
-    .replace(/[^a-z0-9\s]/g, "")
-    .trim()
-    .replace(/\s+/g, "-");
-  if (["home", "landing", "main", "index"].includes(slug)) return "index";
-  return slug;
+  const slug = name.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim().replace(/\s+/g, "-");
+  return ["home", "landing", "main", "index"].includes(slug) ? "index" : slug;
 }
 
-function titleCase(str: string): string {
+function toTitleCase(str: string): string {
   return str.split(" ").map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
 }
 
-function dedupPages(pages: DetectedPage[]): DetectedPage[] {
+function ensureHome(pages: DetectedPage[], mode: OutputMode): DetectedPage[] {
+  if (!pages.find((p) => p.slug === "index")) {
+    pages.unshift({ name: "Home", slug: "index", description: "Landing page", routePath: buildRoutePath("index", mode) });
+  }
+  const idx = pages.findIndex((p) => p.slug === "index");
+  if (idx > 0) {
+    const [home] = pages.splice(idx, 1);
+    pages.unshift(home);
+  }
+  return pages;
+}
+
+function dedup(pages: DetectedPage[]): DetectedPage[] {
   const seen = new Set<string>();
-  return pages.filter((p) => {
-    if (seen.has(p.slug)) return false;
-    seen.add(p.slug);
-    return true;
-  });
+  return pages.filter((p) => { if (seen.has(p.slug)) return false; seen.add(p.slug); return true; });
+}
+
+/**
+ * Returns a human-readable summary of what was detected.
+ * Useful for showing users a "BuildFlow understood:" confirmation.
+ */
+export function summariseDetection(result: ModeDetectionResult): string {
+  const { mode, confidence, techStack, pages } = result;
+  const lines: string[] = [];
+
+  lines.push(`Framework: ${mode === "nextjs" ? "Next.js 14 App Router" : mode === "react-spa" ? "React SPA (Vite)" : "Plain HTML"} (${confidence})`);
+  if (techStack.database && techStack.database !== "none") lines.push(`Database: ${techStack.database}`);
+  if (techStack.auth && techStack.auth !== "none") lines.push(`Auth: ${techStack.auth}`);
+  if (techStack.styling) lines.push(`Styling: ${techStack.styling}`);
+  lines.push(`Pages: ${pages.map((p) => p.name).join(", ")}`);
+
+  return lines.join(" · ");
 }

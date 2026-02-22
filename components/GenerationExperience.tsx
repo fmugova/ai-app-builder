@@ -5,6 +5,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { GenerationPlan, PlanStep, StepStatus } from "@/lib/api/planGeneration";
+import { MultiPagePreview } from "@/components/MultiPagePreview";
 
 // --- Types ---
 
@@ -538,9 +539,8 @@ export function GenerationExperience({
           {/* Panel content */}
           <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
             {activeTab === "preview" ? (
-              <PreviewPanel
+              <MultiPagePreview
                 files={state.files}
-                previewFile={state.previewFile}
                 phase={state.phase}
               />
             ) : (
@@ -669,126 +669,6 @@ function StepRow({
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-// --- Preview panel ---
-
-function PreviewPanel({
-  files,
-  previewFile,
-  phase,
-}: {
-  files: Record<string, string>;
-  previewFile: string | null;
-  phase: string;
-}) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [ready, setReady] = useState(false);
-
-  // Build blob URL for HTML preview — inlines CSS/JS for instant render
-  const blobUrl = useMemo(() => {
-    const file =
-      previewFile ??
-      Object.keys(files).find((p) => p === "index.html" || p.endsWith("index.html"));
-    if (!file || !files[file]) return null;
-
-    let content = files[file];
-
-    // Inline style.css so iframe renders without needing a server
-    if (files["style.css"]) {
-      content = content.replace(
-        '<link rel="stylesheet" href="style.css">',
-        `<style>${files["style.css"]}</style>`
-      );
-    }
-
-    // Inline script.js
-    if (files["script.js"]) {
-      content = content.replace(
-        '<script src="script.js"></script>',
-        `<script>${files["script.js"]}</script>`
-      );
-    }
-
-    return URL.createObjectURL(new Blob([content], { type: "text/html" }));
-  }, [files, previewFile]);
-
-  useEffect(() => {
-    if (blobUrl && iframeRef.current) {
-      setReady(false);
-      iframeRef.current.src = blobUrl;
-    }
-    return () => {
-      if (blobUrl) URL.revokeObjectURL(blobUrl);
-    };
-  }, [blobUrl]);
-
-  if (phase === "planning" || phase === "planned") {
-    return (
-      <div
-        style={{
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 12,
-          background: "#09090b",
-        }}
-      >
-        <Spinner size={48} />
-        <div style={{ fontSize: 12, color: "#52525b" }}>Planning your build…</div>
-      </div>
-    );
-  }
-
-  if (!blobUrl) {
-    return (
-      <div
-        style={{
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 8,
-          background: "#09090b",
-        }}
-      >
-        <div style={{ fontSize: 36, opacity: 0.3 }}>⚡</div>
-        <div style={{ fontSize: 12, color: "#3f3f46" }}>
-          Preview appears as files are built
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ height: "100%", position: "relative", background: "#ffffff" }}>
-      {!ready && (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: "#09090b",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 10,
-          }}
-        >
-          <Spinner size={24} />
-        </div>
-      )}
-      <iframe
-        ref={iframeRef}
-        onLoad={() => setReady(true)}
-        style={{ width: "100%", height: "100%", border: 0 }}
-        title="Live preview"
-        sandbox="allow-scripts allow-same-origin"
-      />
     </div>
   );
 }
