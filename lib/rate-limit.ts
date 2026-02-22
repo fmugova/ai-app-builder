@@ -2,10 +2,19 @@ import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 import { NextRequest, NextResponse } from 'next/server'
 
-// Initialize Redis (exported so other modules can use the same connection)
+// Initialize Redis (exported so other modules can use the same connection).
+// Guard against missing env vars: the @upstash/redis constructor throws if url/token
+// are undefined, which would crash the entire module at import time (including the
+// /api/auth/[...nextauth] route) and cause CLIENT_FETCH_ERROR with HTML responses.
+if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+  throw new Error(
+    '[rate-limit] UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must be set in .env.local'
+  )
+}
+
 export const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
 })
 
 // Rate limiters by use case

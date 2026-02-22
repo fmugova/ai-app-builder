@@ -6,7 +6,11 @@ import PostHogProvider from '@/components/providers/PostHogProvider'
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <SessionProvider basePath="/api/auth">
+    <SessionProvider
+      basePath="/api/auth"
+      refetchOnWindowFocus={false}
+      refetchWhenOffline={false}
+    >
       <PostHogProvider>
       {children}
       <Toaster
