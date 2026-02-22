@@ -122,7 +122,10 @@ export default function PreviewFrameMultiPage({
     const hasFullHTML = /<!doctype|<html/i.test(page.content)
 
     if (hasFullHTML) {
-      // Inject shared CSS and a minimal nav bar into existing full HTML
+      // Inject BuildFlow nav bar + shared CSS into existing full HTML.
+      // We also strip the original <link stylesheet> and external <script src> tags
+      // because style.css/script.js are served as separate files in the session
+      // (so the browser will fetch them correctly) AND we inline them as a fallback.
       const injectedStyle = `
 <style>
   .__bf-nav { position:fixed;top:0;left:0;right:0;z-index:9999;background:#1e1b4b;padding:0.5rem 1rem;display:flex;gap:1rem;font-family:system-ui,sans-serif;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,0.3); }
@@ -130,13 +133,14 @@ export default function PreviewFrameMultiPage({
   .__bf-nav a:hover { background:rgba(255,255,255,.12); }
   .__bf-nav a.active { background:#7c3aed;color:#fff;font-weight:600; }
   body { padding-top:40px!important; }
-  ${sharedCSS}
+  ${sharedCSS ? `/* shared styles */\n${sharedCSS}` : ''}
 </style>`
       const nav = `<div class="__bf-nav">${validPages.map((p: Page) => {
         const filename = p.isHomepage ? 'index.html' : `${p.slug}.html`
         return `<a href="${filename}"${p.slug === page.slug ? ' class="active"' : ''}>${p.isHomepage ? '🏠 ' : ''}${p.title}</a>`
       }).join('')}</div>`
-      const navScript = `<script>${sharedJS}</script>`
+      // Inline JS as fallback (session also serves script.js for pages that link to it)
+      const navScript = sharedJS ? `<script>${sharedJS}</script>` : ''
 
       return page.content
         .replace(/<head>/i, `<head><base target="_self">${injectedStyle}`)
@@ -181,11 +185,16 @@ export default function PreviewFrameMultiPage({
     if (!validPages || validPages.length === 0) return
     setLoading(true)
     try {
-      const files = validPages.map(page => ({
-        filename: page.isHomepage ? 'index.html' : `${page.slug}.html`,
-        content: buildPageFile(page),
-        mimeType: 'text/html',
-      }))
+      // Upload HTML pages + shared CSS/JS so page-to-page navigation works correctly
+      const files = [
+        ...validPages.map(page => ({
+          filename: page.isHomepage ? 'index.html' : `${page.slug}.html`,
+          content: buildPageFile(page),
+          mimeType: 'text/html',
+        })),
+        ...(sharedCSS ? [{ filename: 'style.css', content: sharedCSS, mimeType: 'text/css' }] : []),
+        ...(sharedJS ? [{ filename: 'script.js', content: sharedJS, mimeType: 'application/javascript' }] : []),
+      ]
 
       const res = await fetch('/api/preview-session', {
         method: 'POST',

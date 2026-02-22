@@ -130,7 +130,8 @@ const nextConfig: NextConfig = {
             // Workers: Next.js Turbopack creates blob: workers at runtime
             "worker-src 'self' blob:",
             // Frames: WebContainer dev server runs on *.webcontainer-api.io subdomains
-            "frame-src 'self' https://vercel.live https://*.vercel.live https://stackblitz.com https://*.stackblitz.com https://*.webcontainer.io https://*.webcontainer-api.io",
+            // blob: required for GenerationExperience inline HTML preview (blob URL iframes)
+            "frame-src 'self' blob: https://vercel.live https://*.vercel.live https://stackblitz.com https://*.stackblitz.com https://*.webcontainer.io https://*.webcontainer-api.io",
             // Clickjacking: only we can embed our own pages
             "frame-ancestors 'self'",
             // Block <object> and <embed> entirely

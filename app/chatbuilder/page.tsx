@@ -1935,7 +1935,11 @@ Please regenerate the complete, fixed code.`;
                   </div>
                 ) : /* Branch 2: Multi-page HTML → tabbed preview */
                 projectPages.length > 0 ? (
-                  <PreviewFrameMultiPage pages={projectPages} />
+                  <PreviewFrameMultiPage
+                    pages={projectPages}
+                    sharedCSS={state.css}
+                    sharedJS={state.js}
+                  />
                 ) : /* Branch 3: Single HTML → standard preview */
                 (
                   <PreviewFrame
