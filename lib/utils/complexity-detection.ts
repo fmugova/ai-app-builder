@@ -188,8 +188,12 @@ export function detectComplexity(prompt: string): ComplexityAnalysis {
   const totalScore = fullstackScore - simpleScore;
   const confidence = Math.min(95, Math.max(50, Math.abs(totalScore)));
 
-  // Determine mode based on threshold
-  const FULLSTACK_THRESHOLD = 20; // Scores above this = fullstack
+  // Determine mode based on threshold.
+  // Raised from 20 → 40: a single keyword like "analytics" or "admin dashboard"
+  // was scoring 20-40 and triggering JSON multi-file generation in the chatbot stream,
+  // where the AI would return truncated/unparseable JSON. Now requires at least two
+  // distinct backend signals (e.g. database + auth, payments + api, etc.).
+  const FULLSTACK_THRESHOLD = 40;
 
   const mode: ProjectMode = totalScore >= FULLSTACK_THRESHOLD ? 'fullstack-nextjs' : 'simple-html';
 

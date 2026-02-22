@@ -732,9 +732,13 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
       } else {
         console.warn('⚠️ Multi-file parsing failed:', parseResult.error);
         // Don't fall through to single-HTML processing — raw JSON stored as code
-        // would render as garbage in the preview. Send a graceful error instead.
+        // would render as garbage in the preview.
+        // If this was auto-detected (not explicitly requested), suggest HTML mode.
+        const suggestion = generationType === 'multi-file'
+          ? 'Please try again — the AI output was incomplete.'
+          : 'Your prompt was auto-detected as a fullstack project, but the output could not be parsed. Try rephrasing to focus on the UI/frontend, or start a new session to use the Generation Experience mode.';
         send(controller, {
-          error: 'The AI generated a fullstack project but the output could not be parsed. Please try again.',
+          error: suggestion,
           done: true,
         });
         controller.close();
