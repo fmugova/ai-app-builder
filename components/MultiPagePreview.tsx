@@ -6,7 +6,7 @@
 // then creates a new blob URL for the target page and updates the iframe src.
 // This makes relative links work inside blob:// preview contexts.
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface Props {
   files: Record<string, string>;
@@ -228,7 +228,7 @@ export function MultiPagePreview({ files, phase }: Props) {
           onLoad={() => setLoading(false)}
           style={{ width: "100%", height: "100%", border: 0, background: "#ffffff" }}
           title="Live preview"
-          sandbox="allow-scripts allow-same-origin"
+          sandbox="allow-scripts allow-forms allow-popups allow-modals"
         />
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </div>
