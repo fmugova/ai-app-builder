@@ -2,9 +2,10 @@
 // components/MultiPagePreview.tsx
 // Replaces PreviewPanel in GenerationExperience.tsx
 //
-// THE FIX: Intercepts <a href="*.html"> clicks inside the iframe via postMessage,
-// then creates a new blob URL for the target page and updates the iframe src.
-// This makes relative links work inside blob:// preview contexts.
+// Uses srcdoc instead of blob URLs so the iframe runs with a null/opaque origin:
+//  - No allow-same-origin needed → no browser security warning
+//  - Parent page's CSP is NOT inherited → generated HTML can call external APIs freely
+//  - postMessage navigation still works (postMessage is origin-agnostic)
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -35,7 +36,7 @@ const LINK_INTERCEPTOR = `
 </script>
 `;
 
-function buildBlobContent(
+function buildPageContent(
   targetFile: string,
   files: Record<string, string>
 ): string | null {
@@ -68,7 +69,6 @@ export function MultiPagePreview({ files, phase }: Props) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [currentFile, setCurrentFile] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const blobUrlsRef = useRef<Map<string, string>>(new Map());
 
   const ff = "'Geist Mono','IBM Plex Mono',ui-monospace,monospace";
 
@@ -92,23 +92,16 @@ export function MultiPagePreview({ files, phase }: Props) {
       });
   }, [files]);
 
-  // Navigate to a page by filename
+  // Navigate to a page by filename — uses srcdoc (no blob URL needed)
   const navigateTo = useCallback(
     (filename: string) => {
-      const content = buildBlobContent(filename, files);
+      const content = buildPageContent(filename, files);
       if (!content) return;
-
-      // Revoke old blob URL for this file to avoid memory leaks
-      const existingUrl = blobUrlsRef.current.get(filename);
-      if (existingUrl) URL.revokeObjectURL(existingUrl);
-
-      const url = URL.createObjectURL(new Blob([content], { type: "text/html" }));
-      blobUrlsRef.current.set(filename, url);
 
       setLoading(true);
       setCurrentFile(filename);
       if (iframeRef.current) {
-        iframeRef.current.src = url;
+        iframeRef.current.srcdoc = content;
       }
     },
     [files]
@@ -147,14 +140,6 @@ export function MultiPagePreview({ files, phase }: Props) {
   // Only re-run when the CONTENT of the current file changes, not when navigateTo changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [files[currentFile ?? ""]]);
-
-  // Cleanup all blob URLs on unmount
-  useEffect(() => {
-    const urls = blobUrlsRef.current;
-    return () => {
-      urls.forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, []);
 
   if (phase === "planning" || phase === "planned") {
     return (
@@ -218,7 +203,10 @@ export function MultiPagePreview({ files, phase }: Props) {
         </div>
       )}
 
-      {/* iframe */}
+      {/* iframe — srcdoc avoids blob URLs entirely, so no allow-same-origin is needed.
+          Without allow-same-origin the iframe runs with a null/opaque origin:
+          - no CSP inheritance from the parent page (generated HTML can fetch freely)
+          - no browser security warning about allow-scripts + allow-same-origin */}
       <div style={{ flex: 1, position: "relative" }}>
         {loading && (
           <div style={{ position: "absolute", top: 8, right: 8, zIndex: 10, width: 14, height: 14, borderRadius: "50%", border: "2px solid #27272a", borderTopColor: "#6366f1", animation: "spin 0.7s linear infinite" }} />
