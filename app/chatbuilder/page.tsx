@@ -384,11 +384,23 @@ function ChatBuilderContent() {
     if (/pages?\s*:/i.test(p)) return true;
 
     const multiPageSignals = [
+      // Classic multi-page website signals
       'multi-page', 'multiple pages', 'home page', 'about page', 'contact page',
       'landing page', 'homepage', 'website with', 'site with', 'portfolio site',
       'business website', 'restaurant website', 'agency website', 'personal website',
       'blog site', 'company website', 'marketing site', 'saas landing',
       'portfolio website', 'corporate site',
+      // App / dashboard signals
+      'dashboard', 'admin panel', 'admin dashboard', 'crm', 'erp',
+      'management system', 'management app', 'management dashboard',
+      'analytics dashboard', 'reporting dashboard', 'sales dashboard',
+      'sidebar navigation', 'sidebar menu', 'with sidebar',
+      'settings page', 'settings panel',
+      'web app', 'web application', 'full app', 'saas app',
+      'e-commerce', 'ecommerce', 'online store', 'shop with',
+      'task manager', 'project manager', 'kanban', 'deal pipeline',
+      'finance app', 'inventory', 'hr dashboard', 'helpdesk',
+      'activity timeline', 'data table', 'data tables',
     ];
     // Only reject if the prompt is clearly about a real SPA/server app with NO page list
     const hardRejectSignals = [
@@ -1656,7 +1668,7 @@ Please regenerate the complete, fixed code.`;
               
               <button
                 onClick={() => {
-                  if (!state.fullCode && !currentProjectId && isMultiPageHtmlPrompt(prompt)) {
+                  if (!state.fullCode && isMultiPageHtmlPrompt(prompt)) {
                     if (!projectName || projectName.trim() === '') {
                       setProjectName(generateSmartProjectName(prompt));
                     }
