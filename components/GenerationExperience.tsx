@@ -7,6 +7,7 @@ import React, { useMemo } from "react";
 import type { PlanStep, StepStatus } from "@/lib/api/planGeneration";
 import { MultiPagePreview } from "@/components/MultiPagePreview";
 import { useGenerationStream } from "@/lib/useGenerationStream";
+import { DownloadButton } from "@/components/DownloadButton";
 
 // --- Types ---
 
@@ -304,6 +305,14 @@ export function GenerationExperience({
             >
               Open in Editor →
             </button>
+          )}
+          {isDone && (
+            <DownloadButton
+              files={state.files}
+              projectName={siteName}
+              ff={ff}
+              style={{ flex: 1 }}
+            />
           )}
           {isDone && (
             <button

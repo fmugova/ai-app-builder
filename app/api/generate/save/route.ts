@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { saveProjectFiles } from "@/lib/saveProjectFiles";
 
 export const runtime = "nodejs";
 
@@ -105,6 +106,10 @@ export async function POST(req: NextRequest) {
         });
       }
     }
+
+    // Save all individual files to ProjectFile table (enables per-file retrieval,
+    // WebContainer fast preview, and proper ZIP download reconstruction)
+    await saveProjectFiles(project.id, files);
 
     return NextResponse.json({ projectId: project.id });
   } catch (err) {
