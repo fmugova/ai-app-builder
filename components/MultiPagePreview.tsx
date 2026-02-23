@@ -59,8 +59,15 @@ function buildPageContent(
     );
   }
 
-  // Inject the link interceptor before </body>
-  content = content.replace(/<\/body>/i, `${LINK_INTERCEPTOR}</body>`);
+  // Inject the link interceptor. AI-generated HTML sometimes omits </body> or
+  // </html>, so try each closing tag in order, falling back to plain append.
+  if (/<\/body>/i.test(content)) {
+    content = content.replace(/<\/body>/i, `${LINK_INTERCEPTOR}</body>`);
+  } else if (/<\/html>/i.test(content)) {
+    content = content.replace(/<\/html>/i, `${LINK_INTERCEPTOR}</html>`);
+  } else {
+    content = content + LINK_INTERCEPTOR;
+  }
 
   return content;
 }

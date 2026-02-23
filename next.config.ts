@@ -4,6 +4,10 @@ const nextConfig: NextConfig = {
   experimental: {
   },
 
+  // Allow the WebContainer dev-server iframe (*.webcontainer-api.io) to load
+  // /_next/* HMR and chunk resources in development without the cross-origin warning.
+  allowedDevOrigins: ['*.webcontainer-api.io'],
+
   async rewrites() {
     return [
       {
