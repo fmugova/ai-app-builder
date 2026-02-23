@@ -3,19 +3,26 @@ import { Redis } from '@upstash/redis'
 import { NextRequest, NextResponse } from 'next/server'
 
 // Initialize Redis (exported so other modules can use the same connection).
-// Guard against missing env vars: the @upstash/redis constructor throws if url/token
-// are undefined, which would crash the entire module at import time (including the
-// /api/auth/[...nextauth] route) and cause CLIENT_FETCH_ERROR with HTML responses.
-if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
-  throw new Error(
-    '[rate-limit] UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must be set in .env.local'
-  )
+//
+// IMPORTANT: Do NOT throw here. lib/auth.ts imports this module, which means the
+// /api/auth/[...nextauth] route depends on it. A module-level throw causes that
+// route to return an HTML error page instead of JSON → CLIENT_FETCH_ERROR in the
+// browser. When env vars are missing we use a no-op placeholder so the module
+// loads successfully; rate limiting is simply disabled (checkRateLimit fails open).
+const _redisAvailable = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+if (!_redisAvailable) {
+  console.warn(
+    '[rate-limit] UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN is not set — ' +
+    'rate limiting and TOTP replay protection are disabled. Set these env vars.'
+  );
 }
 
-export const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN,
-})
+export const redis: Redis = _redisAvailable
+  ? new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL!,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+    })
+  : (new Proxy({}, { get: () => async () => null }) as unknown as Redis);
 
 // Rate limiters by use case
 export const rateLimiters = {
@@ -138,9 +145,11 @@ export async function checkRateLimit(
     }
   } catch (error) {
     console.error('❌ Rate limit check failed:', error)
-    // Fail closed: deny the request when Redis is unavailable
+    // Fail open when Redis is unavailable (no env vars or transient error):
+    // blocking all users because the rate limiter is down is worse than
+    // temporarily allowing unlimited requests.
     return {
-      success: false,
+      success: true,
       limit: 0,
       remaining: 0,
       reset: Date.now(),
@@ -167,9 +176,9 @@ export async function checkRateLimitByIdentifier(
     }
   } catch (error) {
     console.error('❌ Rate limit check failed:', error)
-    // Fail closed: deny the request when Redis is unavailable
+    // Fail open — same rationale as checkRateLimit above.
     return {
-      success: false,
+      success: true,
       limit: 0,
       remaining: 0,
       reset: Date.now(),
@@ -224,9 +233,9 @@ export async function checkUserRateLimit(
 
   } catch (error) {
     console.error('❌ User rate limit check failed:', error)
-    // Fail closed: deny the request when Redis is unavailable
+    // Fail open — rate limiter unavailable, allow the request.
     return {
-      success: false,
+      success: true,
       limit: 0,
       remaining: 0,
       reset: Date.now(),

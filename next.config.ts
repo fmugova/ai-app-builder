@@ -77,6 +77,22 @@ const nextConfig: NextConfig = {
 
   headers: async () => [
     {
+      // ── WebContainer isolation headers (chatbuilder only) ──────────────
+      // SharedArrayBuffer (required by the WebContainer WASM runtime) is only
+      // available on cross-origin isolated pages. These headers MUST be scoped
+      // to /chatbuilder — applying them globally breaks OAuth popups and Stripe
+      // on other pages (COOP same-origin prevents cross-window communication).
+      //
+      // credentialless COEP (not require-corp): more permissive — allows
+      // PostHog/Sentry/Vercel scripts to load without CORP headers, and still
+      // enables SharedArrayBuffer for the WebContainer WASM sandbox.
+      source: '/chatbuilder/:path*',
+      headers: [
+        { key: 'Cross-Origin-Embedder-Policy', value: 'credentialless' },
+        { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+      ],
+    },
+    {
       // ── Global security headers (all routes) ───────────────────────────
       source: '/:path*',
       headers: [
