@@ -3,24 +3,12 @@
 // The complete generation experience: plan -> execute -> preview
 // Better than Bolt: preview works, quality score shown, file tree is live
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import type { GenerationPlan, PlanStep, StepStatus } from "@/lib/api/planGeneration";
+import React, { useMemo } from "react";
+import type { PlanStep, StepStatus } from "@/lib/api/planGeneration";
 import { MultiPagePreview } from "@/components/MultiPagePreview";
+import { useGenerationStream } from "@/lib/useGenerationStream";
 
 // --- Types ---
-
-interface GenerationState {
-  phase: "idle" | "planning" | "planned" | "executing" | "done" | "error";
-  plan: GenerationPlan | null;
-  currentStepId: string | null;
-  completedSteps: Set<string>;
-  files: Record<string, string>;
-  previewFile: string | null;
-  qualityScore: number | null;
-  errorMessage: string | null;
-  startedAt: number | null;
-  elapsedMs: number;
-}
 
 interface Props {
   prompt: string;
@@ -71,128 +59,40 @@ export function GenerationExperience({
   onOpenInBuilder,
   generationApiUrl,
 }: Props) {
-  const [state, setState] = useState<GenerationState>({
-    phase: "idle",
-    plan: null,
-    currentStepId: null,
-    completedSteps: new Set(),
-    files: {},
-    previewFile: null,
-    qualityScore: null,
-    errorMessage: null,
-    startedAt: null,
-    elapsedMs: 0,
+  const { state, start, stop } = useGenerationStream({
+    prompt,
+    siteName,
+    apiUrl: generationApiUrl,
+    // After SSE completes, save to DB via a separate Node.js route (Prisma can't
+    // run in the Edge stream route). projectId comes back from the save call.
+    onComplete: async (files, score) => {
+      let projectId: string | undefined;
+      try {
+        const res = await fetch("/api/generate/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: siteName, prompt, files, qualityScore: score }),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          projectId = json.projectId;
+        }
+      } catch {
+        // Non-fatal — project still usable, just not saved to DB
+      }
+      onComplete?.(files, score, projectId);
+    },
   });
 
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(
+  const [selectedFile, setSelectedFile] = React.useState<string | null>(null);
+  const [expandedDirs, setExpandedDirs] = React.useState<Set<string>>(
     new Set(["src", "app", "components"])
   );
-  const [activeTab, setActiveTab] = useState<"preview" | "code">("preview");
-  const sseRef = useRef<EventSource | null>(null);
-  const doneRef = useRef(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [activeTab, setActiveTab] = React.useState<"preview" | "code">("preview");
 
-  // Elapsed timer
-  useEffect(() => {
-    if (state.phase === "executing" && state.startedAt) {
-      timerRef.current = setInterval(() => {
-        setState((prev) => ({
-          ...prev,
-          elapsedMs: Date.now() - (prev.startedAt ?? Date.now()),
-        }));
-      }, 100);
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current);
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [state.phase, state.startedAt]);
-
-  function start() {
-    doneRef.current = false;
-    setState((prev) => ({ ...prev, phase: "planning" }));
-
-    const es = new EventSource(
-      `${generationApiUrl}?prompt=${encodeURIComponent(prompt)}&name=${encodeURIComponent(siteName)}`
-    );
-    sseRef.current = es;
-
-    es.addEventListener("plan", (e) => {
-      const plan: GenerationPlan = JSON.parse((e as MessageEvent).data);
-      setState((prev) => ({ ...prev, phase: "planned", plan, startedAt: Date.now() }));
-      // Auto-start execution after 800ms (shows plan briefly)
-      setTimeout(() => setState((prev) => ({ ...prev, phase: "executing" })), 800);
-    });
-
-    es.addEventListener("step_start", (e) => {
-      const { stepId } = JSON.parse((e as MessageEvent).data);
-      setState((prev) => ({ ...prev, currentStepId: stepId }));
-    });
-
-    es.addEventListener("step_done", (e) => {
-      const { stepId } = JSON.parse((e as MessageEvent).data);
-      setState((prev) => {
-        const next = new Set(prev.completedSteps);
-        next.add(stepId);
-        return { ...prev, completedSteps: next, currentStepId: null };
-      });
-    });
-
-    es.addEventListener("file", (e) => {
-      const { path, content } = JSON.parse((e as MessageEvent).data);
-      setState((prev) => {
-        const files = { ...prev.files, [path]: content };
-        const previewFile =
-          prev.previewFile ?? (isPreviewable(path) ? path : null);
-        if (!prev.previewFile && previewFile) setSelectedFile(previewFile);
-        return { ...prev, files, previewFile: previewFile ?? prev.previewFile };
-      });
-    });
-
-    es.addEventListener("quality", (e) => {
-      const { score } = JSON.parse((e as MessageEvent).data);
-      setState((prev) => ({ ...prev, qualityScore: score }));
-    });
-
-    es.addEventListener("done", (e) => {
-      doneRef.current = true;
-      const data = JSON.parse((e as MessageEvent).data);
-      setState((prev) => ({
-        ...prev,
-        phase: "done",
-        qualityScore: data.qualityScore ?? prev.qualityScore,
-        files: data.files ?? prev.files,
-      }));
-      es.close();
-      onComplete?.(data.files, data.qualityScore, data.projectId);
-    });
-
-    es.addEventListener("error_event", (e) => {
-      const { message } = JSON.parse((e as MessageEvent).data);
-      setState((prev) => ({ ...prev, phase: "error", errorMessage: message }));
-      es.close();
-    });
-
-    es.onerror = () => {
-      // doneRef guards against the TCP close firing before the done state update
-      // commits — a race that causes false "Connection lost" errors on success.
-      if (doneRef.current) return;
-      setState((prev) => {
-        if (prev.phase === "done") return prev;
-        return { ...prev, phase: "error", errorMessage: "Connection lost — please retry" };
-      });
-      es.close();
-    };
-  }
-
-  useEffect(() => {
+  React.useEffect(() => {
     start();
-    return () => {
-      sseRef.current?.close();
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
+    return () => stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -265,7 +165,7 @@ export function GenerationExperience({
                 {state.phase === "planned" && "Plan ready — starting build"}
                 {state.phase === "executing" && `Building · ${elapsed}`}
                 {state.phase === "done" && `Done · ${fileCount} files · ${elapsed}`}
-                {state.phase === "error" && "Error — see below"}
+                {state.phase === "error" && (state.error?.includes("reconnecting") ? state.error : "Error — see below")}
               </div>
             </div>
             {state.qualityScore !== null && (
@@ -353,7 +253,7 @@ export function GenerationExperience({
                   Build failed
                 </div>
                 <div style={{ fontSize: 11, color: "#fca5a5", marginTop: 4 }}>
-                  {state.errorMessage}
+                  {state.error}
                 </div>
                 <button
                   onClick={start}
@@ -426,7 +326,7 @@ export function GenerationExperience({
           {!isDone && (
             <button
               onClick={() => {
-                sseRef.current?.close();
+                stop();
                 onCancel?.();
               }}
               style={{
@@ -967,9 +867,6 @@ function Spinner({ size = 16 }: { size?: number }) {
 
 // --- Utils ---
 
-function isPreviewable(path: string): boolean {
-  return path.endsWith(".html");
-}
 
 function formatElapsed(ms: number): string {
   if (ms < 1000) return `${ms}ms`;

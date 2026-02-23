@@ -1,20 +1,22 @@
 // app/api/generate/stream/route.ts
 // SSE endpoint powering the GenerationExperience component.
-// Streams: plan -> step_start -> file -> step_done -> quality -> done
+// Streams: token -> plan -> step_start -> file -> step_done -> quality -> done
+//
+// Edge runtime: no Vercel timeout on streaming responses (unlike Node.js serverless
+// which is killed after 60s on Hobby or 300s on Pro even with keep-alive pings).
+// Auth uses getToken (JWT-only) because getServerSession requires Node.js APIs.
+// DB save is handled client-side via POST /api/generate/save after the done event.
 
 import { NextRequest } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getToken } from "next-auth/jwt";
 import { createGenerationPlan } from "@/lib/api/planGeneration";
 import { runGenerationPipeline } from "@/lib/pipeline/htmlGenerationPipeline";
-import prisma from "@/lib/prisma";
 
-export const runtime = "nodejs";
-export const maxDuration = 300; // 5 min for large projects
+export const runtime = "edge";
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  if (!token?.email) {
     return new Response("Unauthorized", { status: 401 });
   }
 
@@ -23,15 +25,6 @@ export async function GET(req: NextRequest) {
 
   if (!prompt.trim()) {
     return new Response("Missing prompt", { status: 400 });
-  }
-
-  // Resolve user ID once (needed for DB save)
-  const dbUser = await prisma.user.findUnique({
-    where: { email: session.user.email },
-    select: { id: true },
-  });
-  if (!dbUser) {
-    return new Response("User not found", { status: 401 });
   }
 
   const encoder = new TextEncoder();
@@ -52,6 +45,7 @@ export async function GET(req: NextRequest) {
 
       // Send SSE comment pings every 15s so Vercel/proxies don't kill idle connections
       // between AI calls. SSE comments (": ping\n\n") are invisible to EventSource listeners.
+      // Edge runtime streaming has no Vercel timeout so these are just belt-and-suspenders.
       const keepAlive = setInterval(() => {
         if (closed) return;
         try {
@@ -62,6 +56,11 @@ export async function GET(req: NextRequest) {
       }, 15_000);
 
       try {
+        // 0. Emit a generation token — the client saves this and sends it on reconnect.
+        //    (No KV store yet: the server ignores ?token= and just restarts cleanly.
+        //     The client-side useGenerationStream hook handles the retry UX.)
+        send("token", { token: crypto.randomUUID() });
+
         // 1. Generate plan (fast -- uses haiku, ~1s)
         const plan = await createGenerationPlan(prompt, siteName);
         send("plan", plan);
@@ -119,80 +118,14 @@ export async function GET(req: NextRequest) {
         // 3. Quality score
         send("quality", { score: result.qualityScore });
 
-        // 4. Save project + pages to DB
-        let savedProjectId: string | undefined;
-        try {
-          const htmlFiles = Object.entries(result.files).filter(([p]) => p.endsWith(".html"));
-          const combinedHtml = result.files["index.html"] ?? htmlFiles[0]?.[1] ?? "";
-
-          const project = await prisma.project.create({
-            data: {
-              userId: dbUser.id,
-              name: siteName,
-              prompt,
-              type: "html",
-              projectType: "multi-page-html",
-              code: combinedHtml,
-              html: combinedHtml,
-              css: result.files["style.css"] ?? "",
-              javascript: result.files["script.js"] ?? "",
-              multiPage: htmlFiles.length > 1,
-              isMultiFile: false,
-              validationScore: BigInt(result.qualityScore),
-              validationPassed: result.qualityScore >= 70,
-              status: "DRAFT",
-            },
-          });
-          savedProjectId = project.id;
-
-          // Create Page records for each HTML file
-          if (htmlFiles.length > 0) {
-            await prisma.page.deleteMany({ where: { projectId: project.id } });
-
-            for (let pi = 0; pi < htmlFiles.length; pi++) {
-              const [filename, content] = htmlFiles[pi];
-              const slug = filename.replace(".html", "") || "index";
-              const titleMatch = content.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-              const h1Match = content.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
-              const metaDescMatch =
-                content.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i) ??
-                content.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i);
-              const pMatch = content.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
-
-              const rawTitle = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, "").trim() : "";
-              const h1Text = h1Match ? h1Match[1].replace(/<[^>]*>/g, "").trim() : "";
-              const metaDesc = metaDescMatch ? metaDescMatch[1].trim() : "";
-              const pText = pMatch ? pMatch[1].replace(/<[^>]*>/g, "").trim().slice(0, 160) : "";
-              const pageTitle = rawTitle || h1Text || (slug === "index" ? siteName : slug.charAt(0).toUpperCase() + slug.slice(1));
-
-              await prisma.page.create({
-                data: {
-                  projectId: project.id,
-                  slug,
-                  title: pageTitle,
-                  content,
-                  description: pText || metaDesc || null,
-                  metaTitle: pageTitle,
-                  metaDescription: metaDesc || pText || null,
-                  isHomepage: slug === "index",
-                  order: pi,
-                  isPublished: true,
-                },
-              });
-            }
-          }
-        } catch (dbErr) {
-          console.error("[generate/stream] DB save failed:", dbErr);
-          // Non-fatal — still send done event
-        }
-
-        // 5. Done
+        // 4. Done — DB save is handled client-side via POST /api/generate/save
+        //    so it runs on Node.js runtime (Prisma) without blocking the Edge stream.
         send("done", {
           files: result.files,
           qualityScore: result.qualityScore,
           pages: result.pages,
           warnings: result.warnings,
-          projectId: savedProjectId,
+          // projectId will be populated by the client after saving
         });
       } catch (e: unknown) {
         const message = e instanceof Error ? e.message : "Generation failed";
