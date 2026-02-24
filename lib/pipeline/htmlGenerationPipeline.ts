@@ -166,54 +166,58 @@ async function generateSharedAssets(
     return `<li><a href="${filename}">${p.name}</a></li>`;
   }).join("\n          ");
 
-  const prompt = `Generate a shared CSS file and JavaScript file for a website called "${siteName}".
+  const prompt = `Generate the shared design system and navigation for a website called "${siteName}".
 
-User's design requirements from their prompt:
+User's design requirements:
 ${userPrompt}
 
-Pages that will use these files: ${pages.map((p) => p.name).join(", ")}
+Pages: ${pages.map((p) => p.name).join(", ")}
 
-Generate TWO files:
+IMPORTANT: All pages will include Tailwind CDN. Use Tailwind classes for layout/styling.
+Keep style.css minimal — only CSS custom properties, scroll-reveal animations, and anything Tailwind can't do.
 
-1. style.css -- Complete CSS including:
-   - CSS custom properties (color palette, typography scale)
-   - CSS reset/base styles
-   - Shared layout: header, nav, footer, main content
-   - Component styles: buttons, cards, forms, badges
-   - Responsive breakpoints (mobile-first)
-   - Any animations/transitions requested
-   - Page-specific section classes
+Generate FOUR items:
 
-2. script.js -- JavaScript including:
-   - Mobile navigation toggle
-   - Smooth scroll
-   - Scroll-triggered animations (IntersectionObserver)
-   - Form validation function (validateForm)
-   - Active nav link highlighting based on current page
+1. style.css -- Minimal CSS:
+   - :root custom properties for brand colors (derive from the prompt, e.g. coffee shop → warm browns)
+   - .reveal class: opacity:0; transform:translateY(20px); transition:all 0.5s ease
+   - .reveal.visible: opacity:1; transform:translateY(0)
+   - Any bespoke animations (e.g. hero gradient shift, loading shimmer)
+   - NO layout classes — Tailwind handles all layout
 
-Also provide the SHARED NAV HTML to reuse in every page:
-nav_html: <nav>...</nav>
+2. script.js -- Complete vanilla JavaScript:
+   - Mobile hamburger nav toggle (toggles 'hidden' class on mobile menu)
+   - Active nav link highlighting (match href to current filename)
+   - Scroll reveal: IntersectionObserver adding 'visible' to .reveal elements
+   - Form handler: handleFormSubmit(e) — e.preventDefault(), hides form, shows #form-success
+   - Smooth scroll for anchor links
 
-And SHARED FOOTER HTML:
-footer_html: <footer>...</footer>
+3. nav_html: A responsive Tailwind nav with:
+   - Logo/site name on left (font-bold text-xl)
+   - Desktop links: hidden sm:flex gap-8
+   - Mobile hamburger button (sm:hidden) that toggles a mobile menu
+   - Current page link gets visual active state
+   - Include ALL these links: ${navLinks}
+   - Style: bg-white shadow-sm sticky top-0 z-50
 
-The nav must include these links:
-<ul>
-  ${navLinks}
-</ul>
+4. footer_html: A rich Tailwind footer with:
+   - 3-column grid: brand blurb | quick links | contact info
+   - Social media icon links (SVG icons for Twitter/X, LinkedIn, Instagram)
+   - Copyright line
+   - Style: bg-gray-900 text-gray-300 py-12
 
-Return JSON:
+Return JSON exactly:
 {
-  "style.css": "/* full CSS */",
+  "style.css": "/* minimal CSS */",
   "script.js": "// full JS",
-  "nav_html": "<nav>...</nav>",
-  "footer_html": "<footer>...</footer>"
+  "nav_html": "<nav class=\\"...\\">...</nav>",
+  "footer_html": "<footer class=\\"...\\">...</footer>"
 }`;
 
   try {
     const response = await anthropic.messages.create({
       model: "claude-opus-4-6",
-      max_tokens: 8000,
+      max_tokens: 6000,
       system: HTML_SYSTEM_PROMPT,
       messages: [{ role: "user", content: prompt }],
     });
@@ -255,45 +259,75 @@ async function generateSinglePage(
     .map((p) => `${p.slug === "index" ? "index.html" : `${p.slug}.html`} (${p.name})`)
     .join(", ");
 
-  const prompt = `Generate the "${page.name}" page (${filename}) for "${siteName}".
+  const prompt = `Generate the complete "${page.name}" page (${filename}) for "${siteName}".
 
 USER'S ORIGINAL REQUEST:
 ${userPrompt}
 
-THIS PAGE'S SPECIFIC CONTENT:
-${page.description || `Create the full ${page.name} page with complete, real content`}
+PAGE FOCUS:
+${page.description || `Create the full ${page.name} page with rich, professional content`}
 
-CRITICAL RULES:
-1. Output ONLY a complete <!DOCTYPE html> HTML file
-2. NO JSX, NO React components, NO <ComponentName /> tags
-3. Every section must have REAL text content -- no empty divs, no placeholder text
-4. Link stylesheet: <link rel="stylesheet" href="style.css">
-5. Link script (before </body>): <script src="script.js"></script>
-6. Other pages to link to: ${otherPageLinks}
+━━━ TECHNICAL REQUIREMENTS ━━━
+1. Output ONLY a complete <!DOCTYPE html> document — nothing else
+2. Include in <head>:
+   <script src="https://cdn.tailwindcss.com"></script>
+   <script>tailwind.config = { theme: { extend: {} } }</script>
+   <link rel="stylesheet" href="style.css">
+3. Link before </body>: <script src="script.js"></script>
+4. NO JSX, NO React, NO <ComponentName /> tags — pure HTML only
+5. Other pages: ${otherPageLinks}
 
-NAVIGATION TO INCLUDE (copy this exactly, mark current page as active):
-${navHtml || `<nav><a href="index.html">${siteName}</a> | ${allPages.map(p => `<a href="${p.slug === "index" ? "index.html" : `${p.slug}.html`}">${p.name}</a>`).join(" | ")}</nav>`}
+━━━ NAVIGATION (paste verbatim, mark ${page.name} link as active) ━━━
+${navHtml || `<nav class="bg-white shadow-sm sticky top-0 z-50 px-6 py-4 flex justify-between items-center"><span class="font-bold text-xl">${siteName}</span><div class="flex gap-6">${allPages.map(p => `<a href="${p.slug === "index" ? "index.html" : `${p.slug}.html`}" class="text-gray-600 hover:text-indigo-600">${p.name}</a>`).join("")}</div></nav>`}
 
-FOOTER TO INCLUDE (copy this exactly):
-${footerHtml || `<footer><p>&copy; 2024 ${siteName}. All rights reserved.</p></footer>`}
+━━━ FOOTER (paste verbatim) ━━━
+${footerHtml || `<footer class="bg-gray-900 text-gray-300 py-10 text-center"><p>&copy; 2024 ${siteName}</p></footer>`}
 
-PAGE-SPECIFIC REQUIREMENTS:
-This page (${page.name}) MUST include:
-- A proper hero/header section for this page (not generic -- specific to ${page.name})
-- At least 3 substantial content sections with real headings and body text
-- All interactive elements mentioned in the original prompt for this page
-- Real, believable content specific to ${siteName} -- no lorem ipsum
-- Mobile-responsive layout
+━━━ CONTENT REQUIREMENTS ━━━
+This page MUST contain ALL of the following:
 
-IMPORTANT: The body content should be substantial and complete.
-Minimum: 500+ characters of visible text content beyond navigation/footer.
+1. HERO SECTION — full-width, visually striking:
+   - bg-gradient-to-br from-indigo-600 to-purple-700 text-white (or theme-appropriate gradient)
+   - Large <h1> (text-4xl md:text-6xl font-extrabold)
+   - Compelling subheading (<p class="text-xl opacity-90">)
+   - 1-2 CTA buttons (bg-white text-indigo-600 or outlined)
+   - Hero image: <img src="https://picsum.photos/seed/${page.slug}-hero/1200/500" alt="..." class="w-full h-64 object-cover rounded-2xl mt-8">
 
-Output ONLY the HTML file. Start with <!DOCTYPE html>:`;
+2. MAIN CONTENT SECTIONS (minimum 3 distinct sections):
+   - Each with a heading, body text, and visual element (image, icon grid, or data table)
+   - Section images: <img src="https://picsum.photos/seed/${page.slug}-s{N}/800/400" alt="..." class="rounded-xl shadow-lg">
+   - Use Tailwind grid/flex layouts (grid grid-cols-1 md:grid-cols-3 gap-8)
+   - Cards: class="bg-white rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all p-6"
+
+3. SCROLL ANIMATIONS:
+   - Add class="reveal" to every major section div
+   - These animate in via script.js's IntersectionObserver
+
+4. REAL CONTENT ONLY:
+   - Invent specific, believable content for ${siteName}
+   - NO lorem ipsum, NO "placeholder", NO "coming soon"
+   - Real names, prices, descriptions relevant to the business
+
+5. MINIMUM CONTENT: 600+ words of visible body text (excluding nav/footer)
+
+${page.slug === "contact" ? `
+CONTACT FORM REQUIREMENTS:
+- <form id="contact-form" onsubmit="handleFormSubmit(event)" class="space-y-4 max-w-lg mx-auto">
+  - Fields: Full Name, Email, Subject (select/dropdown), Message (textarea)
+  - Submit: <button type="submit" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 transition">Send Message</button>
+- Hidden success state: <div id="form-success" class="hidden text-center py-12">
+  <div class="text-5xl mb-4">✓</div>
+  <h3 class="text-2xl font-bold text-green-600">Message Sent!</h3>
+  <p class="text-gray-500 mt-2">We'll get back to you within 24 hours.</p>
+</div>
+` : ""}
+
+Output ONLY the HTML file starting with <!DOCTYPE html>:`;
 
   try {
     const response = await anthropic.messages.create({
       model: "claude-opus-4-6",
-      max_tokens: 12000,
+      max_tokens: 16000,
       system: HTML_SYSTEM_PROMPT,
       messages: [{ role: "user", content: prompt }],
     });
@@ -376,14 +410,15 @@ function buildFallbackPage(
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${page.name} - ${siteName}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="bg-gray-50">
   ${navHtml}
   <main>
-    <section style="padding:80px 20px;text-align:center">
-      <h1>${page.name}</h1>
-      <p>This page is being generated. Please regenerate if this message persists.</p>
+    <section class="flex flex-col items-center justify-center min-h-[60vh] text-center px-6">
+      <h1 class="text-4xl font-extrabold text-gray-900 mb-4">${page.name}</h1>
+      <p class="text-gray-500 text-lg">This page could not be generated. Please click Regenerate.</p>
       ${error ? `<!-- Generation error: ${error} -->` : ""}
     </section>
   </main>
@@ -393,58 +428,59 @@ function buildFallbackPage(
 </html>`;
 }
 
-function defaultCss(siteName: string): string {
-  return `/* ${siteName} - Shared Stylesheet */
+function defaultCss(_siteName: string): string {
+  return `/* Shared Stylesheet — Tailwind CDN handles layout; this adds scroll-reveal + brand tokens */
 :root {
-  --primary: #6366f1;
-  --primary-dark: #4f46e5;
-  --bg: #ffffff;
-  --text: #1f2937;
-  --muted: #6b7280;
-  --border: #e5e7eb;
-  --radius: 8px;
+  --brand: #6366f1;
+  --brand-dark: #4f46e5;
 }
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,sans-serif;color:var(--text);background:var(--bg);line-height:1.6}
-nav{padding:16px 24px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)}
-nav ul{list-style:none;display:flex;gap:24px}
-nav a{text-decoration:none;color:var(--text);font-weight:500}
-nav a:hover,nav a.active{color:var(--primary)}
-main{min-height:80vh}
-.hero{padding:80px 24px;text-align:center;max-width:800px;margin:0 auto}
-.hero h1{font-size:clamp(2rem,5vw,3.5rem);font-weight:800;margin-bottom:16px}
-.hero p{font-size:1.2rem;color:var(--muted);margin-bottom:32px}
-.btn{display:inline-block;padding:12px 24px;background:var(--primary);color:#fff;border-radius:var(--radius);text-decoration:none;font-weight:600;border:none;cursor:pointer}
-.btn:hover{background:var(--primary-dark)}
-.section{padding:64px 24px;max-width:1200px;margin:0 auto}
-.grid{display:grid;gap:24px}
-.grid-3{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
-.card{padding:24px;border:1px solid var(--border);border-radius:var(--radius)}
-footer{padding:40px 24px;text-align:center;border-top:1px solid var(--border);color:var(--muted)}`;
+
+/* Scroll-reveal animation (triggered by script.js IntersectionObserver) */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Active nav link */
+nav a.active {
+  color: var(--brand);
+  font-weight: 700;
+}`;
 }
 
 function defaultJs(): string {
-  return `// Shared scripts
-document.addEventListener('DOMContentLoaded',()=>{
+  return `document.addEventListener('DOMContentLoaded', function() {
   // Active nav link
-  const links=document.querySelectorAll('nav a');
-  const path=location.pathname.split('/').pop()||'index.html';
-  links.forEach(a=>{if(a.getAttribute('href')===path)a.classList.add('active')});
+  var path = location.pathname.split('/').pop() || 'index.html';
+  document.querySelectorAll('nav a').forEach(function(a) {
+    if (a.getAttribute('href') === path) a.classList.add('active');
+  });
 
-  // Scroll animations
-  const observer=new IntersectionObserver((entries)=>{
-    entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible')});
-  },{threshold:0.1});
-  document.querySelectorAll('.animate').forEach(el=>observer.observe(el));
+  // Scroll-reveal
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.reveal').forEach(function(el) { observer.observe(el); });
 
-  // Form validation
-  window.validateForm=function(form){
-    let valid=true;
-    form.querySelectorAll('[required]').forEach(field=>{
-      if(!field.value.trim()){field.style.borderColor='red';valid=false;}
-      else field.style.borderColor='';
-    });
-    return valid;
-  };
-});`;
+  // Mobile nav toggle
+  var toggle = document.getElementById('nav-toggle');
+  var mobileMenu = document.getElementById('mobile-menu');
+  if (toggle && mobileMenu) {
+    toggle.addEventListener('click', function() { mobileMenu.classList.toggle('hidden'); });
+  }
+});
+
+// Contact form handler — called via onsubmit="handleFormSubmit(event)"
+function handleFormSubmit(e) {
+  e.preventDefault();
+  var form = e.target;
+  var success = document.getElementById('form-success');
+  if (form) form.style.display = 'none';
+  if (success) success.style.display = 'block';
+}`;
 }

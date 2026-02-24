@@ -39,40 +39,25 @@ export interface GenerationPlan {
   pages: { name: string; file: string }[];
 }
 
-const PLANNER_SYSTEM = `You are a senior software architect planning a web application build.
-Given a user's request, produce a structured build plan.
+const PLANNER_SYSTEM = `You are a senior frontend architect planning a multi-page HTML website build.
+The build pipeline generates HTML/CSS/vanilla-JavaScript static files — no React, no Next.js, no build step needed.
+Given a user's request, produce a structured build plan that reflects exactly what will be produced.
 Output ONLY valid JSON -- no markdown, no explanation.`;
 
 /**
  * Generate a build plan from the user's prompt.
  * Fast -- uses a small model (~1 second).
+ *
+ * Mode is always "html" because the generation pipeline produces static
+ * HTML/CSS/JS regardless of what the user requests. Showing "react" or
+ * "nextjs" plan steps misleads users into expecting a running full-stack app.
  */
 export async function createGenerationPlan(
   prompt: string,
   siteName: string
 ): Promise<GenerationPlan> {
-  const lower = prompt.toLowerCase();
-
-  // Detect mode
-  const isNextjs =
-    lower.includes("next") ||
-    lower.includes("full-stack") ||
-    lower.includes("fullstack") ||
-    lower.includes("database") ||
-    lower.includes("auth") ||
-    lower.includes("prisma") ||
-    lower.includes("supabase");
-
-  const isReact =
-    !isNextjs &&
-    (lower.includes("react") ||
-      lower.includes("spa") ||
-      lower.includes("dashboard") ||
-      lower.includes("app") ||
-      lower.includes("task manager") ||
-      lower.includes("todo"));
-
-  const mode = isNextjs ? "nextjs" : isReact ? "react" : "html";
+  // Always HTML — pipeline outputs static HTML/CSS/JS.
+  const mode = "html";
 
   try {
     const response = await anthropic.messages.create({
@@ -82,40 +67,49 @@ export async function createGenerationPlan(
       messages: [
         {
           role: "user",
-          content: `Create a build plan for this web project:
+          content: `Create a build plan for this HTML website project:
 Name: "${siteName}"
 Request: ${prompt}
-Mode: ${mode}
+
+The pipeline produces these files: style.css, script.js, and one .html file per page.
+Steps must reflect ONLY what will actually be generated (no React, no database, no API routes).
 
 Return JSON matching this exact shape:
 {
   "title": "string",
   "description": "string -- one sentence summary",
-  "mode": "${mode}",
+  "mode": "html",
   "estimatedFiles": number,
   "estimatedSeconds": number,
-  "pages": [{"name":"Home","file":"index.html"}],
+  "pages": [{"name":"Home","file":"index.html"},{"name":"About","file":"about.html"}],
   "steps": [
     {
       "id": "step-1",
-      "label": "Create database schema",
-      "detail": "Define tasks table with id, title, status, priority, createdAt",
-      "category": "schema",
-      "files": ["prisma/schema.prisma"],
+      "label": "Design system",
+      "detail": "Tailwind config, CSS variables, shared nav and footer components",
+      "category": "style",
+      "files": ["style.css", "script.js"],
+      "status": "pending"
+    },
+    {
+      "id": "step-2",
+      "label": "Build Home page",
+      "detail": "Hero section, feature highlights, testimonials, CTA",
+      "category": "page",
+      "files": ["index.html"],
       "status": "pending"
     }
   ]
 }
 
 Rules for steps:
-- 6-10 steps total
-- Each step produces 1-4 files
-- Steps must be in dependency order (shared CSS before pages, types before components)
-- Labels are short (5 words max), details explain what's being built
-- Categories: schema | config | types | component | hook | page | api | style | build
-- For HTML mode: steps like "Set up design system", "Build home page", "Build about page" etc.
-- For React mode: steps like "Configure Vite + TypeScript", "Define types", "Create hooks", "Build components", "Wire app together"
-- For Next.js mode: full-stack steps including database, auth, API routes, components, pages`,
+- ALWAYS start with one "Design system" step (produces style.css + script.js)
+- Then one step per HTML page to be generated
+- 4-8 steps total
+- Labels are short (4 words max), details describe the page sections
+- Categories: style | page | config | build
+- NEVER include steps for: database, schema, auth, API routes, TypeScript, React, Next.js
+- Each page step files array contains only the .html filename`,
         },
       ],
     });
