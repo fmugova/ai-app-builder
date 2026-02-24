@@ -70,7 +70,7 @@ async function verifyProjectToken(
 
 // Wrapper so every response from this public endpoint carries CORS headers
 function corsJson(data: unknown, init?: ResponseInit): NextResponse {
-  return corsJson(data, {
+  return NextResponse.json(data, {
     ...init,
     headers: { ...CORS_HEADERS, ...(init?.headers ?? {}) },
   })

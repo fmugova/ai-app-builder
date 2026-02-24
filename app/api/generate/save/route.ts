@@ -109,9 +109,20 @@ export async function POST(req: NextRequest) {
 
     // Replace the BUILDFLOW_PROJECT_ID placeholder injected during generation
     // with the real project id so contact forms POST to the correct endpoint.
+    // Also rewrite relative /api/ paths to absolute URLs so forms work when
+    // the site is published to Netlify or downloaded and opened locally.
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://buildflow-ai.app').replace(/\/$/, '')
     const injectedFiles: Record<string, string> = {};
     for (const [path, content] of Object.entries(files)) {
-      injectedFiles[path] = content.replaceAll("BUILDFLOW_PROJECT_ID", project.id);
+      let injected = content.replaceAll("BUILDFLOW_PROJECT_ID", project.id);
+      // For HTML and JS files, upgrade relative BuildFlow API paths to absolute
+      // so they resolve correctly on any host (Netlify, local file://, etc.)
+      if (path.endsWith('.html') || path.endsWith('.js')) {
+        injected = injected
+          .replaceAll(`/api/projects/${project.id}/`, `${appUrl}/api/projects/${project.id}/`)
+          .replaceAll(`/api/public/auth/${project.id}`, `${appUrl}/api/public/auth/${project.id}`)
+      }
+      injectedFiles[path] = injected;
     }
 
     // Save all individual files to ProjectFile table

@@ -940,6 +940,7 @@ model Project {
   framework           String?
   isPublished         Boolean               @default(false)
   publishedAt         DateTime?
+  publishedSiteId     String?
   publicSlug          String?               @unique
   publicUrl           String?
   multiPage           Boolean               @default(false)

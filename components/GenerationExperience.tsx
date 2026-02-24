@@ -7,7 +7,8 @@ import React, { useMemo } from "react";
 import type { PlanStep, StepStatus } from "@/lib/api/planGeneration";
 import { MultiPagePreview } from "@/components/MultiPagePreview";
 import { useGenerationStream } from "@/lib/useGenerationStream";
-import { DownloadButton } from "@/components/DownloadButton";
+import { PostGenerationSummary } from "@/components/PostGenerationSummary";
+import { downloadProjectZip } from "@/lib/downloadProjectZip";
 
 // --- Types ---
 
@@ -64,6 +65,7 @@ export function GenerationExperience({
   // so contact forms POST to the correct endpoint. Store those injected files here
   // and use them in place of the raw stream files for preview + download.
   const [savedFiles, setSavedFiles] = React.useState<Record<string, string> | null>(null);
+  const [savedProjectId, setSavedProjectId] = React.useState<string | null>(null);
 
   const { state, start, stop } = useGenerationStream({
     prompt,
@@ -80,6 +82,7 @@ export function GenerationExperience({
         if (res.ok) {
           const json = await res.json();
           projectId = json.projectId;
+          setSavedProjectId(json.projectId ?? null);
           // Use the injected files (real projectId in form actions) for preview + download
           if (json.files) setSavedFiles(json.files);
         }
@@ -227,8 +230,19 @@ export function GenerationExperience({
               />
             ))}
 
-            {/* Summary when done */}
-            {isDone && (
+            {/* Post-generation summary — download, publish live, dashboard links */}
+            {isDone && savedProjectId && (
+              <PostGenerationSummary
+                projectId={savedProjectId}
+                projectName={siteName}
+                files={displayFiles}
+                qualityScore={state.qualityScore ?? 0}
+                mode="html"
+                onDownload={() => downloadProjectZip(displayFiles, siteName)}
+              />
+            )}
+            {/* Fallback compact summary when project hasn't saved yet */}
+            {isDone && !savedProjectId && (
               <div
                 style={{
                   margin: "12px 16px",
@@ -313,14 +327,6 @@ export function GenerationExperience({
             >
               Open in Editor →
             </button>
-          )}
-          {isDone && (
-            <DownloadButton
-              files={displayFiles}
-              projectName={siteName}
-              ff={ff}
-              style={{ flex: 1 }}
-            />
           )}
           {isDone && (
             <button

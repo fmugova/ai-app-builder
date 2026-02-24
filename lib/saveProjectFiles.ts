@@ -68,3 +68,22 @@ export async function saveProjectFiles(
 
   return entries.length;
 }
+
+/**
+ * Loads all files for a project from the ProjectFile table.
+ * Returns a flat map of { "index.html": "...", "style.css": "..." }
+ * Private files (path starts with "_") are excluded.
+ */
+export async function loadProjectFiles(
+  projectId: string
+): Promise<Record<string, string>> {
+  const rows = await prisma.projectFile.findMany({
+    where: { projectId },
+    select: { path: true, content: true },
+    orderBy: { order: 'asc' },
+  });
+
+  return Object.fromEntries(
+    rows.filter((r) => !r.path.startsWith('_')).map((r) => [r.path, r.content])
+  );
+}
