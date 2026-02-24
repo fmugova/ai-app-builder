@@ -189,19 +189,19 @@ export function useGenerationStream({
         if (isStoppedRef.current) return;
         es.close();
 
+        // Read phase from state snapshot via a ref so we don't schedule
+        // side-effects (setTimeout) inside a setState updater, which can
+        // fire multiple times in React StrictMode.
+        const attempt = reconnectCountRef.current;
+
         setState((prev) => {
           if (prev.phase === "done" || prev.phase === "error") return prev;
 
-          const attempt = reconnectCountRef.current;
-          if (attempt < MAX_RECONNECT_ATTEMPTS && tokenRef.current) {
-            const delay = RECONNECT_DELAY_MS[attempt] ?? 8000;
-            reconnectCountRef.current += 1;
-
-            reconnectTimerRef.current = setTimeout(() => {
-              setState((p) => ({ ...p, error: null, reconnectCount: reconnectCountRef.current }));
-              connect(true);
-            }, delay);
-
+          if (attempt < MAX_RECONNECT_ATTEMPTS) {
+            // Reconnect regardless of whether the token event was received.
+            // The server ignores the token anyway (no KV store) — every
+            // reconnect restarts generation cleanly. Without this, any drop
+            // before the very first SSE frame arrives kills all retries.
             return {
               ...prev,
               error: `Connection interrupted — reconnecting (${attempt + 1}/${MAX_RECONNECT_ATTEMPTS})…`,
@@ -211,12 +211,20 @@ export function useGenerationStream({
           return {
             ...prev,
             phase: "error",
-            error:
-              attempt >= MAX_RECONNECT_ATTEMPTS
-                ? `Generation interrupted after ${attempt} retries. Your files so far are preserved — you can retry.`
-                : "Connection lost — please retry",
+            error: `Generation interrupted after ${attempt} retries. Your files so far are preserved — you can retry.`,
           };
         });
+
+        // Schedule reconnect outside setState to avoid double-fire in StrictMode
+        if (attempt < MAX_RECONNECT_ATTEMPTS) {
+          const delay = RECONNECT_DELAY_MS[attempt] ?? 8000;
+          reconnectCountRef.current += 1;
+          reconnectTimerRef.current = setTimeout(() => {
+            if (isStoppedRef.current) return;
+            setState((p) => ({ ...p, error: null, reconnectCount: reconnectCountRef.current }));
+            connect(true);
+          }, delay);
+        }
       };
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps

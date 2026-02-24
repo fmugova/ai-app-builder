@@ -1485,7 +1485,7 @@ Please regenerate the complete, fixed code.`;
           <div className="flex flex-col gap-4 sm:gap-6">
             {/* Prompt Input */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-1">
                 <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Describe Your App</h2>
                 <button
                   onClick={() => setShowPromptGuide(!showPromptGuide)}
@@ -1495,6 +1495,9 @@ Please regenerate the complete, fixed code.`;
                   <span className="hidden sm:inline">Guide</span>
                 </button>
               </div>
+              <p className="text-xs text-gray-500 mb-4">
+                Preview shows your app&apos;s design instantly. Download gives you production-ready code — add your database URL and deploy.
+              </p>
 
               {/* Quick Start Templates */}
               <div className="mb-4">
