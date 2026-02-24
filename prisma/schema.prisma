@@ -986,6 +986,7 @@ model Project {
   ProjectVersion      ProjectVersion[]
   WorkspaceProject    WorkspaceProject[]
   Preview             Preview[]
+  ProjectUser         ProjectUser[]
 
   @@index([isPublic])
   @@index([isPublished])
@@ -1011,6 +1012,21 @@ model ProjectFile {
 
   @@unique([projectId, path])
   @@index([language])
+  @@index([projectId])
+  @@schema("public")
+}
+
+model ProjectUser {
+  id           String    @id @default(cuid())
+  projectId    String
+  email        String
+  passwordHash String
+  name         String?
+  createdAt    DateTime  @default(now())
+  lastLoginAt  DateTime?
+  Project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, email])
   @@index([projectId])
   @@schema("public")
 }

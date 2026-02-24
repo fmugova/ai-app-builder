@@ -166,6 +166,8 @@ async function generateSharedAssets(
     return `<li><a href="${filename}">${p.name}</a></li>`;
   }).join("\n          ");
 
+  const hasAuthPages = pages.some((p) => ["login", "signup", "dashboard", "member", "account", "profile", "settings"].includes(p.slug));
+
   const prompt = `Generate the shared design system and navigation for a website called "${siteName}".
 
 User's design requirements:
@@ -185,19 +187,42 @@ Generate FOUR items:
    - Any bespoke animations (e.g. hero gradient shift, loading shimmer)
    - NO layout classes — Tailwind handles all layout
 
-2. script.js -- Complete vanilla JavaScript:
-   - Mobile hamburger nav toggle (toggles 'hidden' class on mobile menu)
-   - Active nav link highlighting (match href to current filename)
-   - Scroll reveal: IntersectionObserver adding 'visible' to .reveal elements
-   - Form handler: handleFormSubmit(e) — e.preventDefault(), hides form, shows #form-success
-   - Smooth scroll for anchor links
+2. script.js -- Complete vanilla JavaScript including ALL of these sections:
+   a) DOMContentLoaded init:
+      - Mobile hamburger nav toggle (toggles 'hidden' class on mobile menu)
+      - Active nav link highlighting (match href to current filename)
+      - Scroll reveal: IntersectionObserver adding 'visible' to .reveal elements
+      - Smooth scroll for anchor links
+      ${hasAuthPages ? `- Call updateNavForAuth() on load to show correct nav state` : ""}
+   b) Contact form handler: handleFormSubmit(e) — e.preventDefault(), hides form, shows #form-success
+   ${hasAuthPages ? `c) AUTH HELPERS (required — these power login/signup/logout):
+      function getAuthUser() { try { return JSON.parse(localStorage.getItem('auth_user')||'null'); } catch { return null; } }
+      function getAuthToken() { return localStorage.getItem('auth_token'); }
+      function requireAuth(redirect) { if (!getAuthToken()) { window.location.href = redirect || 'login.html'; return false; } return true; }
+      function logout() { localStorage.removeItem('auth_token'); localStorage.removeItem('auth_user'); window.location.href = 'index.html'; }
+      function updateNavForAuth() {
+        var user = getAuthUser();
+        document.querySelectorAll('[data-auth="guest"]').forEach(function(el){ el.style.display = user ? 'none' : ''; });
+        document.querySelectorAll('[data-auth="user"]').forEach(function(el){ el.style.display = user ? '' : 'none'; });
+        var nameEl = document.getElementById('nav-user-name');
+        if (nameEl && user) nameEl.textContent = user.name || user.email;
+      }` : ""}
 
 3. nav_html: A responsive Tailwind nav with:
    - Logo/site name on left (font-bold text-xl)
-   - Desktop links: hidden sm:flex gap-8
+   - Desktop links: hidden sm:flex gap-8 items-center
    - Mobile hamburger button (sm:hidden) that toggles a mobile menu
    - Current page link gets visual active state
-   - Include ALL these links: ${navLinks}
+   - Include ALL these page links: ${navLinks}
+   ${hasAuthPages ? `- Add AFTER the page links (desktop) — the auth state section:
+     <!-- Guest links (hidden when logged in) -->
+     <a href="login.html" data-auth="guest" class="text-gray-600 hover:text-indigo-600 text-sm font-medium">Login</a>
+     <a href="signup.html" data-auth="guest" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">Sign Up</a>
+     <!-- User menu (hidden when logged out, display:none by default) -->
+     <div data-auth="user" style="display:none" class="flex items-center gap-3">
+       <span class="text-sm text-gray-700">Hi, <span id="nav-user-name"></span></span>
+       <button onclick="logout()" class="text-sm text-gray-500 hover:text-red-600 font-medium">Logout</button>
+     </div>` : ""}
    - Style: bg-white shadow-sm sticky top-0 z-50
 
 4. footer_html: A rich Tailwind footer with:
@@ -259,6 +284,10 @@ async function generateSinglePage(
     .map((p) => `${p.slug === "index" ? "index.html" : `${p.slug}.html`} (${p.name})`)
     .join(", ");
 
+  // Pages that must redirect to login if user is not authenticated
+  const PROTECTED_SLUGS = new Set(["dashboard", "member", "account", "profile", "settings", "admin"]);
+  const isProtected = PROTECTED_SLUGS.has(page.slug.toLowerCase());
+
   const prompt = `Generate the complete "${page.name}" page (${filename}) for "${siteName}".
 
 USER'S ORIGINAL REQUEST:
@@ -276,6 +305,10 @@ ${page.description || `Create the full ${page.name} page with rich, professional
 3. Link before </body>: <script src="script.js"></script>
 4. NO JSX, NO React, NO <ComponentName /> tags — pure HTML only
 5. Other pages: ${otherPageLinks}
+${isProtected ? `6. AUTH GUARD REQUIRED — This is a protected page. Add this EXACT inline script as the FIRST script in <head> (before Tailwind):
+   <script>if(!localStorage.getItem('auth_token')){window.location.replace('login.html');}</script>
+   Also: show the logged-in user's name in the page heading using:
+   <script>document.addEventListener('DOMContentLoaded',function(){try{var u=JSON.parse(localStorage.getItem('auth_user')||'null');if(u&&document.getElementById('user-name'))document.getElementById('user-name').textContent=u.name||u.email;}catch(e){}});</script>` : ""}
 
 ━━━ NAVIGATION (paste verbatim, mark ${page.name} link as active) ━━━
 ${navHtml || `<nav class="bg-white shadow-sm sticky top-0 z-50 px-6 py-4 flex justify-between items-center"><span class="font-bold text-xl">${siteName}</span><div class="flex gap-6">${allPages.map(p => `<a href="${p.slug === "index" ? "index.html" : `${p.slug}.html`}" class="text-gray-600 hover:text-indigo-600">${p.name}</a>`).join("")}</div></nav>`}
@@ -311,15 +344,189 @@ This page MUST contain ALL of the following:
 5. MINIMUM CONTENT: 600+ words of visible body text (excluding nav/footer)
 
 ${page.slug === "contact" ? `
-CONTACT FORM REQUIREMENTS:
-- <form id="contact-form" onsubmit="handleFormSubmit(event)" class="space-y-4 max-w-lg mx-auto">
-  - Fields: Full Name, Email, Subject (select/dropdown), Message (textarea)
-  - Submit: <button type="submit" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 transition">Send Message</button>
-- Hidden success state: <div id="form-success" class="hidden text-center py-12">
-  <div class="text-5xl mb-4">✓</div>
-  <h3 class="text-2xl font-bold text-green-600">Message Sent!</h3>
-  <p class="text-gray-500 mt-2">We'll get back to you within 24 hours.</p>
-</div>
+CONTACT FORM REQUIREMENTS (this form submits to a REAL backend):
+- Use this EXACT form tag — do not change the action URL or onsubmit:
+  <form id="contact-form" action="/api/projects/BUILDFLOW_PROJECT_ID/submissions" onsubmit="handleFormSubmit(event)" class="space-y-6 max-w-lg mx-auto">
+    <input type="hidden" name="formType" value="contact">
+    <!-- Full Name -->
+    <div><label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+    <input type="text" name="name" required class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"></div>
+    <!-- Email -->
+    <div><label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+    <input type="email" name="email" required class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"></div>
+    <!-- Subject -->
+    <div><label class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+    <select name="subject" class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none">
+      <option>General Enquiry</option><option>Support</option><option>Partnership</option><option>Other</option>
+    </select></div>
+    <!-- Message -->
+    <div><label class="block text-sm font-medium text-gray-700 mb-1">Message</label>
+    <textarea name="message" required rows="5" class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none resize-none"></textarea></div>
+    <button type="submit" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition">Send Message</button>
+  </form>
+- Immediately after the </form>, add the hidden success state:
+  <div id="form-success" style="display:none" class="text-center py-16">
+    <div class="text-6xl mb-4">✅</div>
+    <h3 class="text-2xl font-bold text-green-600 mb-2">Message Sent!</h3>
+    <p class="text-gray-500">We'll get back to you within 24 hours.</p>
+  </div>
+` : ""}
+
+${page.slug === "login" ? `
+LOGIN FORM REQUIREMENTS (this form authenticates against a REAL backend):
+This is a REAL login page — users can actually create accounts and log in.
+The auth endpoint is /api/public/auth/BUILDFLOW_PROJECT_ID
+
+REQUIRED HTML STRUCTURE:
+  <div class="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+      <!-- Brand/Logo -->
+      <div class="text-center mb-8">
+        <h1 class="text-3xl font-extrabold text-gray-900">${siteName}</h1>
+        <p class="text-gray-500 mt-2">Sign in to your account</p>
+      </div>
+      <!-- Error message (hidden by default) -->
+      <div id="auth-error" style="display:none" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4 text-sm"></div>
+      <!-- Login form -->
+      <form id="login-form" class="space-y-5" onsubmit="onLoginSubmit(event)">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+          <input type="email" id="login-email" required placeholder="you@example.com"
+            class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+          <input type="password" id="login-password" required placeholder="••••••••"
+            class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm">
+        </div>
+        <button type="submit" id="submit-btn"
+          class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition text-sm">
+          Sign In
+        </button>
+      </form>
+      <p class="text-center text-sm text-gray-500 mt-6">
+        Don't have an account?
+        <a href="signup.html" class="text-indigo-600 hover:underline font-medium">Create one</a>
+      </p>
+    </div>
+  </div>
+
+REQUIRED INLINE SCRIPT (place just before </body>):
+  <script>
+    async function handleAuth(action, email, password, name) {
+      var btn = document.getElementById('submit-btn');
+      var errEl = document.getElementById('auth-error');
+      errEl.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Please wait...';
+      try {
+        var res = await fetch('/api/public/auth/BUILDFLOW_PROJECT_ID', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ action: action, email: email, password: password, name: name })
+        });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Authentication failed');
+        localStorage.setItem('auth_token', data.token);
+        localStorage.setItem('auth_user', JSON.stringify(data.user));
+        window.location.href = 'index.html';
+      } catch(e) {
+        errEl.textContent = e.message;
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = action === 'register' ? 'Create Account' : 'Sign In';
+      }
+    }
+    function onLoginSubmit(e) {
+      e.preventDefault();
+      handleAuth('login', document.getElementById('login-email').value, document.getElementById('login-password').value, null);
+    }
+  </script>
+
+DO NOT include nav or hero section on this page — it's a full-page auth screen.
+` : ""}
+
+${page.slug === "signup" ? `
+SIGNUP FORM REQUIREMENTS (this form creates a REAL account in the backend):
+This is a REAL signup page — users can actually register and log in.
+The auth endpoint is /api/public/auth/BUILDFLOW_PROJECT_ID
+
+REQUIRED HTML STRUCTURE:
+  <div class="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+      <!-- Brand/Logo -->
+      <div class="text-center mb-8">
+        <h1 class="text-3xl font-extrabold text-gray-900">${siteName}</h1>
+        <p class="text-gray-500 mt-2">Create your account</p>
+      </div>
+      <!-- Error message (hidden by default) -->
+      <div id="auth-error" style="display:none" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4 text-sm"></div>
+      <!-- Signup form -->
+      <form id="signup-form" class="space-y-5" onsubmit="onSignupSubmit(event)">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+          <input type="text" id="signup-name" required placeholder="Jane Smith"
+            class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+          <input type="email" id="signup-email" required placeholder="you@example.com"
+            class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+          <input type="password" id="signup-password" required placeholder="Min. 8 characters"
+            class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm">
+        </div>
+        <div class="flex items-start gap-3">
+          <input type="checkbox" id="terms" required class="mt-1 accent-indigo-600">
+          <label for="terms" class="text-sm text-gray-600">I agree to the <a href="#" class="text-indigo-600 hover:underline">Terms of Service</a> and <a href="#" class="text-indigo-600 hover:underline">Privacy Policy</a></label>
+        </div>
+        <button type="submit" id="submit-btn"
+          class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition text-sm">
+          Create Account
+        </button>
+      </form>
+      <p class="text-center text-sm text-gray-500 mt-6">
+        Already have an account?
+        <a href="login.html" class="text-indigo-600 hover:underline font-medium">Sign in</a>
+      </p>
+    </div>
+  </div>
+
+REQUIRED INLINE SCRIPT (place just before </body>):
+  <script>
+    async function handleAuth(action, email, password, name) {
+      var btn = document.getElementById('submit-btn');
+      var errEl = document.getElementById('auth-error');
+      errEl.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Please wait...';
+      try {
+        var res = await fetch('/api/public/auth/BUILDFLOW_PROJECT_ID', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ action: action, email: email, password: password, name: name })
+        });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Authentication failed');
+        localStorage.setItem('auth_token', data.token);
+        localStorage.setItem('auth_user', JSON.stringify(data.user));
+        window.location.href = 'index.html';
+      } catch(e) {
+        errEl.textContent = e.message;
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = action === 'register' ? 'Create Account' : 'Sign In';
+      }
+    }
+    function onSignupSubmit(e) {
+      e.preventDefault();
+      handleAuth('register', document.getElementById('signup-email').value, document.getElementById('signup-password').value, document.getElementById('signup-name').value);
+    }
+  </script>
+
+DO NOT include nav or hero section on this page — it's a full-page auth screen.
 ` : ""}
 
 Output ONLY the HTML file starting with <!DOCTYPE html>:`;
@@ -454,7 +661,23 @@ nav a.active {
 }
 
 function defaultJs(): string {
-  return `document.addEventListener('DOMContentLoaded', function() {
+  return `// ── Auth helpers ──────────────────────────────────────────────────────────
+function getAuthUser() { try { return JSON.parse(localStorage.getItem('auth_user')||'null'); } catch { return null; } }
+function getAuthToken() { return localStorage.getItem('auth_token'); }
+function requireAuth(redirect) { if (!getAuthToken()) { window.location.href = redirect || 'login.html'; return false; } return true; }
+function logout() { localStorage.removeItem('auth_token'); localStorage.removeItem('auth_user'); window.location.href = 'index.html'; }
+function updateNavForAuth() {
+  var user = getAuthUser();
+  document.querySelectorAll('[data-auth="guest"]').forEach(function(el){ el.style.display = user ? 'none' : ''; });
+  document.querySelectorAll('[data-auth="user"]').forEach(function(el){ el.style.display = user ? '' : 'none'; });
+  var nameEl = document.getElementById('nav-user-name');
+  if (nameEl && user) nameEl.textContent = user.name || user.email;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  // Auth nav state
+  updateNavForAuth();
+
   // Active nav link
   var path = location.pathname.split('/').pop() || 'index.html';
   document.querySelectorAll('nav a').forEach(function(a) {
@@ -475,12 +698,20 @@ function defaultJs(): string {
   }
 });
 
-// Contact form handler — called via onsubmit="handleFormSubmit(event)"
+// Contact form handler — POSTs to BuildFlow backend, then shows success state
 function handleFormSubmit(e) {
   e.preventDefault();
   var form = e.target;
-  var success = document.getElementById('form-success');
-  if (form) form.style.display = 'none';
-  if (success) success.style.display = 'block';
+  var data = { formType: 'contact' };
+  new FormData(form).forEach(function(v, k) { data[k] = v; });
+  fetch(form.action, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).finally(function() {
+    form.style.display = 'none';
+    var s = document.getElementById('form-success');
+    if (s) s.style.display = 'block';
+  });
 }`;
 }

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { sendEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,10 +25,10 @@ export async function POST(
     const { id: projectId } = await context.params
     const body = await request.json()
 
-    // Validate project exists
+    // Validate project exists and fetch owner email for notification
     const project = await prisma.project.findUnique({
       where: { id: projectId },
-      select: { id: true, userId: true }
+      select: { id: true, userId: true, name: true, User: { select: { email: true } } }
     })
 
     if (!project) {
@@ -61,6 +62,35 @@ export async function POST(
         }
       }
     })
+
+    // Email the project owner — fire-and-forget, never block the response
+    const ownerEmail = project.User?.email
+    if (ownerEmail) {
+      const fields = Object.entries(body as Record<string, string>)
+        .filter(([k]) => k !== 'formType')
+        .map(([k, v]) => `<tr><td style="padding:6px 12px;font-weight:600;color:#374151;white-space:nowrap">${k}</td><td style="padding:6px 12px;color:#6b7280">${v}</td></tr>`)
+        .join('')
+
+      sendEmail({
+        to: ownerEmail,
+        subject: `New form submission on ${project.name}`,
+        replyTo: (body as Record<string, string>).email || ownerEmail,
+        html: `
+          <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto">
+            <h2 style="color:#111827;margin-bottom:4px">New form submission</h2>
+            <p style="color:#6b7280;margin-top:0">From your site: <strong>${project.name}</strong></p>
+            <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin:16px 0">
+              ${fields}
+            </table>
+            <p style="font-size:12px;color:#9ca3af">
+              View all submissions at
+              <a href="https://buildflow-ai.app/dashboard/projects/${project.id}/submissions" style="color:#6366f1">
+                buildflow-ai.app
+              </a>
+            </p>
+          </div>`,
+      }).catch(() => { /* non-fatal */ })
+    }
 
     return NextResponse.json({
       success: true,

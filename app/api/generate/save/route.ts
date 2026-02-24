@@ -107,11 +107,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Save all individual files to ProjectFile table (enables per-file retrieval,
-    // WebContainer fast preview, and proper ZIP download reconstruction)
-    await saveProjectFiles(project.id, files);
+    // Replace the BUILDFLOW_PROJECT_ID placeholder injected during generation
+    // with the real project id so contact forms POST to the correct endpoint.
+    const injectedFiles: Record<string, string> = {};
+    for (const [path, content] of Object.entries(files)) {
+      injectedFiles[path] = content.replaceAll("BUILDFLOW_PROJECT_ID", project.id);
+    }
 
-    return NextResponse.json({ projectId: project.id });
+    // Save all individual files to ProjectFile table
+    await saveProjectFiles(project.id, injectedFiles);
+
+    // Return both projectId and injected files so the client can update
+    // its in-memory state (preview + download will use the real endpoint).
+    return NextResponse.json({ projectId: project.id, files: injectedFiles });
   } catch (err) {
     console.error("[generate/save] DB save failed:", err);
     return NextResponse.json({ error: "Database error" }, { status: 500 });

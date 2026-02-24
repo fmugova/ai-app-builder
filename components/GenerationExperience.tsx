@@ -60,12 +60,15 @@ export function GenerationExperience({
   onOpenInBuilder,
   generationApiUrl,
 }: Props) {
+  // After save, the server replaces BUILDFLOW_PROJECT_ID with the real project id
+  // so contact forms POST to the correct endpoint. Store those injected files here
+  // and use them in place of the raw stream files for preview + download.
+  const [savedFiles, setSavedFiles] = React.useState<Record<string, string> | null>(null);
+
   const { state, start, stop } = useGenerationStream({
     prompt,
     siteName,
     apiUrl: generationApiUrl,
-    // After SSE completes, save to DB via a separate Node.js route (Prisma can't
-    // run in the Edge stream route). projectId comes back from the save call.
     onComplete: async (files, score) => {
       let projectId: string | undefined;
       try {
@@ -77,6 +80,8 @@ export function GenerationExperience({
         if (res.ok) {
           const json = await res.json();
           projectId = json.projectId;
+          // Use the injected files (real projectId in form actions) for preview + download
+          if (json.files) setSavedFiles(json.files);
         }
       } catch {
         // Non-fatal — project still usable, just not saved to DB
@@ -84,6 +89,9 @@ export function GenerationExperience({
       onComplete?.(files, score, projectId);
     },
   });
+
+  // Prefer saved (projectId-injected) files; fall back to raw stream files
+  const displayFiles = savedFiles ?? state.files;
 
   const [selectedFile, setSelectedFile] = React.useState<string | null>(null);
   const [expandedDirs, setExpandedDirs] = React.useState<Set<string>>(
@@ -98,8 +106,8 @@ export function GenerationExperience({
   }, []);
 
   // Derived
-  const fileTree = useMemo(() => buildFileTree(state.files), [state.files]);
-  const fileCount = Object.keys(state.files).length;
+  const fileTree = useMemo(() => buildFileTree(displayFiles), [displayFiles]);
+  const fileCount = Object.keys(displayFiles).length;
   const elapsed = formatElapsed(state.elapsedMs);
 
   function getStepStatus(step: PlanStep): StepStatus {
@@ -308,7 +316,7 @@ export function GenerationExperience({
           )}
           {isDone && (
             <DownloadButton
-              files={state.files}
+              files={displayFiles}
               projectName={siteName}
               ff={ff}
               style={{ flex: 1 }}
@@ -394,7 +402,7 @@ export function GenerationExperience({
             setSelectedFile,
             expandedDirs,
             setExpandedDirs,
-            state.files
+            displayFiles
           )}
           {fileCount === 0 && (
             <div
@@ -455,12 +463,12 @@ export function GenerationExperience({
           <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
             {activeTab === "preview" ? (
               <MultiPagePreview
-                files={state.files}
+                files={displayFiles}
                 phase={state.phase}
               />
             ) : (
               <CodePanel
-                content={selectedFile ? (state.files[selectedFile] ?? "") : ""}
+                content={selectedFile ? (displayFiles[selectedFile] ?? "") : ""}
                 filename={selectedFile ?? ""}
               />
             )}

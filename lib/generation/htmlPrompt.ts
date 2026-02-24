@@ -52,17 +52,61 @@ export const HTML_SYSTEM_PROMPT = `You are an expert frontend developer generati
 - Contact forms: name, email, subject, message fields + submit button
 - Footers: real links, copyright, social media icons
 
-### Working form submissions (no backend needed)
+### Working form submissions (posts to real BuildFlow backend)
 For ALL contact/inquiry forms:
-- Show a success message on submit instead of navigating away:
-  <form id="contact-form" onsubmit="handleFormSubmit(event)">...</form>
-  Then in script.js:
+- Use this exact form tag (the action URL stores submissions in the database):
+  <form id="contact-form" action="/api/projects/BUILDFLOW_PROJECT_ID/submissions" onsubmit="handleFormSubmit(event)">
+    <input type="hidden" name="formType" value="contact">
+    ... fields ...
+  </form>
+- The handleFormSubmit function in script.js POSTs via fetch to form.action then shows success:
   function handleFormSubmit(e) {
     e.preventDefault();
-    document.getElementById('contact-form').style.display='none';
-    document.getElementById('form-success').style.display='block';
+    var form = e.target;
+    var data = { formType: 'contact' };
+    new FormData(form).forEach(function(v,k){ data[k]=v; });
+    fetch(form.action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+      .finally(function(){
+        form.style.display='none';
+        var s=document.getElementById('form-success');
+        if(s) s.style.display='block';
+      });
   }
-- Include a hidden success div: <div id="form-success" style="display:none">✓ Message sent!</div>
+- Include a hidden success div after the form: <div id="form-success" style="display:none">✓ Message sent!</div>
+- NEVER use mailto: links or action="" — always use the fetch pattern above
+
+### Real user authentication (for login.html and signup.html pages)
+When the site has login or signup pages, they MUST use the real BuildFlow auth endpoint:
+- Auth API base: /api/public/auth/BUILDFLOW_PROJECT_ID
+- Signup: POST { action: 'register', email, password, name } → returns { token, user }
+- Login: POST { action: 'login', email, password } → returns { token, user }
+- Store the returned token in localStorage: localStorage.setItem('auth_token', data.token)
+- Store user info: localStorage.setItem('auth_user', JSON.stringify(data.user))
+- On success redirect to the main page (index.html) or dashboard (dashboard.html)
+- To check auth on protected pages: read localStorage.getItem('auth_token'), redirect to login.html if missing
+- Logout: localStorage.removeItem('auth_token'); localStorage.removeItem('auth_user'); redirect to login.html
+
+Auth form JavaScript pattern (use this EXACTLY in the signup/login page inline scripts):
+  async function handleAuth(action, email, password, name) {
+    var btn = document.getElementById('submit-btn');
+    var errEl = document.getElementById('auth-error');
+    btn.disabled = true; btn.textContent = 'Please wait...';
+    try {
+      var res = await fetch('/api/public/auth/BUILDFLOW_PROJECT_ID', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ action: action, email: email, password: password, name: name })
+      });
+      var data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Authentication failed');
+      localStorage.setItem('auth_token', data.token);
+      localStorage.setItem('auth_user', JSON.stringify(data.user));
+      window.location.href = 'index.html';
+    } catch(e) {
+      errEl.textContent = e.message; errEl.style.display = 'block';
+      btn.disabled = false; btn.textContent = action === 'register' ? 'Create Account' : 'Sign In';
+    }
+  }
 
 ### JavaScript
 - Vanilla JS only — addEventListener, querySelector, fetch for APIs
@@ -201,26 +245,34 @@ function buildPageContentSpec(page: DetectedPage, siteName: string): string {
   - Next/Back navigation buttons`,
 
     dashboard: `DASHBOARD PAGE (dashboard.html) -- must include:
+  - AUTH GUARD: First script in <head> must be: <script>if(!localStorage.getItem('auth_token')){window.location.replace('login.html');}</script>
+  - Welcome heading with the logged-in user's name (use <span id="user-name">there</span>)
   - Sidebar navigation with all main sections
-  - Stats cards (4 metrics with numbers and labels)
-  - Chart placeholder or data table
-  - Recent activity list
+  - Stats cards (4 metrics with real numbers and labels relevant to the app)
+  - Chart placeholder or data table with real-looking data
+  - Recent activity feed (5+ items)
   - Quick action buttons`,
 
     login: `LOGIN PAGE (login.html) -- must include:
-  - Centered login card
-  - Email + password fields
-  - "Remember me" checkbox
-  - "Forgot password" link
-  - Submit button
-  - Link to signup page`,
+  - Centered login card with brand logo/name at top
+  - Email + password fields with proper labels and placeholders
+  - Submit button (id="submit-btn") — disables while loading
+  - Error message div (id="auth-error", display:none initially)
+  - Link to signup.html for new users
+  - Uses the EXACT handleAuth JavaScript pattern from the auth section above
+  - On form submit: call handleAuth('login', email, password, null)
+  - IMPORTANT: the fetch URL must be /api/public/auth/BUILDFLOW_PROJECT_ID (not a relative path)`,
 
     signup: `SIGNUP PAGE (signup.html) -- must include:
-  - Centered signup card
-  - Name, email, password, confirm password fields
-  - Terms checkbox
-  - Submit button
-  - Link to login page`,
+  - Centered signup card with brand logo/name at top
+  - Name, email, password fields with proper labels and placeholders
+  - Submit button (id="submit-btn") — disables while loading
+  - Error message div (id="auth-error", display:none initially)
+  - Terms checkbox (required)
+  - Link to login.html for existing users
+  - Uses the EXACT handleAuth JavaScript pattern from the auth section above
+  - On form submit: call handleAuth('register', email, password, name)
+  - IMPORTANT: the fetch URL must be /api/public/auth/BUILDFLOW_PROJECT_ID (not a relative path)`,
   };
 
   const specific = specs[slug];
