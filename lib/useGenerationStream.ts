@@ -90,8 +90,33 @@ export function useGenerationStream({
 
   // ── Connect/reconnect ────────────────────────────────────────────────────
   const connect = useCallback(
-    (isReconnect = false) => {
+    async (isReconnect = false) => {
       if (isStoppedRef.current) return;
+
+      // On the initial attempt, verify the session is still valid before
+      // opening EventSource. EventSource doesn't expose HTTP status codes in
+      // its onerror callback — a 401 looks identical to a network drop and
+      // triggers up to MAX_RECONNECT_ATTEMPTS needless retries.
+      if (!isReconnect) {
+        try {
+          const sessionRes = await fetch("/api/auth/session");
+          const session = (await sessionRes.json()) as { user?: unknown } | null;
+          if (!session?.user) {
+            setState((prev) => ({
+              ...prev,
+              phase: "error",
+              error: "Your session has expired — redirecting to sign in…",
+            }));
+            setTimeout(() => {
+              window.location.href =
+                "/auth/signin?callbackUrl=" + encodeURIComponent("/chatbuilder");
+            }, 1500);
+            return;
+          }
+        } catch {
+          // Network error during preflight — proceed and let EventSource handle it
+        }
+      }
 
       const params = new URLSearchParams({ prompt, name: siteName });
       if (isReconnect && tokenRef.current) {
