@@ -10,12 +10,9 @@
  * (unguessable), and the content is ephemeral (20-min TTL) user-generated HTML.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { Redis } from '@upstash/redis'
+import { redis } from '@/lib/rate-limit'
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-})
+const REDIS_AVAILABLE = !!process.env.UPSTASH_REDIS_REST_URL?.startsWith('https://')
 
 const MIME_TYPES: Record<string, string> = {
   html: 'text/html; charset=utf-8',
@@ -43,6 +40,9 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ sessionId: string; path: string[] }> }
 ) {
+  if (!REDIS_AVAILABLE) {
+    return new NextResponse('Preview requires Upstash Redis.', { status: 503 })
+  }
   const { sessionId, path } = await params
 
   // Validate sessionId format (32 hex chars)

@@ -9,7 +9,13 @@ import { NextRequest, NextResponse } from 'next/server'
 // route to return an HTML error page instead of JSON → CLIENT_FETCH_ERROR in the
 // browser. When env vars are missing we use a no-op placeholder so the module
 // loads successfully; rate limiting is simply disabled (checkRateLimit fails open).
-const _redisAvailable = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+// A truthy-but-invalid placeholder like "<set>" passes !! checks but makes the
+// Redis constructor throw at module load time — crashing auth routes. Require
+// the URL to actually start with https:// before treating Redis as available.
+const _redisAvailable = !!(
+  process.env.UPSTASH_REDIS_REST_URL?.startsWith('https://') &&
+  process.env.UPSTASH_REDIS_REST_TOKEN
+);
 if (!_redisAvailable) {
   console.warn(
     '[rate-limit] UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN is not set — ' +

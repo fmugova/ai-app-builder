@@ -5,16 +5,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { decrypt } from '@/lib/encryption'
-import { Redis } from '@upstash/redis'
+import { redis } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 // Allow up to 5 minutes for the full deploy pipeline
 export const maxDuration = 300
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-})
+const REDIS_AVAILABLE = !!process.env.UPSTASH_REDIS_REST_URL?.startsWith('https://')
 
 const JOB_TTL = 60 * 30 // 30 minutes
 
@@ -239,6 +236,9 @@ async function waitForVercelReady(
 // ── Route handler ─────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  if (!REDIS_AVAILABLE) {
+    return NextResponse.json({ error: 'Deployment requires Upstash Redis.' }, { status: 503 })
+  }
   // Validate internal secret
   const secret = req.headers.get('x-deploy-secret') ?? ''
   if (!secret || secret !== (process.env.DEPLOY_JOB_SECRET ?? '')) {

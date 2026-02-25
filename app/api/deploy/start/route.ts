@@ -5,17 +5,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { Redis } from '@upstash/redis'
+import { redis } from '@/lib/rate-limit'
 import { randomBytes } from 'crypto'
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-})
+const REDIS_AVAILABLE = !!process.env.UPSTASH_REDIS_REST_URL?.startsWith('https://')
 
 const JOB_TTL = 60 * 30 // 30 minutes
 
 export async function POST(req: NextRequest) {
+  if (!REDIS_AVAILABLE) {
+    return NextResponse.json({ error: 'Deployment requires Upstash Redis. Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.' }, { status: 503 })
+  }
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {

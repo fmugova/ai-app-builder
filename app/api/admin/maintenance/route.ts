@@ -14,12 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { Redis } from '@upstash/redis'
-
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-})
+import { redis } from '@/lib/rate-limit'
 
 const KEY_ENABLED = 'maintenance:enabled'
 const KEY_MESSAGE = 'maintenance:message'

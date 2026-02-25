@@ -3,16 +3,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { Redis } from '@upstash/redis'
+import { redis } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-})
+const REDIS_AVAILABLE = !!process.env.UPSTASH_REDIS_REST_URL?.startsWith('https://')
 
 export async function GET(req: NextRequest) {
+  if (!REDIS_AVAILABLE) {
+    return NextResponse.json({ error: 'Deployment requires Upstash Redis.' }, { status: 503 })
+  }
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {

@@ -44,15 +44,17 @@ export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
 // Using instrumentation-client.ts is the recommended approach for Next.js 15.3+
 import posthog from "posthog-js";
 
-posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
-  // Use env var directly — hardcoding "/ingest" causes Turbopack's dev proxy
-  // to return 500 on external rewrites. The next.config.ts rewrite still applies
-  // in production if NEXT_PUBLIC_POSTHOG_HOST is set to "/ingest" in Vercel.
-  api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
-  ui_host: "https://eu.posthog.com",
-  defaults: "2026-01-30",
-  // Enables capturing unhandled exceptions via Error Tracking
-  capture_exceptions: true,
-  // Turn on debug in development mode
-  debug: process.env.NODE_ENV === "development",
-});
+if (process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+  posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
+    // Use env var directly — hardcoding "/ingest" causes Turbopack's dev proxy
+    // to return 500 on external rewrites. The next.config.ts rewrite still applies
+    // in production if NEXT_PUBLIC_POSTHOG_HOST is set to "/ingest" in Vercel.
+    api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+    ui_host: "https://eu.posthog.com",
+    defaults: "2026-01-30",
+    // Enables capturing unhandled exceptions via Error Tracking
+    capture_exceptions: true,
+    // Turn on debug in development mode
+    debug: process.env.NODE_ENV === "development",
+  });
+}
