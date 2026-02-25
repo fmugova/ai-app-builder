@@ -21,6 +21,30 @@ import {
 
 const anthropic = new Anthropic();
 
+// ── Model routing ────────────────────────────────────────────────────────────
+// Opus is 3-4× slower than Sonnet for the same output with minimal quality
+// difference for structured HTML. Haiku is used for simple, form-only pages.
+// Budget: sonnet ~12-15s/page, haiku ~4-6s/page, keeping 8-page sites under 2min.
+
+const SIMPLE_PAGE_SLUGS = new Set([
+  "login", "signup", "register", "contact", "about",
+  "error", "404", "terms", "privacy", "faq",
+]);
+
+function pageModel(slug: string): string {
+  return SIMPLE_PAGE_SLUGS.has(slug.toLowerCase())
+    ? "claude-haiku-4-5-20251001"
+    : "claude-sonnet-4-6";
+}
+
+function pageMaxTokens(slug: string): number {
+  return SIMPLE_PAGE_SLUGS.has(slug.toLowerCase()) ? 4000 : 8000;
+}
+
+// Maximum pages per generation — prevents prompts like "build an entire SaaS"
+// from generating 15+ pages and hitting the 300s Vercel Edge timeout.
+const MAX_PAGES = 7;
+
 export interface PipelineResult {
   success: boolean;
   files: Record<string, string>;
@@ -58,6 +82,15 @@ export async function runGenerationPipeline(
 
   if (detection.mode !== "html") {
     warnings.push(`Detected ${detection.mode} -- routing to appropriate pipeline`);
+  }
+
+  // Cap pages to prevent very long prompts from generating 10+ pages and
+  // hitting the 300s Vercel Edge Function timeout.
+  if (pages.length > MAX_PAGES) {
+    warnings.push(
+      `Prompt requested ${pages.length} pages — generating the first ${MAX_PAGES} to stay within time limits. Retry with a focused prompt to generate the remaining pages.`
+    );
+    pages.splice(MAX_PAGES);
   }
 
   // Step 2: Generate shared assets first (CSS + JS)
@@ -241,8 +274,8 @@ Return JSON exactly:
 
   try {
     const response = await anthropic.messages.create({
-      model: "claude-opus-4-6",
-      max_tokens: 6000,
+      model: "claude-sonnet-4-6",
+      max_tokens: 4000,
       system: HTML_SYSTEM_PROMPT,
       messages: [{ role: "user", content: prompt }],
     });
@@ -533,8 +566,8 @@ Output ONLY the HTML file starting with <!DOCTYPE html>:`;
 
   try {
     const response = await anthropic.messages.create({
-      model: "claude-opus-4-6",
-      max_tokens: 16000,
+      model: pageModel(page.slug),
+      max_tokens: pageMaxTokens(page.slug),
       system: HTML_SYSTEM_PROMPT,
       messages: [{ role: "user", content: prompt }],
     });
@@ -553,11 +586,12 @@ Output ONLY the HTML file starting with <!DOCTYPE html>:`;
   }
 }
 
-async function regeneratePage(_filename: string, regenPrompt: string): Promise<string | null> {
+async function regeneratePage(filename: string, regenPrompt: string): Promise<string | null> {
+  const slug = filename.replace(/\.html$/, "");
   try {
     const response = await anthropic.messages.create({
-      model: "claude-opus-4-6",
-      max_tokens: 10000,
+      model: pageModel(slug),
+      max_tokens: pageMaxTokens(slug),
       system: HTML_SYSTEM_PROMPT,
       messages: [{ role: "user", content: regenPrompt }],
     });

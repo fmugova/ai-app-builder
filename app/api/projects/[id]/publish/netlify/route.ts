@@ -59,8 +59,16 @@ export async function POST(
   for (const [path, content] of Object.entries(files)) {
     zip.file(path, content)
   }
-  // Netlify redirects: allow direct URL access for each page (e.g. /about → about.html)
-  zip.file('_redirects', htmlFiles.map((f) => `/${f.replace('.html', '')} /${f} 200`).join('\n'))
+  // Netlify _redirects: clean URL access for each page (/about → about.html).
+  // index.html must map from / (not /index) so the homepage URL works.
+  const redirectLines = htmlFiles.map((f) => {
+    const slug = f.replace('.html', '')
+    const urlPath = slug === 'index' ? '/' : `/${slug}`
+    return `${urlPath} /${f} 200`
+  })
+  // Catch-all: unknown paths fall back to index (SPA-style)
+  redirectLines.push('/* /index.html 200')
+  zip.file('_redirects', redirectLines.join('\n'))
 
   // ArrayBuffer is directly assignable to fetch BodyInit
   const zipBytes = await zip.generateAsync({

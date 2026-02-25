@@ -2,5 +2,10 @@
   "buildCommand": "prisma generate && prisma migrate deploy && next build",
   "env": {
     "SKIP_ENV_VALIDATION": "true"
+  },
+  "functions": {
+    "app/api/generate/stream/route.ts": {
+      "maxDuration": 300
+    }
   }
 }
