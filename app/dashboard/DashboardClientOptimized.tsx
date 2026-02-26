@@ -21,6 +21,10 @@ const QuickActions = dynamic(() => import('@/components/DashboardQuickActions'),
   ssr: false
 })
 
+const PublishedSitesCard = dynamic(() => import('@/components/PublishedSitesCard'), {
+  ssr: false
+})
+
 // Icons
 const SunIcon = () => (
   <svg className="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -293,6 +297,13 @@ export default function DashboardClient({
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Stats Cards - Keep light and server-side */}
         <StatsCards stats={stats} isDarkMode={isDarkMode} />
+
+        {/* Published Sites Overview */}
+        <PublishedSitesCard
+          projects={projects}
+          isDarkMode={isDarkMode}
+          onRefresh={() => window.location.reload()}
+        />
 
         {/* Quick Actions - Lazy loaded */}
         <Suspense fallback={<QuickActionsSkeleton isDarkMode={isDarkMode} />}>

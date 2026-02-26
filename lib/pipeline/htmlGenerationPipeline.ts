@@ -38,7 +38,7 @@ function pageModel(slug: string): string {
 }
 
 function pageMaxTokens(slug: string): number {
-  return SIMPLE_PAGE_SLUGS.has(slug.toLowerCase()) ? 4000 : 8000;
+  return SIMPLE_PAGE_SLUGS.has(slug.toLowerCase()) ? 4000 : 12000;
 }
 
 // Maximum pages per generation — prevents prompts like "build an entire SaaS"

@@ -13,6 +13,8 @@ export interface Project {
   isPublic?: boolean
   shareToken?: string | null
   views?: number
+  publishedAt?: string | Date | null
+  publishedSiteId?: string | null
   templateUsed?: string | null
   thumbnail?: string | null
 }
