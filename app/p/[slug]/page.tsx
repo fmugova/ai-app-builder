@@ -67,12 +67,25 @@ export default function SitePage() {
     );
   }
 
-  // Sanitize user-generated HTML to prevent XSS attacks
+  // Sanitize user-generated HTML while preserving the full document structure
+  // (html/head/body/script tags). Without WHOLE_DOCUMENT:true DOMPurify drops
+  // the <head>, stripping Tailwind CDN and other stylesheet links — leaving the
+  // page completely unstyled. The iframe sandbox (no allow-same-origin) keeps
+  // the content isolated from the parent origin regardless of what scripts run.
   const sanitizedCode = DOMPurify.sanitize(site.code, {
-    ADD_TAGS: ['script', 'style', 'link'],
-    ADD_ATTR: ['class', 'id', 'style', 'href', 'src', 'alt', 'title', 'data-*'],
+    WHOLE_DOCUMENT: true,
+    FORCE_BODY: false,
+    ADD_TAGS: ['script', 'style', 'link', 'meta', 'html', 'head', 'body'],
+    ADD_ATTR: [
+      'class', 'id', 'style', 'href', 'src', 'rel', 'type', 'charset',
+      'name', 'content', 'alt', 'title', 'lang', 'dir', 'property',
+      'media', 'async', 'defer', 'crossorigin', 'integrity', 'data-*',
+    ],
     FORBID_TAGS: ['iframe', 'object', 'embed', 'base'],
-    FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur']
+    FORBID_ATTR: [
+      'onerror', 'onclick', 'onmouseover', 'onfocus', 'onblur',
+      'onsubmit', 'onchange', 'onkeydown', 'onkeyup', 'onresize',
+    ],
   });
 
   return (
