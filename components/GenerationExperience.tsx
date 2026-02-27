@@ -102,6 +102,77 @@ export function GenerationExperience({
   );
   const [activeTab, setActiveTab] = React.useState<"preview" | "code">("preview");
 
+  // ── Targeted modification state ───────────────────────────────────────────
+  const [modifyInput, setModifyInput] = React.useState('');
+  const [isModifying, setIsModifying] = React.useState(false);
+  const [modifyStatus, setModifyStatus] = React.useState('');
+
+  async function handleModify() {
+    if (!modifyInput.trim() || !savedProjectId || isModifying) return;
+    setIsModifying(true);
+    setModifyStatus('Analyzing your request…');
+
+    try {
+      const res = await fetch('/api/generate/modify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: savedProjectId,
+          modifyRequest: modifyInput,
+          currentFiles: displayFiles,
+        }),
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+
+      const updatedFiles: Record<string, string> = { ...displayFiles };
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (reader) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        let currentEvent = '';
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            currentEvent = line.slice(7).trim();
+          } else if (line.startsWith('data: ') && currentEvent) {
+            try {
+              const data = JSON.parse(line.slice(6)) as Record<string, unknown>;
+              if (currentEvent === 'status') {
+                setModifyStatus(data.message as string);
+              } else if (currentEvent === 'file') {
+                updatedFiles[data.path as string] = data.content as string;
+                setModifyStatus(`Updated ${data.path}`);
+              } else if (currentEvent === 'done') {
+                setSavedFiles({ ...updatedFiles });
+                setModifyStatus('Changes applied!');
+                setModifyInput('');
+                setTimeout(() => setModifyStatus(''), 3000);
+              } else if (currentEvent === 'error') {
+                throw new Error(data.message as string);
+              }
+            } catch {
+              // non-JSON or parse error — skip
+            }
+            currentEvent = '';
+          }
+        }
+      }
+    } catch (e) {
+      setModifyStatus(
+        'Failed: ' + (e instanceof Error ? e.message : 'Unknown error')
+      );
+    } finally {
+      setIsModifying(false);
+    }
+  }
+
   React.useEffect(() => {
     start();
     return () => stop();
@@ -305,68 +376,155 @@ export function GenerationExperience({
           style={{
             padding: "10px 16px",
             borderTop: "1px solid #27272a",
-            display: "flex",
-            gap: 8,
           }}
         >
-          {isDone && (
-            <button
-              onClick={() => onOpenInBuilder?.()}
-              style={{
-                flex: 1,
-                padding: "7px 0",
-                borderRadius: 8,
-                border: "none",
-                background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
-                color: "#fff",
-                cursor: "pointer",
-                fontSize: 12,
-                fontWeight: 800,
-                fontFamily: ff,
-              }}
-            >
-              Open in Editor →
-            </button>
+          {/* Targeted modify input — only shown after generation completes + project saved */}
+          {isDone && savedProjectId && (
+            <div style={{ marginBottom: 10 }}>
+              <div
+                style={{
+                  fontSize: 10,
+                  color: "#52525b",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                  fontWeight: 700,
+                  marginBottom: 6,
+                  fontFamily: ff,
+                }}
+              >
+                ✏ Ask AI to modify
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <input
+                  value={modifyInput}
+                  onChange={(e) => setModifyInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleModify();
+                    }
+                  }}
+                  placeholder='e.g. "Fix the login page" or "Add a pricing page"'
+                  disabled={isModifying}
+                  style={{
+                    flex: 1,
+                    background: "#141416",
+                    border: "1px solid #3f3f46",
+                    borderRadius: 7,
+                    color: "#e4e4e7",
+                    fontSize: 11,
+                    padding: "7px 10px",
+                    fontFamily: ff,
+                    outline: "none",
+                    opacity: isModifying ? 0.6 : 1,
+                  }}
+                />
+                <button
+                  onClick={handleModify}
+                  disabled={isModifying || !modifyInput.trim()}
+                  style={{
+                    padding: "7px 14px",
+                    borderRadius: 7,
+                    border: "none",
+                    background:
+                      isModifying || !modifyInput.trim()
+                        ? "#3f3f46"
+                        : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+                    color: "#fff",
+                    cursor:
+                      isModifying || !modifyInput.trim() ? "default" : "pointer",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    fontFamily: ff,
+                    whiteSpace: "nowrap",
+                    opacity: isModifying || !modifyInput.trim() ? 0.5 : 1,
+                    transition: "opacity 0.2s",
+                  }}
+                >
+                  {isModifying ? "…" : "Apply"}
+                </button>
+              </div>
+              {modifyStatus && (
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: modifyStatus.startsWith("Failed")
+                      ? "#f87171"
+                      : modifyStatus === "Changes applied!"
+                      ? "#22c55e"
+                      : "#6366f1",
+                    marginTop: 5,
+                    fontFamily: ff,
+                  }}
+                >
+                  {modifyStatus}
+                </div>
+              )}
+            </div>
           )}
-          {isDone && (
-            <button
-              onClick={() => start()}
-              style={{
-                flex: 1,
-                padding: "7px 0",
-                borderRadius: 8,
-                border: "1px solid #3f3f46",
-                background: "transparent",
-                color: "#a1a1aa",
-                cursor: "pointer",
-                fontSize: 12,
-                fontFamily: ff,
-              }}
-            >
-              Regenerate
-            </button>
-          )}
-          {!isDone && (
-            <button
-              onClick={() => {
-                stop();
-                onCancel?.();
-              }}
-              style={{
-                flex: 1,
-                padding: "7px 0",
-                borderRadius: 8,
-                border: "1px solid #3f3f46",
-                background: "transparent",
-                color: "#71717a",
-                cursor: "pointer",
-                fontSize: 12,
-                fontFamily: ff,
-              }}
-            >
-              Cancel
-            </button>
-          )}
+
+          {/* Primary action buttons */}
+          <div style={{ display: "flex", gap: 8 }}>
+            {isDone && (
+              <button
+                onClick={() => onOpenInBuilder?.()}
+                style={{
+                  flex: 1,
+                  padding: "7px 0",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+                  color: "#fff",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontWeight: 800,
+                  fontFamily: ff,
+                }}
+              >
+                Open in Editor →
+              </button>
+            )}
+            {isDone && (
+              <button
+                onClick={() => start()}
+                title="Regenerate the entire site from scratch"
+                style={{
+                  flex: 1,
+                  padding: "7px 0",
+                  borderRadius: 8,
+                  border: "1px solid #3f3f46",
+                  background: "transparent",
+                  color: "#a1a1aa",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontFamily: ff,
+                }}
+              >
+                Regenerate all
+              </button>
+            )}
+            {!isDone && (
+              <button
+                onClick={() => {
+                  stop();
+                  onCancel?.();
+                }}
+                style={{
+                  flex: 1,
+                  padding: "7px 0",
+                  borderRadius: 8,
+                  border: "1px solid #3f3f46",
+                  background: "transparent",
+                  color: "#71717a",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontFamily: ff,
+                }}
+              >
+                Cancel
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
