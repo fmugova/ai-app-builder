@@ -7,6 +7,18 @@ import { sendEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
+// Published sites run in sandboxed iframes (null origin). Allow their fetch calls
+// through with a wildcard CORS policy — submissions are public by design.
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+}
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS })
+}
+
 // POST - Submit form from published site
 export async function POST(
   request: NextRequest,
@@ -18,7 +30,7 @@ export async function POST(
     if (!rateLimit.success) {
       return NextResponse.json(
         { error: 'Too many submissions. Please try again later.' },
-        { status: 429, headers: { 'Retry-After': String(Math.ceil((rateLimit.reset - Date.now()) / 1000)) } }
+        { status: 429, headers: { ...CORS_HEADERS, 'Retry-After': String(Math.ceil((rateLimit.reset - Date.now()) / 1000)) } }
       )
     }
 
@@ -96,13 +108,13 @@ export async function POST(
       success: true,
       message: 'Form submitted successfully',
       submissionId: submission.id
-    })
+    }, { headers: CORS_HEADERS })
 
   } catch (error: unknown) {
     console.error('Form submission error:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to submit form' },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     )
   }
 }

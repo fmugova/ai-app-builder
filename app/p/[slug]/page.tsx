@@ -88,6 +88,43 @@ export default function SitePage() {
     ],
   });
 
+  // Inject a form-interceptor script so that any contact/booking forms on the
+  // published site POST their data to BuildFlow's submissions API instead of
+  // navigating away (which would break in the sandboxed iframe anyway).
+  // The script runs in the iframe context — the absolute API URL is needed
+  // because the iframe has no origin (sandbox without allow-same-origin).
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://buildflow-ai.app';
+  const formInterceptor = `<script>
+(function(){
+  var API='${appUrl}/api/projects/${site.id}/submissions';
+  function showToast(msg,ok){
+    var t=document.createElement('div');
+    t.style.cssText='position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:8px;font-size:14px;font-family:system-ui,sans-serif;z-index:99999;box-shadow:0 4px 12px rgba(0,0,0,.2);color:#fff;background:'+(ok?'#10b981':'#ef4444');
+    t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.remove()},4000);
+  }
+  document.addEventListener('submit',function(e){
+    var form=e.target;if(!form||form.tagName!=='FORM')return;
+    e.preventDefault();
+    var data={};
+    try{new FormData(form).forEach(function(v,k){data[k]=String(v)});}catch(ex){}
+    data.formType=form.dataset.formType||form.id||form.getAttribute('name')||'contact';
+    fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+      .then(function(r){r.ok?showToast('Message sent!',true):showToast('Failed to send. Please try again.',false);})
+      .catch(function(){showToast('Failed to send. Please try again.',false);});
+  },true);
+})();
+</script>`;
+
+  // Inject before </body> (or </html> as fallback, or append if neither found)
+  let finalCode = sanitizedCode;
+  if (finalCode.includes('</body>')) {
+    finalCode = finalCode.replace('</body>', formInterceptor + '</body>');
+  } else if (finalCode.includes('</html>')) {
+    finalCode = finalCode.replace('</html>', formInterceptor + '</html>');
+  } else {
+    finalCode = finalCode + formInterceptor;
+  }
+
   return (
     <div className="relative h-screen w-full overflow-hidden">
       {/* BuildFlow Banner */}
@@ -110,7 +147,7 @@ export default function SitePage() {
 
       {/* Site Content - Sanitized for security */}
       <iframe
-        srcDoc={sanitizedCode}
+        srcDoc={finalCode}
         className="w-full h-full border-0"
         style={{ marginTop: "40px", height: "calc(100vh - 40px)" }}
         sandbox="allow-scripts allow-forms allow-popups"

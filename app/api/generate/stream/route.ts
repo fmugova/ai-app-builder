@@ -2,9 +2,8 @@
 // SSE endpoint powering the GenerationExperience component.
 // Streams: token -> plan -> step_start -> file -> step_done -> quality -> done
 //
-// Edge runtime: no Vercel timeout on streaming responses (unlike Node.js serverless
-// which is killed after 60s on Hobby or 300s on Pro even with keep-alive pings).
-// Auth uses getToken (JWT-only) because getServerSession requires Node.js APIs.
+// Node.js runtime with maxDuration:300 — allows generation to run up to 5 minutes.
+// Auth uses getToken (JWT-only, works in both Edge and Node runtimes).
 // DB save is handled client-side via POST /api/generate/save after the done event.
 
 import { NextRequest } from "next/server";
@@ -12,7 +11,9 @@ import { getToken } from "next-auth/jwt";
 import { createGenerationPlan } from "@/lib/api/planGeneration";
 import { runGenerationPipeline } from "@/lib/pipeline/htmlGenerationPipeline";
 
-export const runtime = "edge";
+// Node.js runtime — vercel.json functions.maxDuration:300 applies here.
+// Edge Runtime ignores the vercel.json functions config and caps at 30s.
+export const maxDuration = 300;
 
 export async function GET(req: NextRequest) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
