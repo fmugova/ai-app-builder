@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import DashboardClientOptimized from './DashboardClientOptimized'
 import { DashboardSkeleton } from '@/components/LoadingSkeleton'
+import type { Project } from '@/types/project'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,15 +36,42 @@ async function DashboardContent() {
     redirect('/auth/signin?error=User+not+found')
   }
 
-  // Fetch user's projects
+  // Fetch user's projects — only lightweight metadata fields.
+  // Excluding: code, html, css, javascript, cssCode, htmlCode, jsCode, prompt
+  // These are large text blobs (50-100 KB each) that are not needed for the
+  // dashboard list. Loading them caused "Load failed" on slow/VPN connections
+  // due to the massive RSC payload they added.
   const projects = await prisma.project.findMany({
-    where: {
-      userId: user.id,
+    where: { userId: user.id },
+    orderBy: { updatedAt: 'desc' },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      type: true,
+      createdAt: true,
+      updatedAt: true,
+      isPublished: true,
+      publishedAt: true,
+      publishedSiteId: true,
+      publicUrl: true,
+      publicSlug: true,
+      isPublic: true,
+      shareToken: true,
+      views: true,
+      downloads: true,
+      tags: true,
+      status: true,
+      projectType: true,
+      isMultiFile: true,
+      multiPage: true,
+      language: true,
+      framework: true,
+      validationScore: true,
+      validationPassed: true,
+      isComplete: true,
     },
-    orderBy: {
-      updatedAt: 'desc',
-    },
-  })
+  }) as unknown as Project[]
 
   // Calculate stats
   const stats = {
