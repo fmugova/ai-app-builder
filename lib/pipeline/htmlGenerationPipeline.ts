@@ -31,7 +31,7 @@ type AnthropicCreateParams = Parameters<typeof anthropic.messages.create>[0];
 async function createWithRetry(
   params: AnthropicCreateParams,
   maxRetries = 2
-): ReturnType<typeof anthropic.messages.create> {
+): Promise<Anthropic.Message> {
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
