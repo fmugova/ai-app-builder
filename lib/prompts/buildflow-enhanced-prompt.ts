@@ -41,15 +41,33 @@ RULES:
 🎨 DESIGN SYSTEM — EVERY SITE MUST USE THIS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Every site shares identical CSS variables. Define these in a <style> block inside each page's <head>:
+Every site uses the CSS variable structure below. **You MUST choose a color palette that matches the industry/niche of the project** — do NOT default to indigo/purple for every site. Pick distinct, appropriate brand colors:
+
+| Industry | --primary | --primary-dark | --primary-light | --secondary |
+|---|---|---|---|---|
+| Finance / Fintech | #10b981 | #059669 | #6ee7b7 | #0ea5e9 |
+| Healthcare / Medical | #0ea5e9 | #0284c7 | #7dd3fc | #8b5cf6 |
+| Food / Restaurant | #f59e0b | #d97706 | #fcd34d | #ef4444 |
+| Education / Learning | #8b5cf6 | #7c3aed | #c4b5fd | #0ea5e9 |
+| Fitness / Sports | #f97316 | #ea580c | #fdba74 | #10b981 |
+| Travel / Tourism | #06b6d4 | #0891b2 | #67e8f9 | #f59e0b |
+| Creative / Design / Agency | #ec4899 | #db2777 | #f9a8d4 | #8b5cf6 |
+| Legal / Corporate / Professional | #1e40af | #1e3a8a | #93c5fd | #0ea5e9 |
+| Real Estate / Property | #d97706 | #b45309 | #fcd34d | #10b981 |
+| Tech / SaaS / Developer tools | #6366f1 | #4f46e5 | #a5b4fc | #0ea5e9 |
+| E-commerce / Retail | #ef4444 | #dc2626 | #fca5a5 | #f59e0b |
+| Security / Cybersecurity | #6366f1 | #3730a3 | #a5b4fc | #10b981 |
+| Non-profit / Social | #10b981 | #059669 | #6ee7b7 | #8b5cf6 |
+
+Define these in a <style> block inside each page's <head>:
 
 \`\`\`css
 :root {
-  /* Brand Colors — choose a palette that fits the request */
-  --primary: #6366f1;       /* indigo — or use blue, emerald, rose, amber */
-  --primary-dark: #4f46e5;
-  --primary-light: #a5b4fc;
-  --secondary: #0ea5e9;
+  /* Brand Colors — MUST match the industry (see table above, do NOT always use indigo) */
+  --primary: [PICK FROM TABLE];
+  --primary-dark: [PICK FROM TABLE];
+  --primary-light: [PICK FROM TABLE];
+  --secondary: [PICK FROM TABLE];
   --accent: #f59e0b;
 
   /* Neutrals */
@@ -200,18 +218,28 @@ NEVER use placeholder.jpg, empty src, or placeholder.com.
 
 Use these (always load, free, no API key):
 
-**Picsum (generic photos — consistent with seed):**
-- Hero: https://picsum.photos/seed/hero-main/1400/700
-- Feature image: https://picsum.photos/seed/feature-1/800/500
-- Team member: https://picsum.photos/seed/team-1/400/400
+**Picsum — IMPORTANT: use UNIQUE, PROJECT-SPECIFIC seeds so every site gets different photos.**
+Use the project name/topic in the seed, e.g. for a finance app use "finance-hero", "finance-dash", "finance-team-1"; for a restaurant use "restaurant-hero", "restaurant-food-1", "chef-profile". NEVER use generic seeds like "hero-main" or "team-1" — they produce the same photo on every project.
+- Hero (1400×700): https://picsum.photos/seed/{project-topic}-hero/1400/700
+- Feature image (800×500): https://picsum.photos/seed/{project-topic}-feature-1/800/500
+- Team member (400×400): https://picsum.photos/seed/{project-topic}-team-1/400/400
+- Blog thumbnail (800×450): https://picsum.photos/seed/{project-topic}-blog-1/800/450
 
-**Unsplash Source (topic-relevant):**
-- Technology: https://source.unsplash.com/1200x600/?technology,software
-- People: https://source.unsplash.com/400x400/?portrait,professional
-- Office: https://source.unsplash.com/800x500/?office,workspace
-- Product: https://source.unsplash.com/800x500/?product,design
-- Food: https://source.unsplash.com/800x500/?food,restaurant
-- Travel: https://source.unsplash.com/1200x600/?travel,landscape
+**Curated Unsplash photos by industry (stable URLs, always work):**
+- Finance / Money: https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=1200&auto=format&fit=crop
+- Team / Office meeting: https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=1200&auto=format&fit=crop
+- Technology / Laptop: https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&auto=format&fit=crop
+- Analytics / Data: https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&auto=format&fit=crop
+- Healthcare / Medical: https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1200&auto=format&fit=crop
+- Education / Study: https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=1200&auto=format&fit=crop
+- Food / Restaurant: https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=1200&auto=format&fit=crop
+- Travel / Landscape: https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1200&auto=format&fit=crop
+- Fitness / Sport: https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=1200&auto=format&fit=crop
+- E-commerce / Shopping: https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1200&auto=format&fit=crop
+- Startup / Work: https://images.unsplash.com/photo-1497366216548-37526070297c?w=1200&auto=format&fit=crop
+- People / Portrait: https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80
+
+**IMPORTANT: ⚠️ NEVER use source.unsplash.com — that API is deprecated and returns broken/wrong images.**
 
 **DiceBear (avatars — great for team/testimonials):**
 - https://api.dicebear.com/7.x/personas/svg?seed=Emma

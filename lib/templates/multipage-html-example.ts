@@ -62,7 +62,7 @@ export const MULTIPAGE_HTML_EXAMPLE = `
 
     /* HERO */
     .hero{min-height:100vh;background:linear-gradient(135deg,#064e3b 0%,#065f46 45%,#1e3a5f 100%);display:flex;align-items:center;position:relative;overflow:hidden;padding:100px 24px 60px}
-    .hero::before{content:'';position:absolute;inset:0;background:url('https://source.unsplash.com/1400x900/?fitness,training') center/cover;opacity:.12}
+    .hero::before{content:'';position:absolute;inset:0;background:url('https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=1400&auto=format&fit=crop') center/cover;opacity:.12}
     .blob{position:absolute;border-radius:50%;filter:blur(60px);opacity:.35}
     .blob-1{width:380px;height:380px;background:var(--primary);top:-80px;right:-80px}
     .blob-2{width:280px;height:280px;background:var(--secondary);bottom:-40px;left:8%}
@@ -460,7 +460,7 @@ export const MULTIPAGE_HTML_EXAMPLE = `
   <section class="story">
     <div class="story-grid">
       <div class="story-img">
-        <img src="https://source.unsplash.com/800x500/?gym,coaching" alt="Emma and James in their first East London studio, 2019" loading="lazy">
+        <img src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&auto=format&fit=crop" alt="Emma and James in their first East London studio, 2019" loading="lazy">
       </div>
       <div>
         <p class="story-label">Our Origin</p>

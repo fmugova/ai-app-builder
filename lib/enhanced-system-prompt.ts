@@ -652,35 +652,43 @@ NEVER use broken or fake image src values. ALL images must be real URLs:
 
 1. **Lorem Picsum** — generic photos, always loads, no API key:
    https://picsum.photos/seed/{unique-seed}/{width}/{height}
-   Examples:
-     https://picsum.photos/seed/hero-1/1200/600      ← hero banner
-     https://picsum.photos/seed/project-web/800/500  ← project card
-     https://picsum.photos/seed/avatar-1/200/200     ← avatar
+   IMPORTANT: Use UNIQUE, project-specific seeds — NEVER generic seeds like "hero-1" or "avatar-1" or every project will get identical photos. Base seeds on the project name/domain:
+     Finance app → https://picsum.photos/seed/finance-hero/1200/600
+     Restaurant   → https://picsum.photos/seed/restaurant-hero/1200/600
+     Portfolio    → https://picsum.photos/seed/portfolio-hero/1200/600
 
-2. **Unsplash Source** — keyword-specific photos:
-   https://source.unsplash.com/{width}x{height}/?{keyword}
-   Examples:
-     https://source.unsplash.com/1200x600/?technology  ← tech hero
-     https://source.unsplash.com/400x400/?portrait     ← profile photo
-     https://source.unsplash.com/800x500/?office       ← workspace
+2. **Curated Unsplash photos by topic (stable, always work):**
+   ⚠️ NEVER use source.unsplash.com — that API is deprecated and returns wrong/broken images.
+   Use these direct photo URLs instead:
+     Finance/Money: https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=1200&auto=format&fit=crop
+     Team/Office:   https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=1200&auto=format&fit=crop
+     Technology:    https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&auto=format&fit=crop
+     Analytics:     https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&auto=format&fit=crop
+     Healthcare:    https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1200&auto=format&fit=crop
+     Education:     https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=1200&auto=format&fit=crop
+     Food:          https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=1200&auto=format&fit=crop
+     Travel:        https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1200&auto=format&fit=crop
+     Fitness:       https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=1200&auto=format&fit=crop
+     E-commerce:    https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1200&auto=format&fit=crop
+     Portrait:      https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80
 
 3. **DiceBear** — avatars / profile illustrations:
    https://api.dicebear.com/7.x/avataaars/svg?seed={name}
 
 Rules:
-- Use UNIQUE seeds per image (seed/hero-1, seed/hero-2, etc.)
-- Match keywords to context (portfolio → "design,creative", food app → "food,restaurant")
+- Use project-specific seeds for Picsum (not generic "hero-1" etc.)
 - Add descriptive alt text on every <img>
 - Add loading="lazy" on images below the fold
 
 \`\`\`tsx
 // ✅ CORRECT
-<Image src="https://picsum.photos/seed/project-1/800/500" alt="Dashboard project screenshot" width={800} height={500} />
-<img src="https://source.unsplash.com/400x400/?portrait,professional" alt="Team member Alex" loading="lazy" />
+<Image src="https://picsum.photos/seed/finance-dashboard/800/500" alt="Dashboard screenshot" width={800} height={500} />
+<img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop" alt="Team member Alex" loading="lazy" />
 
 // ❌ WRONG
 <Image src="/placeholder.jpg" alt="..." />
 <img src="#" />
+<img src="https://source.unsplash.com/400x400/?portrait" /> {/* DEPRECATED — do NOT use */}
 \`\`\`
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

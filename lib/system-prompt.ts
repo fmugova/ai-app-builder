@@ -165,20 +165,27 @@ Wrap each page in special delimiters so BuildFlow can extract them into separate
 NEVER use broken/fake image sources. ALL <img> tags must load real photos.
 
 Use these free services — no API key required:
-- **Lorem Picsum** (seed-based, always loads):
-  https://picsum.photos/seed/{unique-seed}/{width}/{height}
-  → Hero: https://picsum.photos/seed/hero/1200/600
-  → Project card: https://picsum.photos/seed/proj1/800/500
-  → Avatar: https://picsum.photos/seed/user1/200/200
-- **Unsplash Source** (keyword photos):
-  https://source.unsplash.com/{width}x{height}/?{keyword}
-  → https://source.unsplash.com/800x500/?technology,design
-  → https://source.unsplash.com/400x400/?portrait,professional
+- **Lorem Picsum** (seed-based, always loads) — use PROJECT-SPECIFIC seeds, not generic ones:
+  https://picsum.photos/seed/{project-topic-descriptor}/{width}/{height}
+  → Finance hero: https://picsum.photos/seed/finance-hero/1200/600
+  → Restaurant card: https://picsum.photos/seed/restaurant-food-1/800/500
+  → Profile avatar: https://picsum.photos/seed/user-emma/200/200
+  ⚠️ Generic seeds like "hero", "proj1", "user1" produce the SAME photo on every project. Always use topic-based seeds.
+- **Curated Unsplash photos (stable, always work):**
+  ⚠️ NEVER use source.unsplash.com — deprecated, returns broken/wrong images.
+  Use these direct photo URLs instead:
+  → Finance: https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&auto=format&fit=crop
+  → Tech/Laptop: https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop
+  → Team/Office: https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&auto=format&fit=crop
+  → Healthcare: https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=800&auto=format&fit=crop
+  → Education: https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800&auto=format&fit=crop
+  → Food: https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=800&auto=format&fit=crop
+  → Portrait: https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop
 - **DiceBear** (profile avatars):
   https://api.dicebear.com/7.x/avataaars/svg?seed={name}
 
-Use UNIQUE seeds per image. Match Unsplash keywords to context.
-❌ NEVER: src="placeholder.jpg" or src="#" or src=""
+Use UNIQUE, project-specific seeds per image.
+❌ NEVER: src="placeholder.jpg" or src="#" or src="" or source.unsplash.com URLs
 
 ## 3. Navigation & Routing
 
