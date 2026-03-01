@@ -3,13 +3,13 @@ import { notFound } from 'next/navigation';
 import DOMPurify from 'isomorphic-dompurify';
 
 interface PageProps {
-  params: {
+  params: Promise<{
     slug: string;
-  };
+  }>;
 }
 
 export async function generateMetadata({ params }: PageProps) {
-  const { slug } = params;
+  const { slug } = await params;
 
   const project = await prisma.project.findUnique({
     where: { publicSlug: slug },
@@ -32,7 +32,7 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 export default async function PublishedAppPage({ params }: PageProps) {
-  const { slug } = params;
+  const { slug } = await params;
 
   const project = await prisma.project.findUnique({
     where: { publicSlug: slug },
