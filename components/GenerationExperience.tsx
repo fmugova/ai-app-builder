@@ -101,6 +101,7 @@ export function GenerationExperience({
     new Set(["src", "app", "components"])
   );
   const [activeTab, setActiveTab] = React.useState<"preview" | "code">("preview");
+  const [codeCopied, setCodeCopied] = React.useState(false);
 
   // ── Targeted modification state ───────────────────────────────────────────
   const [modifyInput, setModifyInput] = React.useState('');
@@ -617,8 +618,58 @@ export function GenerationExperience({
               </button>
             ))}
             {selectedFile && (
-              <div style={{ marginLeft: "auto", fontSize: 11, color: "#52525b" }}>
-                {selectedFile}
+              <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 11, color: "#52525b" }}>{selectedFile}</span>
+                <button
+                  onClick={async () => {
+                    const content = displayFiles[selectedFile] ?? "";
+                    if (!content) return;
+                    try {
+                      await navigator.clipboard.writeText(content);
+                      setCodeCopied(true);
+                      setTimeout(() => setCodeCopied(false), 2000);
+                    } catch {
+                      // fallback for browsers that block clipboard in iframes
+                      const ta = document.createElement("textarea");
+                      ta.value = content;
+                      ta.style.position = "fixed";
+                      ta.style.opacity = "0";
+                      document.body.appendChild(ta);
+                      ta.select();
+                      document.execCommand("copy");
+                      document.body.removeChild(ta);
+                      setCodeCopied(true);
+                      setTimeout(() => setCodeCopied(false), 2000);
+                    }
+                  }}
+                  title={codeCopied ? "Copied!" : "Copy file to clipboard"}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    padding: "3px 8px",
+                    border: `1px solid ${codeCopied ? "#22c55e" : "#3f3f46"}`,
+                    borderRadius: 5,
+                    background: codeCopied ? "#14532d" : "#18181b",
+                    color: codeCopied ? "#86efac" : "#a1a1aa",
+                    cursor: "pointer",
+                    fontSize: 11,
+                    fontFamily: "inherit",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {codeCopied ? (
+                    <>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                      Copy
+                    </>
+                  )}
+                </button>
               </div>
             )}
           </div>

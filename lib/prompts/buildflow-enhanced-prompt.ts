@@ -35,7 +35,12 @@ RULES:
 - NEVER use hash anchors (href="#about" is FORBIDDEN) — use href="about.html"
 - NEVER put all pages in one file
 - Create one <!-- File: name.html --> block per page mentioned by the user
-- Filenames: lowercase, hyphen-separated (e.g. our-team.html, case-studies.html)
+- Filenames: SHORT (1-2 words, max 20 chars), lowercase, hyphen-separated
+  ✅ login.html, signup.html, dashboard.html, pricing.html, about.html, contact.html
+  ❌ login-and-sign-up-pages-together-and-create-the.html (too long — FORBIDDEN)
+- ⚠️ CRITICAL: Every navigateTo() call, href link, and <a> tag MUST use the EXACT slug (filename without .html).
+  If the file is login.html → use href="login.html" and navigateTo('login') — never navigateTo('auth') or navigateTo('sign-in')
+  The navigation key MUST match the filename exactly.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🎨 DESIGN SYSTEM — EVERY SITE MUST USE THIS

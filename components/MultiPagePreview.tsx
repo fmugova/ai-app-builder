@@ -14,24 +14,138 @@ interface Props {
   phase: string;
 }
 
-const LINK_INTERCEPTOR = `
-<script>
+// Injected early (inside <head>) so it runs BEFORE the page's own scripts.
+// Must be a single <script> block with no external deps.
+const SANDBOX_INTERCEPTOR = `
+<script id="__buildflow_sandbox__">
 (function() {
-  // Intercept all link clicks and post to parent
-  document.addEventListener('click', function(e) {
-    var a = e.target.closest('a');
-    if (!a) return;
-    var href = a.getAttribute('href');
-    if (!href) return;
-    // Only intercept relative .html links (not #anchors, not http://, not mailto:)
-    if (href.startsWith('#') || href.startsWith('http') || href.startsWith('mailto')) return;
-    if (!href.endsWith('.html') && !href.includes('.html')) return;
-    e.preventDefault();
-    window.parent.postMessage({ type: 'navigate', href: href }, '*');
+  // Helper: resolve a raw href/src value to a bare filename (e.g. "login.html")
+  function toFilename(val) {
+    if (typeof val !== 'string') return null;
+    // Strip leading ./ ../  and keep only the last path segment
+    var name = val.split('/').pop() || val;
+    // Accept *.html files only (ignore anchors, http URLs, data: etc.)
+    if (!name.endsWith('.html')) return null;
+    return name;
+  }
+  function sendNav(filename) {
+    window.parent.postMessage({ type: 'navigate', href: filename }, '*');
+  }
+
+  // ── 1. navigateTo() trap ─────────────────────────────────────────────────
+  // AI-generated pages define navigateTo(page) themselves. We capture the
+  // assignment via a property descriptor so our version wins regardless of
+  // when the page script runs.
+  var _origNav = null;
+  Object.defineProperty(window, 'navigateTo', {
+    configurable: true,
+    enumerable: true,
+    get: function() { return _origNav; },
+    set: function(fn) {
+      // Replace with sandboxed version; discard the original
+      _origNav = function sandboxedNav(page) {
+        var filename = toFilename(
+          typeof page === 'string' && !page.endsWith('.html') ? page + '.html' : page
+        );
+        if (filename) { sendNav(filename); return; }
+        // Non-HTML navigation — let original run (e.g. tab switching)
+        if (typeof fn === 'function') { try { fn(page); } catch(e) {} }
+      };
+    }
   });
 
-  // Tell parent what page we are (for active nav highlighting)
-  window.parent.postMessage({ type: 'loaded', title: document.title }, '*');
+  // ── 2. <a> click interception (capture phase) ────────────────────────────
+  document.addEventListener('click', function(e) {
+    var a = e.target && e.target.closest && e.target.closest('a');
+    if (!a) return;
+    var href = a.getAttribute('href') || '';
+    if (href.startsWith('#') || href.startsWith('http') || href.startsWith('mailto:') || href.startsWith('javascript:')) return;
+    var filename = toFilename(href);
+    if (!filename) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    sendNav(filename);
+  }, true);
+
+  // ── 3. <button> click interception for onclick="navigateTo(...)" ─────────
+  // If the button has an onclick attribute (inline handler), intercept it
+  document.addEventListener('click', function(e) {
+    var el = e.target;
+    while (el && el !== document.body) {
+      var onclick = el.getAttribute && el.getAttribute('onclick');
+      if (onclick) {
+        var m = onclick.match(/navigateTo\(['"]([^'"]+)['"]\)/);
+        if (m) {
+          e.preventDefault();
+          var filename = toFilename(m[1].endsWith('.html') ? m[1] : m[1] + '.html');
+          if (filename) { sendNav(filename); return; }
+        }
+      }
+      el = el.parentElement;
+    }
+  }, true);
+
+  // ── 4. iframe.src override — catches in-page iframe navigation ───────────
+  // Some AI pages open other pages in a nested <iframe id="page-frame">.
+  // Intercept assignments so those don't hit the dev server.
+  try {
+    var iframeDesc = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'src');
+    if (iframeDesc && iframeDesc.set) {
+      Object.defineProperty(HTMLIFrameElement.prototype, 'src', {
+        configurable: true,
+        get: iframeDesc.get,
+        set: function(val) {
+          var filename = toFilename(val);
+          if (filename) { sendNav(filename); return; }
+          iframeDesc.set.call(this, val);
+        }
+      });
+    }
+  } catch(e) {}
+
+  // ── 5. history API shim — catches SPA-style navigation ───────────────────
+  try {
+    var _push = history.pushState.bind(history);
+    var _replace = history.replaceState.bind(history);
+    history.pushState = function(st, t, url) {
+      var f = toFilename(String(url || ''));
+      if (f) { sendNav(f); return; }
+      try { _push(st, t, url); } catch(e) {}
+    };
+    history.replaceState = function(st, t, url) {
+      var f = toFilename(String(url || ''));
+      if (f) { sendNav(f); return; }
+      try { _replace(st, t, url); } catch(e) {}
+    };
+  } catch(e) {}
+
+  // ── 6. window.location.assign / replace ──────────────────────────────────
+  try {
+    var _assign = location.assign.bind(location);
+    var _locReplace = location.replace.bind(location);
+    location.assign = function(url) {
+      var f = toFilename(String(url || ''));
+      if (f) { sendNav(f); return; }
+      _assign(url);
+    };
+    location.replace = function(url) {
+      var f = toFilename(String(url || ''));
+      if (f) { sendNav(f); return; }
+      _locReplace(url);
+    };
+  } catch(e) {}
+
+  // ── 7. Report load + force reveal animations ──────────────────────────────
+  window.addEventListener('load', function() {
+    window.parent.postMessage({ type: 'loaded', title: document.title }, '*');
+    // Force scroll-reveal elements visible — IntersectionObserver may not fire
+    // in a sandboxed srcdoc iframe (null/opaque origin), leaving content at opacity:0.
+    try {
+      document.querySelectorAll('.reveal').forEach(function(el) {
+        el.classList.add('visible');
+      });
+    } catch(e) {}
+  });
 })();
 </script>
 `;
@@ -59,14 +173,15 @@ function buildPageContent(
     );
   }
 
-  // Inject the link interceptor. AI-generated HTML sometimes omits </body> or
-  // </html>, so try each closing tag in order, falling back to plain append.
-  if (/<\/body>/i.test(content)) {
-    content = content.replace(/<\/body>/i, `${LINK_INTERCEPTOR}</body>`);
-  } else if (/<\/html>/i.test(content)) {
-    content = content.replace(/<\/html>/i, `${LINK_INTERCEPTOR}</html>`);
+  // Inject the sandbox interceptor EARLY — must run before any page script so
+  // the navigateTo() property trap is in place before the page defines it.
+  // Insert right after <head> if present; otherwise prepend to the document.
+  if (/<head>/i.test(content)) {
+    content = content.replace(/<head>/i, `<head>${SANDBOX_INTERCEPTOR}`);
+  } else if (/<html[^>]*>/i.test(content)) {
+    content = content.replace(/<html[^>]*>/i, (m) => `${m}<head>${SANDBOX_INTERCEPTOR}</head>`);
   } else {
-    content = content + LINK_INTERCEPTOR;
+    content = SANDBOX_INTERCEPTOR + content;
   }
 
   return content;

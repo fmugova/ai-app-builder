@@ -21,14 +21,41 @@ import {
 
 const anthropic = new Anthropic();
 
+// ── Retry helper ─────────────────────────────────────────────────────────────
+// Retries an Anthropic API call up to 2 extra times on 529 (overload) or 503
+// errors, with exponential backoff. Other errors are re-thrown immediately so
+// the caller can decide whether to use a fallback page.
+
+type AnthropicCreateParams = Parameters<typeof anthropic.messages.create>[0];
+
+async function createWithRetry(
+  params: AnthropicCreateParams,
+  maxRetries = 2
+): ReturnType<typeof anthropic.messages.create> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await anthropic.messages.create(params);
+    } catch (err: unknown) {
+      lastError = err;
+      const status = (err as { status?: number })?.status ?? 0;
+      const retryable = status === 529 || status === 503 || status === 429;
+      if (!retryable || attempt === maxRetries) throw lastError;
+      // Exponential backoff: 3s, 6s
+      await new Promise((r) => setTimeout(r, 3000 * (attempt + 1)));
+    }
+  }
+  throw lastError;
+}
+
 // ── Model routing ────────────────────────────────────────────────────────────
 // Opus is 3-4× slower than Sonnet for the same output with minimal quality
 // difference for structured HTML. Haiku is used for simple, form-only pages.
 // Budget: sonnet ~12-15s/page, haiku ~4-6s/page, keeping 8-page sites under 2min.
 
 const SIMPLE_PAGE_SLUGS = new Set([
-  "login", "signup", "register", "contact", "about",
-  "error", "404", "terms", "privacy", "faq",
+  "login", "signup", "register", "contact", "about", "auth",
+  "error", "404", "terms", "privacy", "faq", "team", "blog",
 ]);
 
 function pageModel(slug: string): string {
@@ -38,7 +65,10 @@ function pageModel(slug: string): string {
 }
 
 function pageMaxTokens(slug: string): number {
-  return SIMPLE_PAGE_SLUGS.has(slug.toLowerCase()) ? 4000 : 12000;
+  // Keep Haiku pages at 4000; Sonnet pages reduced from 12000 → 8000 to
+  // cut per-page latency by ~33% and stay within Vercel's 300s function limit
+  // on projects with 5-7 pages. 8000 tokens is still ~500+ lines of HTML.
+  return SIMPLE_PAGE_SLUGS.has(slug.toLowerCase()) ? 4000 : 8000;
 }
 
 // Maximum pages per generation — prevents prompts like "build an entire SaaS"
@@ -273,7 +303,7 @@ Return JSON exactly:
 }`;
 
   try {
-    const response = await anthropic.messages.create({
+    const response = await createWithRetry({
       model: "claude-sonnet-4-6",
       max_tokens: 4000,
       system: HTML_SYSTEM_PROMPT,
@@ -565,7 +595,7 @@ DO NOT include nav or hero section on this page — it's a full-page auth screen
 Output ONLY the HTML file starting with <!DOCTYPE html>:`;
 
   try {
-    const response = await anthropic.messages.create({
+    const response = await createWithRetry({
       model: pageModel(page.slug),
       max_tokens: pageMaxTokens(page.slug),
       system: HTML_SYSTEM_PROMPT,
@@ -589,7 +619,7 @@ Output ONLY the HTML file starting with <!DOCTYPE html>:`;
 async function regeneratePage(filename: string, regenPrompt: string): Promise<string | null> {
   const slug = filename.replace(/\.html$/, "");
   try {
-    const response = await anthropic.messages.create({
+    const response = await createWithRetry({
       model: pageModel(slug),
       max_tokens: pageMaxTokens(slug),
       system: HTML_SYSTEM_PROMPT,
