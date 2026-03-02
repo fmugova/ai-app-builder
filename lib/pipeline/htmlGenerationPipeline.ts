@@ -35,7 +35,9 @@ async function createWithRetry(
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await anthropic.messages.create(params);
+      // Cast through unknown: we never pass stream:true so runtime type is always Message,
+      // but TypeScript can't narrow the overloaded union without an explicit cast.
+      return (await anthropic.messages.create(params)) as unknown as Anthropic.Message;
     } catch (err: unknown) {
       lastError = err;
       const status = (err as { status?: number })?.status ?? 0;
