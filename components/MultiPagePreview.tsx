@@ -19,6 +19,32 @@ interface Props {
 const SANDBOX_INTERCEPTOR = `
 <script id="__buildflow_sandbox__">
 (function() {
+  // ── 0. Mock localStorage ──────────────────────────────────────────────────
+  // Sandboxed srcdoc iframes run with a null/opaque origin, which causes
+  // localStorage access to throw SecurityError. Apps (task managers, notes,
+  // calculators, etc.) rely on localStorage for CRUD — mock it with an
+  // in-memory store so all app functionality works in preview.
+  // Data won't persist across reloads, but add/edit/delete all work normally.
+  try {
+    localStorage.getItem('__test__');
+  } catch(e) {
+    var _ls = {};
+    var _lsMock = {
+      getItem: function(k) { return Object.prototype.hasOwnProperty.call(_ls, k) ? _ls[k] : null; },
+      setItem: function(k, v) { _ls[String(k)] = String(v); },
+      removeItem: function(k) { delete _ls[String(k)]; },
+      clear: function() { _ls = {}; },
+      get length() { return Object.keys(_ls).length; },
+      key: function(n) { return Object.keys(_ls)[n] || null; }
+    };
+    try {
+      Object.defineProperty(window, 'localStorage', { configurable: true, get: function() { return _lsMock; } });
+    } catch(e2) {}
+    try {
+      Object.defineProperty(window, 'sessionStorage', { configurable: true, get: function() { return _lsMock; } });
+    } catch(e2) {}
+  }
+
   // Helper: resolve a raw href/src value to a bare filename (e.g. "login.html")
   function toFilename(val) {
     if (typeof val !== 'string') return null;

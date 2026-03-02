@@ -130,6 +130,10 @@ export function GenerationExperience({
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      // currentEvent must live OUTSIDE the while loop — large HTML files are
+      // split across multiple network chunks, so the 'event:' line and the
+      // matching 'data:' line may arrive in different read() calls.
+      let currentEvent = '';
 
       while (reader) {
         const { done, value } = await reader.read();
@@ -138,7 +142,6 @@ export function GenerationExperience({
         const lines = buffer.split('\n');
         buffer = lines.pop() ?? '';
 
-        let currentEvent = '';
         for (const line of lines) {
           if (line.startsWith('event: ')) {
             currentEvent = line.slice(7).trim();
