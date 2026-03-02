@@ -77,6 +77,31 @@ function pageMaxTokens(slug: string): number {
 // from generating 15+ pages and hitting the 300s Vercel Edge timeout.
 const MAX_PAGES = 7;
 
+// ── App vs marketing detection ───────────────────────────────────────────────
+// When the user's prompt describes a functional app (task manager, calculator,
+// etc.) we skip the marketing-website requirements (hero/3-sections/600-words)
+// and instead focus the AI on building working interactive JavaScript.
+
+const APP_KEYWORDS = [
+  "task", "todo", "to-do", "to do", "kanban", "board",
+  "note", "notes", "note-taking", "note taking",
+  "calculator", "converter", "currency", "unit converter",
+  "timer", "stopwatch", "clock", "countdown",
+  "quiz", "game", "puzzle", "trivia",
+  "tracker", "habit", "budget", "expense", "finance",
+  "calendar", "planner", "schedule", "appointment",
+  "inventory", "stock", "crud", "database",
+  "poll", "vote", "survey", "form builder",
+  "chat", "messaging",
+  "weather app", "news app",
+  "flashcard", "pomodoro", "productivity app",
+];
+
+function isAppPrompt(userPrompt: string): boolean {
+  const lower = userPrompt.toLowerCase();
+  return APP_KEYWORDS.some((k) => lower.includes(k));
+}
+
 export interface PipelineResult {
   success: boolean;
   files: Record<string, string>;
@@ -381,7 +406,38 @@ ${navHtml || `<nav class="bg-white shadow-sm sticky top-0 z-50 px-6 py-4 flex ju
 ━━━ FOOTER (paste verbatim) ━━━
 ${footerHtml || `<footer class="bg-gray-900 text-gray-300 py-10 text-center"><p>&copy; 2024 ${siteName}</p></footer>`}
 
-━━━ CONTENT REQUIREMENTS ━━━
+${isAppPrompt(userPrompt) ? `━━━ CONTENT REQUIREMENTS ━━━
+This is a FUNCTIONAL WEB APP — build a working interactive interface, not a marketing page.
+
+1. MAIN APP INTERFACE (REQUIRED — the whole point of this page):
+   - Build the COMPLETE, WORKING UI the user described
+   - Include ALL interactive elements: forms, inputs, buttons, lists, checkboxes, etc.
+   - Use Tailwind for clean, professional styling
+   - Wrap the app in: <main class="max-w-2xl mx-auto px-4 py-8"> or appropriate container
+
+2. JAVASCRIPT FUNCTIONALITY — everything must actually work:
+   - Write COMPLETE JavaScript for every feature (add, delete, edit, filter, etc.)
+   - Persist data with localStorage so it survives page refresh:
+     var items = JSON.parse(localStorage.getItem('${page.slug}_items') || '[]');
+     function save() { localStorage.setItem('${page.slug}_items', JSON.stringify(items)); }
+   - Re-render from data on every change (don't just manipulate DOM directly):
+     function render() { list.innerHTML = ''; items.forEach(function(item) { /* build DOM */ }); }
+   - Wire up on DOMContentLoaded: load saved data, call render(), add event listeners
+   - Pre-populate with 2-3 example items so the UI isn't empty on first load
+
+3. ADD / CREATE functionality (if applicable):
+   - Input field + button that calls addItem() on click AND on Enter key
+   - addItem(): read value, push to array, save(), render(), clear input
+
+4. DELETE / REMOVE functionality (if applicable):
+   - Each item gets a delete button: <button onclick="deleteItem(id)" ...>×</button>
+   - deleteItem(id): filter array, save(), render()
+
+5. SCROLL ANIMATIONS:
+   - Add class="reveal" to major section divs (the app container, any stats sections)
+
+6. HEADER (optional, brief):
+   - A simple app header/title is fine — skip hero images and marketing copy` : `━━━ CONTENT REQUIREMENTS ━━━
 This page MUST contain ALL of the following:
 
 1. HERO SECTION — full-width, visually striking:
@@ -406,7 +462,7 @@ This page MUST contain ALL of the following:
    - NO lorem ipsum, NO "placeholder", NO "coming soon"
    - Real names, prices, descriptions relevant to the business
 
-5. MINIMUM CONTENT: 600+ words of visible body text (excluding nav/footer)
+5. MINIMUM CONTENT: 600+ words of visible body text (excluding nav/footer)`}
 
 ${page.slug === "contact" ? `
 CONTACT FORM REQUIREMENTS (this form submits to a REAL backend):
