@@ -342,18 +342,40 @@ Return JSON exactly:
 
     return {
       "style.css": parsed["style.css"] ?? defaultCss(siteName),
-      "script.js": parsed["script.js"] ?? defaultJs(),
+      "script.js": appendRevealSafetyNet(parsed["script.js"] ?? defaultJs()),
       "_nav_html": parsed["nav_html"] ?? "",
       "_footer_html": parsed["footer_html"] ?? "",
     };
   } catch {
     return {
       "style.css": defaultCss(siteName),
-      "script.js": defaultJs(),
+      "script.js": appendRevealSafetyNet(defaultJs()),
       "_nav_html": "",
       "_footer_html": "",
     };
   }
+}
+
+/**
+ * Appends a safety-net timeout to any script.js content.
+ * Deployed sites can show blank pages if IntersectionObserver never fires
+ * (e.g. a JS error earlier in the script prevents DOMContentLoaded from running).
+ * This timeout force-shows all .reveal elements after 800ms as a fallback.
+ * In the chatbuilder iframe the SANDBOX_INTERCEPTOR already does this on load,
+ * but deployed sites (Netlify, Vercel, etc.) need it baked into the script itself.
+ */
+function appendRevealSafetyNet(script: string): string {
+  const safetyNet = `
+// Safety net: force-show all .reveal elements after 800 ms.
+// Guards against cases where IntersectionObserver doesn't fire on deployed sites
+// (e.g. a JS error earlier in the script, or a browser quirk). Content is always
+// visible after this delay even if the scroll-reveal animation never ran.
+setTimeout(function() {
+  document.querySelectorAll('.reveal').forEach(function(el) {
+    el.classList.add('visible');
+  });
+}, 800);`;
+  return script + safetyNet;
 }
 
 // --- Per-page generation ---
@@ -835,5 +857,11 @@ function handleFormSubmit(e) {
     var s = document.getElementById('form-success');
     if (s) s.style.display = 'block';
   });
-}`;
+}
+
+// Safety net: force-show .reveal elements after 800ms in case IntersectionObserver
+// didn't fire (prevents blank pages on deployed sites due to JS errors or browser quirks)
+setTimeout(function() {
+  document.querySelectorAll('.reveal').forEach(function(el) { el.classList.add('visible'); });
+}, 800);`;
 }

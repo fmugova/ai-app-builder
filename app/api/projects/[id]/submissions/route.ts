@@ -101,7 +101,9 @@ export async function POST(
               </a>
             </p>
           </div>`,
-      }).catch(() => { /* non-fatal */ })
+      }).catch((err: unknown) => {
+        console.error('[submissions] email notification failed:', err instanceof Error ? err.message : err)
+      })
     }
 
     return NextResponse.json({
@@ -121,7 +123,7 @@ export async function POST(
 
 // GET - Retrieve form submissions for a project (requires ownership)
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {

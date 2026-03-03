@@ -49,27 +49,28 @@ export async function POST(req: NextRequest) {
     const htmlFiles = Object.entries(files).filter(([p]) => p.endsWith(".html"));
     const combinedHtml = files["index.html"] ?? htmlFiles[0]?.[1] ?? "";
 
-    const project = await prisma.project.create({
-      data: {
-        userId: dbUser.id,
-        name,
-        prompt,
-        type: "html",
-        projectType: "multi-page-html",
-        code: combinedHtml,
-        html: combinedHtml,
-        css: files["style.css"] ?? "",
-        javascript: files["script.js"] ?? "",
-        multiPage: htmlFiles.length > 1,
-        isMultiFile: false,
-        validationScore: BigInt(Math.round(qualityScore)),
-        validationPassed: qualityScore >= 70,
-        status: "DRAFT",
-      },
-    });
+    // Wrap Project + all Page creates in a single transaction so a partial
+    // Page failure never leaves an orphaned Project record with no pages.
+    const project = await prisma.$transaction(async (tx) => {
+      const created = await tx.project.create({
+        data: {
+          userId: dbUser.id,
+          name,
+          prompt,
+          type: "html",
+          projectType: "multi-page-html",
+          code: combinedHtml,
+          html: combinedHtml,
+          css: files["style.css"] ?? "",
+          javascript: files["script.js"] ?? "",
+          multiPage: htmlFiles.length > 1,
+          isMultiFile: false,
+          validationScore: BigInt(Math.round(qualityScore)),
+          validationPassed: qualityScore >= 70,
+          status: "DRAFT",
+        },
+      });
 
-    // Create Page records
-    if (htmlFiles.length > 0) {
       for (let pi = 0; pi < htmlFiles.length; pi++) {
         const [filename, content] = htmlFiles[pi];
         const slug = filename.replace(".html", "") || "index";
@@ -90,9 +91,9 @@ export async function POST(req: NextRequest) {
           h1Text ||
           (slug === "index" ? name : slug.charAt(0).toUpperCase() + slug.slice(1));
 
-        await prisma.page.create({
+        await tx.page.create({
           data: {
-            projectId: project.id,
+            projectId: created.id,
             slug,
             title: pageTitle,
             content,
@@ -105,7 +106,9 @@ export async function POST(req: NextRequest) {
           },
         });
       }
-    }
+
+      return created;
+    });
 
     // Replace the BUILDFLOW_PROJECT_ID placeholder injected during generation
     // with the real project id so contact forms POST to the correct endpoint.

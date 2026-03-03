@@ -15,7 +15,52 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import bcryptjs from 'bcryptjs'
 import { SignJWT, jwtVerify } from 'jose'
-import { checkRateLimit } from '@/lib/rate-limit'
+import { checkRateLimit, redis } from '@/lib/rate-limit'
+
+// Per-account brute-force protection (complements the per-IP rate limiter).
+// After LOGIN_FAIL_LIMIT consecutive failures for the same email+project the
+// account is locked for LOCK_DURATION_S seconds regardless of IP rotation.
+const LOGIN_FAIL_LIMIT = 10
+const LOCK_DURATION_S = 1800 // 30 minutes
+
+function failKey(projectId: string, email: string) {
+  return `bruteforce:fail:${projectId}:${email}`
+}
+function lockKey(projectId: string, email: string) {
+  return `bruteforce:lock:${projectId}:${email}`
+}
+
+async function isAccountLocked(projectId: string, email: string): Promise<number> {
+  try {
+    const ttl = await redis.ttl(lockKey(projectId, email))
+    return ttl > 0 ? ttl : 0
+  } catch {
+    return 0 // Redis unavailable — fail open
+  }
+}
+
+async function recordLoginFailure(projectId: string, email: string): Promise<void> {
+  try {
+    const key = failKey(projectId, email)
+    const count = await redis.incr(key)
+    if (count === 1) await redis.expire(key, 900) // 15-minute window
+    if (count >= LOGIN_FAIL_LIMIT) {
+      await redis.set(lockKey(projectId, email), '1', { ex: LOCK_DURATION_S })
+      await redis.del(key)
+    }
+  } catch {
+    // Redis unavailable — skip tracking
+  }
+}
+
+async function clearLoginFailures(projectId: string, email: string): Promise<void> {
+  try {
+    await redis.del(failKey(projectId, email))
+    await redis.del(lockKey(projectId, email))
+  } catch {
+    // Redis unavailable — skip
+  }
+}
 
 export const runtime = 'nodejs'
 
@@ -167,6 +212,15 @@ export async function POST(
       }
       const emailLower = email.toLowerCase().trim()
 
+      // Per-account lockout — prevents credential stuffing even with IP rotation
+      const lockedFor = await isAccountLocked(projectId, emailLower)
+      if (lockedFor > 0) {
+        return corsJson(
+          { error: `Too many failed attempts. Try again in ${Math.ceil(lockedFor / 60)} minutes.` },
+          { status: 429, headers: { 'Retry-After': String(lockedFor) } }
+        )
+      }
+
       const user = await prisma.projectUser.findUnique({
         where: { projectId_email: { projectId, email: emailLower } },
       })
@@ -177,8 +231,12 @@ export async function POST(
         : await bcryptjs.compare(password, '$2b$12$invalidhashforenumerationprotection')
 
       if (!user || !passwordMatch) {
+        await recordLoginFailure(projectId, emailLower)
         return corsJson({ error: 'Invalid email or password' }, { status: 401 })
       }
+
+      // Successful login — clear any accumulated failure counters
+      await clearLoginFailures(projectId, emailLower)
 
       await prisma.projectUser.update({
         where: { id: user.id },

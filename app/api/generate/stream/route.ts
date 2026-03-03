@@ -17,9 +17,12 @@ import { detectOutputMode } from "@/lib/generation/detectOutputMode";
 // HTML is still the default for marketing sites and simple apps (localStorage CRUD).
 // Next.js is reserved for prompts that explicitly request it or that clearly need
 // a backend (auth, database, multi-user, real-time, payments, etc.).
+// React SPA requests also route to Next.js — we have no standalone React SPA
+// pipeline, and Next.js (App Router + React 18) is the modern equivalent.
 function shouldUseNextjs(prompt: string): boolean {
   const detection = detectOutputMode(prompt);
-  if (detection.mode === "nextjs") return true; // explicit (user said "Next.js", "App Router", etc.)
+  if (detection.mode === "nextjs") return true; // user said "Next.js", "App Router", etc.
+  if (detection.mode === "react-spa") return true; // user said "React" — route to Next.js (best available)
 
   // Infer from backend-only keywords — marketing sites and simple apps stay as HTML
   const lower = prompt.toLowerCase();
