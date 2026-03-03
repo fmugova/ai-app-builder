@@ -1829,7 +1829,7 @@ Please regenerate the complete, fixed code.`;
                     </div>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           const changed = editableCode && editableCode !== state.fullCode;
                           if (changed) {
                             const parsed = parseGeneratedCode(editableCode);
@@ -1840,14 +1840,39 @@ Please regenerate the complete, fixed code.`;
                               js: parsed.javascript || '',
                               fullCode: editableCode,
                             }));
-                            toast.success('Code changes applied to preview');
+                            // Auto-save to DB for already-saved single-file HTML projects
+                            if (currentProjectId && !isMultiFileProject) {
+                              setSaving(true);
+                              try {
+                                const res = await fetch('/api/projects/save', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    id: currentProjectId,
+                                    name: projectName || prompt.slice(0, 50) || 'Untitled Project',
+                                    code: editableCode,
+                                    validation: state.validation,
+                                  }),
+                                });
+                                toast.success(res.ok ? 'Changes saved' : 'Applied to preview — click Save to persist');
+                              } catch {
+                                toast.success('Applied to preview — click Save to persist');
+                              } finally {
+                                setSaving(false);
+                              }
+                            } else {
+                              toast.success('Code changes applied to preview');
+                            }
                           }
                           setShowViewCode(false);
                         }}
                         className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg transition-colors text-sm"
+                        disabled={saving}
                       >
                         <Save className="w-4 h-4" />
-                        {editableCode && editableCode !== state.fullCode ? 'Apply & Close' : 'Close'}
+                        {editableCode && editableCode !== state.fullCode
+                          ? (currentProjectId && !isMultiFileProject ? 'Save & Close' : 'Apply & Close')
+                          : 'Close'}
                       </button>
                       <button
                         onClick={handleCopy}
