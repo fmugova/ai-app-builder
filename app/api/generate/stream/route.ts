@@ -10,6 +10,31 @@ import { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { createGenerationPlan } from "@/lib/api/planGeneration";
 import { runGenerationPipeline } from "@/lib/pipeline/htmlGenerationPipeline";
+import { runNextjsGenerationPipeline } from "@/lib/pipeline/nextjsGenerationPipeline";
+import { detectOutputMode } from "@/lib/generation/detectOutputMode";
+
+// Detect whether the prompt warrants a Next.js full-stack project.
+// HTML is still the default for marketing sites and simple apps (localStorage CRUD).
+// Next.js is reserved for prompts that explicitly request it or that clearly need
+// a backend (auth, database, multi-user, real-time, payments, etc.).
+function shouldUseNextjs(prompt: string): boolean {
+  const detection = detectOutputMode(prompt);
+  if (detection.mode === "nextjs") return true; // explicit (user said "Next.js", "App Router", etc.)
+
+  // Infer from backend-only keywords — marketing sites and simple apps stay as HTML
+  const lower = prompt.toLowerCase();
+  const BACKEND_SIGNALS = [
+    "sign in", "sign up", "login", "register", "authentication", "oauth",
+    "database", "db", "sql", "postgresql", "mysql", "mongo",
+    "user account", "user profile", "user data", "multi-user", "team",
+    "stripe", "payment", "subscription", "billing", "checkout",
+    "real-time", "realtime", "websocket",
+    "server side", "server-side", "ssr",
+    "api route", "backend", "full-stack", "fullstack",
+    "supabase", "firebase", "prisma", "drizzle",
+  ];
+  return BACKEND_SIGNALS.some((k) => lower.includes(k));
+}
 
 // Node.js runtime — vercel.json functions.maxDuration:300 applies here.
 // Edge Runtime ignores the vercel.json functions config and caps at 30s.
@@ -62,58 +87,93 @@ export async function GET(req: NextRequest) {
         //     The client-side useGenerationStream hook handles the retry UX.)
         send("token", { token: crypto.randomUUID() });
 
+        const useNextjs = shouldUseNextjs(prompt);
+
         // 1. Generate plan (fast -- uses haiku, ~1s)
         const plan = await createGenerationPlan(prompt, siteName);
+        // Override mode in plan so client knows what was generated
+        if (useNextjs) plan.mode = "nextjs";
         send("plan", plan);
 
-        // 2. Execute generation pipeline
+        // 2. Execute the appropriate generation pipeline
         let stepIndex = 0;
 
-        const result = await runGenerationPipeline(
-          prompt,
-          siteName,
-          // onProgress: maps pipeline steps to SSE events
-          (step, detail) => {
-            const currentStep = plan.steps[stepIndex];
-            if (!currentStep) return;
+        let result;
 
-            if (
-              step === "generating-styles" ||
-              step.startsWith("generating-page")
-            ) {
-              send("step_start", { stepId: currentStep.id, label: currentStep.label });
+        if (useNextjs) {
+          // ── Next.js + Supabase pipeline ─────────────────────────────────────
+          // Announce the generation step immediately
+          const firstStep = plan.steps[0];
+          if (firstStep) {
+            send("step_start", { stepId: firstStep.id, label: "Generating Next.js app…" });
+          }
+
+          result = await runNextjsGenerationPipeline(
+            prompt,
+            siteName,
+            // onProgress: log to server, no client events needed (one big call)
+            (step, detail) => {
+              if (detail) console.log(`[generate/stream/nextjs] ${step}: ${detail}`);
+            },
+            // onFile: stream each file to client
+            (path: string, content: string) => {
+              send("file", { path, content });
             }
+          );
 
-            // Log detail for debugging (not sent to client)
-            if (detail) console.log(`[generate/stream] ${step}: ${detail}`);
-          },
-          // onFile: fires as each file is saved -- drives live file tree
-          (path: string, content: string) => {
-            send("file", { path, content });
+          // Mark all plan steps done
+          for (const step of plan.steps) {
+            send("step_done", { stepId: step.id });
+          }
 
-            // Advance to next step when a file matches the current step's expected output
-            const currentStep = plan.steps[stepIndex];
-            if (currentStep) {
-              const filename = path.split("/").pop() ?? path;
-              const matchesStep = currentStep.files.some(
-                (f) => f.endsWith(filename) || f.includes(filename)
-              );
-              if (matchesStep) {
-                send("step_done", { stepId: currentStep.id });
-                stepIndex = Math.min(stepIndex + 1, plan.steps.length - 1);
-                // Pre-announce next step
-                const nextStep = plan.steps[stepIndex];
-                if (nextStep && nextStep.id !== currentStep.id) {
-                  send("step_start", { stepId: nextStep.id });
+        } else {
+          // ── HTML multi-page pipeline ─────────────────────────────────────────
+          result = await runGenerationPipeline(
+            prompt,
+            siteName,
+            // onProgress: maps pipeline steps to SSE events
+            (step, detail) => {
+              const currentStep = plan.steps[stepIndex];
+              if (!currentStep) return;
+
+              if (
+                step === "generating-styles" ||
+                step.startsWith("generating-page")
+              ) {
+                send("step_start", { stepId: currentStep.id, label: currentStep.label });
+              }
+
+              // Log detail for debugging (not sent to client)
+              if (detail) console.log(`[generate/stream] ${step}: ${detail}`);
+            },
+            // onFile: fires as each file is saved -- drives live file tree
+            (path: string, content: string) => {
+              send("file", { path, content });
+
+              // Advance to next step when a file matches the current step's expected output
+              const currentStep = plan.steps[stepIndex];
+              if (currentStep) {
+                const filename = path.split("/").pop() ?? path;
+                const matchesStep = currentStep.files.some(
+                  (f) => f.endsWith(filename) || f.includes(filename)
+                );
+                if (matchesStep) {
+                  send("step_done", { stepId: currentStep.id });
+                  stepIndex = Math.min(stepIndex + 1, plan.steps.length - 1);
+                  // Pre-announce next step
+                  const nextStep = plan.steps[stepIndex];
+                  if (nextStep && nextStep.id !== currentStep.id) {
+                    send("step_start", { stepId: nextStep.id });
+                  }
                 }
               }
             }
-          }
-        );
+          );
 
-        // Mark any remaining steps as done
-        for (let i = stepIndex; i < plan.steps.length; i++) {
-          send("step_done", { stepId: plan.steps[i].id });
+          // Mark any remaining steps as done
+          for (let i = stepIndex; i < plan.steps.length; i++) {
+            send("step_done", { stepId: plan.steps[i].id });
+          }
         }
 
         // 3. Quality score
@@ -126,6 +186,7 @@ export async function GET(req: NextRequest) {
           qualityScore: result.qualityScore,
           pages: result.pages,
           warnings: result.warnings,
+          mode: result.mode,   // ← "html" | "nextjs" — tells client which preview to show
           // projectId will be populated by the client after saving
         });
       } catch (e: unknown) {

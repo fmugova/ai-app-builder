@@ -2071,7 +2071,15 @@ Please regenerate the complete, fixed code.`;
                 }));
               }
 
-              toast.success(`Site generated! Quality score: ${score}/100`);
+              // Detect Next.js output (has .tsx/.ts source files — not HTML)
+              const isNextjs = Object.keys(files).some(
+                (p) => p.endsWith('.tsx') || (p.endsWith('.ts') && !p.endsWith('.d.ts'))
+              );
+              if (isNextjs) {
+                toast.success(`Next.js app generated! Open in StackBlitz to preview.`);
+              } else {
+                toast.success(`Site generated! Quality score: ${score}/100`);
+              }
             }}
             onCancel={() => setShowGenExperience(false)}
           />
