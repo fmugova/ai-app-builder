@@ -67,10 +67,12 @@ function pageModel(slug: string): string {
 }
 
 function pageMaxTokens(slug: string): number {
-  // Keep Haiku pages at 4000; Sonnet pages reduced from 12000 → 8000 to
-  // cut per-page latency by ~33% and stay within Vercel's 300s function limit
-  // on projects with 5-7 pages. 8000 tokens is still ~500+ lines of HTML.
-  return SIMPLE_PAGE_SLUGS.has(slug.toLowerCase()) ? 4000 : 8000;
+  // Haiku simple pages: 5000 tokens (~300+ lines of HTML)
+  // Sonnet complex pages: 12000 tokens (~750+ lines of HTML, prevents truncation)
+  // Rich barber/restaurant/portfolio pages with hero + grid + gallery + CTA + footer
+  // easily exceed 8000 tokens, causing cut-off sections. 12000 stays well within
+  // Vercel's 300s limit: 6 pages × ~25s = 150s + shared assets + validation ≈ 180s.
+  return SIMPLE_PAGE_SLUGS.has(slug.toLowerCase()) ? 5000 : 12000;
 }
 
 // Maximum pages per generation — prevents prompts like "build an entire SaaS"
@@ -174,8 +176,12 @@ export async function runGenerationPipeline(
       page, siteName, userPrompt, pages, sharedFiles, onProgress
     );
 
+    // Keep the raw content (with any truncation marker) in generatedPages so
+    // validatePageCompleteness can detect it and schedule regeneration.
+    // Strip the internal marker before sending to the client so the preview
+    // renders valid HTML even while we queue the regen.
     generatedPages[filename] = pageContent;
-    onFile?.(filename, pageContent); // fire as each page completes
+    onFile?.(filename, pageContent.replace(/\n?<!-- TRUNCATED_AT_TOKEN_LIMIT -->/g, "")); // fire as each page completes
 
     // Quick check -- if page is clearly broken, log it
     const bodyTextLength = extractBodyText(pageContent).length;
@@ -215,9 +221,19 @@ export async function runGenerationPipeline(
 
       const fixed = await regeneratePage(brokenPage.filename, regenPrompt);
       if (fixed) {
-        allFiles[brokenPage.filename] = fixed;
-        onFile?.(brokenPage.filename, fixed);
+        // Strip the truncation marker from the regenerated page (belt-and-suspenders)
+        const cleaned = fixed.replace(/\n?<!-- TRUNCATED_AT_TOKEN_LIMIT -->/g, "");
+        allFiles[brokenPage.filename] = cleaned;
+        onFile?.(brokenPage.filename, cleaned);
       }
+    }
+  }
+
+  // Strip truncation markers from any pages that passed validation (weren't regenerated)
+  // so the final files object sent to the client is clean.
+  for (const filename of Object.keys(allFiles)) {
+    if (allFiles[filename].includes("<!-- TRUNCATED_AT_TOKEN_LIMIT -->")) {
+      allFiles[filename] = allFiles[filename].replace(/\n?<!-- TRUNCATED_AT_TOKEN_LIMIT -->/g, "");
     }
   }
 
@@ -332,7 +348,7 @@ Return JSON exactly:
   try {
     const response = await createWithRetry({
       model: "claude-sonnet-4-6",
-      max_tokens: 4000,
+      max_tokens: 5000,
       system: HTML_SYSTEM_PROMPT,
       messages: [{ role: "user", content: prompt }],
     });
@@ -683,13 +699,22 @@ Output ONLY the HTML file starting with <!DOCTYPE html>:`;
     });
 
     const text = response.content.find((b) => b.type === "text")?.text ?? "";
+    const wasTruncated = response.stop_reason === "max_tokens";
 
     // Extract HTML if wrapped in code block
     const htmlMatch =
       text.match(/```html\n?([\s\S]*?)```/) ?? text.match(/(<!DOCTYPE[\s\S]*)/i);
-    const html = htmlMatch ? (htmlMatch[1] ?? htmlMatch[0]) : text;
+    let html = (htmlMatch ? (htmlMatch[1] ?? htmlMatch[0]) : text).trim();
 
-    return html.trim();
+    if (wasTruncated) {
+      // Close any unclosed tags so the browser can at least render what was generated
+      if (!html.toLowerCase().includes("</body>")) html += "\n</body>";
+      if (!html.toLowerCase().includes("</html>")) html += "\n</html>";
+      // Embed a marker so the validator can detect and schedule regeneration
+      html += "\n<!-- TRUNCATED_AT_TOKEN_LIMIT -->";
+    }
+
+    return html;
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e);
     return buildFallbackPage(page, siteName, navHtml, footerHtml, message);

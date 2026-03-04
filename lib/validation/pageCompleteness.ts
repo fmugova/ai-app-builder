@@ -144,6 +144,17 @@ function checkSinglePage(filename: string, content: string): PageCheckResult {
     });
   }
 
+  // 8. Truncated HTML — generation was cut off at the token limit.
+  // The pipeline embeds a comment marker when stop_reason === "max_tokens".
+  // These pages MUST be regenerated — they may be missing whole sections.
+  if (content.includes("<!-- TRUNCATED_AT_TOKEN_LIMIT -->")) {
+    issues.push({
+      severity: "critical",
+      code: "TRUNCATED_HTML",
+      message: "Page was cut off at token limit — missing sections. Regenerating with higher budget.",
+    });
+  }
+
   const criticalCount = issues.filter((i) => i.severity === "critical").length;
 
   return {
