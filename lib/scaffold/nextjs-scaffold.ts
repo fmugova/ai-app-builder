@@ -21,6 +21,7 @@ export const NEXTJS_SCAFFOLD_FILES: Record<string, string> = {
       '@supabase/ssr': '^0.4.0',
       'lucide-react': '^0.400.0',
       'clsx': '^2.1.1',
+      'sonner': '^1.5.0',
     },
     devDependencies: {
       typescript: '^5',
@@ -436,6 +437,43 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.redirect(\`\${origin}/login?error=Could+not+authenticate\`)
 }
+`,
+
+  // Root layout — included in scaffold so Claude never generates an incompatible one.
+  // Uses sonner for toasts (available via @/components/ui/toaster).
+  'app/layout.tsx': `import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
+import './globals.css'
+import { Toaster } from '@/components/ui/toaster'
+
+const inter = Inter({ subsets: ['latin'] })
+
+export const metadata: Metadata = {
+  title: 'Generated App',
+  description: 'Built with BuildFlow',
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body className={inter.className}>
+        {children}
+        <Toaster />
+      </body>
+    </html>
+  )
+}
+`,
+
+  // Thin wrapper around sonner so code can import from @/components/ui/toaster
+  // (the standard shadcn path) without needing the full shadcn setup.
+  'components/ui/toaster.tsx': `'use client'
+export { Toaster } from 'sonner'
+export { toast } from 'sonner'
 `,
 
   'README.md': `# Generated App

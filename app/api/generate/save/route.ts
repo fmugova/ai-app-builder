@@ -10,6 +10,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { saveProjectFiles } from "@/lib/saveProjectFiles";
+import { autoDetectAndSaveApiEndpoints, createNextjsPagesFromFiles } from "@/lib/autoDetectEndpoints";
 
 export const runtime = "nodejs";
 
@@ -130,6 +131,23 @@ export async function POST(req: NextRequest) {
 
     // Save all individual files to ProjectFile table
     await saveProjectFiles(project.id, injectedFiles);
+
+    // Detect whether this is a Next.js project (has .tsx source files)
+    const isNextjsProject = Object.keys(injectedFiles).some(
+      (p) => p.endsWith('.tsx') || (p.endsWith('.ts') && !p.endsWith('.d.ts') && !p.endsWith('route.ts'))
+    );
+
+    if (isNextjsProject) {
+      // Create Page records from app/**/page.tsx files so the Pages + SEO dashboard sections work
+      await createNextjsPagesFromFiles(project.id, injectedFiles).catch((err) =>
+        console.error('[generate/save] createNextjsPagesFromFiles failed:', err)
+      );
+    }
+
+    // Auto-detect and save API endpoint records from generated route files (both HTML & Next.js)
+    await autoDetectAndSaveApiEndpoints(project.id).catch((err) =>
+      console.error('[generate/save] autoDetectAndSaveApiEndpoints failed:', err)
+    );
 
     // Return both projectId and injected files so the client can update
     // its in-memory state (preview + download will use the real endpoint).
