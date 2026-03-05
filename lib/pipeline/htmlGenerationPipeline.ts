@@ -128,6 +128,10 @@ export async function runGenerationPipeline(
 ): Promise<PipelineResult> {
   const warnings: string[] = [];
   const errors: string[] = [];
+  // Track elapsed time so we can skip the auto-regen pass if we're approaching
+  // Vercel's 300s function limit. Generation alone can fill 240-280s for large sites,
+  // leaving no time for regen API calls. Skipping regen lets `done` fire on time.
+  const pipelineStart = Date.now();
 
   // Step 1: Detect what kind of site to generate
   onProgress?.("detecting", "Analysing your prompt...");
@@ -203,13 +207,29 @@ export async function runGenerationPipeline(
   );
   const validation = validatePageCompleteness(allFiles, expectedPageFiles);
 
-  // Step 6: Regenerate any broken/blank pages
+  // Step 6: Regenerate any broken/blank pages — only if time budget allows.
+  // Vercel functions cap at 300s. Generation alone can take 240-280s for 5-7 page sites.
+  // Attempting regen after a slow generation pushes the total past 300s, causing the
+  // function to be killed before the `done` event fires. We leave a 55s buffer:
+  //   - 45s for done + DB save on the client side
+  //   - 10s safety margin
   const pagesNeedingRegen = validation.pages.filter((p) => p.needsRegeneration);
+  const elapsedSeconds = (Date.now() - pipelineStart) / 1000;
+  const regenBudgetAvailable = elapsedSeconds < 245; // 300s limit − 55s buffer
 
-  if (pagesNeedingRegen.length > 0) {
+  if (pagesNeedingRegen.length > 0 && regenBudgetAvailable) {
     onProgress?.("fixing", `Fixing ${pagesNeedingRegen.length} incomplete page(s)...`);
 
     for (const brokenPage of pagesNeedingRegen) {
+      // Re-check budget before each regen call (each takes ~15-25s)
+      const nowElapsed = (Date.now() - pipelineStart) / 1000;
+      if (nowElapsed >= 245) {
+        warnings.push(
+          `${brokenPage.filename}: Time budget exhausted — click Retry to fix (${brokenPage.issues[0]?.message})`
+        );
+        continue;
+      }
+
       onProgress?.("regenerating", `Regenerating ${brokenPage.filename}...`);
       warnings.push(
         `${brokenPage.filename}: Auto-regenerated -- ${brokenPage.issues[0]?.message}`
@@ -226,6 +246,13 @@ export async function runGenerationPipeline(
         allFiles[brokenPage.filename] = cleaned;
         onFile?.(brokenPage.filename, cleaned);
       }
+    }
+  } else if (pagesNeedingRegen.length > 0) {
+    // Time budget exhausted — warn but still deliver the files we have
+    for (const brokenPage of pagesNeedingRegen) {
+      warnings.push(
+        `${brokenPage.filename}: Needs attention — ${brokenPage.issues[0]?.message}. Click Retry to fix.`
+      );
     }
   }
 
