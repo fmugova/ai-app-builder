@@ -14,11 +14,11 @@ export const NEXTJS_SCAFFOLD_FILES: Record<string, string> = {
       lint: 'next lint',
     },
     dependencies: {
-      next: '14.2.0',
+      next: '^15.0.0',
       react: '^18.3.0',
       'react-dom': '^18.3.0',
       '@supabase/supabase-js': '^2.43.0',
-      '@supabase/ssr': '^0.4.0',
+      '@supabase/ssr': '^0.5.0',
       'lucide-react': '^0.400.0',
       'clsx': '^2.1.1',
       'sonner': '^1.5.0',
@@ -31,8 +31,8 @@ export const NEXTJS_SCAFFOLD_FILES: Record<string, string> = {
       autoprefixer: '^10.4.19',
       postcss: '^8',
       tailwindcss: '^3.4.4',
-      eslint: '^8',
-      'eslint-config-next': '14.2.0',
+      eslint: '^9',
+      'eslint-config-next': '^15.0.0',
     },
   }, null, 2),
 
@@ -140,28 +140,28 @@ export function createClient() {
   'lib/supabase/server.ts': `import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-export function createClient() {
-  const cookieStore = cookies()
+// Next.js 15: cookies() is async — must be awaited before use.
+export async function createClient() {
+  const cookieStore = await cookies()
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://placeholder.supabase.co'
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'placeholder-key'
 
   return createServerClient(url, key, {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          } catch {
-            // Can be ignored in Server Components
-          }
-        },
+    cookies: {
+      getAll() {
+        return cookieStore.getAll()
       },
-    }
-  )
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options)
+          )
+        } catch {
+          // Can be ignored in Server Components (middleware handles cookie writes)
+        }
+      },
+    },
+  })
 }
 `,
 
@@ -414,7 +414,7 @@ export async function GET(request: NextRequest) {
   const next = searchParams.get('next') ?? '/dashboard'
 
   if (code) {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://placeholder.supabase.co',
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'placeholder-key',

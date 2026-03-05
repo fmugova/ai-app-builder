@@ -47,6 +47,8 @@ Before finishing, mentally audit: for every "import X from '@/..." in your outpu
 3. Supabase import convention:
    - Client Components ('use client'): import { createClient } from '@/lib/supabase/client'
    - Server Components / Route Handlers: import { createClient } from '@/lib/supabase/server'
+   - CRITICAL: createClient() from server.ts is ASYNC (Next.js 15). Always await it:
+     const supabase = await createClient()
 4. Database: Supabase client only (supabase.from('table')…) — never Prisma
 5. Icons: lucide-react only (already installed)
 6. Images: next/image for local; <img> with proper alt for external URLs
@@ -64,7 +66,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
 export default async function Page() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
   // fetch data scoped to user.id …
@@ -78,7 +80,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
   if (!user || error) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   // query only data owned by user.id
@@ -87,7 +89,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
   if (!user || error) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await request.json()
@@ -108,7 +110,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 export async function createItem(formData: FormData) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthorized')
   const title = formData.get('title') as string
