@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { prisma } from '@/lib/prisma'
-import speakeasy from 'speakeasy'  // ✅ More reliable alternative
+import { authenticator } from 'otplib'
 
 export async function POST(req: NextRequest) {
   try {

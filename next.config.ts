@@ -109,8 +109,8 @@ const nextConfig: NextConfig = {
           value: [
             "default-src 'self'",
             // Scripts: self + Next.js inline hydration + Stripe.js + Google Tag Manager + Monaco Editor CDN + blob: for Next.js workers
-            // unsafe-eval required for WebContainers WASM runtime on /chatbuilder
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://www.googletagmanager.com https://www.google-analytics.com https://cdn.jsdelivr.net https://cdn.tailwindcss.com https://eu-assets.i.posthog.com https://vercel.live blob:",
+            // wasm-unsafe-eval allows WASM without opening full eval() to JS (safer than unsafe-eval globally)
+            "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://js.stripe.com https://www.googletagmanager.com https://www.google-analytics.com https://cdn.jsdelivr.net https://cdn.tailwindcss.com https://eu-assets.i.posthog.com https://vercel.live blob:",
             // Styles: self + inline (Tailwind/shadcn) + Google Fonts
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             // Fonts: self + data URIs + Google Fonts CDN
@@ -161,6 +161,30 @@ const nextConfig: NextConfig = {
         {
           key: 'X-XSS-Protection',
           value: '1; mode=block',
+        },
+      ],
+    },
+    {
+      // ── Chatbuilder: add unsafe-eval for Monaco editor + WebContainer WASM ─
+      // This overrides the global /:path* CSP for /chatbuilder only.
+      // unsafe-eval is required by Monaco's worker scripts and WebContainer WASM JIT.
+      source: '/chatbuilder/:path*',
+      headers: [
+        {
+          key: 'Content-Security-Policy',
+          value: [
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://www.googletagmanager.com https://www.google-analytics.com https://cdn.jsdelivr.net https://cdn.tailwindcss.com https://eu-assets.i.posthog.com https://vercel.live blob:",
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+            "font-src 'self' data: https://fonts.gstatic.com",
+            "img-src 'self' data: blob: https:",
+            "connect-src 'self' https://api.stripe.com https://api.anthropic.com https://*.upstash.io https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://us.i.posthog.com https://eu.i.posthog.com https://eu-assets.i.posthog.com https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://*.stackblitz.com https://*.webcontainer.io wss://*.webcontainer.io https://*.webcontainer-api.io wss://*.webcontainer-api.io https://*.staticblitz.com wss://*.staticblitz.com https://vitals.vercel-insights.com https://vercel.live wss://vercel.live",
+            "worker-src 'self' blob:",
+            "frame-src 'self' blob: https://vercel.live https://*.vercel.live https://stackblitz.com https://*.stackblitz.com https://*.webcontainer.io https://*.webcontainer-api.io",
+            "frame-ancestors 'self'",
+            "object-src 'none'",
+            "upgrade-insecure-requests",
+          ].join('; '),
         },
       ],
     },

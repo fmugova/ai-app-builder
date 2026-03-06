@@ -290,7 +290,7 @@ async function runDeploy({ jobId, projectId, userId, repoName, privateRepo }: Jo
   }
 
   const ghToken = decrypt(user.githubAccessToken)
-  const vcToken = user.vercelToken  // stored plain
+  const vcToken = decrypt(user.vercelToken)
   const vcTeamId = user.vercelTeamId ?? null
 
   // ── Load project files ─────────────────────────────────────────────────

@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import * as speakeasy from 'speakeasy'
+import { authenticator } from 'otplib'
 import * as QRCode from 'qrcode'
 import { randomBytes } from 'crypto'
 import bcrypt from 'bcryptjs'
@@ -39,13 +39,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Generate TOTP secret
-    const secret = speakeasy.generateSecret({
-      name: `BuildFlow AI (${user.email})`,
-      issuer: 'BuildFlow AI'
-    })
+    const secretBase32 = authenticator.generateSecret()
+    const otpauthUrl = authenticator.keyuri(user.email, 'BuildFlow AI', secretBase32)
 
     // Generate QR code
-    const qrCode = await QRCode.toDataURL(secret.otpauth_url!)
+    const qrCode = await QRCode.toDataURL(otpauthUrl)
 
     // Generate 10 backup codes — 10 bytes = 80-bit entropy (plaintext returned once, hashed for storage)
     const backupCodes = Array.from({ length: 10 }, () =>
@@ -59,14 +57,14 @@ export async function POST(req: NextRequest) {
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        twoFactorSecret: secret.base32,
+        twoFactorSecret: secretBase32,
         twoFactorBackupCodes: hashedBackupCodes,
         twoFactorEnabled: false // Not enabled until verified
       }
     })
 
     return NextResponse.json({
-      secret: secret.base32,
+      secret: secretBase32,
       qrCode,
       backupCodes, // plaintext shown once to user
       message: 'Scan the QR code with your authenticator app'

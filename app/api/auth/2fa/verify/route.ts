@@ -6,7 +6,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { redis } from '@/lib/rate-limit'
-import * as speakeasy from 'speakeasy'
+import { authenticator } from 'otplib'
 
 export async function POST(req: NextRequest) {
   try {
