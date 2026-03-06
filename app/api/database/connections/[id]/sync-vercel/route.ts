@@ -86,6 +86,14 @@ export async function POST(
       )
     }
 
+    // Validate format — prevents SSRF path injection (CodeQL alerts #64, #65)
+    if (typeof vercelProjectId !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(vercelProjectId)) {
+      return NextResponse.json(
+        { error: 'Invalid Vercel project ID format' },
+        { status: 400 }
+      )
+    }
+
     // Sync environment variables
     const result = await syncSupabaseEnvVarsToVercel({
       vercelProjectId,
