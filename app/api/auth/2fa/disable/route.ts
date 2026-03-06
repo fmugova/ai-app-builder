@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { authenticator } from 'otplib'
+import { totpVerify } from '@/lib/totp'
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,12 +35,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify token before disabling
-    const verified = speakeasy.totp.verify({
-      secret: user.twoFactorSecret!,
-      encoding: 'base32',
-      token: token,
-      window: 2
-    })
+    const verified = await totpVerify(user.twoFactorSecret!, token, 2)
 
     if (!verified) {
       return NextResponse.json(

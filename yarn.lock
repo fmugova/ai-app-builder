@@ -2376,13 +2376,6 @@
   dependencies:
     "@babel/types" "^7.28.2"
 
-"@types/bcrypt@^6.0.0":
-  version "6.0.0"
-  resolved "https://registry.npmjs.org/@types/bcrypt/-/bcrypt-6.0.0.tgz"
-  integrity sha512-/oJGukuH3D2+D+3H4JWLaAsJ/ji86dhRidzZ/Od7H/i8g+aCmvkeCc6Ni/f9uxGLSQVCRZkX2/lqEFG2BvWtlQ==
-  dependencies:
-    "@types/node" "*"
-
 "@types/bcryptjs@^2.4.6":
   version "2.4.6"
   resolved "https://registry.npmjs.org/@types/bcryptjs/-/bcryptjs-2.4.6.tgz"
@@ -2574,13 +2567,6 @@
   dependencies:
     "@types/prop-types" "*"
     csstype "^3.2.2"
-
-"@types/speakeasy@^2.0.10":
-  version "2.0.10"
-  resolved "https://registry.npmjs.org/@types/speakeasy/-/speakeasy-2.0.10.tgz"
-  integrity sha512-QVRlDW5r4yl7p7xkNIbAIC/JtyOcClDIIdKfuG7PWdDT1MmyhtXSANsildohy0K+Lmvf/9RUtLbNLMacvrVwxA==
-  dependencies:
-    "@types/node" "*"
 
 "@types/stack-utils@^2.0.3":
   version "2.0.3"
@@ -3248,11 +3234,6 @@ balanced-match@^4.0.2:
   resolved "https://registry.npmjs.org/balanced-match/-/balanced-match-4.0.3.tgz"
   integrity sha512-1pHv8LX9CpKut1Zp4EXey7Z8OfH11ONNH6Dhi2WDUt31VVZFXZzKwXcysBgqSumFCmR+0dqjMK5v5JiFHzi0+g==
 
-base32.js@0.0.1:
-  version "0.0.1"
-  resolved "https://registry.npmjs.org/base32.js/-/base32.js-0.0.1.tgz"
-  integrity sha512-EGHIRiegFa62/SsA1J+Xs2tIzludPdzM064N9wjbiEgHnGnJ1V0WEpA4pEwCYT5nDvZk3ubf0shqaCS7k6xeUQ==
-
 base64-js@0.0.8:
   version "0.0.8"
   resolved "https://registry.npmjs.org/base64-js/-/base64-js-0.0.8.tgz"
@@ -3262,14 +3243,6 @@ baseline-browser-mapping@^2.8.3, baseline-browser-mapping@^2.9.0:
   version "2.9.14"
   resolved "https://registry.npmjs.org/baseline-browser-mapping/-/baseline-browser-mapping-2.9.14.tgz"
   integrity sha512-B0xUquLkiGLgHhpPBqvl7GWegWBUNuujQ6kXd/r1U38ElPT6Ok8KZ8e+FpUGEc2ZoRQUzq/aUnaKFc/svWUGSg==
-
-bcrypt@^6.0.0:
-  version "6.0.0"
-  resolved "https://registry.npmjs.org/bcrypt/-/bcrypt-6.0.0.tgz"
-  integrity sha512-cU8v/EGSrnH+HnxV2z0J7/blxH8gq7Xh2JFT6Aroax7UohdmiJJlxApMxtKfuI7z68NvvVcmR78k2LbT6efhRg==
-  dependencies:
-    node-addon-api "^8.3.0"
-    node-gyp-build "^4.8.4"
 
 bcryptjs@^2.4.3:
   version "2.4.3"
@@ -6352,11 +6325,6 @@ next@*, next@^16.1.6:
     "@next/swc-win32-x64-msvc" "16.1.6"
     sharp "^0.34.4"
 
-node-addon-api@^8.3.0:
-  version "8.5.0"
-  resolved "https://registry.npmjs.org/node-addon-api/-/node-addon-api-8.5.0.tgz"
-  integrity sha512-/bRZty2mXUIFY/xU5HLvveNHlswNJej+RnxBjOMkidWfwZzgTbPG1E3K5TOxRLOR+5hX7bSofy8yf1hZevMS8A==
-
 node-exports-info@^1.6.0:
   version "1.6.0"
   resolved "https://registry.npmjs.org/node-exports-info/-/node-exports-info-1.6.0.tgz"
@@ -6373,11 +6341,6 @@ node-fetch@^2.6.7:
   integrity sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A==
   dependencies:
     whatwg-url "^5.0.0"
-
-node-gyp-build@^4.8.4:
-  version "4.8.4"
-  resolved "https://registry.npmjs.org/node-gyp-build/-/node-gyp-build-4.8.4.tgz"
-  integrity sha512-LA4ZjwlnUblHVgq0oBF3Jl/6h/Nvs5fzBLwdEF4nuxnFdsfajde4WfxtJr3CaiH+F6ewcIB/q4jQ4UzPyid+CQ==
 
 node-html-parser@^7.0.2:
   version "7.0.2"
@@ -7644,13 +7607,6 @@ source-map@^0.7.4:
   version "0.7.6"
   resolved "https://registry.npmjs.org/source-map/-/source-map-0.7.6.tgz"
   integrity sha512-i5uvt8C3ikiWeNZSVZNWcfZPItFQOsYTUAOkcUPGd8DqDy1uOUikjt5dG+uRlwyvR108Fb9DOd4GvXfT0N2/uQ==
-
-speakeasy@^2.0.0:
-  version "2.0.0"
-  resolved "https://registry.npmjs.org/speakeasy/-/speakeasy-2.0.0.tgz"
-  integrity sha512-lW2A2s5LKi8rwu77ewisuUOtlCydF/hmQSOJjpTqTj1gZLkNgTaYnyvfxy2WBr4T/h+9c4g8HIITfj83OkFQFw==
-  dependencies:
-    base32.js "0.0.1"
 
 split2@^4.1.0:
   version "4.2.0"

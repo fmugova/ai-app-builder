@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { authenticator } from 'otplib'
+import { totpGenerateSecret, totpKeyUri } from '@/lib/totp'
 import * as QRCode from 'qrcode'
 import { randomBytes } from 'crypto'
 import bcrypt from 'bcryptjs'
@@ -39,8 +39,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Generate TOTP secret
-    const secretBase32 = authenticator.generateSecret()
-    const otpauthUrl = authenticator.keyuri(user.email, 'BuildFlow AI', secretBase32)
+    const secretBase32 = totpGenerateSecret()
+    const otpauthUrl = totpKeyUri(user.email, 'BuildFlow AI', secretBase32)
 
     // Generate QR code
     const qrCode = await QRCode.toDataURL(otpauthUrl)

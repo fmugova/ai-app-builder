@@ -155,7 +155,7 @@ runTest('Package.json Dependencies Check', () => {
     '@prisma/client',
     'next',
     'react',
-    'speakeasy',
+    'otplib',
     'qrcode',
   ];
   

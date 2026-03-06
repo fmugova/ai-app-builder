@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { prisma } from '@/lib/prisma'
-import { authenticator } from 'otplib'
+import { totpVerify } from '@/lib/totp'
 
 export async function POST(req: NextRequest) {
   try {
@@ -46,13 +46,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid token format' }, { status: 400 })
     }
 
-    // Verify token using speakeasy
-    const isValid = speakeasy.totp.verify({
-      secret: user.twoFactorSecret,
-      encoding: 'base32',
-      token,
-      window: 2, // Allow 2 time steps before/after for clock skew (consistent with all other 2FA routes)
-    })
+    // Verify token using otplib
+    const isValid = await totpVerify(user.twoFactorSecret, token, 2)
 
     if (!isValid) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })

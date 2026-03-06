@@ -7,11 +7,9 @@ import { authOptions } from '@/lib/auth'
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
-    console.log('Vercel connect - Session:', JSON.stringify(session, null, 2))
-    
+
     if (!session?.user?.email) {
-      console.warn('Suspicious request: missing session or email', { ip: request.headers.get('x-forwarded-for') ?? 'unknown', session });
+      console.warn('Vercel connect: unauthenticated request', { ip: request.headers.get('x-forwarded-for') ?? 'unknown' });
       const redirectUrl = new URL('/auth/signin', request.url)
       redirectUrl.searchParams.set('callbackUrl', '/settings?connect=vercel')
       return NextResponse.redirect(redirectUrl)

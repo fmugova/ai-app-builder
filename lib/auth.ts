@@ -15,7 +15,7 @@ import {
   detectSuspiciousActivity
 } from './security'
 import { redis } from './rate-limit'
-import { authenticator } from 'otplib'
+import { totpVerify } from '@/lib/totp'
 
 // Define user roles
 export enum UserRole {
@@ -198,11 +198,7 @@ export const authOptions: NextAuthOptions = {
               throw new Error('Invalid 2FA code')
             }
 
-            authenticator.options = { window: 1 } // ±30s
-            const verified = authenticator.verify({
-              token: twoFactorToken,
-              secret: user.twoFactorSecret
-            })
+            const verified = await totpVerify(user.twoFactorSecret, twoFactorToken, 1)
 
             if (verified) {
               // Mark token as used for 90s (one full TOTP step beyond the window)
