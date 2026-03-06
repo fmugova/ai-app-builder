@@ -12,6 +12,8 @@ import { createGenerationPlan } from "@/lib/api/planGeneration";
 import { runGenerationPipeline } from "@/lib/pipeline/htmlGenerationPipeline";
 import { runNextjsGenerationPipeline } from "@/lib/pipeline/nextjsGenerationPipeline";
 import { detectOutputMode } from "@/lib/generation/detectOutputMode";
+import { rateLimiters } from "@/lib/rate-limit";
+import prisma from "@/lib/prisma";
 
 // Detect whether the prompt warrants a Next.js full-stack project.
 // HTML is still the default for marketing sites and simple apps (localStorage CRUD).
@@ -47,6 +49,33 @@ export async function GET(req: NextRequest) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   if (!token?.email) {
     return new Response("Unauthorized", { status: 401 });
+  }
+
+  // Enforce per-user AI rate limit based on subscription tier
+  const dbUser = await prisma.user.findUnique({
+    where: { email: token.email as string },
+    select: { id: true, subscriptionTier: true },
+  });
+  if (!dbUser) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+  const tier = (dbUser.subscriptionTier ?? "free").toLowerCase();
+  const limiterKey =
+    tier === "enterprise" ? "aiEnterprise" : tier === "pro" ? "aiPro" : "aiFree";
+  const rl = await rateLimiters[limiterKey].limit(dbUser.id);
+  if (!rl.success) {
+    return new Response(
+      JSON.stringify({ error: "AI generation rate limit exceeded. Please try again later." }),
+      {
+        status: 429,
+        headers: {
+          "Content-Type": "application/json",
+          "X-RateLimit-Limit": String(rl.limit),
+          "X-RateLimit-Remaining": String(rl.remaining),
+          "X-RateLimit-Reset": String(rl.reset),
+        },
+      }
+    );
   }
 
   const prompt = req.nextUrl.searchParams.get("prompt") ?? "";
