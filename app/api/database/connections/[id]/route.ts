@@ -1,6 +1,7 @@
 import { withAuth } from '@/lib/api-middleware'
 import { logSecurityEvent } from '@/lib/security'
 import { prisma } from '@/lib/prisma'
+import { encrypt } from '@/lib/encryption'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
@@ -103,9 +104,18 @@ export const PUT = withAuth(async (req: NextRequest, context: RouteContext, sess
         { status: 400 }
       )
     }
+    // Encrypt any credential fields being updated
+    // Encrypt credential fields being updated
+    const { password, supabaseAnonKey, supabaseServiceKey, ...rest } = result.data
+    const encryptedData = {
+      ...rest,
+      ...(password !== undefined && { password: password ? encrypt(password) : null }),
+      ...(supabaseAnonKey !== undefined && { supabaseAnonKey: supabaseAnonKey ? encrypt(supabaseAnonKey) : null }),
+      ...(supabaseServiceKey !== undefined && { supabaseServiceKey: supabaseServiceKey ? encrypt(supabaseServiceKey) : null }),
+    }
     const connection = await prisma.databaseConnection.update({
       where: { id },
-      data: result.data,
+      data: encryptedData,
       select: {
         id: true,
         name: true,

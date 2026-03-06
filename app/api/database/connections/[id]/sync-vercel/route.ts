@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { syncSupabaseEnvVarsToVercel } from '@/lib/vercel-env-sync'
+import { decrypt } from '@/lib/encryption'
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -90,8 +91,8 @@ export async function POST(
       vercelProjectId,
       vercelToken: vercelConnection.accessToken,
       supabaseUrl: connection.supabaseUrl,
-      supabaseAnonKey: connection.supabaseAnonKey,
-      supabaseServiceKey: connection.supabaseServiceKey || undefined
+      supabaseAnonKey: connection.supabaseAnonKey ? decrypt(connection.supabaseAnonKey) : connection.supabaseAnonKey,
+      supabaseServiceKey: connection.supabaseServiceKey ? decrypt(connection.supabaseServiceKey) : undefined
     })
 
     if (!result.success) {

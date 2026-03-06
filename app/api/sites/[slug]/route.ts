@@ -2,6 +2,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+}
+
 interface SlugParamContext {
   params: Promise<{ slug: string }>;
 }
@@ -66,7 +75,8 @@ export async function GET(
       if (indexHtml) {
         code = indexHtml.content
       } else if (files.length > 0) {
-        code = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${project.name}</title><style>body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;display:flex;align-items:center;justify-content:center;min-height:100vh}.card{background:#fff;border-radius:12px;padding:40px;max-width:480px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.08)}.icon{font-size:48px;margin-bottom:16px}h1{font-size:22px;font-weight:700;color:#1e293b;margin:0 0 8px}p{color:#64748b;margin:0 0 24px;line-height:1.6}.badge{display:inline-flex;align-items:center;gap:6px;background:#f1f5f9;border-radius:8px;padding:8px 16px;font-size:13px;color:#475569}</style></head><body><div class="card"><div class="icon">⚡</div><h1>${project.name}</h1><p>This is a full-stack Next.js application that requires a live server to run.</p><div class="badge">📦 ${files.length} files generated — deploy to Vercel to view live</div></div></body></html>`
+        const safeName = escapeHtml(project.name)
+        code = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safeName}</title><style>body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;display:flex;align-items:center;justify-content:center;min-height:100vh}.card{background:#fff;border-radius:12px;padding:40px;max-width:480px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.08)}.icon{font-size:48px;margin-bottom:16px}h1{font-size:22px;font-weight:700;color:#1e293b;margin:0 0 8px}p{color:#64748b;margin:0 0 24px;line-height:1.6}.badge{display:inline-flex;align-items:center;gap:6px;background:#f1f5f9;border-radius:8px;padding:8px 16px;font-size:13px;color:#475569}</style></head><body><div class="card"><div class="icon">⚡</div><h1>${safeName}</h1><p>This is a full-stack Next.js application that requires a live server to run.</p><div class="badge">📦 ${files.length} files generated — deploy to Vercel to view live</div></div></body></html>`
       }
     }
 
