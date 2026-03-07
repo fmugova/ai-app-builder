@@ -1,0 +1,30 @@
+# Development & local config
+.env.local
+.env.*.local
+
+# Test files
+__tests__/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+jest.config.*
+jest.setup.*
+
+# Scripts (not needed at runtime)
+scripts/
+
+# Migration backup files
+prisma/migrations/**/*.sql.bak
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

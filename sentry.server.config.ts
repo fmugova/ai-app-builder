@@ -13,9 +13,9 @@ Sentry.init({
   // Enable logs to be sent to Sentry
   enableLogs: true,
 
-  // Enable sending user PII (Personally Identifiable Information)
+  // Do not send PII (emails, IPs, user agents) to Sentry
   // https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/options/#sendDefaultPii
-  sendDefaultPii: true,
+  sendDefaultPii: false,
 
   // Drop AbortErrors — client disconnects mid-stream are expected and should not create noise.
   beforeSend(event, hint) {
