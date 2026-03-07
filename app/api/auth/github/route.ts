@@ -18,32 +18,24 @@ async function getBaseUrl(): Promise<string> {
   const xForwardedHost = headersList.get('x-forwarded-host') || '';
   const xForwardedProto = headersList.get('x-forwarded-proto') || 'https';
   
-  // Log for debugging
-  console.log('🔍 GitHub OAuth - Host header:', host);
-  console.log('🔍 GitHub OAuth - X-Forwarded-Host:', xForwardedHost);
-  
   // Check both host and x-forwarded-host for production domain
   const effectiveHost = xForwardedHost || host;
   
   if (effectiveHost.replace(/^www\./, '').includes('buildflow-ai.app')) {
-    console.log('✅ Detected PRODUCTION environment');
     return PRODUCTION_URL;
   }
   
   // Check if we're on Vercel preview/development
   if (effectiveHost.includes('vercel.app')) {
-    console.log('✅ Detected DEVELOPMENT environment');
     return `${xForwardedProto}://${effectiveHost || DEFAULT_DEV_SUBDOMAIN}`;
   }
   
   // Local development
   if (effectiveHost.includes('localhost')) {
-    console.log('✅ Detected LOCAL environment');
     return 'http://localhost:3000';
   }
   
   // Fallback to production
-  console.log('⚠️ No match found, defaulting to PRODUCTION');
   return PRODUCTION_URL;
 }
 
@@ -70,9 +62,6 @@ export async function GET(
   githubAuthUrl.searchParams.append('redirect_uri', `${baseUrl}/api/auth/github/callback`);
   githubAuthUrl.searchParams.append('scope', 'repo,user:email');
   githubAuthUrl.searchParams.append('state', state);
-  
-  console.log('🔗 Base URL:', baseUrl);
-  console.log('🔗 Redirecting to GitHub OAuth:', githubAuthUrl.toString());
   
   return NextResponse.redirect(githubAuthUrl.toString());
 }

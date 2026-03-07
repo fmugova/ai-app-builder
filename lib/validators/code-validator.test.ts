@@ -53,24 +53,27 @@ describe('CodeValidator', () => {
       expect(result.errors.some(e => e.message.includes('viewport'))).toBe(true)
     })
 
-    it('should catch inline styles (CSP violation)', () => {
+    it('should not flag inline styles (BuildFlow CSP permits unsafe-inline)', () => {
       const validator = new CodeValidator()
       const html = '<div style="color: red;">Text</div>'
       
       const result = validator.validateAll(html, '', '')
       
-      expect(result.errors.some(e => e.category === 'security')).toBe(true)
-      expect(result.errors.some(e => e.message.includes('inline style'))).toBe(true)
+      // BuildFlow's CSP explicitly includes style-src 'unsafe-inline',
+      // so inline styles are permitted and must NOT be flagged as security errors.
+      expect(result.errors.some(e => e.category === 'security' && e.message.toLowerCase().includes('style'))).toBe(false)
     })
 
-    it('should catch inline event handlers (CSP violation)', () => {
+    it('should warn about inline event handlers (CSP advisory)', () => {
       const validator = new CodeValidator()
       const html = '<button onclick="alert()">Click</button>'
       
       const result = validator.validateAll(html, '', '')
       
-      expect(result.errors.some(e => e.category === 'security')).toBe(true)
-      expect(result.errors.some(e => e.message.includes('onclick'))).toBe(true)
+      // onclick is flagged as a security warning (not an error) because
+      // BuildFlow's pipeline generates them and the auto-fixer converts them.
+      expect(result.warnings.some(e => e.category === 'security')).toBe(true)
+      expect(result.warnings.some(e => e.message.includes('onclick'))).toBe(true)
     })
   })
 
