@@ -12,8 +12,10 @@ import {
   checkAccountLockout,
   trackFailedLoginAttempt,
   resetFailedLoginAttempts,
-  detectSuspiciousActivity
+  detectSuspiciousActivity,
+  createActiveSession,
 } from './security'
+import { computeFingerprint } from './fingerprint'
 import { redis } from './rate-limit'
 import { totpVerify } from '@/lib/totp'
 
@@ -277,6 +279,28 @@ export const authOptions: NextAuthOptions = {
             severity: 'info',
           })
 
+          // Compute browser fingerprint (fail-safe — must never block login)
+          let _fingerprint: string | undefined
+          const rawHeaders: Record<string, string> = {}
+          try {
+            for (const [k, v] of Object.entries(req?.headers ?? {})) {
+              rawHeaders[k] = Array.isArray(v) ? v.join(',') : (v ?? '')
+            }
+            _fingerprint = await computeFingerprint(new Headers(rawHeaders)) || undefined
+          } catch { /* ignore */ }
+
+          // Wire up createActiveSession (defined in lib/security.ts but was never called)
+          try {
+            await createActiveSession(
+              user.id,
+              crypto.randomUUID(),
+              new Request('https://buildflow-ai.app', { headers: new Headers(rawHeaders) }),
+              _fingerprint
+            )
+          } catch (err) {
+            console.error('[auth] createActiveSession failed:', err)
+          }
+
           return {
             id: user.id,
             email: user.email,
@@ -284,6 +308,7 @@ export const authOptions: NextAuthOptions = {
             role: user.role,
             image: user.image,
             emailVerified: user.emailVerified,
+            ...(_fingerprint ? { _fingerprint } : {}),
           }
         } catch (error) {
           console.error('[AUTH ERROR]', error)
@@ -299,6 +324,9 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role;
         token.emailVerified = user.emailVerified ?? null;
         token.roleRefreshedAt = Date.now();
+        // Store fingerprint from credentials authorize into JWT (absent for OAuth users)
+        const fp = (user as unknown as Record<string, unknown>)._fingerprint
+        if (typeof fp === 'string' && fp) token.fingerprint = fp
       }
 
       // Refresh role + emailVerified from DB every 15 minutes or on explicit update
@@ -351,6 +379,17 @@ export const authOptions: NextAuthOptions = {
       } catch (err) {
         // Event logging must never crash the sign-in flow
         console.error('[auth] Failed to log signIn event:', err)
+      }
+      // Wire createActiveSession for OAuth users — credentials users are handled
+      // inside authorize() where the real request object is available.
+      // OAuth sessions have no req here, so IP/UA will be null (nullable fields).
+      if (account?.provider !== 'credentials') {
+        createActiveSession(
+          user.id,
+          account?.providerAccountId || user.id,
+          new Request('https://buildflow-ai.app'),
+          undefined
+        ).catch(err => console.error('[auth] createActiveSession (oauth) failed:', err))
       }
     },
     async signOut({ token }) {

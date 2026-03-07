@@ -37,5 +37,6 @@ declare module 'next-auth/jwt' {
     emailVerified: Date | null
     projectsThisMonth: number
     generationsUsed: number
+    fingerprint?: string
   }
 }

@@ -7,6 +7,7 @@
 // DB save is handled client-side via POST /api/generate/save after the done event.
 
 import { NextRequest } from "next/server";
+import { withLogging } from "@/lib/with-logging";
 import { getToken } from "next-auth/jwt";
 import { createGenerationPlan } from "@/lib/api/planGeneration";
 import { runGenerationPipeline } from "@/lib/pipeline/htmlGenerationPipeline";
@@ -45,7 +46,7 @@ function shouldUseNextjs(prompt: string): boolean {
 // Edge Runtime ignores the vercel.json functions config and caps at 30s.
 export const maxDuration = 300;
 
-export async function GET(req: NextRequest) {
+async function GETHandler(req: NextRequest) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   if (!token?.email) {
     return new Response("Unauthorized", { status: 401 });
@@ -245,3 +246,5 @@ export async function GET(req: NextRequest) {
     },
   });
 }
+
+export const GET = withLogging(GETHandler);

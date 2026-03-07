@@ -1,0 +1,46 @@
+name: "Snyk Security Scan"
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    # Monday 09:00 UTC — offset from CodeQL (08:00) to avoid concurrent billing
+    - cron: "0 9 * * 1"
+
+jobs:
+  snyk:
+    name: Snyk Dependency & Code Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Snyk vulnerability scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          # Only fail on high/critical; upload results either way
+          args: --severity-threshold=high --sarif-file-output=snyk.sarif
+
+      - name: Upload Snyk results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        # Upload even when scan step fails so findings are always visible
+        if: always()
+        with:
+          sarif_file: snyk.sarif

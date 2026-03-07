@@ -4,6 +4,8 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
+import { computeFingerprint } from '@/lib/fingerprint'
+import { redis } from '@/lib/rate-limit'
 
 // ── Routes that require a logged-in session ──────────────────────────────────
 const PROTECTED_PREFIXES = [
@@ -159,6 +161,15 @@ function csrfOriginCheck(req: NextRequest): NextResponse | null {
 export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // Mutable header set — forwarded to the origin route handler via NextResponse.next()
+  const requestHeaders = new Headers(request.headers)
+
+  // Inject X-Request-ID for all API requests so handlers and withLogging HOF
+  // can correlate logs with a consistent ID end-to-end
+  if (pathname.startsWith('/api/')) {
+    requestHeaders.set('x-request-id', crypto.randomUUID())
+  }
+
   // 1. Maintenance mode — runs before everything
   const maintenanceRedirect = await maintenanceModeCheck(request)
   if (maintenanceRedirect) return maintenanceRedirect
@@ -169,7 +180,7 @@ export default async function middleware(request: NextRequest) {
 
   // 3. Skip auth for public paths
   const isPublicPath = PUBLIC_PREFIXES.some(p => pathname.startsWith(p)) || pathname === '/'
-  if (isPublicPath) return NextResponse.next()
+  if (isPublicPath) return NextResponse.next({ request: { headers: requestHeaders } })
 
   // 4. Require authentication for protected routes
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
@@ -199,9 +210,28 @@ export default async function middleware(request: NextRequest) {
     if (emailVerified && pathname === '/verify-email-notice') {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
+
+    // 7. Session fingerprint hijacking check — soft signal only, never blocks requests.
+    // Only applies to API routes for credentials-authenticated users (token.fingerprint
+    // is absent for OAuth users so the check is automatically skipped).
+    if (token.fingerprint && pathname.startsWith('/api/')) {
+      try {
+        const currentFp = await computeFingerprint(request.headers)
+        if (currentFp && currentFp !== token.fingerprint) {
+          const suspKey = `suspicious:${token.sub}`
+          const count = await redis.incr(suspKey)
+          // Set TTL only on first increment to start a 1-hour window
+          if (count === 1) redis.expire(suspKey, 3600).catch(() => {})
+          // Forward as a header so downstream monitoring can pick it up
+          requestHeaders.set('x-suspicious-session', '1')
+        }
+      } catch {
+        // Fingerprint check must never block any request
+      }
+    }
   }
 
-  return NextResponse.next()
+  return NextResponse.next({ request: { headers: requestHeaders } })
 }
 
 export const config = {

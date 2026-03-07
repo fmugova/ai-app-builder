@@ -3,14 +3,15 @@
 // Returns all personal data held for the authenticated user as a JSON download.
 // Excludes: hashed passwords, internal tokens, 2FA secrets, reset tokens.
 
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { withLogging } from '@/lib/with-logging'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+async function GETHandler(_req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -93,3 +94,5 @@ export async function GET() {
     },
   })
 }
+
+export const GET = withLogging(GETHandler)

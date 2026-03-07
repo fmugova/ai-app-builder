@@ -3,6 +3,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { redis } from '@/lib/rate-limit'
+import { sendSecurityAlert } from '@/lib/security-emails'
 import crypto from 'crypto'
 import bcrypt from 'bcryptjs'
 
@@ -152,7 +153,8 @@ async function getLocationFromIP(ipAddress: string): Promise<string | null> {
 export async function createActiveSession(
   userId: string,
   sessionToken: string,
-  request: Request
+  request: Request,
+  fingerprint?: string
 ) {
   const ipAddress = getIpAddress(request)
   const userAgent = request.headers.get('user-agent') || undefined
@@ -169,6 +171,26 @@ export async function createActiveSession(
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
     }
   })
+
+  // New-device detection: compare fingerprint to last-known value in Redis.
+  // No DB migration needed — fingerprint lives in Redis only (30-day TTL matches session).
+  if (fingerprint) {
+    try {
+      const fpKey = `fp:${userId}`
+      const lastFp = await redis.get<string>(fpKey)
+      if (lastFp !== null && lastFp !== fingerprint) {
+        // Known user, fingerprint changed → new device detected → alert (fire-and-forget)
+        sendSecurityAlert(userId, 'new_login_location', {
+          ipAddress,
+          device: userAgent,
+        }).catch(err => console.error('[security] fp alert failed:', err))
+      }
+      await redis.set(fpKey, fingerprint, { ex: 30 * 24 * 3600 })
+    } catch (err) {
+      // Fingerprint check must never block session creation
+      console.error('[security] fingerprint Redis check failed:', err)
+    }
+  }
 }
 
 export async function updateSessionActivity(sessionToken: string) {
