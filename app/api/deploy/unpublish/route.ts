@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { checkRateLimitByIdentifier } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,10 +23,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find the project
+    // Rate limit: 10 unpublish ops per 10 minutes per user
+    const rl = await checkRateLimitByIdentifier(`unpublish:${session.user.id}`, 'external');
+    if (!rl.success) {
+      const retryAfter = Math.ceil((rl.reset - Date.now()) / 1000);
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': retryAfter.toString() } }
+      );
+    }
+
+    // Find the project and verify ownership in one query — use userId (not email)
     const project = await prisma.project.findUnique({
       where: { id: projectId },
-      include: { User: true },
+      select: { id: true, isPublished: true, name: true, status: true, userId: true },
     });
 
     if (!project) {
@@ -35,8 +46,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify ownership
-    if (project.User.email !== session.user.email) {
+    // Verify ownership by userId — avoids loading the full User relation
+    const user = await prisma.user.findUnique({ where: { email: session.user.email! }, select: { id: true } });
+    if (!user || project.userId !== user.id) {
       return NextResponse.json(
         { error: 'Unauthorized - you do not own this project' },
         { status: 403 }

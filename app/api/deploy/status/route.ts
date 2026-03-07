@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { decrypt } from '@/lib/encryption';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -39,6 +40,9 @@ export async function GET(request: NextRequest) {
     if (!user?.VercelConnection) {
       return NextResponse.json({ error: 'Vercel not connected' }, { status: 400 });
     }
+    // Decrypt Vercel token (stored encrypted in DB)
+    const vercelToken = decrypt(user.VercelConnection.accessToken)
+
     // Check deployment status on Vercel
     let vercelRes: Response;
     try {
@@ -46,7 +50,7 @@ export async function GET(request: NextRequest) {
         `https://api.vercel.com/v13/deployments/${deploymentId}`,
         {
           headers: {
-            'Authorization': `Bearer ${user.VercelConnection.accessToken}`
+            'Authorization': `Bearer ${vercelToken}`
           }
         }
       );

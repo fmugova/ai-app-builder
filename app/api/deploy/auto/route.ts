@@ -6,6 +6,7 @@ import { deployToVercel } from '@/lib/vercel-deploy'
 import { provisionSupabaseDatabase } from '@/lib/supabase-auto-setup'
 import { z } from 'zod'
 import { Prisma } from '@prisma/client'
+import { decrypt } from '@/lib/encryption'
 
 const autoDeploySchema = z.object({
   projectId: z.string().cuid(),
@@ -98,11 +99,14 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    // Decrypt Vercel token (stored encrypted in DB)
+    const vercelToken = decrypt(user.VercelConnection.accessToken)
+
     // Start deployment process in background
     deployProjectInBackground(
       deployment.id,
       project,
-      user.VercelConnection.accessToken,
+      vercelToken,
       user.SupabaseIntegration?.accessToken,
       validatedData
     ).catch(async (error) => {

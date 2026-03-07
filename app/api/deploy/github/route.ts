@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { decrypt } from '@/lib/encryption';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,6 +14,15 @@ export async function POST(req: NextRequest) {
     }
 
     const { projectId } = await req.json();
+
+    // Rate limit: 10 GitHub deploys per 10 minutes per user
+    const rateLimit = await checkRateLimit(req, 'external', session.user.id);
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: 'Too many GitHub deployments. Please try again later.', remaining: rateLimit.remaining },
+        { status: 429 }
+      );
+    }
 
     if (!projectId) {
       return NextResponse.json({ error: 'Project ID required' }, { status: 400 });

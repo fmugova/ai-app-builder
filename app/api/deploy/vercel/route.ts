@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { decrypt } from '@/lib/encryption';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -84,11 +85,14 @@ export async function POST(request: NextRequest) {
       projectId
     });
 
+    // Decrypt Vercel token (stored encrypted in DB)
+    const vercelToken = decrypt(user.VercelConnection.accessToken)
+
     // Create Vercel deployment from GitHub repo
     const vercelRes = await fetch('https://api.vercel.com/v13/deployments', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${user.VercelConnection.accessToken}`,
+        'Authorization': `Bearer ${vercelToken}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({

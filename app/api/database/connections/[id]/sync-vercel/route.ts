@@ -97,7 +97,7 @@ export async function POST(
     // Sync environment variables
     const result = await syncSupabaseEnvVarsToVercel({
       vercelProjectId,
-      vercelToken: vercelConnection.accessToken,
+      vercelToken: decrypt(vercelConnection.accessToken),
       supabaseUrl: connection.supabaseUrl,
       supabaseAnonKey: connection.supabaseAnonKey ? decrypt(connection.supabaseAnonKey) : connection.supabaseAnonKey,
       supabaseServiceKey: connection.supabaseServiceKey ? decrypt(connection.supabaseServiceKey) : undefined

@@ -194,6 +194,7 @@ export async function POST(request: NextRequest) {
         const planConfig = {
           pro: { generationsLimit: 100, projectsLimit: 50 },
           business: { generationsLimit: 500, projectsLimit: 200 },
+          enterprise: { generationsLimit: 2000, projectsLimit: 1000 },
           free: { generationsLimit: 3, projectsLimit: 3 },
         }[plan] || { generationsLimit: 100, projectsLimit: 50 }
 
