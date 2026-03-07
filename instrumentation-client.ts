@@ -33,18 +33,19 @@ Sentry.init({
   // Define how likely Replay events are sampled when an error occurs.
   replaysOnErrorSampleRate: 1.0,
 
-  // Enable sending user PII (Personally Identifiable Information)
-  // https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/options/#sendDefaultPii
-  sendDefaultPii: true,
+  // Do NOT send PII — names, emails, IP addresses stay out of Sentry error reports.
+  // Error events are still captured; user identity is not attached.
+  sendDefaultPii: false,
 });
 
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
 
-// PostHog client-side initialization
-// Using instrumentation-client.ts is the recommended approach for Next.js 15.3+
+// PostHog client-side initialization — gated behind cookie consent.
+// Only initialises if the user has explicitly accepted analytics cookies (bf_consent=all).
 import posthog from "posthog-js";
+import { hasAnalyticsConsent } from "@/lib/consent";
 
-if (process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+if (process.env.NEXT_PUBLIC_POSTHOG_KEY && hasAnalyticsConsent()) {
   posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
     // Use env var directly — hardcoding "/ingest" causes Turbopack's dev proxy
     // to return 500 on external rewrites. The next.config.ts rewrite still applies

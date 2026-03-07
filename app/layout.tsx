@@ -5,13 +5,12 @@ import { authOptions } from '@/lib/auth'
 import { checkIfAdmin } from '@/lib/admin-check'
 import { Inter } from 'next/font/google'
 import Providers from './providers'
-import { Analytics } from '@vercel/analytics/next'
-import { SpeedInsights } from '@vercel/speed-insights/next'
-import { GoogleAnalytics, GoogleTagManager } from '@next/third-parties/google'
 import { HomePageSchema } from '@/components/JsonLd'
 import SupportChat from '@/components/SupportChat'
 import FeedbackWidget from '@/components/FeedbackWidget'
 import CSPMonitor from '@/components/CSPMonitor'
+import CookieConsent from '@/components/CookieConsent'
+import ConditionalAnalytics from '@/components/ConditionalAnalytics'
 import type { Metadata, Viewport } from 'next'
 
 
@@ -197,15 +196,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <main className="pt-16">
           <Providers>{children}</Providers>
         </main>
-        {/* Only load Vercel Analytics and SpeedInsights in production */}
-        {process.env.NODE_ENV === 'production' && (
-          <>
-            <Analytics />
-            <SpeedInsights />
-          </>
-        )}
-        <GoogleAnalytics gaId="GTM-KNTK3Z8G" />
-        <GoogleTagManager gtmId="GTM-KNTK3Z8G" />
+        {/* Analytics — only loaded after the user accepts all cookies */}
+        <ConditionalAnalytics />
+        <CookieConsent />
         <SupportChat />
         <FeedbackWidget />
         <CSPMonitor />

@@ -4,19 +4,23 @@ import posthog from 'posthog-js'
 import { PostHogProvider as PHProvider, usePostHog } from 'posthog-js/react'
 import { useSession } from 'next-auth/react'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { useEffect, Suspense } from 'react'
+import { useEffect, useState, Suspense } from 'react'
+import { hasAnalyticsConsent } from '@/lib/consent'
 
 // ── Pageview tracker ────────────────────────────────────────────────────────
 function PageviewTracker() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const ph = usePostHog()
+  const [analyticsOk, setAnalyticsOk] = useState(false)
+
+  useEffect(() => { setAnalyticsOk(hasAnalyticsConsent()) }, [])
 
   useEffect(() => {
-    if (!ph) return
+    if (!ph || !analyticsOk) return
     const url = pathname + (searchParams?.toString() ? `?${searchParams.toString()}` : '')
     ph.capture('$pageview', { $current_url: url })
-  }, [pathname, searchParams, ph])
+  }, [pathname, searchParams, ph, analyticsOk])
 
   return null
 }
@@ -25,9 +29,12 @@ function PageviewTracker() {
 function IdentitySync() {
   const { data: session } = useSession()
   const ph = usePostHog()
+  const [analyticsOk, setAnalyticsOk] = useState(false)
+
+  useEffect(() => { setAnalyticsOk(hasAnalyticsConsent()) }, [])
 
   useEffect(() => {
-    if (!ph) return
+    if (!ph || !analyticsOk) return
     if (session?.user) {
       const user = session.user as { id?: string; email?: string; name?: string }
       if (user.id) {
@@ -40,7 +47,7 @@ function IdentitySync() {
       // User logged out — reset to anonymous
       ph.reset()
     }
-  }, [session, ph])
+  }, [session, ph, analyticsOk])
 
   return null
 }
