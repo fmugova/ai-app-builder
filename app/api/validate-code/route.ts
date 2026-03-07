@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import CodeValidator from '@/lib/validators/code-validator';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit: anonymous callers identified by IP, 30 req/min
+    const rl = await checkRateLimit(req, 'general');
+    if (!rl.success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429 }
+      );
+    }
+
     const { code } = await req.json();
 
     if (!code || typeof code !== 'string') {

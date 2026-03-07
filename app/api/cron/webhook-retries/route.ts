@@ -20,15 +20,15 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  // Verify cron secret (optional but recommended)
+  // Always require CRON_SECRET — fail closed if env var is not configured
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    console.error('[cron/webhook-retries] CRON_SECRET is not set — rejecting request');
+    return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
+  }
   const authHeader = request.headers.get('authorization');
-  if (process.env.CRON_SECRET) {
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {

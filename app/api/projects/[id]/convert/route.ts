@@ -21,7 +21,7 @@ export async function POST(
       include: { User: true }
     })
 
-    if (!project || project.User.email !== session.user.email) {
+    if (!project || project.User?.email !== session.user.email) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 

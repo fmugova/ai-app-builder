@@ -1,17 +1,25 @@
 import { NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { validateCode } from '@/lib/validators/code-validator';
 import { autoFixCode } from '@/lib/validators/auto-fixer';
 import { ensureValidHTML } from '@/lib/templates/htmlTemplate';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 
 /**
- * Test endpoint to verify validation pipeline
- * Tests each layer individually: validation → auto-fix → re-validation → template wrapper
- * 
- * Usage:
- * POST /api/test-validation
- * Body: { "html": "<html><body>Test</body></html>" }
+ * Internal test endpoint to verify validation pipeline — admin only.
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  // Admin-only guard
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  const actor = await prisma.user.findUnique({ where: { email: session.user.email }, select: { role: true } });
+  if (actor?.role !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
   try {
     const { html } = await request.json();
 
@@ -21,76 +29,26 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-
-    console.log('🧪 Testing validation system...');
-    console.log('📝 Input HTML length:', html.length);
     
-    // ========================================================================
-    // STEP 1: Initial Validation
-    // ========================================================================
-    console.log('\n=== STEP 1: INITIAL VALIDATION ===');
+    // Step 1: Initial Validation
     const validation = validateCode(html);
-    console.log('📊 Validation results:', {
-      score: validation.score,
-      passed: validation.passed,
-      errors: validation.summary.errors,
-      warnings: validation.summary.warnings,
-      info: validation.summary.info,
-    });
 
-    // ========================================================================
-    // STEP 2: Auto-Fix
-    // ========================================================================
-    console.log('\n=== STEP 2: AUTO-FIX ===');
+    // Step 2: Auto-Fix
     const fixResult = autoFixCode(html, validation);
-    console.log('🔧 Applied fixes:', fixResult.appliedFixes);
-    console.log('📏 Code length change:', html.length, '→', fixResult.fixed.length);
 
-    // ========================================================================
-    // STEP 3: Re-Validation After Auto-Fix
-    // ========================================================================
-    console.log('\n=== STEP 3: RE-VALIDATION AFTER AUTO-FIX ===');
+    // Step 3: Re-Validation After Auto-Fix
     const revalidation = validateCode(fixResult.fixed);
-    console.log('📊 Re-validation results:', {
-      score: revalidation.score,
-      passed: revalidation.passed,
-      errors: revalidation.summary.errors,
-      warnings: revalidation.summary.warnings,
-    });
 
-    // ========================================================================
-    // STEP 4: Template Wrapper (if score < 90)
-    // ========================================================================
-    console.log('\n=== STEP 4: TEMPLATE WRAPPER CHECK ===');
+    // Step 4: Template wrapper (if score < 90)
     let finalHtml = fixResult.fixed;
     let finalValidation = revalidation;
     let templateWrapperApplied = false;
 
     if (revalidation.score < 90) {
-      console.log('⚠️ Score too low (' + revalidation.score + '), applying template wrapper');
       finalHtml = ensureValidHTML(fixResult.fixed, 'Test Application');
       templateWrapperApplied = true;
-
-      // Final validation after template wrapper
       finalValidation = validateCode(finalHtml);
-      console.log('📊 Final validation after template wrapper:', {
-        score: finalValidation.score,
-        passed: finalValidation.passed,
-        errors: finalValidation.summary.errors,
-        warnings: finalValidation.summary.warnings,
-      });
-    } else {
-      console.log('✅ Score acceptable (' + revalidation.score + '), skipping template wrapper');
     }
-
-    // ========================================================================
-    // SUMMARY
-    // ========================================================================
-    console.log('\n=== SUMMARY ===');
-    console.log('Original score:', validation.score);
-    console.log('After auto-fix:', revalidation.score, '(+' + (revalidation.score - validation.score) + ')');
-    console.log('Final score:', finalValidation.score);
-    console.log('Template wrapper used:', templateWrapperApplied);
 
     return NextResponse.json({
       success: true,
@@ -136,7 +94,6 @@ export async function POST(request: Request) {
     });
 
   } catch (error) {
-    console.error('❌ Test validation error:', error);
     return NextResponse.json(
       { 
         error: 'Test validation failed',
@@ -147,10 +104,16 @@ export async function POST(request: Request) {
   }
 }
 
-/**
- * GET endpoint to show usage instructions
- */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Admin-only guard
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  const actor = await prisma.user.findUnique({ where: { email: session.user.email }, select: { role: true } });
+  if (actor?.role !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
   return NextResponse.json({
     endpoint: '/api/test-validation',
     method: 'POST',
