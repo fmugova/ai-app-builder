@@ -77,6 +77,7 @@ const nextConfig: NextConfig = {
     '@prisma/client',
     'bcryptjs',
     'esbuild',
+    'otplib', // Turbopack can't statically analyse otplib's CJS/ESM exports
   ],
 
   headers: async () => [
