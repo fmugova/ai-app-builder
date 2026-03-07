@@ -40,9 +40,11 @@ export const HTML_SYSTEM_PROMPT = `You are an expert frontend developer generati
 ### Visual quality -- CRITICAL for competitive output
 - Hero sections: full-width gradient or image background, large bold headline, compelling sub-copy, 2 CTA buttons
 - Cards: drop-shadow, rounded-2xl, hover:shadow-xl hover:-translate-y-1 transition
-- Images: use <img src="https://picsum.photos/seed/{UNIQUE_SEED}/{W}/{H}" alt="..."> for every image placeholder
-  - Always use a unique seed per image (e.g. "hero1", "team2", "product3")
-  - Standard sizes: hero 1200×600, cards 600×400, team 300×300, thumbnails 400×300
+- Images: if a "SITE-SPECIFIC IMAGE PALETTE" block appears in the user message, use ONLY those Unsplash URLs — they match the actual subject matter of the site
+  - If no palette is provided, fall back to picsum: <img src="https://picsum.photos/seed/{TOPIC_SEED}/{W}/{H}" alt="...">
+    where TOPIC_SEED describes the subject matter (e.g. "barista-coffee-latte", "lawyer-courtroom", "gym-weights-barbell")
+  - NEVER use generic seeds like "hero1", "team2", "product3" — they produce the same stock photo on every site
+  - Standard sizes: hero 1200×600, cards 600×400, team 400×400, thumbnails 400×300
 - Color: rich gradient CTAs (bg-gradient-to-r from-indigo-600 to-purple-600), not flat single-color buttons
 
 ### Content requirements -- this is critical

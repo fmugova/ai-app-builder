@@ -14,6 +14,7 @@ import {
 import {
   HTML_SYSTEM_PROMPT,
 } from "@/lib/generation/htmlPrompt";
+import { getImagePaletteBlock } from "@/lib/imageLibrary";
 import {
   validatePageCompleteness,
   buildPageRegenerationPrompt,
@@ -316,6 +317,8 @@ async function generateSharedAssets(
 
   const hasAuthPages = pages.some((p) => ["login", "signup", "dashboard", "member", "account", "profile", "settings"].includes(p.slug));
 
+  const sharedImagePalette = getImagePaletteBlock(userPrompt)
+
   const prompt = `Generate the shared design system and navigation for a website called "${siteName}".
 
 User's design requirements:
@@ -380,6 +383,7 @@ Generate FOUR items:
    - Copyright line
    - Style: bg-gray-900 text-gray-300 py-12
 
+${sharedImagePalette ? `\n${sharedImagePalette}\n` : ''}
 Return JSON exactly:
 {
   "style.css": "/* minimal CSS */",
@@ -458,6 +462,9 @@ async function generateSinglePage(
   // Pages that must redirect to login if user is not authenticated
   const PROTECTED_SLUGS = new Set(["dashboard", "member", "account", "profile", "settings", "admin"]);
   const isProtected = PROTECTED_SLUGS.has(page.slug.toLowerCase());
+
+  // Detect site category and build topic-specific image palette
+  const imagePalette = getImagePaletteBlock(userPrompt)
 
   const prompt = `Generate the complete "${page.name}" page (${filename}) for "${siteName}".
 
@@ -733,6 +740,7 @@ REQUIRED INLINE SCRIPT (place just before </body>):
 DO NOT include nav or hero section on this page — it's a full-page auth screen.
 ` : ""}
 
+${imagePalette ? `\n${imagePalette}\n` : ''}
 Output ONLY the HTML file starting with <!DOCTYPE html>:`;
 
   try {
