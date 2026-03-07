@@ -333,6 +333,7 @@ Generate FOUR items:
       function getAuthToken() { return localStorage.getItem('auth_token'); }
       function requireAuth(redirect) { if (!getAuthToken()) { window.location.href = redirect || 'login.html'; return false; } return true; }
       function logout() { localStorage.removeItem('auth_token'); localStorage.removeItem('auth_user'); window.location.href = 'index.html'; }
+      document.addEventListener('click', function(e) { var btn = e.target.closest('[data-action="logout"]'); if (btn) logout(); });
       function updateNavForAuth() {
         var user = getAuthUser();
         document.querySelectorAll('[data-auth="guest"]').forEach(function(el){ el.style.display = user ? 'none' : ''; });
@@ -354,7 +355,7 @@ Generate FOUR items:
      <!-- User menu (hidden when logged out, display:none by default) -->
      <div data-auth="user" style="display:none" class="flex items-center gap-3">
        <span class="text-sm text-gray-700">Hi, <span id="nav-user-name"></span></span>
-       <button onclick="logout()" class="text-sm text-gray-500 hover:text-red-600 font-medium">Logout</button>
+       <button data-action="logout" class="text-sm text-gray-500 hover:text-red-600 font-medium">Logout</button>
      </div>` : ""}
    - Style: bg-white shadow-sm sticky top-0 z-50
 
@@ -495,8 +496,10 @@ This is a FUNCTIONAL WEB APP — build a working interactive interface, not a ma
    - addItem(): read value, push to array, save(), render(), clear input
 
 4. DELETE / REMOVE functionality (if applicable):
-   - Each item gets a delete button: <button onclick="deleteItem(id)" ...>×</button>
-   - deleteItem(id): filter array, save(), render()
+   - Each item gets a delete button with data-id attribute (NO onclick): <button data-id="${item.id}" class="delete-btn" ...>×</button>
+   - Use event delegation on the list container (set up once in DOMContentLoaded, survives re-renders):
+     list.addEventListener('click', function(e) { var btn = e.target.closest('.delete-btn'); if (btn) deleteItem(btn.dataset.id); });
+   - deleteItem(id): filter array by id, save(), render()
 
 5. SCROLL ANIMATIONS:
    - Add class="reveal" to major section divs (the app container, any stats sections)

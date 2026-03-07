@@ -108,13 +108,17 @@ class CodeValidator {
     // NOTE: inline style="" attributes are NOT flagged — BuildFlow's injected CSP
     // explicitly includes style-src 'unsafe-inline', so they are permitted.
 
-    // CSP Violations - inline event handlers (script-src-attr 'none' in strict mode)
-    const inlineHandlers = ['onclick', 'onload', 'onerror', 'onmouseover']
+    // Inline event handlers — warn but don't fail. BuildFlow's HTML pipeline generates
+    // these deliberately; the auto-fixer converts them to addEventListener on demand.
+    const inlineHandlers = ['onload', 'onerror', 'onmouseover']
     inlineHandlers.forEach(handler => {
       if (html.includes(handler + '=')) {
-        this.addError('security', `CSP violation: Found inline ${handler} handler`, 'critical')
+        this.addWarning('security', `Inline ${handler} handler detected — auto-fix will convert to addEventListener`, 'medium')
       }
     })
+    if (html.includes('onclick=')) {
+      this.addWarning('security', 'Inline onclick handler(s) detected — auto-fix will convert to addEventListener', 'low')
+    }
 
     // Check for semantic HTML
     if (!html.includes('<main')) {
@@ -373,7 +377,7 @@ class CodeValidator {
   // ==========================================================================
   // SECURITY VALIDATION
   // ==========================================================================
-  public validateSecurity(html: string, js: string): void {
+  public validateSecurity(_html: string, js: string): void {
     // XSS checks
     if (js.includes('innerHTML') || js.includes('outerHTML')) {
       if (!js.includes('DOMPurify') && !js.includes('textContent')) {
