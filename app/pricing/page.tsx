@@ -113,6 +113,7 @@ export default function PricingPage() {
     code: string
     discountValue: number
     discountType: string
+    stripeCouponId: string
   } | null>(null)
   const [validatingPromo, setValidatingPromo] = useState(false)
 
@@ -130,9 +131,11 @@ export default function PricingPage() {
 
     setValidatingPromo(true)
     try {
-      const response = await fetch('/api/promo/validate', {
+      // validate-promo creates the Stripe coupon and returns stripeCouponId
+      const response = await fetch('/api/stripe/validate-promo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        // plan is unknown here (user hasn't picked one yet); server skips plan check when omitted
         body: JSON.stringify({ code: promoCode.trim().toUpperCase() }),
       })
 
@@ -143,8 +146,9 @@ export default function PricingPage() {
           code: data.code,
           discountValue: data.discountValue,
           discountType: data.discountType,
+          stripeCouponId: data.stripeCouponId,
         })
-        toast.success(`🎉 ${data.discountValue}% discount applied!`, {
+        toast.success(`🎉 ${data.message}`, {
           duration: 2000,
           id: 'discount-applied',
         })
@@ -152,7 +156,7 @@ export default function PricingPage() {
           toast.dismiss('discount-applied');
         }, 2000);
       } else {
-        toast.error(data.message || 'Invalid promo code')
+        toast.error(data.error || 'Invalid promo code')
       }
     } catch (error) {
       toast.error('Failed to validate promo code')
@@ -204,12 +208,14 @@ export default function PricingPage() {
       // Track checkout started
       analytics.checkoutStarted(planId, price)
 
-      const response = await fetch('/api/stripe/create-checkout', {
+      const response = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           priceId,
-          promoCode: appliedPromo?.code,
+          plan: planId,
+          // use Stripe coupon ID (not raw code) so checkout always finds the coupon
+          promoCode: appliedPromo?.stripeCouponId ?? null,
         }),
       })
 

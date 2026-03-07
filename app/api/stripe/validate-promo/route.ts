@@ -25,10 +25,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ valid: false, error: 'Promo code is required' })
     }
 
+    // Sanitise: only allow safe characters to prevent injection
+    const upperCode = String(code).toUpperCase().replace(/[^A-Z0-9_-]/g, '')
+    if (!upperCode) {
+      return NextResponse.json({ valid: false, error: 'Invalid promo code format' })
+    }
+
     // Check if promo code exists in our database
     const promo = await prisma.promo_codes.findFirst({
       where: {
-        code: code.toUpperCase(),
+        code: upperCode,
         active: true,
       },
     })
@@ -57,7 +63,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if promo code is applicable to the selected plan
-    if (promo.applicableTo.length > 0 && !promo.applicableTo.includes(plan)) {
+    // Skip this check when no plan is provided (e.g. pricing page validates before plan selection)
+    if (plan && promo.applicableTo.length > 0 &&
+        !promo.applicableTo.includes(plan) && !promo.applicableTo.includes('all')) {
       return NextResponse.json({ 
         valid: false, 
         error: `This promo code is not valid for the ${plan} plan` 
@@ -81,12 +89,12 @@ export async function POST(req: NextRequest) {
     let stripeCoupon
     try {
       // Try to retrieve existing coupon
-      stripeCoupon = await stripe.coupons.retrieve(code.toUpperCase())
+      stripeCoupon = await stripe.coupons.retrieve(upperCode)
     } catch {
       // Coupon doesn't exist in Stripe, create it
       const couponData: Stripe.CouponCreateParams = {
-        id: code.toUpperCase(),
-        name: `Promo: ${code.toUpperCase()}`,
+        id: upperCode,
+        name: `Promo: ${upperCode}`,
         duration: 'once', // Apply once to the first payment
       }
 

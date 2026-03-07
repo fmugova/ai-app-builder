@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma'
+import { checkRateLimitByIdentifier } from '@/lib/rate-limit'
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,17 +18,48 @@ export async function POST(request: NextRequest) {
       }, { status: 401 })
     }
 
+    // Rate-limit: 10 attempts per 10 minutes per user
+    const rl = await checkRateLimitByIdentifier(`promo-validate:${session.user.email}`, 'external')
+    if (!rl.success) {
+      const retryAfter = Math.ceil((rl.reset - Date.now()) / 1000)
+      return NextResponse.json(
+        { error: 'Too many attempts. Please try again later.', valid: false },
+        { status: 429, headers: { 'Retry-After': retryAfter.toString() } }
+      )
+    }
+
     const { code, plan } = await request.json()
 
-    if (!code || !plan) {
+    if (!code) {
       return NextResponse.json(
-        { error: 'Code and plan are required', valid: false },
+        { error: 'Code is required', valid: false },
+        { status: 400 }
+      )
+    }
+
+    // Sanitise input
+    const upperCode = String(code).toUpperCase().replace(/[^A-Z0-9_-]/g, '')
+    if (!upperCode) {
+      return NextResponse.json(
+        { error: 'Invalid promo code format', valid: false },
+        { status: 400 }
+      )
+    }
+
+    // Check if user already used a promo code
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { promoCodeUsed: true },
+    })
+    if (user?.promoCodeUsed) {
+      return NextResponse.json(
+        { error: 'You have already used a promo code', valid: false },
         { status: 400 }
       )
     }
 
     const promo = await prisma.promo_codes.findUnique({
-      where: { code: code.toUpperCase() },
+      where: { code: upperCode },
     })
 
     if (!promo) {
@@ -64,9 +96,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if promo applies to the selected plan
+    // Check if promo applies to the selected plan (skip when plan not provided)
     const applicableTo = promo.applicableTo || []
-    if (!applicableTo.includes(plan) && !applicableTo.includes('all')) {
+    if (plan && applicableTo.length > 0 && !applicableTo.includes(plan) && !applicableTo.includes('all')) {
       return NextResponse.json(
         { 
           error: `This promo code is only valid for: ${applicableTo.join(', ')}`,
