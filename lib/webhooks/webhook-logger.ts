@@ -185,14 +185,22 @@ function calculateRetryTime(attempts: number): Date {
 }
 
 /**
- * Get webhook statistics
+ * Get webhook statistics, optionally filtered by provider and time window
  */
-export async function getWebhookStats() {
-  const [total, processed, failed, pending] = await Promise.all([
-    prisma.webhookEvent.count(),
-    prisma.webhookEvent.count({ where: { status: 'processed' } }),
-    prisma.webhookEvent.count({ where: { status: 'failed' } }),
-    prisma.webhookEvent.count({ where: { status: 'pending' } }),
+export async function getWebhookStats(provider?: string, hours?: number) {
+  const timeFilter: Prisma.WebhookEventWhereInput = {};
+  if (provider) timeFilter.provider = provider;
+  if (hours) {
+    const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+    timeFilter.createdAt = { gte: since };
+  }
+
+  const [total, processed, failed, pending, manualReview] = await Promise.all([
+    prisma.webhookEvent.count({ where: timeFilter }),
+    prisma.webhookEvent.count({ where: { ...timeFilter, status: 'processed' } }),
+    prisma.webhookEvent.count({ where: { ...timeFilter, status: 'failed' } }),
+    prisma.webhookEvent.count({ where: { ...timeFilter, status: 'pending' } }),
+    prisma.webhookEvent.count({ where: { ...timeFilter, status: 'manual_review' } }),
   ]);
 
   return {
@@ -200,6 +208,7 @@ export async function getWebhookStats() {
     processed,
     failed,
     pending,
+    manualReview,
     successRate: total > 0 ? ((processed / total) * 100).toFixed(2) + '%' : '0%',
   };
 }
@@ -221,6 +230,71 @@ export async function cleanupOldWebhookEvents(): Promise<number> {
   });
 
   return result.count;
+}
+
+/**
+ * Get recent webhook events with optional filters
+ */
+export async function getRecentWebhookEvents(opts: {
+  provider?: string;
+  eventType?: string;
+  status?: string;
+  limit?: number;
+} = {}) {
+  const { provider, eventType, status, limit = 50 } = opts;
+
+  const where: Prisma.WebhookEventWhereInput = {};
+  if (provider) where.provider = provider;
+  if (eventType) where.eventType = eventType;
+  if (status) where.status = status;
+
+  return prisma.webhookEvent.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    take: Math.min(limit, 200),
+    select: {
+      id: true,
+      provider: true,
+      eventType: true,
+      eventId: true,
+      status: true,
+      error: true,
+      attempts: true,
+      retryAt: true,
+      createdAt: true,
+      processedAt: true,
+      userId: true,
+      // payload/metadata intentionally omitted for list view (returned in detail)
+    },
+  });
+}
+
+/**
+ * Get a single webhook event by ID (includes full payload)
+ */
+export async function getWebhookEventById(id: string) {
+  return prisma.webhookEvent.findUnique({ where: { id } });
+}
+
+/**
+ * Mark a specific failed/manual_review webhook event for immediate retry
+ */
+export async function retryFailedWebhook(id: string): Promise<boolean> {
+  const event = await prisma.webhookEvent.findUnique({ where: { id } });
+
+  if (!event) return false;
+  if (event.status !== 'failed' && event.status !== 'manual_review') return false;
+
+  await prisma.webhookEvent.update({
+    where: { id },
+    data: {
+      status: 'pending',
+      retryAt: new Date(), // process immediately on next cron run
+      error: null,
+    },
+  });
+
+  return true;
 }
 
 /**

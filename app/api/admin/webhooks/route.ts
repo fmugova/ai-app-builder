@@ -6,7 +6,7 @@ import {
   getWebhookStats,
   getWebhookEventById,
   retryFailedWebhook,
-} from '@/lib/webhook-logger'
+} from '@/lib/webhooks/webhook-logger'
 
 export const dynamic = 'force-dynamic'
 

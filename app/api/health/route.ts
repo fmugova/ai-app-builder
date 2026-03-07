@@ -134,7 +134,57 @@ export async function GET() {
     }
   }
 
-  // ── 5. API key presence ──────────────────────────────────────────────────
+  // ── 5. Stripe API connectivity ───────────────────────────────────────────
+  if (process.env.STRIPE_SECRET_KEY) {
+    try {
+      const stripeStart = Date.now()
+      const stripeRes = await fetch('https://api.stripe.com/v1/balance', {
+        headers: {
+          Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`,
+        },
+        signal: AbortSignal.timeout(5000),
+      })
+      checks.stripe = {
+        status: stripeRes.ok ? 'healthy' : 'unhealthy',
+        responseTime: Date.now() - stripeStart,
+        httpStatus: stripeRes.status,
+      }
+    } catch (error) {
+      checks.stripe = {
+        status: 'unhealthy',
+        message: error instanceof Error ? error.message : 'Stripe check failed',
+      }
+    }
+  } else {
+    checks.stripe = { status: 'not_configured' }
+  }
+
+  // ── 6. Vercel API connectivity ───────────────────────────────────────────
+  if (process.env.VERCEL_API_TOKEN) {
+    try {
+      const vercelStart = Date.now()
+      const vercelRes = await fetch('https://api.vercel.com/v9/user', {
+        headers: {
+          Authorization: `Bearer ${process.env.VERCEL_API_TOKEN}`,
+        },
+        signal: AbortSignal.timeout(5000),
+      })
+      checks.vercel = {
+        status: vercelRes.ok || vercelRes.status === 403 ? 'healthy' : 'unhealthy',
+        responseTime: Date.now() - vercelStart,
+        httpStatus: vercelRes.status,
+      }
+    } catch (error) {
+      checks.vercel = {
+        status: 'unhealthy',
+        message: error instanceof Error ? error.message : 'Vercel check failed',
+      }
+    }
+  } else {
+    checks.vercel = { status: 'not_configured' }
+  }
+
+  // ── 7. API key presence ──────────────────────────────────────────────────
   // Only report a summary count — never expose which specific keys are present
   // (that leaks information about which integrations are live to attackers).
   const keyPresence = [
@@ -151,7 +201,7 @@ export async function GET() {
     status: keysConfigured === keyPresence.length ? 'all_configured' : 'some_missing',
   }
 
-  // ── 6. System info ───────────────────────────────────────────────────────
+  // ── 8. System info ───────────────────────────────────────────────────────
   const mem = process.memoryUsage()
   checks.system = {
     nodeVersion: process.version,

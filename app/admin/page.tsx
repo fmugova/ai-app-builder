@@ -678,6 +678,27 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+          {/* Webhook Monitor Card - Full Width */}
+          <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700 mb-8">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="text-4xl">🔔</div>
+                <div>
+                  <h3 className="text-xl font-bold mb-1">Webhook Monitor</h3>
+                  <p className="text-gray-400 text-sm">
+                    View recent events, retry failures, and monitor delivery health
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => router.push('/admin/webhooks')}
+                className="px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition font-medium"
+              >
+                View Webhooks
+              </button>
+            </div>
+          </div>
+
           {/* Bulk Actions Bar */}
           {selectedUsers.size > 0 && (
             <div className="bg-blue-900/50 border border-blue-700 rounded-xl p-4 mb-6 animate-fadeIn">
