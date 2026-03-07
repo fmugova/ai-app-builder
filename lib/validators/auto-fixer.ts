@@ -12,51 +12,61 @@ export interface AutoFixResult {
 export class CodeAutoFixer {
   private appliedFixes: string[] = []
 
+  /**
+   * Full auto-fix: structural fixes + inline event handler conversion.
+   * Used by the on-demand Auto-Fix button (user-initiated).
+   */
   autoFix(html: string, validationResult: ValidationResult): AutoFixResult {
     console.log('🔧 AUTO-FIXER STARTING...')
-    console.log('📊 Total issues found:', validationResult.summary.total)
-    console.log('   - Errors:', validationResult.summary.errors)
-    console.log('   - Warnings:', validationResult.summary.warnings)
-    console.log('   - Info:', validationResult.summary.info)
-    
     this.appliedFixes = []
     let fixed = html
     const originalLength = fixed.length
 
-    // Apply fixes in order of importance
-    fixed = this.fixDoctype(fixed)
-    fixed = this.fixCharset(fixed)
-    fixed = this.fixViewport(fixed)
-    fixed = this.fixLangAttribute(fixed)
-    fixed = this.fixMissingTitle(fixed)
-    
-    // NEW MANDATORY FIXES for h1 and meta description
-    fixed = this.fixMissingH1(fixed)
-    fixed = this.fixMultipleH1Elements(fixed)
-    fixed = this.fixMissingMetaDescription(fixed)
+    fixed = this.applyStructuralFixes(fixed)
     fixed = this.fixInlineEventHandlers(fixed)
     fixed = this.addCSSVariables(fixed)
     fixed = this.extractLargeScripts(fixed)
-    
-    fixed = this.fixImageLazyLoading(fixed)
-    fixed = this.fixExternalLinks(fixed)
 
     console.log('✅ Applied fixes:', this.appliedFixes)
-    console.log('📏 Code length change:', originalLength, '→', fixed.length, `(${fixed.length - originalLength > 0 ? '+' : ''}${fixed.length - originalLength})`)
+    console.log('📏 Code length change:', originalLength, '→', fixed.length)
 
-    const remainingIssues = 
-      validationResult.summary.errors + 
-      validationResult.summary.warnings + 
-      validationResult.summary.info - 
+    const remainingIssues =
+      validationResult.summary.errors +
+      validationResult.summary.warnings +
+      validationResult.summary.info -
       this.appliedFixes.length
-
-    console.log('📊 Remaining issues:', remainingIssues)
 
     return {
       fixed,
       appliedFixes: this.appliedFixes,
       remainingIssues,
     }
+  }
+
+  /**
+   * Structural-only auto-fix: safe to run automatically in the generation pipeline.
+   * Skips inline handler conversion (would break onsubmit="handler(event)") and
+   * CSS variable injection (Tailwind CDN pages rarely have <style> blocks).
+   */
+  autoFixStructural(html: string): AutoFixResult {
+    this.appliedFixes = []
+    const fixed = this.applyStructuralFixes(html)
+    return { fixed, appliedFixes: this.appliedFixes, remainingIssues: 0 }
+  }
+
+  private applyStructuralFixes(html: string): string {
+    let fixed = html
+    fixed = this.fixDoctype(fixed)
+    fixed = this.fixCharset(fixed)
+    fixed = this.fixViewport(fixed)
+    fixed = this.fixLangAttribute(fixed)
+    fixed = this.fixMissingTitle(fixed)
+    fixed = this.fixMissingH1(fixed)
+    fixed = this.fixMultipleH1Elements(fixed)
+    fixed = this.fixMissingMetaDescription(fixed)
+    fixed = this.fixImageLazyLoading(fixed)
+    fixed = this.fixExternalLinks(fixed)
+    return fixed
   }
 
   private isAutoFixable(message: string): boolean {

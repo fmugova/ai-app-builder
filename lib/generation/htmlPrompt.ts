@@ -113,6 +113,12 @@ Auth form JavaScript pattern (use this EXACTLY in the signup/login page inline s
 - Animations: CSS transitions + IntersectionObserver for scroll reveal
 - Mobile nav: hamburger toggle for small screens
 - NO import/export statements at the module level unless using type="module"
+- NEVER use inline event handler attributes on HTML elements (onclick, onmouseover, etc.)
+  ✗ WRONG: <button onclick="doSomething()">Click</button>
+  ✓ RIGHT:  <button id="my-btn">Click</button> + document.getElementById('my-btn').addEventListener('click', doSomething)
+  ✓ RIGHT for dynamic lists: use data-* attributes + event delegation on the container
+    <button data-id="ITEM_ID" class="delete-btn">×</button>
+    container.addEventListener('click', e => { const b = e.target.closest('.delete-btn'); if (b) deleteItem(b.dataset.id); })
 
 Every HTML file must be 100% renderable by a browser immediately. No build step required.`;
 

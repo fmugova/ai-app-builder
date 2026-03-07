@@ -18,6 +18,7 @@ import {
   validatePageCompleteness,
   buildPageRegenerationPrompt,
 } from "@/lib/validation/pageCompleteness";
+import { CodeAutoFixer } from "@/lib/validators/auto-fixer";
 
 const anthropic = new Anthropic();
 
@@ -264,12 +265,26 @@ export async function runGenerationPipeline(
     }
   }
 
-  // Step 7: Report missing pages
+  // Step 7: Auto-fix structural issues in all HTML pages (zero latency — pure string transforms).
+  // Fixes: DOCTYPE, charset, viewport, lang, title, meta description, lazy loading, external link rel.
+  // Uses autoFixStructural (not autoFix) to avoid converting onsubmit="handler(event)" which would
+  // break the form handler by referencing `event` inside a closure where it is undefined.
+  const autoFixer = new CodeAutoFixer();
+  for (const filename of Object.keys(allFiles)) {
+    if (!filename.endsWith(".html")) continue;
+    const result = autoFixer.autoFixStructural(allFiles[filename]);
+    if (result.appliedFixes.length > 0) {
+      allFiles[filename] = result.fixed;
+      warnings.push(`${filename}: auto-fixed ${result.appliedFixes.length} structural issue(s)`);
+    }
+  }
+
+  // Step 8: Report missing pages
   for (const missing of validation.missingPages) {
     errors.push(`Page "${missing}" was not generated -- add it manually or regenerate`);
   }
 
-  // Step 8: Compute quality score
+  // Step 9: Compute quality score
   const finalValidation = validatePageCompleteness(allFiles, expectedPageFiles);
   const qualityScore = computeQualityScore(finalValidation, allFiles);
 
@@ -496,7 +511,7 @@ This is a FUNCTIONAL WEB APP — build a working interactive interface, not a ma
    - addItem(): read value, push to array, save(), render(), clear input
 
 4. DELETE / REMOVE functionality (if applicable):
-   - Each item gets a delete button with data-id attribute (NO onclick): <button data-id="${item.id}" class="delete-btn" ...>×</button>
+   - Each item gets a delete button with data-id attribute (NO onclick): <button data-id="ITEM_ID" class="delete-btn" ...>×</button>
    - Use event delegation on the list container (set up once in DOMContentLoaded, survives re-renders):
      list.addEventListener('click', function(e) { var btn = e.target.closest('.delete-btn'); if (btn) deleteItem(btn.dataset.id); });
    - deleteItem(id): filter array by id, save(), render()
