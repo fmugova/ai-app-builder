@@ -31,12 +31,15 @@ function resolveLocalPath(importPath: string): string[] {
 function buildStubContent(importPath: string, defaultName: string | null, namedExports: string[]): string {
   const isComponent = /\/(components|ui|layouts?|sections?)\//i.test(importPath);
   const lines: string[] = ["// Auto-generated stub — component was referenced but not generated"];
+  const usedNames = new Set<string>();
 
   if (isComponent || defaultName) {
     const name = defaultName ?? (importPath.split('/').pop()!.replace(/[^a-zA-Z0-9]/g, '') || 'Stub');
     lines.push(`export default function ${name}() { return null }`);
+    usedNames.add(name);
   }
   for (const n of namedExports) {
+    if (usedNames.has(n)) continue; // already declared as the default export — skip to avoid duplicate identifier
     if (n.startsWith('use')) {
       lines.push(`export function ${n}() { return {} as Record<string, unknown> }`);
     } else if (/^[A-Z]/.test(n)) {
