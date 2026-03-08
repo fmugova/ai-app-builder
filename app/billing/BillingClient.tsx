@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import posthog from 'posthog-js'
@@ -81,6 +81,8 @@ export default function BillingClient({ userEmail }: { userEmail: string }) {
   const [error, setError] = useState<string | null>(null)
   const [portalLoading, setPortalLoading] = useState(false)
   const [buyingPackage, setBuyingPackage] = useState<string | null>(null)
+  const [extraUsageEnabled, setExtraUsageEnabled] = useState(false)
+  const creditsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     Promise.all([fetchBillingData(), fetchCreditPackages()])
@@ -112,11 +114,23 @@ export default function BillingClient({ userEmail }: { userEmail: string }) {
     try {
       const res = await fetch('/api/stripe/portal', { method: 'POST' })
       const data = await res.json()
-      if (data.url) router.push(data.url)
+      if (data.url) {
+        router.push(data.url)
+      } else {
+        alert(data.error || 'Failed to open billing portal. Please try again.')
+      }
     } catch {
       alert('Failed to open billing portal. Please try again.')
     } finally {
       setPortalLoading(false)
+    }
+  }
+
+  function toggleExtraUsage() {
+    const next = !extraUsageEnabled
+    setExtraUsageEnabled(next)
+    if (next) {
+      setTimeout(() => creditsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
     }
   }
 
@@ -322,6 +336,41 @@ export default function BillingClient({ userEmail }: { userEmail: string }) {
           </div>
         </div>
 
+        {/* ── Extra Usage ───────────────────────────────────────────────────── */}
+        {!isUnlimited && (
+          <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <h3 className="text-base font-semibold text-white">Extra usage</h3>
+                <p className="text-sm text-gray-400 mt-0.5">
+                  {extraUsageEnabled
+                    ? 'Extra usage is on. Buy credits below to continue generating when your plan limit is reached.'
+                    : 'Enable to continue generating after your monthly limit is reached using purchased credits.'}
+                </p>
+              </div>
+              <button
+                onClick={toggleExtraUsage}
+                aria-pressed={extraUsageEnabled}
+                className={`relative ml-6 flex-shrink-0 w-12 h-6 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 ${
+                  extraUsageEnabled ? 'bg-purple-600' : 'bg-gray-600'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                    extraUsageEnabled ? 'translate-x-6' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+            {extraCreditsPurchased > 0 && (
+              <div className="mt-4 flex items-center gap-2 text-sm text-purple-300 bg-purple-900/20 border border-purple-800/40 rounded-xl px-4 py-2.5">
+                <span className="text-purple-400">✦</span>
+                <span>You have <strong>{extraCreditsPurchased}</strong> extra credit{extraCreditsPurchased !== 1 ? 's' : ''} available for use when your limit is reached.</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── Plan Features ─────────────────────────────────────────────────── */}
         <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6">
           <h3 className="text-lg font-semibold text-white mb-4">Your Plan Includes</h3>
@@ -337,7 +386,7 @@ export default function BillingClient({ userEmail }: { userEmail: string }) {
 
         {/* ── Buy Extra Credits ─────────────────────────────────────────────── */}
         {!isUnlimited && creditPackages.length > 0 && (
-          <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6">
+          <div ref={creditsRef} className="bg-gray-800 border border-gray-700 rounded-2xl p-6">
             <div className="flex items-start justify-between mb-5">
               <div>
                 <h3 className="text-lg font-semibold text-white">Buy Extra AI Credits</h3>

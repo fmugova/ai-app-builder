@@ -64,35 +64,41 @@ export async function POST(req: NextRequest) {
 
   const baseUrl = process.env.NEXTAUTH_URL || 'https://buildflow-ai.app'
 
-  const checkoutSession = await stripe.checkout.sessions.create({
-    payment_method_types: ['card'],
-    mode: 'payment',
-    line_items: [
-      {
-        price_data: {
-          currency: 'usd',
-          unit_amount: pkg.price * 100,
-          product_data: {
-            name: `BuildFlow ${pkg.name}`,
-            description: `${pkg.credits} AI generation credits — ${pkg.description}`,
+  try {
+    const checkoutSession = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      mode: 'payment',
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            unit_amount: pkg.price * 100,
+            product_data: {
+              name: `BuildFlow ${pkg.name}`,
+              description: `${pkg.credits} AI generation credits — ${pkg.description}`,
+            },
           },
+          quantity: 1,
         },
-        quantity: 1,
+      ],
+      success_url: `${baseUrl}/dashboard?credits_added=${pkg.credits}`,
+      cancel_url: `${baseUrl}/pricing`,
+      customer_email: user.email || undefined,
+      client_reference_id: user.id,
+      metadata: {
+        type: 'credit_purchase',
+        userId: user.id,
+        packageId: pkg.id,
+        credits: String(pkg.credits),
       },
-    ],
-    success_url: `${baseUrl}/dashboard?credits_added=${pkg.credits}`,
-    cancel_url: `${baseUrl}/pricing`,
-    customer_email: user.email || undefined,
-    client_reference_id: user.id,
-    metadata: {
-      type: 'credit_purchase',
-      userId: user.id,
-      packageId: pkg.id,
-      credits: String(pkg.credits),
-    },
-  })
+    })
 
-  return NextResponse.json({ url: checkoutSession.url })
+    return NextResponse.json({ url: checkoutSession.url })
+  } catch (err: unknown) {
+    console.error('Stripe checkout error:', err)
+    const message = err instanceof Error ? err.message : 'Failed to create checkout session'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
 }
 
 // GET — return available packages (used by pricing page)
