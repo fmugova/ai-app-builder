@@ -160,6 +160,8 @@ export const metadata: Metadata = {
   },
 }
 
+export const dynamic = 'force-dynamic'
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Wrap in try/catch: JWEDecryptionFailed (stale cookie after secret rotation)
   // must not crash the entire layout — just treat as unauthenticated
