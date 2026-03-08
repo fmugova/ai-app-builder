@@ -34,10 +34,10 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Supabase integration disconnected',
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Supabase disconnect error:', error)
     return NextResponse.json(
-      { error: 'Failed to disconnect Supabase', message: error.message },
+      { error: 'Failed to disconnect Supabase' },
       { status: 500 }
     )
   }

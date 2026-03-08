@@ -36,10 +36,10 @@ export async function GET(request: NextRequest) {
       email: user.SupabaseIntegration?.email,
       connectedAt: user.SupabaseIntegration?.connectedAt,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Supabase status error:', error)
     return NextResponse.json(
-      { error: 'Failed to get Supabase status', message: error.message },
+      { error: 'Failed to get Supabase status' },
       { status: 500 }
     )
   }

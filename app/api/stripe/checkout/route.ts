@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { checkRateLimitByIdentifier } from '@/lib/rate-limit'
 import { stripe } from '@/lib/stripe'
+import Stripe from 'stripe'
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,40 +29,50 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { priceId, plan, promoCode } = body
 
+    // Allowlist: only accept price IDs that belong to this account
+    const allowedPriceIds = [
+      process.env.STRIPE_PRO_PRICE_ID,
+      process.env.STRIPE_BUSINESS_PRICE_ID,
+      process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID,
+      process.env.NEXT_PUBLIC_STRIPE_BUSINESS_PRICE_ID,
+    ].filter(Boolean)
+
+    if (!priceId || !allowedPriceIds.includes(priceId)) {
+      return NextResponse.json({ error: 'Invalid price selection' }, { status: 400 })
+    }
+
+    // Build metadata object upfront so promoCode can be added safely
+    const metadata: Record<string, string> = {
+      userId: session.user.id || session.user.email || '',
+      plan: plan || 'pro',
+      priceId,
+    }
+    if (promoCode) metadata.promoCode = promoCode
+
     // Build checkout session params
-    const sessionParams: any = {
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: 'subscription',
       payment_method_types: ['card'],
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
+      line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${process.env.NEXTAUTH_URL}/dashboard?success=true`,
       cancel_url: `${process.env.NEXTAUTH_URL}/pricing?canceled=true`,
       customer_email: session.user.email,
-      metadata: {
-        userId: session.user.id || session.user.email,
-        plan: plan || 'pro',
-        priceId: priceId,
-      },
+      metadata,
     }
 
     // Apply promo code if provided
     if (promoCode) {
       sessionParams.discounts = [{ coupon: promoCode }]
-      sessionParams.metadata.promoCode = promoCode
     }
 
     // Create checkout session
     const checkoutSession = await stripe.checkout.sessions.create(sessionParams)
 
     return NextResponse.json({ url: checkoutSession.url })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Stripe checkout error:', error)
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: 'Failed to create checkout session' },
       { status: 500 }
     )
   }

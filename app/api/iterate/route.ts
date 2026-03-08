@@ -107,7 +107,7 @@ Please update the code to fulfill this request. Maintain all existing functional
     }
 
     return NextResponse.json(
-      { error: 'Failed to update code', details: error.message },
+      { error: 'Failed to update code' },
       { status: 500 }
     )
   }
