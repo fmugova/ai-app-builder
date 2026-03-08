@@ -39,15 +39,20 @@ Before finishing, mentally audit: for every "import X from '@/..." in your outpu
 ━━━ TECHNICAL RULES ━━━
 1. TypeScript strict — every prop, param, and return type must be explicitly typed
 2. Tailwind CSS only — no inline styles, no CSS modules, no styled-components
-3. Supabase import convention:
+3. STRING QUOTES — CRITICAL: Never use single quotes for string values that contain apostrophes.
+   Always use double quotes or template literals for such strings:
+   ✅ description: "Get a bird's-eye view..."
+   ✅ description: \`Get a bird's-eye view...\`
+   ❌ description: 'Get a bird's-eye view...'  ← SYNTAX ERROR — breaks the build
+4. Supabase import convention:
    - Client Components ('use client'): import { createClient } from '@/lib/supabase/client'
    - Server Components / Route Handlers: import { createClient } from '@/lib/supabase/server'
    - CRITICAL: createClient() from server.ts is ASYNC (Next.js 15). Always await it:
      const supabase = await createClient()
-4. Database: Supabase client only (supabase.from('table')…) — never Prisma
-5. Icons: lucide-react only (already installed)
-6. Images: next/image for local; <img> with proper alt for external URLs
-7. Toasts: import { toast } from 'sonner' — sonner is already installed, <Toaster> is already in layout
+5. Database: Supabase client only (supabase.from('table')…) — never Prisma
+6. Icons: lucide-react only (already installed)
+7. Images: next/image for local; <img> with proper alt for external URLs
+8. Toasts: import { toast } from 'sonner' — sonner is already installed, <Toaster> is already in layout
    \`\`\`typescript
    import { toast } from 'sonner'
    toast.success('Saved!') | toast.error('Something went wrong') | toast.loading('Saving…')
@@ -167,6 +172,27 @@ Protected app pages must have a proper shell:
 - Error messages: always user-friendly (not raw Supabase error codes)
 `;
 
+/**
+ * Fix unescaped apostrophes in single-quoted TypeScript string literals.
+ * e.g.  'Get a bird's-eye view'  →  "Get a bird's-eye view"
+ * Only rewrites a literal when the apostrophe would be a syntax error
+ * (i.e. the literal is not already using double quotes or template literals).
+ */
+function fixApostrophesInStrings(code: string): string {
+  // Match single-quoted string literals that contain an apostrophe.
+  // Strategy: replace the outer single quotes with double quotes.
+  // We handle escaped single quotes (\') and skip template literals / double-quoted strings.
+  return code.replace(
+    /'((?:[^'\\]|\\.)*)'/g,
+    (match, inner: string) => {
+      // Only rewrite if the inner content contains an unescaped apostrophe
+      if (!inner.includes("'")) return match;
+      // Escape any existing double quotes in inner before switching delimiters
+      return `"${inner.replace(/"/g, '\\"')}"`;
+    }
+  );
+}
+
 /** Parses the `=== FILE: path ===` format into a map of path → content */
 export function parseNextjsOutput(text: string): Record<string, string> {
   const files: Record<string, string> = {};
@@ -177,7 +203,9 @@ export function parseNextjsOutput(text: string): Record<string, string> {
     const path = parts[i].trim();
     const content = parts[i + 1]?.trim() ?? '';
     if (path && content) {
-      files[path] = content;
+      // Post-process TS/TSX files to fix apostrophe syntax errors
+      const isTsLike = /\.(tsx?|jsx?)$/.test(path);
+      files[path] = isTsLike ? fixApostrophesInStrings(content) : content;
     }
   }
   return files;
