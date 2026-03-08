@@ -81,8 +81,8 @@ export async function POST(req: NextRequest) {
           quantity: 1,
         },
       ],
-      success_url: `${baseUrl}/dashboard?credits_added=${pkg.credits}`,
-      cancel_url: `${baseUrl}/pricing`,
+      success_url: `${baseUrl}/billing?credits_added=${pkg.credits}`,
+      cancel_url: `${baseUrl}/billing`,
       customer_email: user.email || undefined,
       client_reference_id: user.id,
       metadata: {

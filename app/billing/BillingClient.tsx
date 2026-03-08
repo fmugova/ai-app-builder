@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import posthog from 'posthog-js'
 
@@ -75,6 +75,7 @@ const UPGRADE_PLANS = ['pro', 'business', 'enterprise'] as const
 
 export default function BillingClient({ userEmail }: { userEmail: string }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [billingData, setBillingData] = useState<BillingData | null>(null)
   const [creditPackages, setCreditPackages] = useState<CreditPackage[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -82,11 +83,23 @@ export default function BillingClient({ userEmail }: { userEmail: string }) {
   const [portalLoading, setPortalLoading] = useState(false)
   const [buyingPackage, setBuyingPackage] = useState<string | null>(null)
   const [extraUsageEnabled, setExtraUsageEnabled] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
   const creditsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     Promise.all([fetchBillingData(), fetchCreditPackages()])
   }, [])
+
+  // Show success toast when returning from Stripe checkout
+  useEffect(() => {
+    const credits = searchParams.get('credits_added')
+    if (credits) {
+      setToast(`✅ ${credits} credits added to your account!`)
+      router.replace('/billing')
+      fetchBillingData()
+      setTimeout(() => setToast(null), 5000)
+    }
+  }, [searchParams, router])
 
   async function fetchBillingData() {
     try {
@@ -208,6 +221,14 @@ export default function BillingClient({ userEmail }: { userEmail: string }) {
 
   return (
     <div className="min-h-screen bg-gray-900">
+      {/* Toast */}
+      {toast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-green-900 border border-green-700 text-green-100 text-sm font-medium px-5 py-3 rounded-xl shadow-lg animate-in fade-in slide-in-from-top-2 duration-300">
+          {toast}
+          <button onClick={() => setToast(null)} className="ml-1 text-green-300 hover:text-white">✕</button>
+        </div>
+      )}
+
       {/* Header */}
       <header className="bg-gray-900/80 backdrop-blur-sm border-b border-gray-800 sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-5 py-4 flex items-center justify-between">
