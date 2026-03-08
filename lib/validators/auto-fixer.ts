@@ -278,6 +278,12 @@ export class CodeAutoFixer {
   }
 
   private fixInlineEventHandlers(html: string): string {
+    // Guard: skip very large inputs to prevent polynomial ReDoS on the event-handler regex
+    if (html.length > 500_000) {
+      console.warn('[auto-fixer] fixInlineEventHandlers skipped — input exceeds 500 KB')
+      return html
+    }
+
     let fixed = html
     let fixedCount = 0
 
@@ -323,10 +329,13 @@ export class CodeAutoFixer {
 
       // Build the fixed element tag
       let fixedElement: string
+      // Escape eventType before using in RegExp to prevent regex injection
+      // (eventType is captured by \w+ so only word chars, but escaping is explicit defence-in-depth)
+      const safeEventTypeRe = eventType.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       if (idMatch) {
-        fixedElement = fullMatch.replace(new RegExp(`\\s+${eventType}="[^"]+"`), '')
+        fixedElement = fullMatch.replace(new RegExp(`\\s+${safeEventTypeRe}="[^"]+"`), '')
       } else {
-        fixedElement = `${beforeHandler} id="${elementId}"${afterHandler}`.replace(new RegExp(`\\s+${eventType}="[^"]+"`), '')
+        fixedElement = `${beforeHandler} id="${elementId}"${afterHandler}`.replace(new RegExp(`\\s+${safeEventTypeRe}="[^"]+"`), '')
       }
 
       // Create event listener script

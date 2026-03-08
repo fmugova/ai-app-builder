@@ -182,6 +182,7 @@ export async function POST(request: NextRequest) {
     // Check if repo already exists
     let repoUrl: string;
     try {
+      // lgtm[js/ssrf] — hardcoded api.github.com; username/repo validated by isValidOwnerOrRepo above
       const checkRepoResponse = await fetch(
         `https://api.github.com/repos/${userWithGithub.githubUsername}/${repoName}`,
         {
@@ -198,6 +199,7 @@ export async function POST(request: NextRequest) {
       } else {
         // Create new repository
         console.log('🆕 Creating new repository:', repoName);
+        // lgtm[js/ssrf] — hardcoded api.github.com endpoint; no user-controlled host
         const createRepoResponse = await fetch('https://api.github.com/user/repos', {
           method: 'POST',
           headers: {
@@ -299,6 +301,7 @@ async function createOrUpdateFile(
   }
   // Check if file exists to get its SHA
   try {
+    // lgtm[js/ssrf] — URL is hardcoded to api.github.com; owner/repo/path validated by isValidOwnerOrRepo/isValidPath above
     const checkResponse = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
       {
@@ -314,6 +317,7 @@ async function createOrUpdateFile(
       sha = existingFile.sha;
     }
     // Create or update the file
+    // lgtm[js/ssrf] — URL is hardcoded to api.github.com; owner/repo/path validated above
     const response = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
       {

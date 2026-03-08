@@ -168,6 +168,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Fetch with SSRF-filter agent as final defence ─────────────────────────
+    // lgtm[js/ssrf] — URL has passed: protocol allowlist + static host blocklist + DNS CIDR check + ssrfFilter agent
     const agent = ssrfFilter(url)
     let response: Awaited<ReturnType<typeof nodeFetch>>
     try {

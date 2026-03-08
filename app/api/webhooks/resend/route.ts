@@ -29,6 +29,21 @@ import { sendEmail } from '@/lib/email'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 
+// ── HTML escaping helper (prevents XSS when embedding webhook data in HTML) ──
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+}
+
+// Sanitise event.type for use in log messages (only allow word chars + dots/dashes)
+function safeType(type: unknown): string {
+  return String(type ?? '').replace(/[^\w.-]/g, '').slice(0, 64) || 'unknown'
+}
+
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const WEBHOOK_SECRET = process.env.RESEND_WEBHOOK_SECRET
@@ -134,11 +149,16 @@ async function handleEmailReceived(data: ResendEmailReceivedData) {
   const { from, to, subject, html, text, attachments = [], messageId } = data
   const toAddresses = to.join(', ')
 
-  console.log(`[resend-webhook] Inbound: "${subject}" from ${from} → ${toAddresses}`)
+  console.log(`[resend-webhook] Inbound: "${escapeHtml(subject)}" from ${escapeHtml(from)} → ${escapeHtml(toAddresses)}`)
+
+  const safeFrom       = escapeHtml(from)
+  const safeToAddr     = escapeHtml(toAddresses)
+  const safeSubject    = escapeHtml(subject || '(no subject)')
+  const safeMessageId  = messageId ? escapeHtml(messageId) : null
 
   const attachmentNote = attachments.length > 0
     ? `<p style="color:#6b7280;font-size:13px;margin-top:16px;">
-        📎 ${attachments.length} attachment(s): ${attachments.map((a) => `${a.filename} (${Math.round(a.size / 1024)}KB)`).join(', ')}
+        📎 ${attachments.length} attachment(s): ${attachments.map((a) => `${escapeHtml(a.filename)} (${Math.round(a.size / 1024)}KB)`).join(', ')}
        </p>`
     : ''
 
@@ -154,25 +174,25 @@ async function handleEmailReceived(data: ResendEmailReceivedData) {
   <div style="max-width:680px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
     <div style="background:#1e293b;padding:16px 24px;display:flex;align-items:center;gap:12px;">
       <span style="background:#3b82f6;color:#fff;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;">INBOUND</span>
-      <span style="color:#94a3b8;font-size:13px;">Forwarded from ${toAddresses}</span>
+      <span style="color:#94a3b8;font-size:13px;">Forwarded from ${safeToAddr}</span>
     </div>
     <div style="padding:24px;">
       <table style="width:100%;font-size:13px;color:#374151;border-collapse:collapse;margin-bottom:20px;">
-        <tr><td style="padding:4px 0;width:64px;color:#9ca3af;vertical-align:top;">From</td><td style="padding:4px 0;font-weight:500;">${from}</td></tr>
-        <tr><td style="padding:4px 0;color:#9ca3af;vertical-align:top;">To</td><td style="padding:4px 0;">${toAddresses}</td></tr>
-        <tr><td style="padding:4px 0;color:#9ca3af;vertical-align:top;">Subject</td><td style="padding:4px 0;font-weight:500;">${subject || '(no subject)'}</td></tr>
-        ${messageId ? `<tr><td style="padding:4px 0;color:#9ca3af;">Msg-ID</td><td style="padding:4px 0;font-size:11px;color:#9ca3af;">${messageId}</td></tr>` : ''}
+        <tr><td style="padding:4px 0;width:64px;color:#9ca3af;vertical-align:top;">From</td><td style="padding:4px 0;font-weight:500;">${safeFrom}</td></tr>
+        <tr><td style="padding:4px 0;color:#9ca3af;vertical-align:top;">To</td><td style="padding:4px 0;">${safeToAddr}</td></tr>
+        <tr><td style="padding:4px 0;color:#9ca3af;vertical-align:top;">Subject</td><td style="padding:4px 0;font-weight:500;">${safeSubject}</td></tr>
+        ${safeMessageId ? `<tr><td style="padding:4px 0;color:#9ca3af;">Msg-ID</td><td style="padding:4px 0;font-size:11px;color:#9ca3af;">${safeMessageId}</td></tr>` : ''}
       </table>
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;">
       <div style="font-size:14px;line-height:1.7;color:#111827;">
-        ${html || `<pre style="white-space:pre-wrap;font-family:inherit;">${(text || '').replace(/</g, '&lt;')}</pre>`}
+        ${html || `<pre style="white-space:pre-wrap;font-family:inherit;">${escapeHtml(text || '')}</pre>`}
       </div>
       ${attachmentNote}
     </div>
     <div style="padding:12px 24px;background:#f8fafc;border-top:1px solid #e5e7eb;">
-      <a href="mailto:${from}?subject=Re: ${encodeURIComponent(subject || '')}"
+      <a href="mailto:${safeFrom}?subject=Re: ${encodeURIComponent(subject || '')}"
          style="display:inline-block;background:#2563eb;color:#fff;padding:8px 18px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:500;">
-        Reply to ${from}
+        Reply to ${safeFrom}
       </a>
     </div>
   </div>
@@ -266,7 +286,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  console.log(`[resend-webhook] Received event: ${event.type}`)
+  const eventType = safeType(event.type)
+  console.log(`[resend-webhook] Received event: ${eventType}`)
 
   try {
     switch (event.type) {
@@ -287,20 +308,20 @@ export async function POST(req: NextRequest) {
       case 'email.opened':
       case 'email.clicked':
         // Acknowledged but no action required for now
-        console.log(`[resend-webhook] ${event.type} for email_id=${(event.data as ResendEmailEventData).email_id}`)
+        console.log(`[resend-webhook] ${eventType} for email_id=${safeType((event.data as ResendEmailEventData).email_id)}`)
         break
 
       default:
-        console.log(`[resend-webhook] Unknown event type: ${event.type} — ignoring`)
+        console.log(`[resend-webhook] Unknown event type: ${eventType} — ignoring`)
     }
   } catch (err) {
-    console.error(`[resend-webhook] Error processing ${event.type}:`, err)
+    console.error(`[resend-webhook] Error processing ${eventType}:`, err)
     // Return 200 so Resend doesn't keep retrying on handler errors;
     // use 500 only for infrastructure failures (signature check, DB down)
-    return NextResponse.json({ error: 'Handler error', type: event.type }, { status: 200 })
+    return NextResponse.json({ error: 'Handler error', type: eventType }, { status: 200 })
   }
 
-  return NextResponse.json({ received: true, type: event.type })
+  return NextResponse.json({ received: true, type: eventType })
 }
 
 // Resend sends a GET to the webhook URL when you save it in the dashboard

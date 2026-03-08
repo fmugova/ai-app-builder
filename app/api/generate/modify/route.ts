@@ -28,7 +28,8 @@ function determineTargetFiles(
   request: string,
   existingFiles: Record<string, string>
 ): string[] {
-  const lower = request.toLowerCase();
+  // Limit input length before applying regexes to prevent polynomial ReDoS
+  const lower = request.slice(0, 2000).toLowerCase();
   const htmlFiles = Object.keys(existingFiles).filter(
     (f) => f.endsWith('.html') && !f.startsWith('_')
   );

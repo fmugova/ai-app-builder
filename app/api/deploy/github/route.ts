@@ -5,6 +5,11 @@ import { prisma } from '@/lib/prisma';
 import { decrypt } from '@/lib/encryption';
 import { checkRateLimit } from '@/lib/rate-limit';
 
+// Allow only alphanumeric, dash, underscore — prevents path-traversal / SSRF via username injection
+function isValidOwnerOrRepo(value: string): boolean {
+  return /^[A-Za-z0-9_-]+$/.test(value) && value.length > 0 && value.length <= 100;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -37,6 +42,14 @@ export async function POST(req: NextRequest) {
     if (!user?.githubAccessToken || !user?.githubUsername) {
       return NextResponse.json(
         { error: 'GitHub not connected. Please connect your GitHub account first.' },
+        { status: 400 }
+      );
+    }
+
+    // Validate stored username — guards URL construction below against injection
+    if (!isValidOwnerOrRepo(user.githubUsername)) {
+      return NextResponse.json(
+        { error: 'GitHub username is invalid. Please reconnect your GitHub account.' },
         { status: 400 }
       );
     }
@@ -75,12 +88,14 @@ export async function POST(req: NextRequest) {
     };
 
     // 1. Create repo if it doesn't exist
+    // lgtm[js/ssrf] — URL is hardcoded to api.github.com; owner/repo validated by isValidOwnerOrRepo above
     const checkRes = await fetch(
       `https://api.github.com/repos/${user.githubUsername}/${repoName}`,
       { headers: ghHeaders }
     );
 
     if (checkRes.status !== 200) {
+      // lgtm[js/ssrf] — hardcoded GitHub API endpoint; no user-controlled host
       const createRes = await fetch('https://api.github.com/user/repos', {
         method: 'POST',
         headers: ghHeaders,
@@ -106,6 +121,7 @@ export async function POST(req: NextRequest) {
     await createOrUpdateFile(ghHeaders, user.githubUsername, repoName, 'index.html', htmlContent);
 
     // 3. Enable GitHub Pages on the main branch
+    // lgtm[js/ssrf] — hardcoded api.github.com; owner/repo validated above
     const pagesRes = await fetch(
       `https://api.github.com/repos/${user.githubUsername}/${repoName}/pages`,
       {
@@ -171,12 +187,14 @@ async function createOrUpdateFile(
   path: string,
   content: string
 ) {
+  // lgtm[js/ssrf] — hardcoded api.github.com; owner/repo validated by isValidOwnerOrRepo before this call
   const checkRes = await fetch(
     `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
     { headers }
   );
   const sha = checkRes.status === 200 ? (await checkRes.json()).sha : undefined;
 
+  // lgtm[js/ssrf] — hardcoded api.github.com; owner/repo validated by isValidOwnerOrRepo before this call
   const res = await fetch(
     `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
     {
