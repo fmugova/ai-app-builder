@@ -57,6 +57,8 @@ const Invites = dynamic(() => import('./invites'), {
   ),
 });
 
+export const dynamic = 'force-dynamic'
+
 export default async function WorkspacePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   let session = null

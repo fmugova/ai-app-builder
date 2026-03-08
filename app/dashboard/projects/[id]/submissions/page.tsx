@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { redirect, notFound } from 'next/navigation'
 import SubmissionsClient from './SubmissionsClient'
 
+export const dynamic = 'force-dynamic'
+
 export default async function SubmissionsPage({ params }: { params: Promise<{ id: string }> }) {
   let session = null
   try {

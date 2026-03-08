@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import VerificationDashboardClient from './VerificationDashboardClient'
 
+export const dynamic = 'force-dynamic'
+
 export default async function UserVerificationPage() {
   let session = null
   try {

@@ -11,6 +11,8 @@ import {
   WorkspaceEmptyState,
 } from './components/WorkspacesClientComponents';
 
+export const dynamic = 'force-dynamic'
+
 export default async function WorkspacesPage() {
   let session = null
   try {

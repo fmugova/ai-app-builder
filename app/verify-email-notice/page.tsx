@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import VerifyEmailNoticeClient from './VerifyEmailNoticeClient'
 
+export const dynamic = 'force-dynamic'
+
 export default async function VerifyEmailNoticePage() {
   let session = null
   try {

@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import VercelIntegrationClient from './VercelIntegrationClient'
 
+export const dynamic = 'force-dynamic'
+
 export default async function VercelIntegrationPage() {
   let session = null
   try {

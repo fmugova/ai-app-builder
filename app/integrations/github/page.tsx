@@ -5,6 +5,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import GitHubIntegrationClient from './GitHubIntegrationClient'
 
+export const dynamic = 'force-dynamic'
+
 export default async function GitHubIntegrationPage() {
   let session = null
   try {
