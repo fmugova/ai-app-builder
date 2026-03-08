@@ -988,6 +988,7 @@ model Project {
   WorkspaceProject    WorkspaceProject[]
   Preview             Preview[]
   ProjectUser         ProjectUser[]
+  ProjectData         ProjectData[]
 
   @@index([isPublic])
   @@index([isPublished])
@@ -1029,6 +1030,24 @@ model ProjectUser {
 
   @@unique([projectId, email])
   @@index([projectId])
+  @@schema("public")
+}
+
+/// Generic key-value data store for generated sites.
+/// Each row is one record in a named collection (e.g. "tasks", "inventory").
+model ProjectData {
+  id            String   @id @default(cuid())
+  projectId     String
+  collection    String   // logical table / entity type within the project
+  data          Json     // arbitrary JSON payload for the record
+  projectUserId String?  // null = public/shared; set = scoped to one ProjectUser
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  Project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([projectId, collection])
+  @@index([projectId, collection, projectUserId])
   @@schema("public")
 }
 

@@ -2041,6 +2041,7 @@ Please regenerate the complete, fixed code.`;
           <GenerationExperience
             prompt={prompt}
             siteName={projectName || generateSmartProjectName(prompt)}
+            projectId={currentProjectId || undefined}
             generationApiUrl="/api/generate/stream"
             onOpenInBuilder={() => setShowGenExperience(false)}
             onComplete={(files, score, projectId) => {

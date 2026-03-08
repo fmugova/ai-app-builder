@@ -37,6 +37,8 @@ async function openInStackBlitz(
 interface Props {
   prompt: string;
   siteName: string;
+  /** Pass the current project's ID so the pipeline can inject its Supabase connection */
+  projectId?: string;
   onComplete?: (files: Record<string, string>, score: number, projectId?: string) => void;
   onCancel?: () => void;
   /** Called when the user explicitly clicks "Open in Editor" after generation finishes */
@@ -78,6 +80,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 export function GenerationExperience({
   prompt,
   siteName,
+  projectId,
   onComplete,
   onCancel,
   onOpenInBuilder,
@@ -92,6 +95,7 @@ export function GenerationExperience({
   const { state, start, stop } = useGenerationStream({
     prompt,
     siteName,
+    projectId,
     apiUrl: generationApiUrl,
     onComplete: async (files, score) => {
       let projectId: string | undefined;

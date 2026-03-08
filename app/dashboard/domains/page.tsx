@@ -7,17 +7,17 @@ import DomainsClient from '../projects/[id]/domains/DomainsClient'
 export const dynamic = 'force-dynamic'
 
 interface DomainsPageProps {
-  params: Promise<{ id: string }>
+  searchParams: Promise<{ projectId?: string }>
 }
 
-export default async function CustomDomainsPage({ params }: DomainsPageProps) {
+export default async function CustomDomainsPage({ searchParams }: DomainsPageProps) {
   let session = null
   try {
     session = await getServerSession(authOptions)
   } catch {
     // Stale/invalid JWT — treat as unauthenticated
   }
-  
+
   if (!session?.user?.email) {
     redirect('/auth/signin')
   }
@@ -30,7 +30,11 @@ export default async function CustomDomainsPage({ params }: DomainsPageProps) {
     redirect('/auth/signin')
   }
 
-  const { id: projectId } = await params
+  const { projectId } = await searchParams
+
+  if (!projectId) {
+    redirect('/dashboard')
+  }
 
   // Verify user owns this project
   const project = await prisma.project.findFirst({
@@ -65,7 +69,7 @@ export default async function CustomDomainsPage({ params }: DomainsPageProps) {
 
   return (
     <DomainsClient
-      projectId={projectId}
+      projectId={projectId!}
       projectName={project.name}
       initialDomains={serializedDomains}
     />

@@ -7,10 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Settings, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import dynamic from 'next/dynamic';
+import dynamicImport from 'next/dynamic';
+
+export const dynamic = 'force-dynamic'
 
 // Lazy load each tab component - only loads when user clicks the tab!
-const Overview = dynamic(() => import('./overview'), {
+const Overview = dynamicImport(() => import('./overview'), {
   loading: () => (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {[1, 2, 3].map(i => (
@@ -23,7 +25,7 @@ const Overview = dynamic(() => import('./overview'), {
   ),
 });
 
-const Members = dynamic(() => import('./members'), {
+const Members = dynamicImport(() => import('./members'), {
   loading: () => (
     <div className="space-y-3 animate-pulse">
       {[1, 2, 3].map(i => (
@@ -36,7 +38,7 @@ const Members = dynamic(() => import('./members'), {
   ),
 });
 
-const Projects = dynamic(() => import('./projects'), {
+const Projects = dynamicImport(() => import('./projects'), {
   loading: () => (
     <div className="space-y-3 animate-pulse">
       <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6">
@@ -47,7 +49,7 @@ const Projects = dynamic(() => import('./projects'), {
   ),
 });
 
-const Invites = dynamic(() => import('./invites'), {
+const Invites = dynamicImport(() => import('./invites'), {
   loading: () => (
     <div className="space-y-3 animate-pulse">
       <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6">
@@ -56,8 +58,6 @@ const Invites = dynamic(() => import('./invites'), {
     </div>
   ),
 });
-
-export const dynamic = 'force-dynamic'
 
 export default async function WorkspacePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

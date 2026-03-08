@@ -50,6 +50,20 @@ export async function POST(req: NextRequest) {
     const htmlFiles = Object.entries(files).filter(([p]) => p.endsWith(".html"));
     const combinedHtml = files["index.html"] ?? htmlFiles[0]?.[1] ?? "";
 
+    // Resolve app URL upfront — needed inside the transaction for Page content replacement
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://buildflow-ai.app').replace(/\/$/, '')
+
+    // Helper: replace BUILDFLOW_PROJECT_ID + upgrade relative API paths for a given file
+    function applyPlaceholders(content: string, projectId: string, isHtml = true): string {
+      let out = content.replaceAll("BUILDFLOW_PROJECT_ID", projectId)
+      if (isHtml) {
+        out = out
+          .replaceAll(`/api/projects/${projectId}/`, `${appUrl}/api/projects/${projectId}/`)
+          .replaceAll(`/api/public/auth/${projectId}`, `${appUrl}/api/public/auth/${projectId}`)
+      }
+      return out
+    }
+
     // Wrap Project + all Page creates in a single transaction so a partial
     // Page failure never leaves an orphaned Project record with no pages.
     const project = await prisma.$transaction(async (tx) => {
@@ -73,8 +87,10 @@ export async function POST(req: NextRequest) {
       });
 
       for (let pi = 0; pi < htmlFiles.length; pi++) {
-        const [filename, content] = htmlFiles[pi];
+        const [filename, rawContent] = htmlFiles[pi];
         const slug = filename.replace(".html", "") || "index";
+        // Apply placeholder replacement so Page records have real URLs (not BUILDFLOW_PROJECT_ID)
+        const content = applyPlaceholders(rawContent, created.id, true)
 
         const titleMatch = content.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
         const h1Match = content.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
@@ -115,18 +131,9 @@ export async function POST(req: NextRequest) {
     // with the real project id so contact forms POST to the correct endpoint.
     // Also rewrite relative /api/ paths to absolute URLs so forms work when
     // the site is published to Netlify or downloaded and opened locally.
-    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://buildflow-ai.app').replace(/\/$/, '')
     const injectedFiles: Record<string, string> = {};
     for (const [path, content] of Object.entries(files)) {
-      let injected = content.replaceAll("BUILDFLOW_PROJECT_ID", project.id);
-      // For HTML and JS files, upgrade relative BuildFlow API paths to absolute
-      // so they resolve correctly on any host (Netlify, local file://, etc.)
-      if (path.endsWith('.html') || path.endsWith('.js')) {
-        injected = injected
-          .replaceAll(`/api/projects/${project.id}/`, `${appUrl}/api/projects/${project.id}/`)
-          .replaceAll(`/api/public/auth/${project.id}`, `${appUrl}/api/public/auth/${project.id}`)
-      }
-      injectedFiles[path] = injected;
+      injectedFiles[path] = applyPlaceholders(content, project.id, path.endsWith('.html') || path.endsWith('.js'));
     }
 
     // Save all individual files to ProjectFile table

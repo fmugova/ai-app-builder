@@ -31,12 +31,21 @@ interface Page {
   isPublished: boolean
 }
 
+interface DbConnection {
+  id: string
+  name: string
+  provider: string
+  status: string
+  supabaseUrl: string | null
+}
+
 interface ProjectOverviewClientProps {
   project: Project
   pages?: Page[]
+  dbConnection?: DbConnection | null
 }
 
-export default function ProjectOverviewClient({ project, pages = [] }: ProjectOverviewClientProps) {
+export default function ProjectOverviewClient({ project, pages = [], dbConnection = null }: ProjectOverviewClientProps) {
   const router = useRouter()
   const [isDeleting, setIsDeleting] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
@@ -229,6 +238,29 @@ export default function ProjectOverviewClient({ project, pages = [] }: ProjectOv
             <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Environment Variables</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">Secure config</p>
           </Link>
+
+          {dbConnection ? (
+            <Link
+              href={`/dashboard/database/${dbConnection.id}`}
+              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 hover:shadow-lg transition"
+            >
+              <div className="text-3xl mb-3">🗄️</div>
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Database</h3>
+              <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
+                <span className="w-2 h-2 bg-green-500 rounded-full inline-block" />
+                {dbConnection.name}
+              </p>
+            </Link>
+          ) : (
+            <Link
+              href={`/dashboard/database/new?projectId=${project.id}`}
+              className="bg-white dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-6 hover:border-purple-400 hover:shadow-lg transition"
+            >
+              <div className="text-3xl mb-3">🗄️</div>
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Database</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Connect Supabase</p>
+            </Link>
+          )}
 
           <Link
             href={`/dashboard/projects/${project.id}/endpoints`}

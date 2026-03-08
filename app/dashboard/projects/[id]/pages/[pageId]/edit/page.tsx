@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import MonacoCodeEditor from '@/components/MonacoCodeEditor'
 
 interface Page {
   id: string
@@ -273,15 +274,16 @@ export default function PageEditorPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       HTML Content
                     </label>
-                    <textarea
-                      value={page.content}
-                      onChange={(e) => setPage({ ...page, content: e.target.value })}
-                      rows={20}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      placeholder="<h1>Your content here...</h1>"
-                    />
+                    <div className="border border-gray-300 rounded-lg overflow-hidden" style={{ height: '500px' }}>
+                      <MonacoCodeEditor
+                        value={page.content}
+                        onChange={(val) => setPage({ ...page, content: val })}
+                        language="html"
+                        height="500px"
+                      />
+                    </div>
                     <p className="text-xs text-gray-500 mt-2">
-                      Use HTML to format your content. You can include inline styles or Tailwind classes.
+                      Full HTML with inline styles or Tailwind classes. Ctrl+Space for suggestions.
                     </p>
                   </div>
                 </div>

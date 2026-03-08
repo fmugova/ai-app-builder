@@ -161,7 +161,117 @@ const SANDBOX_INTERCEPTOR = `
     };
   } catch(e) {}
 
-  // ── 7. Report load + force reveal animations ──────────────────────────────
+  // ── 7. Mock fetch for auth endpoints ─────────────────────────────────────
+  // Before a project is saved the auth URL contains the literal placeholder
+  // string "BUILDFLOW_PROJECT_ID". Fetching that URL from a sandboxed iframe
+  // (null origin, no allow-same-origin) would fail with a CORS/network error.
+  // Intercept those calls and return realistic mock responses so signup/login
+  // work in the preview without hitting the real API.
+  (function() {
+    var _realFetch = window.fetch;
+    window.fetch = function(url, opts) {
+      var u = String(url || '');
+      // ── Data API mock ───────────────────────────────────────────────────
+      if (u.indexOf('/api/public/data/') !== -1) {
+        try {
+          var dataStore = '__preview_data__';
+          var store2 = {};
+          try { store2 = JSON.parse(localStorage.getItem(dataStore) || '{}'); } catch(e2) {}
+          function saveStore(s) { try { localStorage.setItem(dataStore, JSON.stringify(s)); } catch(e2) {} }
+          function dataRespond(d, st) {
+            return Promise.resolve(new Response(JSON.stringify(d), {
+              status: st || 200,
+              headers: { 'Content-Type': 'application/json' }
+            }));
+          }
+          var method = (opts && opts.method || 'GET').toUpperCase();
+          // Parse ?collection= and ?id= from URL
+          var qs = u.split('?')[1] || '';
+          var qp = {};
+          qs.split('&').forEach(function(p) { var kv = p.split('='); if (kv[0]) qp[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || ''); });
+          var col = qp['collection'] || 'default';
+          var recId = qp['id'];
+          if (!store2[col]) store2[col] = [];
+
+          if (method === 'GET') {
+            var lim = parseInt(qp['limit'] || '100');
+            var off = parseInt(qp['offset'] || '0');
+            var recs = store2[col].slice(off, off + lim);
+            return dataRespond({ records: recs, total: store2[col].length, limit: lim, offset: off });
+          }
+          if (method === 'POST') {
+            var pb = opts && opts.body ? JSON.parse(String(opts.body)) : {};
+            col = pb.collection || col;
+            if (!store2[col]) store2[col] = [];
+            var newRec = Object.assign({ id: 'p-' + Date.now() + '-' + Math.random().toString(36).slice(2), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, { data: pb.data });
+            store2[col].unshift(newRec);
+            saveStore(store2);
+            return dataRespond({ record: newRec }, 201);
+          }
+          if (method === 'PATCH') {
+            var pb2 = opts && opts.body ? JSON.parse(String(opts.body)) : {};
+            var found = false;
+            store2[col] = store2[col].map(function(r) {
+              if (r.id !== recId) return r;
+              found = true;
+              return Object.assign({}, r, { data: Object.assign({}, r.data, pb2.data), updatedAt: new Date().toISOString() });
+            });
+            if (!found) return dataRespond({ error: 'Record not found' }, 404);
+            saveStore(store2);
+            return dataRespond({ record: store2[col].find(function(r) { return r.id === recId; }) });
+          }
+          if (method === 'DELETE') {
+            var before = store2[col].length;
+            store2[col] = store2[col].filter(function(r) { return r.id !== recId; });
+            if (store2[col].length === before) return dataRespond({ error: 'Record not found' }, 404);
+            saveStore(store2);
+            return dataRespond({ success: true });
+          }
+        } catch(e) {}
+      }
+
+      if (u.indexOf('BUILDFLOW_PROJECT_ID') !== -1 || (u.indexOf('/api/public/auth/') !== -1)) {
+        try {
+          var body = opts && opts.body ? JSON.parse(String(opts.body)) : {};
+          var action = String(body.action || '');
+          var email  = String(body.email  || '').toLowerCase().trim();
+          var name   = String(body.name   || '');
+          var password = String(body.password || '');
+          var storeKey = '__preview_auth__';
+          var store = {};
+          try { store = JSON.parse(localStorage.getItem(storeKey) || '{}'); } catch(e) {}
+          function respond(data, status) {
+            return Promise.resolve(new Response(JSON.stringify(data), {
+              status: status || 200,
+              headers: { 'Content-Type': 'application/json' }
+            }));
+          }
+          if (action === 'register') {
+            if (!email || !password) return respond({ success: false, error: 'Email and password are required' }, 400);
+            if (password.length < 8) return respond({ success: false, error: 'Password must be at least 8 characters' }, 400);
+            if (store[email]) return respond({ success: false, error: 'An account with this email already exists' }, 409);
+            store[email] = { password: password, name: name };
+            try { localStorage.setItem(storeKey, JSON.stringify(store)); } catch(e) {}
+            var token = 'preview-' + Date.now();
+            return respond({ success: true, token: token, user: { id: 'preview', email: email, name: name } });
+          }
+          if (action === 'login') {
+            if (!email || !password) return respond({ success: false, error: 'Email and password are required' }, 400);
+            var u2 = store[email];
+            if (!u2 || u2.password !== password) return respond({ success: false, error: 'Invalid email or password' }, 401);
+            var token2 = 'preview-' + Date.now();
+            return respond({ success: true, token: token2, user: { id: 'preview', email: email, name: u2.name } });
+          }
+          if (action === 'me') {
+            return respond({ success: true, user: { id: 'preview', email: email, name: name } });
+          }
+        } catch(e) {}
+      }
+      return _realFetch.apply(this, arguments);
+    };
+  })();
+
+  // ── 8. Report load + force reveal animations ──────────────────────────────
   window.addEventListener('load', function() {
     window.parent.postMessage({ type: 'loaded', title: document.title }, '*');
     // Force scroll-reveal elements visible — IntersectionObserver may not fire

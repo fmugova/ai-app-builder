@@ -56,6 +56,12 @@ export default async function ProjectOverviewPage({ params }: ProjectPageProps) 
     redirect('/dashboard?error=Project+not+found')
   }
 
+  // Fetch the project's database connection (if any)
+  const dbConnection = await prisma.databaseConnection.findFirst({
+    where: { projectId: id },
+    select: { id: true, name: true, provider: true, status: true, supabaseUrl: true },
+  })
+
   // Fetch pages for multi-page preview
   const pages = await prisma.page.findMany({
     where: { projectId: id },
@@ -83,13 +89,20 @@ export default async function ProjectOverviewPage({ params }: ProjectPageProps) 
             name: project.name,
             description: project.description,
             code: project.code,
-            published: project.isPublished,           // Map isPublished → published
-            publishedUrl: project.publicUrl,          // Map publicUrl → publishedUrl
-            deployedUrl: null,                        // These might not exist
+            published: project.isPublished,
+            publishedUrl: project.publicUrl,
+            deployedUrl: null,
             githubUrl: null,
             createdAt: project.createdAt.toISOString(),
             updatedAt: project.updatedAt.toISOString(),
           }}
+          dbConnection={dbConnection ? {
+            id: dbConnection.id,
+            name: dbConnection.name,
+            provider: dbConnection.provider,
+            status: dbConnection.status,
+            supabaseUrl: dbConnection.supabaseUrl,
+          } : null}
           pages={pages.map(p => ({
             id: p.id,
             slug: p.slug,

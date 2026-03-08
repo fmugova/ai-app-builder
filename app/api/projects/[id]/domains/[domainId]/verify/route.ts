@@ -185,10 +185,10 @@ async function checkVercelDomainStatus(domain: string): Promise<{
   sslConfigured: boolean
   error?: string
 }> {
-  const vercelToken = process.env.VERCEL_API_TOKEN
-  const vercelProjectId = process.env.VERCEL_PROJECT_ID
+  const vercelToken = process.env.VERCEL_TOKEN || process.env.VERCEL_API_TOKEN
+  const vercelProject = process.env.VERCEL_PROJECT_NAME || process.env.VERCEL_PROJECT_ID
 
-  if (!vercelToken || !vercelProjectId) {
+  if (!vercelToken || !vercelProject) {
     return {
       configured: false,
       sslConfigured: false,
@@ -198,7 +198,7 @@ async function checkVercelDomainStatus(domain: string): Promise<{
 
   try {
     const response = await fetch(
-      `https://api.vercel.com/v9/projects/${vercelProjectId}/domains/${domain}`,
+      `https://api.vercel.com/v9/projects/${vercelProject}/domains/${domain}`,
       {
         headers: {
           'Authorization': `Bearer ${vercelToken}`

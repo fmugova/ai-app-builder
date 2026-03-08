@@ -34,6 +34,7 @@ const CSRF_EXEMPT_PREFIXES = [
   '/api/forms',                // Public contact forms (user-generated sites)
   '/api/cron',                 // Cron jobs — authenticated by CRON_SECRET Bearer token
   '/api/email/inbound',        // Resend inbound webhook — verified by signature
+  '/api/public',               // Public APIs for generated sites (data, upload, email, auth)
 ]
 
 // ── Paths that bypass maintenance mode ────────────────────────────────────────
@@ -71,6 +72,7 @@ const PUBLIC_PREFIXES = [
   '/api/contact',       // Public contact form
   '/api/newsletter',    // Public newsletter sign-up
   '/api/forms',         // User-generated site forms
+  '/api/public',        // Public APIs for generated sites (data, upload, email, auth)
   '/maintenance',
 ]
 
@@ -157,9 +159,35 @@ function csrfOriginCheck(req: NextRequest): NextResponse | null {
   return NextResponse.json({ error: 'CSRF check failed: missing origin' }, { status: 403 })
 }
 
+// ── Subdomain routing ─────────────────────────────────────────────────────────
+// Rewrites [slug].buildflow-ai.app → /p/[slug] so that custom subdomains
+// serve published projects without a separate server.
+const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'buildflow-ai.app'
+const ROOT_DOMAIN_ALIASES = new Set(['www', 'app', 'api', 'admin', 'mail'])
+
+function subdomainRewrite(request: NextRequest): NextResponse | null {
+  const hostname = request.headers.get('host') || request.nextUrl.hostname
+  // Strip port (local dev)
+  const host = hostname.split(':')[0]
+
+  if (!host.endsWith(`.${ROOT_DOMAIN}`)) return null
+
+  const sub = host.slice(0, host.length - ROOT_DOMAIN.length - 1)
+  // Skip reserved subdomains and paths already starting with /p/
+  if (!sub || ROOT_DOMAIN_ALIASES.has(sub)) return null
+
+  const url = request.nextUrl.clone()
+  url.pathname = `/p/${sub}${url.pathname === '/' ? '' : url.pathname}`
+  return NextResponse.rewrite(url)
+}
+
 // ── Main proxy function ───────────────────────────────────────────────────────
 export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // 0. Subdomain routing — rewrite before any other checks
+  const subdomainResponse = subdomainRewrite(request)
+  if (subdomainResponse) return subdomainResponse
 
   // Mutable header set — forwarded to the origin route handler via NextResponse.next()
   const requestHeaders = new Headers(request.headers)

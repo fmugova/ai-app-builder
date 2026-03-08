@@ -36,6 +36,7 @@ export interface GenerationState {
 interface UseGenerationStreamOptions {
   prompt: string;
   siteName: string;
+  projectId?: string;
   apiUrl?: string;
   onComplete?: (files: Record<string, string>, score: number) => void;
 }
@@ -51,6 +52,7 @@ const API_URL = "/api/generate/stream";
 export function useGenerationStream({
   prompt,
   siteName,
+  projectId,
   apiUrl = API_URL,
   onComplete,
 }: UseGenerationStreamOptions) {
@@ -119,6 +121,7 @@ export function useGenerationStream({
       }
 
       const params = new URLSearchParams({ prompt, name: siteName });
+      if (projectId) params.set("projectId", projectId);
       if (isReconnect && tokenRef.current) {
         params.set("token", tokenRef.current);
       }
@@ -253,7 +256,7 @@ export function useGenerationStream({
       };
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [prompt, siteName, apiUrl, onComplete]
+    [prompt, siteName, projectId, apiUrl, onComplete]
   );
 
   // ── Start ────────────────────────────────────────────────────────────────

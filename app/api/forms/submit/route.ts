@@ -65,43 +65,35 @@ const submission = await prisma.formSubmission.create({
   }
 })
     
-    return NextResponse.json({ 
-      success: true, 
-      submissionId: submission.id 
+    return NextResponse.json({ success: true, submissionId: submission.id }, {
+      headers: CORS_HEADERS
     })
-    
+
   } catch (error) {
     // Handle Zod validation errors
     if (error instanceof z.ZodError) {
       const zodError = error as z.ZodError;
       return NextResponse.json(
-        { 
-          error: 'Validation failed', 
-          details: zodError.issues.map(e => e.message) 
-        },
-        { status: 400 }
+        { error: 'Validation failed', details: zodError.issues.map(e => e.message) },
+        { status: 400, headers: CORS_HEADERS }
       );
     }
-    
+
     console.error('Form submission error:', error)
     return NextResponse.json(
-      { 
-        error: 'Failed to submit form',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
+      { error: 'Failed to submit form', message: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500, headers: CORS_HEADERS }
     )
   }
 }
 
-// CORS for cross-origin requests
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+}
+
+// CORS preflight
 export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  })
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
 }

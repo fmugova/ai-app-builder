@@ -10,6 +10,7 @@ import { z } from 'zod'
 const createConnectionSchema = z.object({
   name: z.string().min(1).max(100),
   provider: z.enum(['supabase', 'postgres', 'postgresql', 'mysql', 'mongodb', 'sqlite']),
+  projectId: z.string().optional(),
   connectionString: z.string().max(2000).optional(),
   config: z.record(z.string(), z.unknown()).optional(),
   supabaseUrl: z.string().max(500).optional(),
@@ -106,7 +107,7 @@ export async function POST(request: NextRequest) {
     }
 
     const {
-      name, provider, connectionString, config,
+      name, provider, projectId: reqProjectId, connectionString, config,
       supabaseUrl, supabaseAnonKey, supabaseServiceKey,
       host, port, database, username, password
     } = result.data
@@ -133,7 +134,8 @@ export async function POST(request: NextRequest) {
         username: username ?? null,
         password: password ? encrypt(password) : null,
         status: 'connected',
-        userId: user.id
+        userId: user.id,
+        ...(reqProjectId && { projectId: reqProjectId }),
       },
       select: {
         ...SAFE_SELECT,

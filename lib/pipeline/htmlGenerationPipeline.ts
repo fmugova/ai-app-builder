@@ -119,6 +119,11 @@ export interface PipelineResult {
 export type ProgressCallback = (step: string, detail?: string) => void;
 export type FileCallback = (path: string, content: string) => void;
 
+export interface DbConnection {
+  supabaseUrl: string;
+  supabaseAnonKey: string;
+}
+
 /**
  * Main entry point -- detects mode, generates, validates, fixes blank pages
  */
@@ -126,7 +131,8 @@ export async function runGenerationPipeline(
   userPrompt: string,
   siteName: string,
   onProgress?: ProgressCallback,
-  onFile?: FileCallback
+  onFile?: FileCallback,
+  dbConnection?: DbConnection | null
 ): Promise<PipelineResult> {
   const warnings: string[] = [];
   const errors: string[] = [];
@@ -179,7 +185,7 @@ export async function runGenerationPipeline(
     );
 
     const pageContent = await generateSinglePage(
-      page, siteName, userPrompt, pages, sharedFiles, onProgress
+      page, siteName, userPrompt, pages, sharedFiles, onProgress, dbConnection
     );
 
     // Keep the raw content (with any truncation marker) in generatedPages so
@@ -449,7 +455,8 @@ async function generateSinglePage(
   userPrompt: string,
   allPages: DetectedPage[],
   sharedFiles: Record<string, string>,
-  _onProgress?: ProgressCallback
+  _onProgress?: ProgressCallback,
+  dbConnection?: DbConnection | null
 ): Promise<string> {
   const filename = page.slug === "index" ? "index.html" : `${page.slug}.html`;
   const navHtml = sharedFiles["_nav_html"] ?? "";
@@ -496,6 +503,7 @@ ${footerHtml || `<footer class="bg-gray-900 text-gray-300 py-10 text-center"><p>
 
 ${isAppPrompt(userPrompt) ? `━━━ CONTENT REQUIREMENTS ━━━
 This is a FUNCTIONAL WEB APP — build a working interactive interface, not a marketing page.
+Data is persisted to a REAL database via the BuildFlow Data API (not localStorage).
 
 1. MAIN APP INTERFACE (REQUIRED — the whole point of this page):
    - Build the COMPLETE, WORKING UI the user described
@@ -503,30 +511,170 @@ This is a FUNCTIONAL WEB APP — build a working interactive interface, not a ma
    - Use Tailwind for clean, professional styling
    - Wrap the app in: <main class="max-w-2xl mx-auto px-4 py-8"> or appropriate container
 
-2. JAVASCRIPT FUNCTIONALITY — everything must actually work:
-   - Write COMPLETE JavaScript for every feature (add, delete, edit, filter, etc.)
-   - Persist data with localStorage so it survives page refresh:
-     var items = JSON.parse(localStorage.getItem('${page.slug}_items') || '[]');
-     function save() { localStorage.setItem('${page.slug}_items', JSON.stringify(items)); }
-   - Re-render from data on every change (don't just manipulate DOM directly):
-     function render() { list.innerHTML = ''; items.forEach(function(item) { /* build DOM */ }); }
-   - Wire up on DOMContentLoaded: load saved data, call render(), add event listeners
-   - Pre-populate with 2-3 example items so the UI isn't empty on first load
+2. DATA API — use this EXACT pattern (copy verbatim, change only COLLECTION_NAME):
+${dbConnection ? `   The database is a REAL Supabase project. Use the Supabase JS SDK.
+   REQUIRED script tag in <head> (load Supabase SDK):
+   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 
-3. ADD / CREATE functionality (if applicable):
-   - Input field + button that calls addItem() on click AND on Enter key
-   - addItem(): read value, push to array, save(), render(), clear input
+   REQUIRED inline script — place AFTER the Supabase SDK script:
+   <script>
+     var _sb = window.supabase.createClient('${dbConnection.supabaseUrl}', '${dbConnection.supabaseAnonKey}');
+     var COLLECTION = '${page.slug}_items';  // Supabase table name
+     var items = [];
 
-4. DELETE / REMOVE functionality (if applicable):
-   - Each item gets a delete button with data-id attribute (NO onclick): <button data-id="ITEM_ID" class="delete-btn" ...>×</button>
-   - Use event delegation on the list container (set up once in DOMContentLoaded, survives re-renders):
-     list.addEventListener('click', function(e) { var btn = e.target.closest('.delete-btn'); if (btn) deleteItem(btn.dataset.id); });
-   - deleteItem(id): filter array by id, save(), render()
+     // Returns auth headers if the user is logged in
+     function getAuthHeaders() {
+       var token = localStorage.getItem('auth_token');
+       return token ? { Authorization: 'Bearer ' + token } : {};
+     }
 
-5. SCROLL ANIMATIONS:
+     async function loadItems() {
+       try {
+         var { data, error } = await _sb.from(COLLECTION).select('*').order('created_at', { ascending: false });
+         if (error) throw error;
+         items = (data || []).map(function(r) { return Object.assign({ id: r.id, _createdAt: r.created_at }, r); });
+         render();
+       } catch(e) { console.error('Load error', e); }
+     }
+
+     async function saveItem(itemData) {
+       try {
+         var { data, error } = await _sb.from(COLLECTION).insert([itemData]).select().single();
+         if (error) throw error;
+         items.unshift(Object.assign({ id: data.id, _createdAt: data.created_at }, data));
+         render();
+       } catch(e) { console.error('Save error', e); }
+     }
+
+     async function updateItem(id, changes) {
+       try {
+         var { error } = await _sb.from(COLLECTION).update(changes).eq('id', id);
+         if (error) throw error;
+         var idx = items.findIndex(function(i) { return i.id === id; });
+         if (idx !== -1) { Object.assign(items[idx], changes); render(); }
+       } catch(e) { console.error('Update error', e); }
+     }
+
+     async function deleteItem(id) {
+       try {
+         var { error } = await _sb.from(COLLECTION).delete().eq('id', id);
+         if (error) throw error;
+         items = items.filter(function(i) { return i.id !== id; });
+         render();
+       } catch(e) { console.error('Delete error', e); }
+     }
+   </script>` : `   The API endpoint is: /api/public/data/BUILDFLOW_PROJECT_ID
+   Collection name should describe the data (e.g. "tasks", "notes", "inventory").
+
+   REQUIRED inline script — place BEFORE all other scripts in <head>:
+   <script>
+     var DATA_API = '/api/public/data/BUILDFLOW_PROJECT_ID';
+     var COLLECTION = '${page.slug}_items';  // unique per page/entity type
+     var items = [];
+
+     // Returns auth headers if the user is logged in (token from /api/public/auth/)
+     function getAuthHeaders() {
+       var token = localStorage.getItem('auth_token');
+       return token
+         ? { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }
+         : { 'Content-Type': 'application/json' };
+     }
+
+     // Load all records from the database (scoped to logged-in user if authenticated)
+     async function loadItems() {
+       try {
+         var res = await fetch(DATA_API + '?collection=' + COLLECTION, { headers: getAuthHeaders() });
+         var d = await res.json();
+         items = (d.records || []).map(function(r) {
+           return Object.assign({ id: r.id, _createdAt: r.createdAt }, r.data);
+         });
+         render();
+       } catch(e) { console.error('Load error', e); }
+     }
+
+     // Create a new record (pass an object WITHOUT id)
+     async function saveItem(itemData) {
+       try {
+         var res = await fetch(DATA_API, {
+           method: 'POST',
+           headers: getAuthHeaders(),
+           body: JSON.stringify({ collection: COLLECTION, data: itemData })
+         });
+         var d = await res.json();
+         if (d.record) {
+           items.unshift(Object.assign({ id: d.record.id, _createdAt: d.record.createdAt }, d.record.data));
+           render();
+         }
+       } catch(e) { console.error('Save error', e); }
+     }
+
+     // Update an existing record by id (pass only changed fields)
+     async function updateItem(id, changes) {
+       try {
+         await fetch(DATA_API + '?id=' + id, {
+           method: 'PATCH',
+           headers: getAuthHeaders(),
+           body: JSON.stringify({ data: changes })
+         });
+         var idx = items.findIndex(function(i) { return i.id === id; });
+         if (idx !== -1) { Object.assign(items[idx], changes); render(); }
+       } catch(e) { console.error('Update error', e); }
+     }
+
+     // Delete a record by id
+     async function deleteItem(id) {
+       try {
+         await fetch(DATA_API + '?id=' + id, { method: 'DELETE', headers: getAuthHeaders() });
+         items = items.filter(function(i) { return i.id !== id; });
+         render();
+       } catch(e) { console.error('Delete error', e); }
+     }
+   </script>`}
+
+3. FILE UPLOADS (use ONLY when the page needs image/file upload):
+   - Upload endpoint: POST /api/public/upload/BUILDFLOW_PROJECT_ID (multipart/form-data, field name "file")
+   - Allowed types: JPEG, PNG, GIF, WebP, SVG, PDF, CSV, TXT (max 4.5 MB)
+   - Returns: { url, filename, size, mimeType } — use url to display or store in saveItem()
+   - Example:
+     async function uploadFile(file) {
+       var fd = new FormData(); fd.append('file', file);
+       var res = await fetch('/api/public/upload/BUILDFLOW_PROJECT_ID', { method: 'POST', body: fd });
+       var d = await res.json(); return d.url;
+     }
+   - Only include this if the page actually has a file/image upload requirement.
+
+4. JAVASCRIPT FUNCTIONALITY — everything must actually work:
+   - Call loadItems() on DOMContentLoaded — it fetches from the real database and calls render()
+   - Use saveItem({...}) to create records (do NOT pass id — the server assigns it)
+   - Use updateItem(id, {...}) for edits (only changed fields needed)
+   - Use deleteItem(id) to remove records
+   - Re-render from the items array on every change:
+     function render() { list.innerHTML = ''; items.forEach(function(item) { /* build DOM from item */ }); }
+   - Show a loading indicator while loadItems() is in-flight
+   - Pre-populate with 2-3 example items on FIRST LOAD only (check items.length === 0 after loadItems resolves)
+
+5. ADD / CREATE functionality (if applicable):
+   - Input field + button that calls addItem() on click AND on Enter key:
+     async function addItem() {
+       var val = document.getElementById('item-input').value.trim();
+       if (!val) return;
+       await saveItem({ text: val, done: false });
+       document.getElementById('item-input').value = '';
+     }
+
+6. DELETE / REMOVE functionality (if applicable):
+   - Each item gets a delete button with data-id attribute (NO onclick):
+     <button data-id="ITEM_ID" class="delete-btn" ...>×</button>
+   - Use event delegation (set up once in DOMContentLoaded, survives re-renders):
+     list.addEventListener('click', function(e) {
+       var btn = e.target.closest('.delete-btn');
+       if (btn) deleteItem(btn.dataset.id);
+     });
+
+7. SCROLL ANIMATIONS:
    - Add class="reveal" to major section divs (the app container, any stats sections)
 
-6. HEADER (optional, brief):
+8. HEADER (optional, brief):
    - A simple app header/title is fine — skip hero images and marketing copy` : `━━━ CONTENT REQUIREMENTS ━━━
 This page MUST contain ALL of the following:
 
@@ -556,8 +704,8 @@ This page MUST contain ALL of the following:
 
 ${page.slug === "contact" ? `
 CONTACT FORM REQUIREMENTS (this form submits to a REAL backend):
-- Use this EXACT form tag — do not change the action URL or onsubmit:
-  <form id="contact-form" action="/api/projects/BUILDFLOW_PROJECT_ID/submissions" onsubmit="handleFormSubmit(event)" class="space-y-6 max-w-lg mx-auto">
+- Use this EXACT form tag — do not change the onsubmit:
+  <form id="contact-form" onsubmit="handleFormSubmit(event)" class="space-y-6 max-w-lg mx-auto">
     <input type="hidden" name="formType" value="contact">
     <!-- Full Name -->
     <div><label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
@@ -573,7 +721,7 @@ CONTACT FORM REQUIREMENTS (this form submits to a REAL backend):
     <!-- Message -->
     <div><label class="block text-sm font-medium text-gray-700 mb-1">Message</label>
     <textarea name="message" required rows="5" class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none resize-none"></textarea></div>
-    <button type="submit" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition">Send Message</button>
+    <button type="submit" id="contact-submit-btn" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition">Send Message</button>
   </form>
 - Immediately after the </form>, add the hidden success state:
   <div id="form-success" style="display:none" class="text-center py-16">
@@ -581,6 +729,43 @@ CONTACT FORM REQUIREMENTS (this form submits to a REAL backend):
     <h3 class="text-2xl font-bold text-green-600 mb-2">Message Sent!</h3>
     <p class="text-gray-500">We'll get back to you within 24 hours.</p>
   </div>
+- Add this EXACT script just before </body> — do not modify it:
+  <script>
+    async function handleFormSubmit(e) {
+      e.preventDefault();
+      var btn = document.getElementById('contact-submit-btn');
+      var form = document.getElementById('contact-form');
+      var successEl = document.getElementById('form-success');
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+      var fd = new FormData(form);
+      var formData = {};
+      fd.forEach(function(v, k) { formData[k] = v; });
+      try {
+        var res = await fetch('/api/public/email/BUILDFLOW_PROJECT_ID', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            subject: formData.subject || 'Contact form submission',
+            message: formData.message || '',
+            from: formData.email || '',
+            name: formData.name || '',
+            formType: 'contact'
+          })
+        });
+        if (!res.ok) {
+          var err = await res.json();
+          throw new Error(err.error || 'Submission failed');
+        }
+        form.style.display = 'none';
+        successEl.style.display = 'block';
+      } catch(err) {
+        btn.disabled = false;
+        btn.textContent = 'Send Message';
+        alert('Sorry, there was an error sending your message. Please try again.');
+      }
+    }
+  </script>
 ` : ""}
 
 ${page.slug === "login" ? `

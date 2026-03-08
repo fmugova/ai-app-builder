@@ -81,9 +81,22 @@ async function GETHandler(req: NextRequest) {
 
   const prompt = req.nextUrl.searchParams.get("prompt") ?? "";
   const siteName = req.nextUrl.searchParams.get("name") ?? "My App";
+  const projectId = req.nextUrl.searchParams.get("projectId") ?? "";
 
   if (!prompt.trim()) {
     return new Response("Missing prompt", { status: 400 });
+  }
+
+  // Fetch Supabase connection if projectId provided — used to inject real DB into HTML pipeline
+  let dbConnection: { supabaseUrl: string; supabaseAnonKey: string } | null = null;
+  if (projectId) {
+    const conn = await prisma.databaseConnection.findFirst({
+      where: { projectId, status: "connected" },
+      select: { supabaseUrl: true, supabaseAnonKey: true },
+    });
+    if (conn?.supabaseUrl && conn?.supabaseAnonKey) {
+      dbConnection = { supabaseUrl: conn.supabaseUrl, supabaseAnonKey: conn.supabaseAnonKey };
+    }
   }
 
   const encoder = new TextEncoder();
@@ -200,7 +213,8 @@ async function GETHandler(req: NextRequest) {
                   }
                 }
               }
-            }
+            },
+            dbConnection
           );
 
           // Mark any remaining steps as done

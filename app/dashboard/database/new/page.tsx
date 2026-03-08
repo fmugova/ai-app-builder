@@ -1,13 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast, Toaster } from 'react-hot-toast'
 import { ArrowLeft, Database } from 'lucide-react'
 import SupabaseConnectionForm from '@/components/SupabaseConnectionForm'
 
 export default function NewDatabaseConnectionPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const projectId = searchParams.get('projectId')
   const [isCreating, setIsCreating] = useState(false)
 
   const handleSuccess = async (data: {
@@ -27,7 +29,8 @@ export default function NewDatabaseConnectionPage() {
           provider: 'supabase',
           supabaseUrl: data.url,
           supabaseAnonKey: data.anonKey,
-          supabaseServiceKey: data.serviceKey || null
+          supabaseServiceKey: data.serviceKey || null,
+          ...(projectId && { projectId }),
         })
       })
 
@@ -42,9 +45,13 @@ export default function NewDatabaseConnectionPage() {
         position: 'top-center'
       })
 
-      // Redirect to the new connection's tables page
+      // Return to the project that initiated the connection, or database page
       setTimeout(() => {
-        router.push(`/dashboard/database/${result.connection.id}`)
+        if (projectId) {
+          router.push(`/dashboard/projects/${projectId}`)
+        } else {
+          router.push(`/dashboard/database/${result.connection.id}`)
+        }
       }, 1000)
 
     } catch (error) {
@@ -58,7 +65,11 @@ export default function NewDatabaseConnectionPage() {
   }
 
   const handleCancel = () => {
-    router.push('/dashboard/database')
+    if (projectId) {
+      router.push(`/dashboard/projects/${projectId}`)
+    } else {
+      router.push('/dashboard/database')
+    }
   }
 
   return (
@@ -70,11 +81,11 @@ export default function NewDatabaseConnectionPage() {
           {/* Header */}
           <div className="mb-8">
             <button
-              onClick={() => router.push('/dashboard/database')}
+              onClick={handleCancel}
               className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-4 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
-              Back to Connections
+              {projectId ? 'Back to Project' : 'Back to Connections'}
             </button>
 
             <div className="flex items-center gap-3">
