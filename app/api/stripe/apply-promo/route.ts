@@ -48,15 +48,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Check if promo code has been used too many times
-    if (promo.timesUsed >= promo.maxUses) {
-      return NextResponse.json(
-        { error: 'This promo code has reached its usage limit' },
-        { status: 400 }
-      )
-    }
-
-    // Check expiry date (field is validUntil, not expiresAt)
+    // Check expiry date
     if (promo.validUntil && new Date(promo.validUntil) < new Date()) {
       return NextResponse.json(
         { error: 'This promo code has expired' },
@@ -77,28 +69,31 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Atomically claim one usage slot — only succeeds if limit not yet reached
+    const claimed = await prisma.promo_codes.updateMany({
+      where: { code: promo.code, timesUsed: { lt: promo.maxUses } },
+      data: { timesUsed: { increment: 1 } },
+    })
+
+    if (claimed.count === 0) {
+      return NextResponse.json(
+        { error: 'This promo code has reached its usage limit' },
+        { status: 400 }
+      )
+    }
+
     // Update user with promo code.
     // Convention: positive discountRate = percentage off (e.g. 20 = 20%)
     //             negative discountRate = fixed dollar off (e.g. -10 = $10 off)
     const discountRate = promo.discountType === 'percentage'
       ? promo.discountValue
-      : -Math.abs(promo.discountValue) // negative signals fixed-dollar discount
+      : -Math.abs(promo.discountValue)
 
     await prisma.user.update({
       where: { email: session.user.email },
       data: {
         promoCodeUsed: promo.code,
         discountRate,
-      },
-    })
-
-    // Increment promo code usage count
-    await prisma.promo_codes.update({
-      where: { code: promo.code },
-      data: {
-        timesUsed: {
-          increment: 1,
-        },
       },
     })
 
