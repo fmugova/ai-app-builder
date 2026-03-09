@@ -1,86 +1,89 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { encrypt } from '@/lib/encryption';
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import { encrypt } from '@/lib/encryption'
+import { redis } from '@/lib/rate-limit'
+
+const APP_URL = process.env.NEXTAUTH_URL || 'http://localhost:3000'
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.id || !session?.user?.email) {
+      return NextResponse.redirect(`${APP_URL}/auth/signin`)
     }
 
-    const searchParams = request.nextUrl.searchParams;
-    const code = searchParams.get('code');
-    const state = searchParams.get('state');
+    const searchParams = request.nextUrl.searchParams
+    const code = searchParams.get('code')
+    const state = searchParams.get('state')
 
     if (!code) {
-      return NextResponse.json({ error: 'Missing code' }, { status: 400 });
+      return NextResponse.redirect(`${APP_URL}/integrations/github?error=no_code`)
     }
 
-    // Verify state matches user email for security
-    if (state !== session.user.email) {
-      return NextResponse.json({ error: 'Invalid state' }, { status: 400 });
+    // Validate Redis nonce — prevents CSRF
+    if (!state) {
+      return NextResponse.redirect(`${APP_URL}/integrations/github?error=invalid_state`)
     }
+    const storedUserId = await redis.get<string>(`github:oauth:state:${state}`)
+    if (!storedUserId || storedUserId !== session.user.id) {
+      return NextResponse.redirect(`${APP_URL}/integrations/github?error=invalid_state`)
+    }
+    await redis.del(`github:oauth:state:${state}`)
 
-    const githubClientId = process.env.GITHUB_CLIENT_ID;
-    const githubClientSecret = process.env.GITHUB_CLIENT_SECRET;
+    const githubClientId = process.env.GITHUB_CLIENT_ID
+    const githubClientSecret = process.env.GITHUB_CLIENT_SECRET
 
     if (!githubClientId || !githubClientSecret) {
-      return NextResponse.json({ error: 'GitHub OAuth not configured' }, { status: 500 });
+      return NextResponse.redirect(`${APP_URL}/integrations/github?error=config`)
     }
 
     // Exchange code for access token
     const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
         client_id: githubClientId,
         client_secret: githubClientSecret,
         code,
-        redirect_uri: `${process.env.NEXTAUTH_URL}/api/integrations/github/callback`,
+        redirect_uri: `${APP_URL}/api/integrations/github/callback`,
       }),
-    });
+    })
 
-    const tokenData = await tokenResponse.json();
+    const tokenData = await tokenResponse.json()
 
     if (tokenData.error || !tokenData.access_token) {
-      console.error('GitHub token exchange error:', tokenData);
-      return NextResponse.json({ error: 'Token exchange failed', details: tokenData.error }, { status: 500 });
+      console.error('GitHub token exchange error:', tokenData)
+      return NextResponse.redirect(`${APP_URL}/integrations/github?error=token_exchange`)
     }
 
-    // Fetch user info from GitHub
+    // Fetch GitHub username
     const userResponse = await fetch('https://api.github.com/user', {
       headers: {
-        'Authorization': `Bearer ${tokenData.access_token}`,
-        'Accept': 'application/json',
+        Authorization: `Bearer ${tokenData.access_token}`,
+        Accept: 'application/json',
       },
-    });
-
-    const userData = await userResponse.json();
+    })
+    const userData = await userResponse.json()
 
     if (!userData.login) {
-      return NextResponse.json({ error: 'Failed to fetch user info from GitHub' }, { status: 500 });
+      return NextResponse.redirect(`${APP_URL}/integrations/github?error=user_fetch`)
     }
 
-    // Update user with GitHub credentials (encrypt token for security)
+    // Store encrypted token + username
     await prisma.user.update({
       where: { email: session.user.email },
       data: {
         githubAccessToken: encrypt(tokenData.access_token),
         githubUsername: userData.login,
       },
-    });
+    })
 
-    // Redirect back to GitHub integration page with success
-    return NextResponse.json({ success: true });
+    return NextResponse.redirect(`${APP_URL}/integrations/github?success=true`)
   } catch (error) {
-    console.error('GitHub OAuth callback error:', error);
-    return NextResponse.json({ error: 'GitHub OAuth callback failed', details: error instanceof Error ? error.message : String(error) }, { status: 500 });
+    console.error('GitHub OAuth callback error:', error)
+    return NextResponse.redirect(`${APP_URL}/integrations/github?error=token_exchange`)
   }
 }

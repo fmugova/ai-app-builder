@@ -105,9 +105,24 @@ function TemplatesContent() {
     analytics.templateViewed(template.name)
 
     if (template.owned || template.tier === 'FREE') {
-      // Directly create project
+      // Detect static templates (IDs are slugs like "landing-saas") vs DB templates (UUIDs)
+      const isStatic = staticWithPricing.some(t => t.id === template.id)
+
+      if (isStatic) {
+        // Static templates have JSX code — pre-fill chatbuilder with a descriptive prompt
+        const promptText = `Build a ${template.name}: ${template.description}.${
+          template.tags.length > 0 ? ` Features: ${template.tags.join(', ')}.` : ''
+        }`
+        router.push(`/chatbuilder?prompt=${encodeURIComponent(promptText)}`)
+        return
+      }
+
+      // Owned DB template — fetch actual htmlCode and create a project
       try {
-        toast.loading('Creating project from template...', { id: 'create' })
+        toast.loading('Loading template...', { id: 'create' })
+        const tplRes = await fetch(`/api/templates/${template.id}`)
+        const tplData = await tplRes.json()
+
         const res = await fetch('/api/projects', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -115,13 +130,13 @@ function TemplatesContent() {
             name: `${template.name} Project`,
             description: template.description,
             type: template.category,
-            code: template.id, // placeholder; real code loaded from DB template
+            code: tplData.htmlCode || '',
           }),
         })
         if (res.ok) {
           const data = await res.json()
           toast.success('✅ Project created!', { id: 'create', duration: 2000 })
-          router.push(`/chatbuilder?project=${data.project?.id || ''}`)
+          router.push(`/projects/${data.project?.id || ''}`)
         } else {
           throw new Error('Failed')
         }

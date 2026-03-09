@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import * as Icons from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import ShareModal from './ShareModal';
@@ -27,17 +27,19 @@ interface ProjectCardProps {
 }
 
 export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCardProps) {
-  // Debugging helper
-  // console.log('Project data:', {
-  //   id: project.id,
-  //   publicUrl: project.publicUrl,
-  //   publicSlug: project.publicSlug,
-  //   isPublished: project.isPublished
-  // });
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [deployingVercel, setDeployingVercel] = useState(false);
+  const [githubRepoUrl, setGithubRepoUrl] = useState<string | null>(null);
+
+  // Lazy-load GitHub status to show badge if project was pushed
+  useEffect(() => {
+    fetch(`/api/projects/${project.id}/github-status`)
+      .then(r => r.json())
+      .then(d => { if (d.hasGithubRepo && d.deployment?.deploymentUrl) setGithubRepoUrl(d.deployment.deploymentUrl) })
+      .catch(() => {})
+  }, [project.id]);
 
 
   // BuildFlow Hosting - Simple publish
@@ -190,10 +192,8 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
   const handleExport = async (type: 'github' | 'zip') => {
     try {
       if (type === 'github') {
-        const res = await fetch(`/api/export/github`, {
+        const res = await fetch(`/api/projects/${project.id}/publish/github`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectId: project.id })
         });
         
         if (res.ok) {
@@ -202,6 +202,7 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
             duration: 2000,
             id: 'export-github-2',
           });
+          if (data.repoUrl) setGithubRepoUrl(data.repoUrl);
           window.open(data.repoUrl, '_blank');
         } else {
           toast.error('GitHub export failed');
@@ -252,8 +253,23 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
                 )}
               </div>
               <div className="flex items-center gap-2 mb-2">
-                <Icons.Github className="w-4 h-4" />
-                <span>{project.description || 'No description provided'}</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                  {project.description || 'No description provided'}
+                </span>
+                {githubRepoUrl && (
+                  <a
+                    href={githubRepoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={e => e.stopPropagation()}
+                    className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded-full font-medium hover:opacity-80 transition"
+                  >
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z" />
+                    </svg>
+                    GitHub
+                  </a>
+                )}
               </div>
             </div>
 
@@ -289,7 +305,9 @@ export default function ProjectCard({ project, onDelete, onRefresh }: ProjectCar
                       className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition"
                       type="button"
                     >
-                      <Icons.Github className="w-4 h-4" />
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z" />
+                      </svg>
                       Export to GitHub
                     </button>
                     <button

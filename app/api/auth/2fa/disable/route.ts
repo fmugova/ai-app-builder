@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { totpVerify } from '@/lib/totp'
+import { totpVerifyWithReplay } from '@/lib/totp'
 
 export async function POST(req: NextRequest) {
   try {
@@ -34,12 +34,12 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Verify token before disabling
-    const verified = await totpVerify(user.twoFactorSecret!, token, 2)
+    // Verify token before disabling (with replay protection)
+    const { valid, error: totpError } = await totpVerifyWithReplay(user.id, user.twoFactorSecret!, token, 2)
 
-    if (!verified) {
+    if (!valid) {
       return NextResponse.json(
-        { error: 'Invalid token' },
+        { error: totpError ?? 'Invalid token' },
         { status: 400 }
       )
     }

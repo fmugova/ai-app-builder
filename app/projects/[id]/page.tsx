@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import DeployButton from '@/components/DeployButton'
+import PushToGitHubButton from '@/components/PushToGitHubButton'
 import GenerationInterface from '@/components/GenerationInterface'
-import { FileText, Eye, Edit2, Code2 } from 'lucide-react'
+import AIIterationChat from '@/components/AIIterationChat'
+import { FileText, Eye, Edit2, Code2, Sparkles } from 'lucide-react'
 
 interface ProjectFile {
   id: string
@@ -40,7 +42,8 @@ export default function ProjectViewPage() {
   const { data: session, status } = useSession()
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeView, setActiveView] = useState<'preview' | 'edit' | 'files' | 'code'>('preview')
+  const [activeView, setActiveView] = useState<'preview' | 'edit' | 'files' | 'code' | 'ai-chat'>('preview')
+  const [liveCode, setLiveCode] = useState<string | null>(null)
 
   const projectId = params.id as string
 
@@ -61,6 +64,7 @@ export default function ProjectViewPage() {
       if (res.ok) {
         const data = await res.json()
         setProject(data)
+        if (data.code) setLiveCode(data.code)
       } else {
         alert('Project not found or access denied')
         router.push('/dashboard')
@@ -134,8 +138,9 @@ export default function ProjectViewPage() {
                   {existingFiles.length} files
                 </span>
               )}
-              <DeployButton 
-                projectId={project.id} 
+              <PushToGitHubButton projectId={project.id} />
+              <DeployButton
+                projectId={project.id}
                 projectName={project.name}
                 size="md"
               />
@@ -193,6 +198,19 @@ export default function ProjectViewPage() {
             <Code2 className="w-4 h-4" />
             Code
           </button>
+          {!project.isMultiFile && (liveCode || project.code) && (
+            <button
+              onClick={() => setActiveView('ai-chat')}
+              className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                activeView === 'ai-chat'
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
+              }`}
+            >
+              <Sparkles className="w-4 h-4" />
+              AI Chat
+            </button>
+          )}
         </div>
 
         {/* Preview View */}
@@ -236,13 +254,13 @@ export default function ProjectViewPage() {
               </div>
             )}
 
-            {project.code && (
+            {(liveCode || project.code) && (
               <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-bold">Live Preview</h2>
                   <button
                     onClick={() => {
-                      const blob = new Blob([project.code || ''], { type: 'text/html' })
+                      const blob = new Blob([liveCode || project.code || ''], { type: 'text/html' })
                       const url = URL.createObjectURL(blob)
                       window.open(url, '_blank')
                     }}
@@ -253,7 +271,7 @@ export default function ProjectViewPage() {
                 </div>
                 <div className="border border-gray-700 rounded-lg overflow-hidden bg-white">
                   <iframe
-                    srcDoc={project.code}
+                    srcDoc={liveCode || project.code || ''}
                     className="w-full h-[600px]"
                     title="Project Preview"
                     sandbox="allow-scripts allow-forms allow-modals allow-popups"
@@ -324,7 +342,7 @@ export default function ProjectViewPage() {
               <h2 className="text-xl font-bold">Source Code</h2>
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(project.code || '')
+                  navigator.clipboard.writeText(liveCode || project.code || '')
                   alert('Code copied to clipboard!')
                 }}
                 className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition text-sm"
@@ -334,8 +352,32 @@ export default function ProjectViewPage() {
             </div>
             <div className="bg-gray-900 rounded-lg p-4 overflow-x-auto max-h-[600px]">
               <pre className="text-sm text-gray-300">
-                <code>{project.code}</code>
+                <code>{liveCode || project.code}</code>
               </pre>
+            </div>
+          </div>
+        )}
+
+        {/* AI Chat View */}
+        {activeView === 'ai-chat' && !project.isMultiFile && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="h-[600px]">
+              <AIIterationChat
+                projectId={project.id}
+                currentCode={liveCode || project.code || ''}
+                onCodeUpdate={(newCode) => setLiveCode(newCode)}
+              />
+            </div>
+            <div className="border border-gray-700 rounded-lg overflow-hidden bg-white">
+              <div className="bg-gray-800 px-4 py-2 text-sm text-gray-400 border-b border-gray-700">
+                Live Preview
+              </div>
+              <iframe
+                srcDoc={liveCode || project.code || ''}
+                className="w-full h-[556px]"
+                title="AI Chat Preview"
+                sandbox="allow-scripts allow-forms allow-modals allow-popups"
+              />
             </div>
           </div>
         )}

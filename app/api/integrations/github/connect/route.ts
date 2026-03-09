@@ -1,40 +1,40 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { redis } from '@/lib/rate-limit'
+
+const APP_URL = process.env.NEXTAUTH_URL || 'http://localhost:3000'
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.id) {
+      return NextResponse.redirect(`${APP_URL}/auth/signin`)
     }
 
-    const githubClientId = process.env.GITHUB_CLIENT_ID;
-    
+    const githubClientId = process.env.GITHUB_CLIENT_ID
+
     if (!githubClientId) {
-      return NextResponse.json(
-        { error: 'GitHub OAuth not configured' },
-        { status: 500 }
-      );
+      return NextResponse.redirect(`${APP_URL}/integrations/github?error=config`)
     }
 
-    // Build the OAuth URL
+    // Generate a short-lived nonce; store userId so callback can verify the session
+    const nonce = crypto.randomUUID()
+    await redis.set(`github:oauth:state:${nonce}`, session.user.id, { ex: 300 })
+
     const params = new URLSearchParams({
       client_id: githubClientId,
-      redirect_uri: `${process.env.NEXTAUTH_URL}/api/integrations/github/callback`,
+      redirect_uri: `${APP_URL}/api/integrations/github/callback`,
       scope: 'repo,user:email',
-      state: session.user.email, // Use email as state for verification
-    });
+      state: nonce,
+    })
 
-    const githubAuthUrl = `https://github.com/login/oauth/authorize?${params.toString()}`;
-
-    return NextResponse.json({ success: true, url: githubAuthUrl });
+    return NextResponse.redirect(
+      `https://github.com/login/oauth/authorize?${params.toString()}`
+    )
   } catch (error) {
-    console.error('GitHub OAuth initiation error:', error);
-    return NextResponse.json(
-      { error: 'Failed to initiate GitHub OAuth', details: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    );
+    console.error('GitHub OAuth initiation error:', error)
+    return NextResponse.redirect(`${APP_URL}/integrations/github?error=config`)
   }
 }

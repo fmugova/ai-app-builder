@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { totpVerify } from '@/lib/totp'
+import { totpVerifyWithReplay } from '@/lib/totp'
 import { randomBytes } from 'crypto'
 import bcrypt from 'bcryptjs'
 import { checkRateLimit } from '@/lib/rate-limit'
@@ -46,12 +46,12 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Verify TOTP token before regenerating codes
-    const verified = await totpVerify(user.twoFactorSecret, token, 2)
+    // Verify TOTP token before regenerating codes (with replay protection)
+    const { valid, error: totpError } = await totpVerifyWithReplay(user.id, user.twoFactorSecret, token, 2)
 
-    if (!verified) {
+    if (!valid) {
       return NextResponse.json(
-        { error: 'Invalid verification code' },
+        { error: totpError ?? 'Invalid verification code' },
         { status: 400 }
       )
     }

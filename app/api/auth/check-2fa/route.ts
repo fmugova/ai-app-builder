@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { prisma } from '@/lib/prisma'
-import { totpVerify } from '@/lib/totp'
+import { totpVerifyWithReplay } from '@/lib/totp'
 
 export async function POST(req: NextRequest) {
   try {
@@ -46,11 +46,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid token format' }, { status: 400 })
     }
 
-    // Verify token using otplib
-    const isValid = await totpVerify(user.twoFactorSecret, token, 2)
+    // Verify token with replay protection
+    const { valid, error: totpError } = await totpVerifyWithReplay(user.id, user.twoFactorSecret, token, 2)
 
-    if (!isValid) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+    if (!valid) {
+      return NextResponse.json({ error: totpError ?? 'Invalid token' }, { status: 401 })
     }
 
     // Token is valid

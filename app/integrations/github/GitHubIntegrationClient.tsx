@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { toast } from 'react-hot-toast'
 
 interface GitHubIntegrationClientProps {
   initialUsername?: string | null
@@ -18,36 +19,26 @@ export default function GitHubIntegrationClient({
   const [isConnected, setIsConnected] = useState(initialConnected)
   const [username, setUsername] = useState(initialUsername)
   const [isDisconnecting, setIsDisconnecting] = useState(false)
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false)
 
-  // Handle OAuth callback
+  // Handle OAuth callback result
   useEffect(() => {
     const success = searchParams.get('success')
     const error = searchParams.get('error')
 
     if (success) {
-      alert('✅ GitHub account connected successfully!')
+      toast.success('GitHub account connected successfully!')
       router.replace('/integrations/github')
       router.refresh()
     } else if (error) {
-      let errorMessage = 'Failed to connect GitHub account'
-      switch (error) {
-        case 'no_code':
-          errorMessage = 'Authorization code not received'
-          break
-        case 'invalid_state':
-          errorMessage = 'Invalid state parameter. Please try again.'
-          break
-        case 'config':
-          errorMessage = 'GitHub OAuth is not properly configured'
-          break
-        case 'token_exchange':
-          errorMessage = 'Failed to exchange authorization code for token'
-          break
-        case 'user_fetch':
-          errorMessage = 'Failed to fetch GitHub user information'
-          break
+      const messages: Record<string, string> = {
+        no_code: 'Authorization code not received',
+        invalid_state: 'Invalid state parameter. Please try again.',
+        config: 'GitHub OAuth is not properly configured',
+        token_exchange: 'Failed to exchange authorization code for token',
+        user_fetch: 'Failed to fetch GitHub user information',
       }
-      alert(`❌ ${errorMessage}`)
+      toast.error(messages[error] ?? 'Failed to connect GitHub account')
       router.replace('/integrations/github')
     }
   }, [searchParams, router])
@@ -57,27 +48,21 @@ export default function GitHubIntegrationClient({
   }
 
   const handleDisconnect = async () => {
-    if (!confirm('Disconnect GitHub?\n\nYou can reconnect anytime.')) {
-      return
-    }
-
     setIsDisconnecting(true)
     try {
-      const res = await fetch('/api/integrations/github/disconnect', {
-        method: 'POST'
-      })
-
+      const res = await fetch('/api/integrations/github/disconnect', { method: 'POST' })
       if (res.ok) {
-        alert('✅ GitHub account disconnected')
+        toast.success('GitHub account disconnected')
         setIsConnected(false)
         setUsername(null)
+        setConfirmDisconnect(false)
         router.refresh()
       } else {
-        alert('❌ Failed to disconnect GitHub account')
+        toast.error('Failed to disconnect GitHub account')
       }
     } catch (error) {
       console.error('Disconnect error:', error)
-      alert('❌ Failed to disconnect GitHub account')
+      toast.error('Failed to disconnect GitHub account')
     } finally {
       setIsDisconnecting(false)
     }
@@ -117,13 +102,31 @@ export default function GitHubIntegrationClient({
                 <p className="text-sm text-green-700 dark:text-green-300">
                   Signed in as <strong>@{username}</strong>
                 </p>
-                <button
-                  onClick={handleDisconnect}
-                  disabled={isDisconnecting}
-                  className="mt-3 text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium disabled:opacity-50"
-                >
-                  {isDisconnecting ? 'Disconnecting...' : 'Disconnect Account'}
-                </button>
+                {confirmDisconnect ? (
+                  <div className="mt-3 flex items-center gap-2">
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Disconnect GitHub?</span>
+                    <button
+                      onClick={handleDisconnect}
+                      disabled={isDisconnecting}
+                      className="text-sm text-red-600 dark:text-red-400 font-medium hover:text-red-700 disabled:opacity-50"
+                    >
+                      {isDisconnecting ? 'Disconnecting...' : 'Yes, disconnect'}
+                    </button>
+                    <button
+                      onClick={() => setConfirmDisconnect(false)}
+                      className="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmDisconnect(true)}
+                    className="mt-3 text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium"
+                  >
+                    Disconnect Account
+                  </button>
+                )}
               </div>
             </div>
           </div>

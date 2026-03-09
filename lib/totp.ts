@@ -16,6 +16,7 @@
  */
 
 import { generateSecret, generateURI, verify } from 'otplib';
+import { redis } from '@/lib/rate-limit';
 
 /** Generate a random Base32 TOTP secret (uses built-in Noble crypto + scure base32). */
 export function totpGenerateSecret(): string {
@@ -42,4 +43,44 @@ export async function totpVerify(
 ): Promise<boolean> {
   const result = await verify({ secret, token, epochTolerance: window * 30 });
   return result.valid;
+}
+
+/**
+ * Verify a TOTP token with replay protection.
+ * Marks valid tokens as used in Redis (TTL = window * 30 * 2 + 30 seconds)
+ * so the same code cannot be accepted twice within the tolerance window.
+ *
+ * Use this instead of totpVerify() on all login and sensitive-action routes.
+ */
+export async function totpVerifyWithReplay(
+  userId: string,
+  secret: string,
+  token: string,
+  window = 1
+): Promise<{ valid: boolean; error?: string }> {
+  // Check replay first — cheapest check
+  const usedKey = `totp:used:${userId}:${token}`;
+  try {
+    const wasUsed = await redis.get(usedKey);
+    if (wasUsed) {
+      return { valid: false, error: 'Token already used' };
+    }
+  } catch {
+    // Redis unavailable — fail open (don't lock users out) but still verify signature
+  }
+
+  const result = await verify({ secret, token, epochTolerance: window * 30 });
+  if (!result.valid) {
+    return { valid: false, error: 'Invalid token' };
+  }
+
+  // Mark as used — TTL covers the full valid window + one extra step as buffer
+  const ttlSeconds = window * 30 * 2 + 30;
+  try {
+    await redis.set(usedKey, '1', { ex: ttlSeconds });
+  } catch {
+    // Non-fatal — token is valid, Redis write failure should not block login
+  }
+
+  return { valid: true };
 }
