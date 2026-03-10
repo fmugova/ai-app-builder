@@ -30,6 +30,8 @@ const GenerationExperience = dynamic(
 import { parseMultiFileProject, convertToSingleHTML } from '@/lib/multi-file-parser';
 import { parseGeneratedCode } from '@/lib/code-parser';
 import { AlertTriangle, CheckCircle, XCircle, Download, Copy, Github, ExternalLink, Save, Sparkles, RefreshCw, Upload, Link as LinkIcon, Code2, Lightbulb, Menu, X, Wand2, ImageIcon, Loader2 } from 'lucide-react';
+import GenerationWizard, { type PhaseStatus } from '@/components/GenerationWizard';
+import type { DecompositionPhase, DecompositionResult } from '@/lib/generation/prompt-decomposition';
 
 // Types remain the same as before...
 interface ValidationMessage {
@@ -293,6 +295,17 @@ function ChatBuilderContent() {
   const [useWebContainer, setUseWebContainer] = useState(false); // off by default — WebContainer build failures are worse UX than static fallback
   const [webContainerFailed, setWebContainerFailed] = useState(false);
   const [showGenExperience, setShowGenExperience] = useState(false);
+
+  // ── Phase Wizard state ────────────────────────────────────────────────────
+  const [showWizard, setShowWizard] = useState(false);
+  const [scaffoldType, setScaffoldType] = useState('marketing');
+  const [decompositionPlan, setDecompositionPlan] = useState<DecompositionResult | null>(null);
+  const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
+  const [phaseStatuses, setPhaseStatuses] = useState<Map<number, PhaseStatus>>(new Map());
+  const [allPhaseFiles, setAllPhaseFiles] = useState<Record<string, string>>({});
+  const [wizardRunning, setWizardRunning] = useState(false);
+  const [wizardProjectId, setWizardProjectId] = useState<string | null>(null);
+  const phaseEsRef = useRef<EventSource | null>(null);
 
   // Auth check
   useEffect(() => {
@@ -919,6 +932,131 @@ Please regenerate the complete, fixed code.`;
       toast.error('Failed to auto-fix code', { id: loadingToast });
     }
   }, [currentProjectId]);
+
+  // ── Phase Wizard logic ──────────────────────────────────────────────────────
+
+  const handleGeneratePhase = useCallback(async (phase: DecompositionPhase) => {
+    const phaseIdx = phase.phaseNumber - 1;
+    setPhaseStatuses(prev => new Map(prev).set(phaseIdx, 'generating'));
+    setWizardRunning(true);
+
+    const name = projectName || generateSmartProjectName(prompt);
+    const params = new URLSearchParams({
+      prompt,
+      name,
+      phasePrompt: phase.prompt,
+      scaffoldType,
+    });
+
+    const es = new EventSource(`/api/generate/stream?${params.toString()}`);
+    phaseEsRef.current = es;
+
+    const phaseFiles: Record<string, string> = {};
+
+    es.addEventListener('file', (e: MessageEvent) => {
+      const { path, content } = JSON.parse(e.data);
+      phaseFiles[path] = content;
+    });
+
+    es.addEventListener('done', async () => {
+      es.close();
+      phaseEsRef.current = null;
+
+      const merged = { ...allPhaseFiles, ...phaseFiles };
+      setAllPhaseFiles(merged);
+      setPhaseStatuses(prev => new Map(prev).set(phaseIdx, 'done'));
+      const nextIdx = phaseIdx + 1;
+      setCurrentPhaseIndex(nextIdx);
+
+      // After last phase: save the accumulated project
+      const isLastPhase = !decompositionPlan || nextIdx >= decompositionPlan.totalPhases;
+      if (isLastPhase) {
+        setWizardRunning(false);
+        try {
+          const res = await fetch('/api/generate/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, prompt, files: merged, qualityScore: 80 }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setWizardProjectId(data.projectId ?? null);
+            setCurrentProjectId(data.projectId ?? null);
+            toast.success('All phases complete! Your app is ready.');
+          }
+        } catch {
+          toast.error('Project generation complete but save failed.');
+        }
+      } else {
+        setWizardRunning(false);
+      }
+    });
+
+    es.addEventListener('error_event', (e: MessageEvent) => {
+      const { message } = JSON.parse(e.data);
+      es.close();
+      phaseEsRef.current = null;
+      setPhaseStatuses(prev => new Map(prev).set(phaseIdx, 'error'));
+      setWizardRunning(false);
+      toast.error(`Phase ${phase.phaseNumber} failed: ${message}`);
+    });
+
+    es.onerror = () => {
+      if (phaseEsRef.current !== es) return;
+      es.close();
+      phaseEsRef.current = null;
+      setPhaseStatuses(prev => new Map(prev).set(phaseIdx, 'error'));
+      setWizardRunning(false);
+      toast.error(`Phase ${phase.phaseNumber}: connection error`);
+    };
+  }, [prompt, projectName, scaffoldType, allPhaseFiles, decompositionPlan]);
+
+  const handleGenerateAll = useCallback(async () => {
+    if (!decompositionPlan) return;
+    // Run phases sequentially by triggering the first, then each 'done' auto-advances
+    const firstPending = decompositionPlan.phases.find(
+      (_, i) => (phaseStatuses.get(i) ?? 'pending') === 'pending'
+    );
+    if (firstPending) handleGeneratePhase(firstPending);
+  }, [decompositionPlan, phaseStatuses, handleGeneratePhase]);
+
+  // Intercepts the "Generate App" button — checks complexity before showing GenExperience
+  const handleGenerateWithDecompose = useCallback(async () => {
+    if (!prompt.trim()) {
+      toast.error('Please enter a prompt');
+      return;
+    }
+    if (!projectName || projectName.trim() === '') {
+      setProjectName(generateSmartProjectName(prompt));
+    }
+
+    try {
+      const res = await fetch('/api/generate/decompose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setScaffoldType(data.scaffoldType || 'marketing');
+
+        if (data.isComplex && data.decomposition) {
+          setDecompositionPlan(data.decomposition);
+          setCurrentPhaseIndex(0);
+          setPhaseStatuses(new Map());
+          setAllPhaseFiles({});
+          setWizardProjectId(null);
+          setShowWizard(true);
+          return; // don't open GenerationExperience yet
+        }
+      }
+    } catch {
+      // Non-fatal — fall through to normal generation
+    }
+
+    // Not complex or decompose failed → proceed with standard single-shot generation
+    setShowGenExperience(true);
+  }, [prompt, projectName]);
 
   const handleSave = useCallback(async () => {
     if (!state.fullCode) {
@@ -1637,12 +1775,8 @@ Please regenerate the complete, fixed code.`;
               <button
                 onClick={() => {
                   if (!state.fullCode) {
-                    // Always route fresh generations through GenerationExperience
-                    // so every site gets the file tree, preview, and Netlify deploy UX.
-                    if (!projectName || projectName.trim() === '') {
-                      setProjectName(generateSmartProjectName(prompt));
-                    }
-                    setShowGenExperience(true);
+                    // Fresh generation — check complexity first, may show Phase Wizard
+                    handleGenerateWithDecompose();
                   } else {
                     // Code already exists → iterate via legacy path
                     handleGenerate();
@@ -2034,6 +2168,26 @@ Please regenerate the complete, fixed code.`;
         onClose={() => setShowMediaLibrary(false)}
         onSelectAsset={handleAssetSelected}
       />
+
+      {/* Phase Generation Wizard — shown for complex Next.js projects */}
+      {showWizard && decompositionPlan && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <GenerationWizard
+            decomposition={decompositionPlan}
+            scaffoldType={scaffoldType}
+            phaseStatuses={phaseStatuses}
+            currentPhaseIndex={currentPhaseIndex}
+            onGeneratePhase={handleGeneratePhase}
+            onGenerateAll={handleGenerateAll}
+            onDismiss={() => {
+              setShowWizard(false);
+              setShowGenExperience(true);
+            }}
+            isRunning={wizardRunning}
+            savedProjectId={wizardProjectId}
+          />
+        </div>
+      )}
 
       {/* Generation Experience Overlay — plan-first HTML multi-page builder */}
       {showGenExperience && (

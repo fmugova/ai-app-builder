@@ -6,6 +6,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { NEXTJS_SYSTEM_PROMPT, parseNextjsOutput } from '@/lib/generation/nextjsPrompt';
 import { getScaffoldFiles } from '@/lib/scaffold/nextjs-scaffold';
+import { getDashboardScaffoldFiles, DASHBOARD_SYSTEM_PROMPT_ADDON } from '@/lib/scaffold/dashboard-scaffold';
 import type { ProgressCallback, FileCallback, PipelineResult } from './htmlGenerationPipeline';
 
 const anthropic = new Anthropic();
@@ -91,12 +92,24 @@ export async function runNextjsGenerationPipeline(
   userPrompt: string,
   siteName: string,
   onProgress?: ProgressCallback,
-  onFile?: FileCallback
+  onFile?: FileCallback,
+  scaffoldType?: string
 ): Promise<PipelineResult> {
   const warnings: string[] = [];
 
+  const isDashboard = scaffoldType === 'dashboard';
+
   onProgress?.('nextjs-start', 'Starting Next.js + Supabase generation...');
   onProgress?.('nextjs-generating', 'Generating feature files with Claude...');
+
+  // Dashboard projects get extra scaffold components + a system prompt addon
+  const systemPrompt = isDashboard
+    ? NEXTJS_SYSTEM_PROMPT + DASHBOARD_SYSTEM_PROMPT_ADDON
+    : NEXTJS_SYSTEM_PROMPT;
+
+  const dashboardScaffoldNote = isDashboard
+    ? `\n- Pre-built dashboard components are in the scaffold: components/ui/sidebar.tsx, components/ui/data-table.tsx, components/ui/chart.tsx, components/ui/stat-card.tsx — USE THEM`
+    : '';
 
   const userMessage = `Build a complete Next.js app called "${siteName}".
 
@@ -105,7 +118,7 @@ ${userPrompt}
 
 Remember:
 - Output ONLY the feature-specific files in === FILE: path === format
-- The scaffold is already provided: auth pages, Supabase clients, middleware, globals.css, package.json, app/layout.tsx, components/ui/toaster.tsx
+- The scaffold is already provided: auth pages, Supabase clients, middleware, globals.css, package.json, app/layout.tsx, components/ui/toaster.tsx${dashboardScaffoldNote}
 - Generate: app/page.tsx, feature pages, API routes, ALL components you reference, types, and the Supabase SQL migration
 - CRITICAL: Every import from '@/components/...' or '@/lib/...' or '@/hooks/...' that you write MUST have a corresponding === FILE: === block in your output
 - Make it real and complete — no placeholders or TODOs`;
@@ -116,7 +129,7 @@ Remember:
     const response = await (anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 16000,
-      system: NEXTJS_SYSTEM_PROMPT,
+      system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
     }) as unknown as Promise<Anthropic.Message>);
 
@@ -130,7 +143,8 @@ Remember:
   }
 
   // Merge scaffold + feature files (feature files override scaffold if same path)
-  const scaffoldFiles = getScaffoldFiles();
+  // Dashboard projects get extra pre-built UI components in the scaffold.
+  const scaffoldFiles = isDashboard ? getDashboardScaffoldFiles() : getScaffoldFiles();
   const allFiles = { ...scaffoldFiles, ...featureFiles };
 
   // Post-process: auto-stub any @/ imports that reference missing files

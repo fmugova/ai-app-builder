@@ -13,6 +13,7 @@ import { createGenerationPlan } from "@/lib/api/planGeneration";
 import { runGenerationPipeline } from "@/lib/pipeline/htmlGenerationPipeline";
 import { runNextjsGenerationPipeline } from "@/lib/pipeline/nextjsGenerationPipeline";
 import { detectOutputMode } from "@/lib/generation/detectOutputMode";
+import { selectScaffold, scaffoldUsesNextjs } from "@/lib/scaffolds/scaffold-selector";
 import { rateLimiters } from "@/lib/rate-limit";
 import prisma from "@/lib/prisma";
 
@@ -82,6 +83,10 @@ async function GETHandler(req: NextRequest) {
   const prompt = req.nextUrl.searchParams.get("prompt") ?? "";
   const siteName = req.nextUrl.searchParams.get("name") ?? "My App";
   const projectId = req.nextUrl.searchParams.get("projectId") ?? "";
+  // Phase wizard params — phasePrompt overrides the generation prompt while keeping
+  // the original prompt for plan creation and display.
+  const phasePrompt = req.nextUrl.searchParams.get("phasePrompt") ?? "";
+  const scaffoldTypeParam = req.nextUrl.searchParams.get("scaffoldType") ?? "";
 
   if (!prompt.trim()) {
     return new Response("Missing prompt", { status: 400 });
@@ -133,7 +138,18 @@ async function GETHandler(req: NextRequest) {
         //     The client-side useGenerationStream hook handles the retry UX.)
         send("token", { token: crypto.randomUUID() });
 
-        const useNextjs = shouldUseNextjs(prompt);
+        // Scaffold-aware routing: use selectScaffold() for 7-way type detection,
+        // fall back to the original keyword-based shouldUseNextjs() for explicit keywords.
+        const scaffoldResult = selectScaffold(prompt);
+        const useNextjs =
+          scaffoldUsesNextjs(scaffoldResult.scaffold) || shouldUseNextjs(prompt);
+
+        // Resolved scaffold type: prefer explicit param (from wizard) over auto-detected
+        const scaffoldType = scaffoldTypeParam || scaffoldResult.scaffold;
+
+        // Use phasePrompt for generation if provided (phase wizard flow).
+        // The original prompt is still used for plan creation so it stays descriptive.
+        const generationPrompt = phasePrompt || prompt;
 
         // 1. Generate plan (fast -- uses haiku, ~1s)
         const plan = await createGenerationPlan(prompt, siteName);
@@ -155,7 +171,7 @@ async function GETHandler(req: NextRequest) {
           }
 
           result = await runNextjsGenerationPipeline(
-            prompt,
+            generationPrompt,
             siteName,
             // onProgress: log to server, no client events needed (one big call)
             (step, detail) => {
@@ -164,7 +180,8 @@ async function GETHandler(req: NextRequest) {
             // onFile: stream each file to client
             (path: string, content: string) => {
               send("file", { path, content });
-            }
+            },
+            scaffoldType
           );
 
           // Mark all plan steps done
@@ -175,7 +192,7 @@ async function GETHandler(req: NextRequest) {
         } else {
           // ── HTML multi-page pipeline ─────────────────────────────────────────
           result = await runGenerationPipeline(
-            prompt,
+            generationPrompt,
             siteName,
             // onProgress: maps pipeline steps to SSE events
             (step, detail) => {

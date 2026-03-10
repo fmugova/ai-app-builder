@@ -29,7 +29,18 @@ export async function GET(
             name: true,
             email: true   // used only for ownership check below, stripped from response
           }
-        }
+        },
+        ProjectFile: {
+          select: {
+            id: true,
+            projectId: true,
+            path: true,
+            content: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+          orderBy: { path: 'asc' },
+        },
       }
     })
 
@@ -48,7 +59,10 @@ export async function GET(
 
     // Strip internal User.email from the response
     const { User, ...projectData } = project
-    return NextResponse.json({ ...projectData, User: { name: User.name } })
+    return NextResponse.json({
+      ...projectData,
+      User: { name: User.name },
+    })
   } catch (error) {
     console.error('Project view error:', error)
     return NextResponse.json(
