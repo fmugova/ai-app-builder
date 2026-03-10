@@ -43,6 +43,7 @@ export default function ProjectViewPage() {
   const { data: session, status } = useSession()
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [activeView, setActiveView] = useState<'preview' | 'edit' | 'code' | 'ai-chat'>('preview')
   const [liveCode, setLiveCode] = useState<string | null>(null)
   const [showMobileFiles, setShowMobileFiles] = useState(false)
@@ -67,11 +68,17 @@ export default function ProjectViewPage() {
         setProject(data)
         if (data.code) setLiveCode(data.code)
       } else {
-        alert('Project not found or access denied')
-        router.push('/dashboard')
+        const data = await res.json().catch(() => ({}))
+        const msg = res.status === 403
+          ? 'Access denied — you don\'t have permission to view this project.'
+          : res.status === 404
+          ? 'Project not found. It may have been deleted.'
+          : `Failed to load project (${res.status}): ${data.error ?? 'Unknown error'}`
+        setLoadError(msg)
       }
     } catch (error) {
       console.error('Failed to load project:', error)
+      setLoadError('Network error — could not reach the server.')
     } finally {
       setLoading(false)
     }
@@ -88,14 +95,18 @@ export default function ProjectViewPage() {
     )
   }
 
-  if (!project) {
+  if (loadError || !project) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
-        <div className="text-center">
-          <p className="text-red-400 text-xl mb-4">Project not found</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center max-w-md px-6">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-2xl">⚠️</span>
+          </div>
+          <p className="text-gray-800 font-semibold text-lg mb-2">Could not load project</p>
+          <p className="text-gray-500 text-sm mb-6">{loadError ?? 'Project not found.'}</p>
           <button
             onClick={() => router.push('/dashboard')}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+            className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition text-sm font-medium"
           >
             Back to Dashboard
           </button>

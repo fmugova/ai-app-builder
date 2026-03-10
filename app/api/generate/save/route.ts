@@ -47,6 +47,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const isNextjsProject = Object.keys(files).some(
+      (p) => p.endsWith(".tsx") || (p.endsWith(".ts") && !p.endsWith(".d.ts") && !p.endsWith("route.ts"))
+    );
     const htmlFiles = Object.entries(files).filter(([p]) => p.endsWith(".html"));
     const combinedHtml = files["index.html"] ?? htmlFiles[0]?.[1] ?? "";
 
@@ -72,14 +75,14 @@ export async function POST(req: NextRequest) {
           userId: dbUser.id,
           name,
           prompt,
-          type: "html",
-          projectType: "multi-page-html",
+          type: isNextjsProject ? "nextjs" : "html",
+          projectType: isNextjsProject ? "nextjs" : "multi-page-html",
           code: combinedHtml,
           html: combinedHtml,
           css: files["style.css"] ?? "",
           javascript: files["script.js"] ?? "",
-          multiPage: htmlFiles.length > 1,
-          isMultiFile: false,
+          multiPage: isNextjsProject ? true : htmlFiles.length > 1,
+          isMultiFile: isNextjsProject,
           validationScore: BigInt(Math.round(qualityScore)),
           validationPassed: qualityScore >= 70,
           status: "DRAFT",
@@ -138,11 +141,6 @@ export async function POST(req: NextRequest) {
 
     // Save all individual files to ProjectFile table
     await saveProjectFiles(project.id, injectedFiles);
-
-    // Detect whether this is a Next.js project (has .tsx source files)
-    const isNextjsProject = Object.keys(injectedFiles).some(
-      (p) => p.endsWith('.tsx') || (p.endsWith('.ts') && !p.endsWith('.d.ts') && !p.endsWith('route.ts'))
-    );
 
     if (isNextjsProject) {
       // Create Page records from app/**/page.tsx files so the Pages + SEO dashboard sections work
