@@ -35,6 +35,8 @@ interface GenerationWizardProps {
   isRunning?: boolean
   /** Set once all phases are done */
   savedProjectId?: string | null
+  /** Called when user clicks "Open in Builder" after all phases complete */
+  onOpenInBuilder?: () => void
 }
 
 // ── Phase status icon ─────────────────────────────────────────────────────────
@@ -66,6 +68,7 @@ export default function GenerationWizard({
   onDismiss,
   isRunning = false,
   savedProjectId,
+  onOpenInBuilder,
 }: GenerationWizardProps) {
   const scaffold = SCAFFOLD_LABELS[scaffoldType] ?? SCAFFOLD_LABELS.marketing
   const allDone = decomposition.phases.every(
@@ -183,16 +186,27 @@ export default function GenerationWizard({
 
       {/* All done state */}
       {allDone && savedProjectId && (
-        <div className="px-6 pb-4">
+        <div className="px-6 pb-5">
           <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
             <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
             <p className="text-sm font-semibold text-green-800">All phases complete!</p>
-            <a
-              href={`/projects/${savedProjectId}`}
-              className="mt-3 inline-block px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
-            >
-              View Your Project →
-            </a>
+            <div className="flex flex-col gap-2 mt-3">
+              {onOpenInBuilder && (
+                <button
+                  onClick={onOpenInBuilder}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                >
+                  <Zap className="w-4 h-4" />
+                  Open in Builder
+                </button>
+              )}
+              <a
+                href={`/projects/${savedProjectId}`}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                View Project Page →
+              </a>
+            </div>
           </div>
         </div>
       )}

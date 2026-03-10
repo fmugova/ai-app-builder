@@ -2185,6 +2185,24 @@ Please regenerate the complete, fixed code.`;
             }}
             isRunning={wizardRunning}
             savedProjectId={wizardProjectId}
+            onOpenInBuilder={() => {
+              // Load all accumulated phase files into the builder file tree
+              if (Object.keys(allPhaseFiles).length > 0) {
+                const langMap: Record<string, string> = {
+                  tsx: 'typescript', ts: 'typescript', jsx: 'javascript',
+                  js: 'javascript', css: 'css', json: 'json',
+                  md: 'markdown', sql: 'sql', html: 'html',
+                };
+                const files = Object.entries(allPhaseFiles).map(([path, content]) => ({
+                  path,
+                  content,
+                  language: langMap[path.split('.').pop() ?? ''] ?? 'plaintext',
+                }));
+                setProjectFiles(files);
+                setIsMultiFileProject(true);
+              }
+              setShowWizard(false);
+            }}
           />
         </div>
       )}
