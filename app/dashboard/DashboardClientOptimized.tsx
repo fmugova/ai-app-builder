@@ -76,12 +76,9 @@ export default function DashboardClient({
 }: DashboardClientProps) {
   const searchParams = useSearchParams()
   const [projects, setProjects] = useState<Project[]>(initialProjects || [])
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('theme') === 'dark'
-    }
-    return true
-  })
+  // Always start with a consistent SSR-safe default (dark); read localStorage after mount
+  const [isDarkMode, setIsDarkMode] = useState(true)
+  const [mounted, setMounted] = useState(false)
   const [showAccountMenu, setShowAccountMenu] = useState(false)
   const [toasts, setToasts] = useState<Toast[]>([])
 
@@ -131,14 +128,24 @@ export default function DashboardClient({
     fetch('/api/analytics?type=dashboard').catch(() => {})
   }, [])
 
+  // Sync theme preference from localStorage after first mount (client-only)
   useEffect(() => {
+    setMounted(true)
+    const stored = localStorage.getItem('theme')
+    if (stored !== null) {
+      setIsDarkMode(stored === 'dark')
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!mounted) return
     localStorage.setItem('theme', isDarkMode ? 'dark' : 'light')
     if (isDarkMode) {
       document.documentElement.classList.add('dark')
     } else {
       document.documentElement.classList.remove('dark')
     }
-  }, [isDarkMode])
+  }, [isDarkMode, mounted])
 
   const handleDeleteProject = async (projectId: string) => {
     try {
@@ -158,15 +165,9 @@ export default function DashboardClient({
     }
   }
 
-  const { data: session, status } = useSession()
-
-  if (status === 'loading') return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500" />
-    </div>
-  )
-
-  if (!session) return null
+  // session is only used for the signOut callback — no loading guard needed
+  // because the server component already protects this route and passes data as props.
+  const { data: session } = useSession()
 
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
