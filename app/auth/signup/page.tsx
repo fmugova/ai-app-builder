@@ -56,8 +56,11 @@ export default function SignUpPage() {
       if (result?.ok) {
         router.push('/dashboard')
         router.refresh()
+      } else if (result?.error?.includes('Two-factor') || result?.error?.includes('TWO_FACTOR_ONBOARDING')) {
+        // 2FA setup required — redirect to setup flow
+        router.push('/account/security/2fa?onboarding=1')
       } else {
-        setError('Account created but failed to sign in. Please try signing in manually.')
+        setError(result?.error || 'Account created but failed to sign in. Please try signing in manually.')
         setLoading(false)
       }
     } catch (err) {

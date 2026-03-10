@@ -70,22 +70,24 @@ const LIBRARY: Record<string, ImagePalette> = {
   },
 
   cafe_bakery: {
-    category: 'CAFÉ / COFFEE SHOP / BAKERY',
+    category: 'CAFÉ / COFFEE SHOP / BAKERY / CAKE SHOP',
     hero: [
-      hero('1501339847302-ac426a4a7cbb'),  // coffee with latte art
+      hero('1578985545062-6e5e57f6b5e5'),  // elegant layered cake
       hero('1495474472287-4d71bcdd2085'),  // cafe interior
-      hero('1442975631392-c18b7cca1a63'),  // barista at work
+      hero('1501339847302-ac426a4a7cbb'),  // coffee with latte art
     ],
     cards: [
-      card('1509042239860-f7a671399e1e'),  // flat white
+      card('1565958011703-44f9829ba187'),  // beautiful cake slice
       card('1519975258993-60b42d1c2ee2'),  // fresh pastries
-      card('1551024506-0bccd828d1f5'),     // coffee beans
       card('1464219789935-c2d9d9aea5b2'),  // croissants
+      card('1509042239860-f7a671399e1e'),  // flat white coffee
+      card('1571115764595-644a1f56a516'),  // decorated cupcakes
+      card('1586788680434-30d324b2d46f'),  // wedding cake
     ],
     portraits: [
-      portrait('1511366820374-db428d977ac7'),  // barista
-      portrait('1580489944761-15a19d654956'),  // cafe owner
       portrait('1607990283144-0097c51a2aa8'),  // baker
+      portrait('1580489944761-15a19d654956'),  // pastry chef (female)
+      portrait('1511366820374-db428d977ac7'),  // barista
     ],
   },
 
@@ -495,7 +497,7 @@ const LIBRARY: Record<string, ImagePalette> = {
 const KEYWORDS: Record<string, string[]> = {
   barbershop:       ['barber', 'barbershop', 'haircut', 'hair salon', 'hair cut', 'hairdresser', 'grooming salon', 'fade', 'taper', 'lineup', 'shave'],
   restaurant:       ['restaurant', 'dining', 'bistro', 'eatery', 'diner', 'tavern', 'brasserie', 'steakhouse', 'sushi bar', 'thai food', 'italian food', 'cuisine', 'fine dining'],
-  cafe_bakery:      ['cafe', 'coffee shop', 'bakery', 'bakehouse', 'pastry', 'espresso', 'coffee bar', 'patisserie', 'roastery', 'bake', 'brunch spot'],
+  cafe_bakery:      ['cafe', 'coffee shop', 'bakery', 'bakehouse', 'pastry', 'espresso', 'coffee bar', 'patisserie', 'roastery', 'bake', 'brunch spot', 'cake', 'cakes', 'cupcake', 'cupcakes', 'wedding cake', 'custom cake', 'birthday cake', 'cake shop', 'cake studio', 'bakeshop', 'dessert shop', 'confectionery', 'sweet shop', 'brownie', 'muffin', 'donut', 'doughnut'],
   gym_fitness:      ['gym', 'fitness', 'crossfit', 'weightlifting', 'bodybuilding', 'personal trainer', 'workout', 'health club', 'exercise', 'athletic'],
   medical:          ['medical', 'clinic', 'hospital', 'doctor', 'physician', 'dentist', 'dental', 'pharmacy', 'healthcare', 'health care', 'therapist', 'optometrist', 'chiropractic', 'pediatric'],
   law_firm:         ['law firm', 'legal', 'attorney', 'lawyer', 'solicitor', 'barrister', 'law office', 'counsel', 'litigation', 'legal services'],

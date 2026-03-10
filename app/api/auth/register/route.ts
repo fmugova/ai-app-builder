@@ -40,6 +40,12 @@ export async function POST(request: NextRequest) {
         subscriptionTier: 'free',
         subscriptionStatus: 'active',
         generationsLimit: 10,
+        // Auto-verify: this route doesn't send a verification email,
+        // so mark verified immediately to allow sign-in.
+        emailVerified: new Date(),
+        // Require 2FA setup on first login
+        twoFactorRequired: true,
+        twoFactorEnabled: false,
       }
     });
     return NextResponse.json({
