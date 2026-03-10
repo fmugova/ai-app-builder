@@ -139,22 +139,33 @@ export function createClient() {
 
   'lib/supabase/server.ts': `import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import type { ReadonlyRequestCookies } from 'next/dist/server/web/spec-extension/adapters/request-cookies'
 
-// Next.js 15: cookies() is async — must be awaited before use.
+// Next.js 15: cookies() is async — must be awaited inside a request context.
+// The try/catch guard prevents the "workUnitAsyncStorage" invariant crash that
+// Next.js 15.5+ throws when cookies() is called during static rendering.
 export async function createClient() {
-  const cookieStore = await cookies()
+  let cookieStore: ReadonlyRequestCookies | null = null
+  try {
+    cookieStore = await cookies()
+  } catch {
+    // Called outside a request context (static/build-time rendering).
+    // Return a cookie-less client so the page can still load without crashing.
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://placeholder.supabase.co'
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'placeholder-key'
 
   return createServerClient(url, key, {
     cookies: {
       getAll() {
-        return cookieStore.getAll()
+        return cookieStore?.getAll() ?? []
       },
       setAll(cookiesToSet) {
+        if (!cookieStore) return
         try {
           cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
+            cookieStore!.set(name, value, options)
           )
         } catch {
           // Can be ignored in Server Components (middleware handles cookie writes)
@@ -407,6 +418,9 @@ export default function SignupPage() {
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+
+// Force dynamic so cookies() has an active request context (Next.js 15.5+)
+export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)

@@ -65,6 +65,10 @@ Every page behind authentication MUST start with:
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
+// REQUIRED on every page/layout that calls createClient() — prevents the
+// Next.js 15.5+ "workUnitAsyncStorage" crash during static rendering
+export const dynamic = 'force-dynamic'
+
 export default async function Page() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -73,11 +77,22 @@ export default async function Page() {
 }
 \`\`\`
 
+CRITICAL (Next.js 15.5+): Add \`export const dynamic = 'force-dynamic'\` at the
+top of EVERY file that imports from '@/lib/supabase/server', including:
+- All protected pages (app/dashboard/page.tsx, etc.)
+- The authenticated shell layout (app/(app)/layout.tsx)
+- All Route Handlers that call createClient()
+- All Server Actions files
+Omitting this causes a fatal RuntimeInvariantError in production.
+
 ━━━ API ROUTES — SECURITY ━━━
 Every Route Handler that accesses user data MUST verify the session:
 \`\`\`typescript
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+
+// Required: prevents workUnitAsyncStorage crash in Next.js 15.5+
+export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const supabase = await createClient()
