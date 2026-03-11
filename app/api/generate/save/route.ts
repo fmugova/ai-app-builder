@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import crypto from "crypto";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { saveProjectFiles } from "@/lib/saveProjectFiles";
@@ -67,11 +68,54 @@ export async function POST(req: NextRequest) {
       return out
     }
 
-    // Wrap Project + all Page creates in a single transaction so a partial
-    // Page failure never leaves an orphaned Project record with no pages.
-    const project = await prisma.$transaction(async (tx) => {
-      const created = await tx.project.create({
+    // Pre-generate the project ID so Page creates can reference it without
+    // an interactive transaction (interactive transactions are incompatible
+    // with Supabase's pgbouncer in transaction-pool mode).
+    const projectId = crypto.randomUUID();
+
+    // Build page creates upfront (HTML projects only)
+    const pageCreates = htmlFiles.map(([filename, rawContent], pi) => {
+      const slug = filename.replace(".html", "") || "index";
+      const content = applyPlaceholders(rawContent, projectId, true);
+
+      const titleMatch = content.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+      const h1Match = content.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+      const metaDescMatch =
+        content.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i) ??
+        content.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i);
+      const pMatch = content.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+
+      const rawTitle = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, "").trim() : "";
+      const h1Text = h1Match ? h1Match[1].replace(/<[^>]*>/g, "").trim() : "";
+      const metaDesc = metaDescMatch ? metaDescMatch[1].trim() : "";
+      const pText = pMatch ? pMatch[1].replace(/<[^>]*>/g, "").trim().slice(0, 160) : "";
+      const pageTitle =
+        rawTitle ||
+        h1Text ||
+        (slug === "index" ? name : slug.charAt(0).toUpperCase() + slug.slice(1));
+
+      return prisma.page.create({
         data: {
+          projectId,
+          slug,
+          title: pageTitle,
+          content,
+          description: pText || metaDesc || null,
+          metaTitle: pageTitle,
+          metaDescription: metaDesc || pText || null,
+          isHomepage: slug === "index",
+          order: pi,
+          isPublished: true,
+        },
+      });
+    });
+
+    // Use the array form of $transaction — compatible with pgbouncer transaction-pool mode.
+    // All operations are pre-built so no interactive callback is needed.
+    const [project] = await prisma.$transaction([
+      prisma.project.create({
+        data: {
+          id: projectId,
           userId: dbUser.id,
           name,
           prompt,
@@ -87,48 +131,9 @@ export async function POST(req: NextRequest) {
           validationPassed: qualityScore >= 70,
           status: "DRAFT",
         },
-      });
-
-      for (let pi = 0; pi < htmlFiles.length; pi++) {
-        const [filename, rawContent] = htmlFiles[pi];
-        const slug = filename.replace(".html", "") || "index";
-        // Apply placeholder replacement so Page records have real URLs (not BUILDFLOW_PROJECT_ID)
-        const content = applyPlaceholders(rawContent, created.id, true)
-
-        const titleMatch = content.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-        const h1Match = content.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
-        const metaDescMatch =
-          content.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i) ??
-          content.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i);
-        const pMatch = content.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
-
-        const rawTitle = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, "").trim() : "";
-        const h1Text = h1Match ? h1Match[1].replace(/<[^>]*>/g, "").trim() : "";
-        const metaDesc = metaDescMatch ? metaDescMatch[1].trim() : "";
-        const pText = pMatch ? pMatch[1].replace(/<[^>]*>/g, "").trim().slice(0, 160) : "";
-        const pageTitle =
-          rawTitle ||
-          h1Text ||
-          (slug === "index" ? name : slug.charAt(0).toUpperCase() + slug.slice(1));
-
-        await tx.page.create({
-          data: {
-            projectId: created.id,
-            slug,
-            title: pageTitle,
-            content,
-            description: pText || metaDesc || null,
-            metaTitle: pageTitle,
-            metaDescription: metaDesc || pText || null,
-            isHomepage: slug === "index",
-            order: pi,
-            isPublished: true,
-          },
-        });
-      }
-
-      return created;
-    });
+      }),
+      ...pageCreates,
+    ]);
 
     // Replace the BUILDFLOW_PROJECT_ID placeholder injected during generation
     // with the real project id so contact forms POST to the correct endpoint.
