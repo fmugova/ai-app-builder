@@ -35,6 +35,10 @@ interface GenerationWizardProps {
   isRunning?: boolean
   /** Set once all phases are done */
   savedProjectId?: string | null
+  /** Error message if save failed */
+  saveError?: string | null
+  /** Called when user clicks "Retry Save" after a save failure */
+  onRetrySave?: () => void
   /** Called when user clicks "Open in Builder" after all phases complete */
   onOpenInBuilder?: () => void
 }
@@ -68,6 +72,8 @@ export default function GenerationWizard({
   onDismiss,
   isRunning = false,
   savedProjectId,
+  saveError,
+  onRetrySave,
   onOpenInBuilder,
 }: GenerationWizardProps) {
   const scaffold = SCAFFOLD_LABELS[scaffoldType] ?? SCAFFOLD_LABELS.marketing
@@ -211,10 +217,27 @@ export default function GenerationWizard({
         </div>
       )}
 
-      {allDone && !savedProjectId && (
+      {allDone && !savedProjectId && saveError && (
+        <div className="px-6 pb-4">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <p className="text-sm font-medium text-red-800 mb-1">Save failed</p>
+            <p className="text-xs text-red-600 mb-3">{saveError}</p>
+            {onRetrySave && (
+              <button
+                onClick={onRetrySave}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                Retry Save
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {allDone && !savedProjectId && !saveError && (
         <div className="px-6 pb-4">
           <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
-            <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />
+            <Loader2 className="w-5 h-5 text-green-500 shrink-0 animate-spin" />
             <p className="text-sm font-medium text-green-800">All phases complete! Saving your project…</p>
           </div>
         </div>

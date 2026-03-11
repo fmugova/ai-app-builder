@@ -305,6 +305,7 @@ function ChatBuilderContent() {
   const [allPhaseFiles, setAllPhaseFiles] = useState<Record<string, string>>({});
   const [wizardRunning, setWizardRunning] = useState(false);
   const [wizardProjectId, setWizardProjectId] = useState<string | null>(null);
+  const [wizardSaveError, setWizardSaveError] = useState<string | null>(null);
   const phaseEsRef = useRef<EventSource | null>(null);
 
   // Auth check
@@ -972,6 +973,7 @@ Please regenerate the complete, fixed code.`;
       const isLastPhase = !decompositionPlan || nextIdx >= decompositionPlan.totalPhases;
       if (isLastPhase) {
         setWizardRunning(false);
+        setWizardSaveError(null);
         try {
           const res = await fetch('/api/generate/save', {
             method: 'POST',
@@ -983,9 +985,17 @@ Please regenerate the complete, fixed code.`;
             setWizardProjectId(data.projectId ?? null);
             setCurrentProjectId(data.projectId ?? null);
             toast.success('All phases complete! Your app is ready.');
+          } else {
+            const errData = await res.json().catch(() => ({ error: 'Unknown error' }));
+            const msg = errData.error ?? `HTTP ${res.status}`;
+            console.error('[handleGeneratePhase] Save failed:', res.status, errData);
+            toast.error(`Save failed: ${msg}`);
+            setWizardSaveError(msg);
           }
-        } catch {
-          toast.error('Project generation complete but save failed.');
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Network error';
+          toast.error(`Save failed: ${msg}`);
+          setWizardSaveError(msg);
         }
       } else {
         setWizardRunning(false);
@@ -1020,6 +1030,34 @@ Please regenerate the complete, fixed code.`;
     if (firstPending) handleGeneratePhase(firstPending);
   }, [decompositionPlan, phaseStatuses, handleGeneratePhase]);
 
+  const handleRetrySave = useCallback(async () => {
+    if (Object.keys(allPhaseFiles).length === 0) return;
+    const name = projectName || generateSmartProjectName(prompt);
+    setWizardSaveError(null);
+    try {
+      const res = await fetch('/api/generate/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, prompt, files: allPhaseFiles, qualityScore: 80 }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setWizardProjectId(data.projectId ?? null);
+        setCurrentProjectId(data.projectId ?? null);
+        toast.success('Project saved!');
+      } else {
+        const errData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        const msg = errData.error ?? `HTTP ${res.status}`;
+        toast.error(`Save failed: ${msg}`);
+        setWizardSaveError(msg);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Network error';
+      toast.error(`Save failed: ${msg}`);
+      setWizardSaveError(msg);
+    }
+  }, [allPhaseFiles, projectName, prompt]);
+
   // Intercepts the "Generate App" button — checks complexity before showing GenExperience
   const handleGenerateWithDecompose = useCallback(async () => {
     if (!prompt.trim()) {
@@ -1046,6 +1084,7 @@ Please regenerate the complete, fixed code.`;
           setPhaseStatuses(new Map());
           setAllPhaseFiles({});
           setWizardProjectId(null);
+          setWizardSaveError(null);
           setShowWizard(true);
           return; // don't open GenerationExperience yet
         }
@@ -2185,6 +2224,8 @@ Please regenerate the complete, fixed code.`;
             }}
             isRunning={wizardRunning}
             savedProjectId={wizardProjectId}
+            saveError={wizardSaveError}
+            onRetrySave={handleRetrySave}
             onOpenInBuilder={() => {
               // Load all accumulated phase files into the builder file tree
               if (Object.keys(allPhaseFiles).length > 0) {
