@@ -15,10 +15,10 @@ export default function ResendVerificationEmail({ email }: { email: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
       })
-      if (res.ok) {
+      const data = await res.json()
+      if (res.ok && data.success) {
         setStatus('sent')
       } else {
-        const data = await res.json()
         setError(data.error || 'Failed to send verification email.')
         setStatus('error')
       }

@@ -158,7 +158,12 @@ export async function POST(req: NextRequest) {
     // its in-memory state (preview + download will use the real endpoint).
     return NextResponse.json({ projectId: project.id, files: injectedFiles });
   } catch (err) {
-    console.error("[generate/save] DB save failed:", err);
-    return NextResponse.json({ error: "Database error" }, { status: 500 });
+    const prismaCode = (err as { code?: string })?.code;
+    const prismaMsg = (err as { message?: string })?.message ?? String(err);
+    console.error("[generate/save] DB save failed:", prismaCode, prismaMsg);
+    const clientMsg = prismaCode
+      ? `Database error (${prismaCode}): ${prismaMsg.split('\n')[0]}`
+      : `Database error: ${prismaMsg.split('\n')[0]}`;
+    return NextResponse.json({ error: clientMsg }, { status: 500 });
   }
 }

@@ -44,27 +44,21 @@ export async function saveProjectFiles(
   const entries = Object.entries(files);
   if (entries.length === 0) return 0;
 
-  // Upsert in parallel — the unique constraint on [projectId, path] prevents duplicates
-  await Promise.all(
-    entries.map(([path, content], index) =>
-      prisma.projectFile.upsert({
-        where: { projectId_path: { projectId, path } },
-        create: {
-          projectId,
-          path,
-          content,
-          language: languageFromPath(path),
-          order: index,
-        },
-        update: {
-          content,
-          language: languageFromPath(path),
-          order: index,
-          updatedAt: new Date(),
-        },
+  // Process in batches of 10 to avoid overwhelming the Supabase pgbouncer connection pool
+  const BATCH_SIZE = 10;
+  for (let i = 0; i < entries.length; i += BATCH_SIZE) {
+    const batch = entries.slice(i, i + BATCH_SIZE);
+    await Promise.all(
+      batch.map(([path, content], batchIndex) => {
+        const order = i + batchIndex;
+        return prisma.projectFile.upsert({
+          where: { projectId_path: { projectId, path } },
+          create: { projectId, path, content, language: languageFromPath(path), order },
+          update: { content, language: languageFromPath(path), order, updatedAt: new Date() },
+        });
       })
-    )
-  );
+    );
+  }
 
   return entries.length;
 }
