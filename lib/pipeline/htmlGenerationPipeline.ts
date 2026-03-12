@@ -106,6 +106,73 @@ function isAppPrompt(userPrompt: string): boolean {
   return APP_KEYWORDS.some((k) => lower.includes(k));
 }
 
+// ── E-commerce detection ──────────────────────────────────────────────────────
+// When the prompt describes a shop/store we pre-generate a data.js module with
+// product data + cart helpers BEFORE page generation starts. Pages then reference
+// this shared module instead of duplicating cart logic inline, which eliminates
+// the basket-count drift and promo-code bugs that arise from independent counters.
+
+const ECOMMERCE_KEYWORDS = [
+  "shop", "store", "ecommerce", "e-commerce", "product", "products",
+  "cart", "basket", "checkout", "buy", "purchase", "order",
+  "marketplace", "catalogue", "catalog", "merchandise", "retail",
+  "shipping", "promo code", "discount", "coupon",
+];
+
+function isEcommercePrompt(userPrompt: string): boolean {
+  const lower = userPrompt.toLowerCase();
+  return ECOMMERCE_KEYWORDS.some((k) => lower.includes(k));
+}
+
+/**
+ * Generate a self-contained data.js module for ecommerce sites.
+ * Returns the JS source string. Pages include it via <script src="data.js">.
+ */
+async function generateEcommerceDataLayer(
+  siteName: string,
+  userPrompt: string,
+  onProgress?: ProgressCallback
+): Promise<string> {
+  onProgress?.("generating-data", "Generating product catalogue and cart logic...");
+
+  const response = await createWithRetry({
+    model: "claude-sonnet-4-6",
+    max_tokens: 4000,
+    system: `You are generating a self-contained JavaScript data module for an ecommerce website.
+Output ONLY valid JavaScript — no markdown, no code fences, no explanation.
+
+The module must:
+1. Define a PRODUCTS array with 8–12 realistic products matching the site theme.
+   Each product: { id, name, description, price, category, image }
+   - price: a realistic number (e.g. 12.99) — will be displayed with .toFixed(2)
+   - image: use picsum with a descriptive seed: "https://picsum.photos/seed/{product-slug}/400/300"
+     or placehold.co for products where a text label helps: "https://placehold.co/400x300/6366f1/white?text={URL+encoded+name}"
+
+2. Define a PROMO_CODES object:
+   { 'SAVE10': { rate: 0.10, label: '10% off' }, 'WELCOME20': { rate: 0.20, label: '20% off' } }
+
+3. Implement cart helpers — these MUST be the single source of truth:
+   - var cart = JSON.parse(localStorage.getItem('cart') || '[]');
+   - function cartCount() { return cart.reduce(function(n,i){ return n+i.qty; }, 0); }
+   - function cartSubtotal() { return cart.reduce(function(s,i){ return s+i.price*i.qty; }, 0); }
+   - function updateCartBadges() { var c=cartCount(); document.querySelectorAll('[data-cart-count]').forEach(function(el){ el.textContent=c; el.style.display=c>0?'inline-flex':'none'; }); }
+   - function addToCart(product) { ... find existing and increment qty, or push new; save; updateCartBadges(); }
+   - function removeFromCart(id) { ... filter; save; updateCartBadges(); }
+   - function applyPromoCode(code) { return PROMO_CODES[code.toUpperCase()] || null; }
+   Call updateCartBadges() on DOMContentLoaded.`,
+    messages: [
+      {
+        role: "user",
+        content: `Generate the data.js module for: "${siteName}"\n\nUser's description: ${userPrompt}`,
+      },
+    ],
+  });
+
+  const raw = response.content[0]?.type === "text" ? response.content[0].text : "";
+  // Strip any accidental markdown fences
+  return raw.replace(/^```(?:javascript|js)?\n?/m, "").replace(/\n?```$/m, "").trim();
+}
+
 export interface PipelineResult {
   success: boolean;
   files: Record<string, string>;
@@ -172,6 +239,20 @@ export async function runGenerationPipeline(
   if (sharedFiles["style.css"]) onFile?.("style.css", sharedFiles["style.css"]);
   if (sharedFiles["script.js"]) onFile?.("script.js", sharedFiles["script.js"]);
 
+  // Step 2b: For ecommerce sites, pre-generate a shared data.js module with the
+  // product catalogue and cart helpers BEFORE any page is built. This ensures every
+  // page references a single cart source-of-truth instead of maintaining independent
+  // counters, eliminating basket-count drift and promo-code calculation bugs.
+  const isEcommerce = isEcommercePrompt(userPrompt);
+  let ecommerceDataJs = "";
+  if (isEcommerce) {
+    ecommerceDataJs = await generateEcommerceDataLayer(siteName, userPrompt, onProgress);
+    if (ecommerceDataJs) {
+      sharedFiles["data.js"] = ecommerceDataJs;
+      onFile?.("data.js", ecommerceDataJs);
+    }
+  }
+
   // Step 3: Generate each page individually
   const generatedPages: Record<string, string> = {};
 
@@ -185,7 +266,7 @@ export async function runGenerationPipeline(
     );
 
     const pageContent = await generateSinglePage(
-      page, siteName, userPrompt, pages, sharedFiles, onProgress, dbConnection
+      page, siteName, userPrompt, pages, sharedFiles, onProgress, dbConnection, isEcommerce
     );
 
     // Keep the raw content (with any truncation marker) in generatedPages so
@@ -456,7 +537,8 @@ async function generateSinglePage(
   allPages: DetectedPage[],
   sharedFiles: Record<string, string>,
   _onProgress?: ProgressCallback,
-  dbConnection?: DbConnection | null
+  dbConnection?: DbConnection | null,
+  isEcommerce = false
 ): Promise<string> {
   const filename = page.slug === "index" ? "index.html" : `${page.slug}.html`;
   const navHtml = sharedFiles["_nav_html"] ?? "";
@@ -925,7 +1007,13 @@ REQUIRED INLINE SCRIPT (place just before </body>):
 DO NOT include nav or hero section on this page — it's a full-page auth screen.
 ` : ""}
 
-${imagePalette ? `\n${imagePalette}\n` : ''}
+${imagePalette ? `\n${imagePalette}\n` : ''}${isEcommerce && sharedFiles["data.js"] ? `
+## Shared data.js module (already loaded — do NOT redeclare PRODUCTS or cart functions)
+Include <script src="data.js"></script> in <head> BEFORE your page's inline <script>.
+The module provides: PRODUCTS array, PROMO_CODES object, cart[], addToCart(product),
+removeFromCart(id), cartCount(), cartSubtotal(), updateCartBadges(), applyPromoCode(code).
+Always use [data-cart-count] attributes on badge elements.
+` : ''}
 Output ONLY the HTML file starting with <!DOCTYPE html>:`;
 
   try {

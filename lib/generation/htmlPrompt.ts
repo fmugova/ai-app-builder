@@ -122,6 +122,41 @@ Auth form JavaScript pattern (use this EXACTLY in the signup/login page inline s
     <button data-id="ITEM_ID" class="delete-btn">×</button>
     container.addEventListener('click', e => { const b = e.target.closest('.delete-btn'); if (b) deleteItem(b.dataset.id); })
 
+### E-commerce sites — data integrity (CRITICAL)
+When generating shop, cart, or checkout functionality:
+
+**Cart count — single source of truth:**
+  ✓ RIGHT: always derive from the cart array:
+    function cartCount() { return cart.reduce(function(n,i){ return n+i.qty; }, 0); }
+    document.querySelectorAll('[data-cart-count]').forEach(function(el){ el.textContent = cartCount(); });
+  ✗ WRONG: let cartCount = 0; incremented separately (drifts out of sync instantly)
+  Use data-cart-count attribute on ALL badge elements so one updateCartBadges() refreshes every badge.
+
+**Promo codes — calculate discount BEFORE rendering total:**
+  ✓ RIGHT: var discount = promoApplied ? subtotal * promoRate : 0;
+            var total = subtotal - discount;
+            renderOrderSummary(subtotal, discount, total);
+  ✗ WRONG: display total first, then patch discount in separately.
+
+**Monetary values:** always .toFixed(2) — never display raw JS floats.
+
+**Cart state:** [{id, name, price, qty, image}] stored in localStorage key 'cart'.
+  addToCart: increment qty if product already exists; only push new entry if not found.
+  removeFromCart: filter by id, then updateCartBadges().
+
+**If a data.js file is provided in context:** use the PRODUCTS array and cart helpers from that file
+  instead of re-declaring them inline. Include <script src="data.js"></script> BEFORE your page script.
+
+### Images
+- If a "SITE-SPECIFIC IMAGE PALETTE" block appears in the user message, use ONLY those Unsplash URLs
+- Otherwise use picsum with a descriptive topic seed:
+  <img src="https://picsum.photos/seed/{TOPIC_SEED}/{W}/{H}" alt="...">
+  TOPIC_SEED must describe the actual subject (e.g. "espresso-coffee-latte", "gym-barbell-weights")
+  NEVER use generic seeds like "hero1", "team2", "product3" — they produce the same photo on every site
+- For product thumbnails where the image must clearly identify the product, use placehold.co:
+  <img src="https://placehold.co/400x300/6366f1/white?text={URL_encoded_product_name}" alt="...">
+- Standard sizes: hero 1200×600, cards 600×400, team 400×400, thumbnails 400×300
+
 Every HTML file must be 100% renderable by a browser immediately. No build step required.`;
 
 /**
@@ -220,10 +255,14 @@ function buildPageContentSpec(page: DetectedPage, siteName: string): string {
   - Each card must have real project names and descriptions`,
 
     products: `PRODUCTS PAGE (products.html) -- must include:
-  - Page hero with "Products" or store name
+  - Page hero with store name
+  - Cart badge in nav using data-cart-count attribute (updated by updateCartBadges())
   - Filter/sort bar
-  - Product grid (6+ items) each with: product name, image placeholder, price, "Add to cart" button, brief description
-  - Real product names and prices -- no empty cards`,
+  - Product grid (6+ items) each with: product name, image, price formatted with .toFixed(2), "Add to Cart" button
+  - Real product names and prices — no empty cards
+  - Cart logic: use PRODUCTS array + addToCart/updateCartBadges from data.js if provided,
+    otherwise declare a single cart array in localStorage and use event delegation for all "Add to Cart" buttons
+  - Promo code input: validate against PROMO_CODES, calculate subtotal * discount BEFORE rendering total`,
 
     blog: `BLOG PAGE (blog.html) -- must include:
   - Page hero
