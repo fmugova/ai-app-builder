@@ -79,10 +79,13 @@ export default async function Page() {
 
 CRITICAL (Next.js 15.5+): Add \`export const dynamic = 'force-dynamic'\` at the
 top of EVERY file that imports from '@/lib/supabase/server', including:
+- app/page.tsx (root landing page — even if public, must be dynamic)
 - All protected pages (app/dashboard/page.tsx, etc.)
 - The authenticated shell layout (app/(app)/layout.tsx)
 - All Route Handlers that call createClient()
 - All Server Actions files
+NOTE: The scaffold's app/layout.tsx already exports \`dynamic = 'force-dynamic'\` as
+a safety net, but each individual page/route MUST also export it.
 Omitting this causes a fatal RuntimeInvariantError in production.
 
 ━━━ API ROUTES — SECURITY ━━━

@@ -462,6 +462,11 @@ import { Toaster } from '@/components/ui/toaster'
 
 const inter = Inter({ subsets: ['latin'] })
 
+// Force all pages to render dynamically so cookies() / Supabase auth always
+// has a request context. Without this, Next.js 15.5+ throws:
+// "Invariant: Expected workUnitAsyncStorage to have a store"
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: 'Generated App',
   description: 'Built with BuildFlow',
