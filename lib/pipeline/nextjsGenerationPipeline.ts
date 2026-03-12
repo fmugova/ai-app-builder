@@ -147,6 +147,22 @@ Remember:
   const scaffoldFiles = isDashboard ? getDashboardScaffoldFiles() : getScaffoldFiles();
   const allFiles = { ...scaffoldFiles, ...featureFiles };
 
+  // Force-restore scaffold files that must never be overwritten by generated code.
+  // app/layout.tsx contains `export const dynamic = 'force-dynamic'` which prevents
+  // the Next.js 15.5+ "workUnitAsyncStorage" crash. If Claude regenerates it without
+  // that directive, every page fails with a RuntimeInvariantError.
+  const PROTECTED_SCAFFOLD_FILES = [
+    'app/layout.tsx',
+    'lib/supabase/server.ts',
+    'lib/supabase/client.ts',
+    'middleware.ts',
+  ];
+  for (const path of PROTECTED_SCAFFOLD_FILES) {
+    if (scaffoldFiles[path]) {
+      allFiles[path] = scaffoldFiles[path];
+    }
+  }
+
   // Post-process: auto-stub any @/ imports that reference missing files
   const stubs = generateMissingImportStubs(allFiles);
   for (const [path, content] of Object.entries(stubs)) {

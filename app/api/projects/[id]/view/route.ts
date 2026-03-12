@@ -57,10 +57,18 @@ export async function GET(
       return NextResponse.json({ error: 'Access denied' }, { status: 403 })
     }
 
-    // Strip internal User.email from the response
+    // Strip internal User.email from the response.
+    // Convert ALL BigInt fields to Number — JSON.stringify cannot serialize BigInt
+    // and will throw a TypeError causing a silent 500 error.
+    // BigInt fields on Project: generationTime, retryCount, tokensUsed, validationScore
     const { User, ...projectData } = project
+    const toNum = (v: bigint | null | undefined) => v != null ? Number(v) : null
     return NextResponse.json({
       ...projectData,
+      generationTime: toNum(projectData.generationTime),
+      retryCount:     toNum(projectData.retryCount),
+      tokensUsed:     toNum(projectData.tokensUsed),
+      validationScore: toNum(projectData.validationScore),
       User: { name: User.name },
     })
   } catch (error) {
