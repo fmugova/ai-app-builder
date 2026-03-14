@@ -143,22 +143,63 @@ Output ONLY valid JavaScript — no markdown, no code fences, no explanation.
 
 The module must:
 1. Define a PRODUCTS array with 8–12 realistic products matching the site theme.
-   Each product: { id, name, description, price, category, image }
-   - price: a realistic number (e.g. 12.99) — will be displayed with .toFixed(2)
+   Each product: { id, name, description, price, category, image, tags }
+   - id: a short slug like "velvet-rose-cake" (no spaces)
+   - price: a realistic number (e.g. 64.99) — will be displayed with .toFixed(2)
    - image: use picsum with a descriptive seed: "https://picsum.photos/seed/{product-slug}/400/300"
      or placehold.co for products where a text label helps: "https://placehold.co/400x300/6366f1/white?text={URL+encoded+name}"
 
-2. Define a PROMO_CODES object:
+2. Define a PROMO_CODES object with 2-3 realistic codes matching the brand:
    { 'SAVE10': { rate: 0.10, label: '10% off' }, 'WELCOME20': { rate: 0.20, label: '20% off' } }
+   (Use brand-appropriate code names e.g. ELITE10, CAKE20, FIRST15)
 
 3. Implement cart helpers — these MUST be the single source of truth:
-   - var cart = JSON.parse(localStorage.getItem('cart') || '[]');
-   - function cartCount() { return cart.reduce(function(n,i){ return n+i.qty; }, 0); }
-   - function cartSubtotal() { return cart.reduce(function(s,i){ return s+i.price*i.qty; }, 0); }
-   - function updateCartBadges() { var c=cartCount(); document.querySelectorAll('[data-cart-count]').forEach(function(el){ el.textContent=c; el.style.display=c>0?'inline-flex':'none'; }); }
-   - function addToCart(product) { ... find existing and increment qty, or push new; save; updateCartBadges(); }
-   - function removeFromCart(id) { ... filter; save; updateCartBadges(); }
-   - function applyPromoCode(code) { return PROMO_CODES[code.toUpperCase()] || null; }
+   var cart = JSON.parse(localStorage.getItem('cart') || '[]');
+   function saveCart() { localStorage.setItem('cart', JSON.stringify(cart)); }
+   function cartCount() { return cart.reduce(function(n,i){ return n+i.qty; }, 0); }
+   function cartSubtotal() { return cart.reduce(function(s,i){ return s+i.price*i.qty; }, 0); }
+   function updateCartBadges() { var c=cartCount(); document.querySelectorAll('[data-cart-count]').forEach(function(el){ el.textContent=c; el.style.display=c>0?'inline-flex':'none'; }); }
+   function addToCart(product) {
+     var existing = cart.find(function(i){ return i.id === product.id; });
+     if (existing) { existing.qty++; } else { cart.push({ id: product.id, name: product.name, price: product.price, image: product.image, qty: 1 }); }
+     saveCart(); updateCartBadges();
+   }
+   function removeFromCart(id) { cart = cart.filter(function(i){ return i.id !== id; }); saveCart(); updateCartBadges(); }
+   function updateCartQty(id, delta) {
+     var item = cart.find(function(i){ return i.id === id; });
+     if (!item) return;
+     item.qty = Math.max(1, item.qty + delta);
+     saveCart(); updateCartBadges();
+   }
+   function applyPromoCode(code) { return PROMO_CODES[code.toUpperCase()] || null; }
+
+4. Implement a real order submission function:
+   async function submitOrder(customerInfo) {
+     // customerInfo: { name, email, address, phone } — collected from checkout form
+     var subtotal = cartSubtotal();
+     var promo = window._appliedPromo || null;
+     var discount = promo ? subtotal * promo.rate : 0;
+     var total = subtotal - discount;
+     var order = {
+       items: cart.map(function(i){ return { id: i.id, name: i.name, price: i.price, qty: i.qty }; }),
+       subtotal: parseFloat(subtotal.toFixed(2)),
+       discount: parseFloat(discount.toFixed(2)),
+       total: parseFloat(total.toFixed(2)),
+       promoCode: promo ? promo.label : null,
+       customer: customerInfo,
+       status: 'pending',
+       orderedAt: new Date().toISOString()
+     };
+     var res = await fetch('/api/public/data/BUILDFLOW_PROJECT_ID', {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify({ collection: 'orders', item: order })
+     });
+     if (!res.ok) throw new Error('Order submission failed');
+     var data = await res.json();
+     cart = []; saveCart(); updateCartBadges();
+     return data.id || data.item?.id || 'ORD-' + Date.now();
+   }
    Call updateCartBadges() on DOMContentLoaded.`,
     messages: [
       {
@@ -1011,8 +1052,136 @@ ${imagePalette ? `\n${imagePalette}\n` : ''}${isEcommerce && sharedFiles["data.j
 ## Shared data.js module (already loaded — do NOT redeclare PRODUCTS or cart functions)
 Include <script src="data.js"></script> in <head> BEFORE your page's inline <script>.
 The module provides: PRODUCTS array, PROMO_CODES object, cart[], addToCart(product),
-removeFromCart(id), cartCount(), cartSubtotal(), updateCartBadges(), applyPromoCode(code).
+removeFromCart(id), updateCartQty(id, delta), cartCount(), cartSubtotal(),
+updateCartBadges(), applyPromoCode(code), submitOrder(customerInfo).
 Always use [data-cart-count] attributes on badge elements.
+` : ''}${['cart', 'basket', 'checkout'].includes(page.slug.toLowerCase()) && isEcommerce ? `
+## CART / BASKET PAGE — CRITICAL REQUIREMENTS
+
+This is the shopping cart page. ALL interactions MUST work. Use this EXACT script pattern:
+
+REQUIRED SCRIPT (place just before </body> — data.js already loaded above it):
+<script>
+  var _appliedPromo = null;
+
+  function renderCart() {
+    var list = document.getElementById('cart-items');
+    var emptyMsg = document.getElementById('cart-empty');
+    var cartSummary = document.getElementById('cart-summary');
+    if (!list) return;
+
+    if (cart.length === 0) {
+      list.innerHTML = '';
+      if (emptyMsg) emptyMsg.style.display = 'block';
+      if (cartSummary) cartSummary.style.display = 'none';
+      return;
+    }
+    if (emptyMsg) emptyMsg.style.display = 'none';
+    if (cartSummary) cartSummary.style.display = 'block';
+
+    list.innerHTML = cart.map(function(item) {
+      return '<div class="flex items-center gap-4 p-4 bg-white rounded-xl shadow-sm mb-3" data-item-id="' + item.id + '">' +
+        '<img src="' + item.image + '" alt="' + item.name + '" class="w-20 h-20 object-cover rounded-lg">' +
+        '<div class="flex-1 min-w-0">' +
+          '<p class="font-semibold text-gray-900">' + item.name + '</p>' +
+          '<p class="text-indigo-600 font-bold">£' + item.price.toFixed(2) + '</p>' +
+        '</div>' +
+        '<div class="flex items-center gap-2">' +
+          '<button class="qty-minus w-8 h-8 rounded-full border border-gray-300 hover:bg-gray-100 flex items-center justify-center font-bold" data-id="' + item.id + '">−</button>' +
+          '<span class="w-8 text-center font-semibold">' + item.qty + '</span>' +
+          '<button class="qty-plus w-8 h-8 rounded-full border border-gray-300 hover:bg-gray-100 flex items-center justify-center font-bold" data-id="' + item.id + '">+</button>' +
+        '</div>' +
+        '<button class="remove-item ml-4 text-red-500 hover:text-red-700 text-sm font-medium" data-id="' + item.id + '">Remove</button>' +
+      '</div>';
+    }).join('');
+
+    renderOrderSummary();
+  }
+
+  function renderOrderSummary() {
+    var subtotal = cartSubtotal();
+    var discount = _appliedPromo ? subtotal * _appliedPromo.rate : 0;
+    var total = subtotal - discount;
+    var el = function(id) { return document.getElementById(id); };
+    if (el('summary-subtotal')) el('summary-subtotal').textContent = '£' + subtotal.toFixed(2);
+    if (el('summary-discount')) el('summary-discount').textContent = discount > 0 ? '-£' + discount.toFixed(2) : '£0.00';
+    if (el('summary-total')) el('summary-total').textContent = '£' + total.toFixed(2);
+    if (el('summary-count')) el('summary-count').textContent = cartCount() + ' item' + (cartCount() !== 1 ? 's' : '');
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    renderCart();
+
+    // Event delegation for +/−/remove buttons (survives re-render)
+    var list = document.getElementById('cart-items');
+    if (list) {
+      list.addEventListener('click', function(e) {
+        var plus = e.target.closest('.qty-plus');
+        var minus = e.target.closest('.qty-minus');
+        var remove = e.target.closest('.remove-item');
+        if (plus)   { updateCartQty(plus.dataset.id, 1);   renderCart(); }
+        if (minus)  { updateCartQty(minus.dataset.id, -1); renderCart(); }
+        if (remove) { removeFromCart(remove.dataset.id);    renderCart(); }
+      });
+    }
+
+    // Promo code
+    var promoBtn = document.getElementById('apply-promo');
+    if (promoBtn) {
+      promoBtn.addEventListener('click', function() {
+        var input = document.getElementById('promo-input');
+        var msg = document.getElementById('promo-message');
+        if (!input) return;
+        var result = applyPromoCode(input.value.trim());
+        _appliedPromo = result;
+        if (result) {
+          if (msg) { msg.textContent = '✓ ' + result.label + ' applied!'; msg.className = 'text-sm text-green-600 mt-1'; }
+        } else {
+          if (msg) { msg.textContent = 'Invalid promo code.'; msg.className = 'text-sm text-red-500 mt-1'; }
+        }
+        renderOrderSummary();
+      });
+    }
+
+    // Checkout
+    var checkoutBtn = document.getElementById('checkout-btn');
+    if (checkoutBtn) {
+      checkoutBtn.addEventListener('click', async function() {
+        if (cart.length === 0) { alert('Your cart is empty.'); return; }
+        checkoutBtn.disabled = true;
+        checkoutBtn.textContent = 'Processing...';
+        try {
+          var orderId = await submitOrder({ guest: true });
+          var confirmEl = document.getElementById('order-confirmation');
+          var orderIdEl = document.getElementById('order-id');
+          if (orderIdEl) orderIdEl.textContent = '#' + String(orderId).slice(0, 8).toUpperCase();
+          if (confirmEl) { confirmEl.style.display = 'block'; }
+          var cartSection = document.getElementById('cart-section');
+          if (cartSection) cartSection.style.display = 'none';
+        } catch(err) {
+          alert('Checkout failed. Please try again.');
+          checkoutBtn.disabled = false;
+          checkoutBtn.textContent = 'Proceed to Checkout';
+        }
+      });
+    }
+  });
+</script>
+
+REQUIRED HTML structure for this page:
+- A <div id="cart-items"> container for the item list
+- A <div id="cart-empty" style="display:none"> message shown when cart is empty
+- A <div id="cart-summary"> with:
+    - <span id="summary-count"></span> item count
+    - <span id="summary-subtotal"></span>
+    - <span id="summary-discount"></span> (shows promo discount)
+    - <span id="summary-total"></span>
+    - <input id="promo-input" placeholder="Promo code"> + <button id="apply-promo">Apply</button>
+    - <p id="promo-message"></p>
+    - <button id="checkout-btn">Proceed to Checkout</button>
+- A <div id="order-confirmation" style="display:none"> success panel with <span id="order-id"></span>
+- A <div id="cart-section"> wrapping the cart and summary (hidden on success)
+DO NOT put inline onclick handlers on any element — the script above uses event delegation.
 ` : ''}
 Output ONLY the HTML file starting with <!DOCTYPE html>:`;
 

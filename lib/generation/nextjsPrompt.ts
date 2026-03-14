@@ -211,6 +211,36 @@ function fixApostrophesInStrings(code: string): string {
   );
 }
 
+/**
+ * Returns true if a TSX/TS file appears to have been cut off mid-generation.
+ * Heuristics: unbalanced braces, unclosed template literal, or file doesn't
+ * end with a closing brace/paren/semicolon.
+ */
+function isTruncated(content: string): boolean {
+  const trimmed = content.trimEnd();
+  // Unclosed template literal — odd number of unescaped backticks
+  const backtickCount = (trimmed.match(/(?<!\\)`/g) ?? []).length;
+  if (backtickCount % 2 !== 0) return true;
+  // Severely unbalanced braces (allow small imbalance from string literals)
+  const opens = (trimmed.match(/\{/g) ?? []).length;
+  const closes = (trimmed.match(/\}/g) ?? []).length;
+  if (opens - closes > 3) return true;
+  // File doesn't end with a "natural" closing token
+  if (!/[;}\)>]$/.test(trimmed)) return true;
+  return false;
+}
+
+/** Builds a minimal stub component/export for a truncated file */
+function buildTruncationStub(path: string): string {
+  const name = path.split('/').pop()?.replace(/\.(tsx?|jsx?)$/, '') ?? 'Component';
+  const PascalName = name.charAt(0).toUpperCase() + name.slice(1).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+  const isPage = path.includes('/page.') || path.startsWith('app/');
+  if (isPage) {
+    return `// Auto-stub: original file was truncated during generation\nexport const dynamic = 'force-dynamic'\nexport default function ${PascalName}Page() {\n  return <div className="p-8 text-center"><h1 className="text-2xl font-bold text-red-600">Page failed to generate</h1><p className="text-gray-500 mt-2">Please retry generation.</p></div>\n}\n`;
+  }
+  return `// Auto-stub: original file was truncated during generation\nexport default function ${PascalName}() { return null }\n`;
+}
+
 /** Parses the `=== FILE: path ===` format into a map of path → content */
 export function parseNextjsOutput(text: string): Record<string, string> {
   const files: Record<string, string> = {};
@@ -221,9 +251,14 @@ export function parseNextjsOutput(text: string): Record<string, string> {
     const path = parts[i].trim();
     const content = parts[i + 1]?.trim() ?? '';
     if (path && content) {
-      // Post-process TS/TSX files to fix apostrophe syntax errors
       const isTsLike = /\.(tsx?|jsx?)$/.test(path);
-      files[path] = isTsLike ? fixApostrophesInStrings(content) : content;
+      if (isTsLike && isTruncated(content)) {
+        // Replace the broken file with a safe stub so the build doesn't crash
+        files[path] = buildTruncationStub(path);
+      } else {
+        // Post-process TS/TSX files to fix apostrophe syntax errors
+        files[path] = isTsLike ? fixApostrophesInStrings(content) : content;
+      }
     }
   }
   return files;

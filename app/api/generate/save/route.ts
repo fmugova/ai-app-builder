@@ -57,13 +57,15 @@ export async function POST(req: NextRequest) {
     // Resolve app URL upfront — needed inside the transaction for Page content replacement
     const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://buildflow-ai.app').replace(/\/$/, '')
 
-    // Helper: replace BUILDFLOW_PROJECT_ID + upgrade relative API paths for a given file
+    // Helper: replace BUILDFLOW_PROJECT_ID + upgrade relative API paths for a given file.
+    // All relative /api/ paths become absolute so they work on external hosts
+    // (Netlify, GitHub Pages, custom domains) that don't run the BuildFlow backend.
+    // Covers every pattern: fetch('/api/...'), action="/api/...", href="/api/..."
     function applyPlaceholders(content: string, projectId: string, isHtml = true): string {
       let out = content.replaceAll("BUILDFLOW_PROJECT_ID", projectId)
       if (isHtml) {
-        out = out
-          .replaceAll(`/api/projects/${projectId}/`, `${appUrl}/api/projects/${projectId}/`)
-          .replaceAll(`/api/public/auth/${projectId}`, `${appUrl}/api/public/auth/${projectId}`)
+        // Single regex replaces all quote + /api/ occurrences (handles both ' and ")
+        out = out.replace(/(['"])\/(api\/)/g, `$1${appUrl}/$2`)
       }
       return out
     }
