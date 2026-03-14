@@ -10,6 +10,7 @@ export type ScaffoldType =
   | 'portfolio'
   | 'landing'
   | 'marketing'
+  | 'saas'
 
 const SCAFFOLD_KEYWORDS: Record<ScaffoldType, string[]> = {
   dashboard: [
@@ -41,6 +42,13 @@ const SCAFFOLD_KEYWORDS: Record<ScaffoldType, string[]> = {
     'portfolio', 'showcase', 'resume', 'cv', 'personal site', 'personal website',
     'work samples', 'projects gallery', 'about me', 'hire me', 'freelancer',
     'designer portfolio', 'developer portfolio',
+  ],
+  saas: [
+    'multi-tenant', 'multitenant', 'multi tenant', 'organization', 'organisations',
+    'workspace', 'workspaces', 'team management', 'team members', 'invite members',
+    'invite team', 'roles and permissions', 'rbac', 'org switcher', 'billing portal',
+    'subscription management', 'saas platform', 'saas app', 'b2b saas',
+    'per-seat pricing', 'per seat billing', 'tenant', 'tenants',
   ],
   landing: [
     'landing page', 'saas landing', 'waitlist', 'coming soon', 'sign up page',
@@ -117,6 +125,8 @@ export const NEXTJS_SCAFFOLD_TYPES: ScaffoldType[] = [
   'dashboard',
   'ecommerce',
   'social',
+  'saas',
+  'blog',
 ]
 
 export function scaffoldUsesNextjs(scaffold: ScaffoldType): boolean {

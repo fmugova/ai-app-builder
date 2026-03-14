@@ -7,6 +7,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import { NEXTJS_SYSTEM_PROMPT, parseNextjsOutput } from '@/lib/generation/nextjsPrompt';
 import { getScaffoldFiles } from '@/lib/scaffold/nextjs-scaffold';
 import { getDashboardScaffoldFiles, DASHBOARD_SYSTEM_PROMPT_ADDON } from '@/lib/scaffold/dashboard-scaffold';
+import { getSaasMultitenantScaffoldFiles, SAAS_MULTITENANT_SYSTEM_PROMPT_ADDON } from '@/lib/scaffold/saas-multitenant-scaffold';
+import { getEcommerceScaffoldFiles, ECOMMERCE_NEXTJS_SYSTEM_PROMPT_ADDON } from '@/lib/scaffold/ecommerce-scaffold';
+import { getBlogScaffoldFiles, BLOG_NEXTJS_SYSTEM_PROMPT_ADDON } from '@/lib/scaffold/blog-scaffold';
 import type { ProgressCallback, FileCallback, PipelineResult } from './htmlGenerationPipeline';
 
 const anthropic = new Anthropic();
@@ -97,18 +100,33 @@ export async function runNextjsGenerationPipeline(
 ): Promise<PipelineResult> {
   const warnings: string[] = [];
 
-  const isDashboard = scaffoldType === 'dashboard';
+  const isDashboard  = scaffoldType === 'dashboard';
+  const isSaas       = scaffoldType === 'saas';
+  const isEcommerce  = scaffoldType === 'ecommerce';
+  const isBlog       = scaffoldType === 'blog';
 
   onProgress?.('nextjs-start', 'Starting Next.js + Supabase generation...');
   onProgress?.('nextjs-generating', 'Generating feature files with Claude...');
 
-  // Dashboard projects get extra scaffold components + a system prompt addon
+  // Each scaffold type gets extra pre-built components + a system prompt addon
   const systemPrompt = isDashboard
     ? NEXTJS_SYSTEM_PROMPT + DASHBOARD_SYSTEM_PROMPT_ADDON
+    : isSaas
+    ? NEXTJS_SYSTEM_PROMPT + SAAS_MULTITENANT_SYSTEM_PROMPT_ADDON
+    : isEcommerce
+    ? NEXTJS_SYSTEM_PROMPT + ECOMMERCE_NEXTJS_SYSTEM_PROMPT_ADDON
+    : isBlog
+    ? NEXTJS_SYSTEM_PROMPT + BLOG_NEXTJS_SYSTEM_PROMPT_ADDON
     : NEXTJS_SYSTEM_PROMPT;
 
   const dashboardScaffoldNote = isDashboard
     ? `\n- Pre-built dashboard components are in the scaffold: components/ui/sidebar.tsx, components/ui/data-table.tsx, components/ui/chart.tsx, components/ui/stat-card.tsx — USE THEM`
+    : isSaas
+    ? `\n- Pre-built SaaS components are in the scaffold: components/ui/org-switcher.tsx, components/ui/members-table.tsx, components/ui/invite-form.tsx, components/ui/plan-card.tsx — USE THEM`
+    : isEcommerce
+    ? `\n- Pre-built ecommerce components are in the scaffold: components/cart/CartContext.tsx (useCart hook), components/cart/CartDrawer.tsx, components/cart/CartButton.tsx, components/products/ProductCard.tsx — USE THEM. CartProvider + CartDrawer are already in app/layout.tsx.`
+    : isBlog
+    ? `\n- Pre-built blog components are in the scaffold: components/blog/ArticleCard.tsx, components/blog/CategoryPills.tsx, components/blog/NewsletterForm.tsx, components/blog/ReadingProgress.tsx — USE THEM`
     : '';
 
   const userMessage = `Build a complete Next.js app called "${siteName}".
@@ -143,8 +161,16 @@ Remember:
   }
 
   // Merge scaffold + feature files (feature files override scaffold if same path)
-  // Dashboard projects get extra pre-built UI components in the scaffold.
-  const scaffoldFiles = isDashboard ? getDashboardScaffoldFiles() : getScaffoldFiles();
+  // Scaffold type determines which pre-built UI components are included.
+  const scaffoldFiles = isDashboard
+    ? getDashboardScaffoldFiles()
+    : isSaas
+    ? getSaasMultitenantScaffoldFiles()
+    : isEcommerce
+    ? getEcommerceScaffoldFiles()
+    : isBlog
+    ? getBlogScaffoldFiles()
+    : getScaffoldFiles();
   const allFiles = { ...scaffoldFiles, ...featureFiles };
 
   // Force-restore scaffold files that must never be overwritten by generated code.
