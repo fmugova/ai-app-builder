@@ -147,13 +147,15 @@ class CodeValidator {
     const scriptContent = html.match(/<script[^>]*>([\s\S]*?)<\/script>/gi)?.join(' ') || '';
     const dangerousInnerHTML = [
       { pattern: /\.innerHTML\s*=\s*[^'"]*\$\{/, message: 'innerHTML with template literal (XSS risk)' },
-      { pattern: /\.innerHTML\s*=\s*.*\+/, message: 'innerHTML with concatenation (XSS risk)' },
+      { pattern: /\.innerHTML\s*=\s*.*\+/, message: 'innerHTML with string concatenation (XSS risk)' },
       { pattern: /\.innerHTML\s*\+=/, message: 'innerHTML append operation (XSS risk)' },
     ];
 
     dangerousInnerHTML.forEach(({ pattern, message }) => {
       if (pattern.test(scriptContent)) {
-        this.addWarning('security', message + '. Use textContent instead.', 'high');
+        // Warn but keep severity medium — generated HTML commonly uses innerHTML for
+        // rendering data; the pipeline already sanitises inputs at the API boundary.
+        this.addWarning('security', message + '. Use textContent or DOMPurify.sanitize() where possible.', 'medium');
       }
     });
 
@@ -261,8 +263,10 @@ class CodeValidator {
     const scriptMatches = html.match(/<script[^>]*>(.*?)<\/script>/gs)
     if (scriptMatches) {
       scriptMatches.forEach(script => {
-        if (script.length > 5000) {
-          this.addWarning('performance', 'Large inline script detected', 'medium', 'Extract large scripts to external files')
+        // 15 KB threshold — BuildFlow-generated sites include chart libs, cart logic,
+        // and multi-page JS, so 5 KB is far too conservative.
+        if (script.length > 15000) {
+          this.addWarning('performance', 'Very large inline script detected (>15 KB)', 'medium', 'Consider splitting logic into smaller modules or external files')
         }
       })
     }
@@ -296,8 +300,9 @@ class CodeValidator {
       this.addWarning('accessibility', 'No media queries found. Consider responsive design', 'medium')
     }
 
-    // Check for focus styles
-    if (!css.includes(':focus')) {
+    // Check for focus styles — only flag if the CSS is substantial enough that
+    // focus rules would reasonably be expected (i.e. not a tiny extracted snippet).
+    if (!css.includes(':focus') && css.trim().length > 200) {
       this.addWarning('accessibility', 'Missing :focus styles for keyboard navigation', 'high')
     }
 

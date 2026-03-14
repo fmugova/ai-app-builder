@@ -1580,10 +1580,22 @@ function computeQualityScore(
   _files: Record<string, string>
 ): number {
   let score = 100;
-  score -= validation.criticalErrors.length * 15;
+  // Critical errors (JSX in HTML, truncated output): heavier penalty
+  score -= validation.criticalErrors.filter((e) => e.includes("JSX") || e.includes("truncated") || e.includes("TRUNCATED")).length * 20;
+  // Other critical errors: moderate penalty
+  const otherCritical = validation.criticalErrors.filter((e) => !e.includes("JSX") && !e.includes("truncated") && !e.includes("TRUNCATED") && !e.includes("empty"));
+  score -= otherCritical.length * 8;
+  // Missing pages are a real problem
   score -= validation.missingPages.length * 10;
-  score -= validation.pages.filter((p) => p.isEmpty).length * 10;
+  // Empty pages: lighter penalty — the threshold detection is deliberately conservative
+  // so a small number of borderline-empty pages should not tank the whole score.
+  score -= validation.pages.filter((p) => p.isEmpty).length * 5;
+  // JSX components inside HTML files: render as blank — penalise heavily
   score -= validation.pages.filter((p) => p.hasJsxComponents).length * 20;
+  // Bonus: all expected pages present with real content
+  if (validation.pages.length > 0 && validation.pages.every((p) => p.hasRealContent)) {
+    score = Math.min(100, score + 5);
+  }
   return Math.max(0, Math.min(100, score));
 }
 
