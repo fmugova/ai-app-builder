@@ -106,9 +106,16 @@ export async function POST(
       }
     }).catch(err => console.error('Activity log failed:', err))
 
+    const toNum = (v: bigint | null | undefined) => v != null ? Number(v) : null
     return NextResponse.json({
       success: true,
-      project: updated,
+      project: {
+        ...updated,
+        generationTime:  toNum(updated.generationTime),
+        retryCount:      toNum(updated.retryCount),
+        tokensUsed:      toNum(updated.tokensUsed),
+        validationScore: toNum(updated.validationScore),
+      },
       publicUrl: publicUrl,
       publicSlug: publicSlug,
       message: 'Project published successfully!'

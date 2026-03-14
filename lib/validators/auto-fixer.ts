@@ -48,9 +48,19 @@ export class CodeAutoFixer {
    * Skips inline handler conversion (would break onsubmit="handler(event)") and
    * CSS variable injection (Tailwind CDN pages rarely have <style> blocks).
    */
-  autoFixStructural(html: string): AutoFixResult {
+  autoFixStructural(html: string, siteFiles?: Record<string, string>): AutoFixResult {
     this.appliedFixes = []
-    const fixed = this.applyStructuralFixes(html)
+    let fixed = this.applyStructuralFixes(html)
+    fixed = this.injectOpenGraphTags(fixed)
+    fixed = this.injectAuthScript(fixed)
+    fixed = this.injectResourceHints(fixed)
+    // Accessibility pass
+    fixed = this.injectSkipLink(fixed)
+    fixed = this.injectMainRole(fixed)
+    fixed = this.injectImgAlts(fixed)
+    fixed = this.injectAriaLandmarks(fixed)
+    // Consent + analytics (only when those files are present in the site)
+    fixed = this.injectConsentAndAnalyticsScripts(fixed, siteFiles ?? {})
     return { fixed, appliedFixes: this.appliedFixes, remainingIssues: 0 }
   }
 
@@ -365,6 +375,239 @@ export class CodeAutoFixer {
     }
 
     return fixed
+  }
+
+  // ── New structural injections ─────────────────────────────────────────────
+
+  private _escapeAttr(str: string): string {
+    return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  }
+
+  /**
+   * Injects Open Graph + Twitter Card meta tags if none are present.
+   * Derives og:title and og:description from existing <title> and
+   * <meta name="description"> tags (already fixed by earlier passes).
+   */
+  private injectOpenGraphTags(html: string): string {
+    if (html.includes('property="og:title"') || html.includes("property='og:title'")) {
+      return html
+    }
+
+    const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i)
+    const title = titleMatch ? this._escapeAttr(titleMatch[1].trim()) : ''
+    if (!title) return html
+
+    const descMatch =
+      html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i) ??
+      html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i)
+    const desc = descMatch ? this._escapeAttr(descMatch[1].trim()) : title
+
+    const ogBlock = [
+      `  <meta property="og:type" content="website">`,
+      `  <meta property="og:title" content="${title}">`,
+      `  <meta property="og:description" content="${desc}">`,
+      `  <meta name="twitter:card" content="summary_large_image">`,
+      `  <meta name="twitter:title" content="${title}">`,
+      `  <meta name="twitter:description" content="${desc}">`,
+    ].join('\n')
+
+    // Insert after <meta name="description"> if present, otherwise before </head>
+    const descTagMatch = html.match(/<meta[^>]+name=["']description["'][^>]*>/i)
+    if (descTagMatch) {
+      const idx = html.indexOf(descTagMatch[0]) + descTagMatch[0].length
+      this.appliedFixes.push('Injected Open Graph / Twitter Card meta tags')
+      return html.slice(0, idx) + '\n' + ogBlock + html.slice(idx)
+    }
+
+    const headClose = html.match(/<\/head>/i)
+    if (headClose) {
+      this.appliedFixes.push('Injected Open Graph / Twitter Card meta tags')
+      return html.replace(/<\/head>/i, ogBlock + '\n</head>')
+    }
+
+    return html
+  }
+
+  /**
+   * Ensures auth.js, forms.js, and toast.js are all present immediately before
+   * <script src="script.js">. Inserts only the ones that are missing.
+   * No-ops if script.js is absent (auth/form pages that don't use it).
+   */
+  private injectAuthScript(html: string): string {
+    const scriptJsMatch = html.match(/<script[^>]+src=["']script\.js["'][^>]*><\/script>/i)
+    if (!scriptJsMatch) return html
+
+    const missing: string[] = []
+    if (!html.includes('src="auth.js"') && !html.includes("src='auth.js'")) missing.push('auth.js')
+    if (!html.includes('src="forms.js"') && !html.includes("src='forms.js'")) missing.push('forms.js')
+    if (!html.includes('src="toast.js"') && !html.includes("src='toast.js'")) missing.push('toast.js')
+
+    if (missing.length === 0) return html
+
+    const prefix = missing.map((f) => `<script src="${f}"></script>`).join('\n  ')
+    this.appliedFixes.push(`Injected ${missing.join(', ')} before script.js`)
+    return html.replace(scriptJsMatch[0], `${prefix}\n  ${scriptJsMatch[0]}`)
+  }
+
+  /**
+   * Adds <link rel="preconnect"> and <link rel="dns-prefetch"> hints for
+   * external CDN origins referenced in the page's script/link tags.
+   * Only origins not already hinted are added.
+   */
+  private injectResourceHints(html: string): string {
+    if (html.includes('rel="preconnect"') || html.includes("rel='preconnect'")) {
+      return html
+    }
+
+    // Collect unique CDN origins from script src and link href attributes
+    const urlMatches = [
+      ...Array.from(html.matchAll(/<script[^>]+src=["'](https?:\/\/[^"']+)["']/gi)),
+      ...Array.from(html.matchAll(/<link[^>]+href=["'](https?:\/\/[^"']+)["']/gi)),
+    ]
+
+    const origins = new Set<string>()
+    for (const m of urlMatches) {
+      try {
+        origins.add(new URL(m[1]).origin)
+      } catch {
+        // ignore malformed URLs
+      }
+    }
+
+    if (origins.size === 0) return html
+
+    const hints = Array.from(origins)
+      .map(
+        (o) =>
+          `  <link rel="preconnect" href="${o}" crossorigin>\n  <link rel="dns-prefetch" href="${o}">`
+      )
+      .join('\n')
+
+    // Insert after <meta charset> if present, otherwise after <head>
+    const charsetMatch = html.match(/<meta[^>]+charset[^>]*>/i)
+    if (charsetMatch) {
+      const idx = html.indexOf(charsetMatch[0]) + charsetMatch[0].length
+      this.appliedFixes.push(`Added resource hints for ${origins.size} CDN origin(s)`)
+      return html.slice(0, idx) + '\n' + hints + html.slice(idx)
+    }
+
+    const headMatch = html.match(/<head[^>]*>/i)
+    if (headMatch) {
+      this.appliedFixes.push(`Added resource hints for ${origins.size} CDN origin(s)`)
+      return html.replace(headMatch[0], headMatch[0] + '\n' + hints)
+    }
+
+    return html
+  }
+
+  // ── Accessibility injections ──────────────────────────────────────────────
+
+  /** Injects a skip-to-main-content link as first child of <body>. */
+  private injectSkipLink(html: string): string {
+    if (html.includes('#main-content') || html.includes('skip-to') || html.includes('skipnav')) {
+      return html
+    }
+    const bodyMatch = html.match(/<body([^>]*)>/i)
+    if (!bodyMatch) return html
+    const skipLink = `<a href="#main-content" style="position:absolute;top:-999px;left:-999px;width:1px;height:1px;overflow:hidden;z-index:99999;background:#fff;color:#111;padding:.75rem 1.25rem;text-decoration:none;font-weight:600;border-radius:0 0 8px 0" onfocus="this.style.top='0';this.style.left='0';this.style.width='auto';this.style.height='auto'" onblur="this.style.top='-999px';this.style.left='-999px';this.style.width='1px';this.style.height='1px'">Skip to main content</a>`
+    this.appliedFixes.push('Injected skip-to-main-content link')
+    return html.replace(bodyMatch[0], `${bodyMatch[0]}\n  ${skipLink}`)
+  }
+
+  /** Adds id="main-content" and role="main" to the first <main> element. */
+  private injectMainRole(html: string): string {
+    if (html.includes('id="main-content"') || html.includes("id='main-content'")) return html
+    const mainMatch = html.match(/<main(?![^>]*\bid=)([^>]*)>/i)
+    if (!mainMatch) return html
+    this.appliedFixes.push('Added id="main-content" and role="main" to <main>')
+    return html.replace(mainMatch[0],
+      `<main id="main-content" role="main"${mainMatch[1]}>`)
+  }
+
+  /** Adds descriptive alt text to <img> tags missing the alt attribute. */
+  private injectImgAlts(html: string): string {
+    let count = 0
+    const result = html.replace(/<img([^>]*)>/gi, (fullTag, attrs) => {
+      if (/role=["'](presentation|none)["']/i.test(attrs)) return fullTag
+      if (/\balt=/i.test(attrs)) {
+        // Has alt= but it might be empty — replace empty alts on content images
+        const altVal = (attrs.match(/\balt=["']([^"']*)["']/i) ?? [])[1] ?? null
+        if (altVal !== null && altVal.trim() === '') {
+          const srcMatch = attrs.match(/\bsrc=["']([^"']+)["']/i)
+          const generated = srcMatch ? this._altFromSrc(srcMatch[1]) : ''
+          if (!generated) return fullTag
+          count++
+          return fullTag.replace(/\balt=["']['"]/, `alt="${generated}"`)
+        }
+        return fullTag
+      }
+      // No alt at all — generate from src
+      const srcMatch = attrs.match(/\bsrc=["']([^"']+)["']/i)
+      const generated = srcMatch ? this._altFromSrc(srcMatch[1]) : 'Image'
+      count++
+      return `<img alt="${generated}"${attrs}>`
+    })
+    if (count > 0) this.appliedFixes.push(`Generated alt text for ${count} image(s)`)
+    return result
+  }
+
+  private _altFromSrc(src: string): string {
+    try {
+      const picsumSeed = src.match(/picsum\.photos\/seed\/([^/?]+)/)
+      if (picsumSeed) {
+        return picsumSeed[1].replace(/[-_]/g, ' ')
+          .replace(/\b\w/g, (c) => c.toUpperCase()).trim()
+      }
+      if (src.includes('unsplash.com')) return 'Photo'
+      if (src.includes('dicebear.com')) {
+        const seed = new URL(src).searchParams.get('seed')
+        return seed ? `${seed} avatar` : 'Avatar'
+      }
+      const filename = new URL(src).pathname.split('/').pop() ?? ''
+      const name = filename.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ').trim()
+      return name ? name.charAt(0).toUpperCase() + name.slice(1) : 'Image'
+    } catch {
+      return 'Image'
+    }
+  }
+
+  /** Adds explicit ARIA landmark roles to <header>, <footer>, and <nav>. */
+  private injectAriaLandmarks(html: string): string {
+    let fixed = html
+    // <header> without role
+    fixed = fixed.replace(/<header(?![^>]*\brole=)([^>]*)>/gi,
+      (_, attrs) => `<header role="banner"${attrs}>`)
+    // <footer> without role
+    fixed = fixed.replace(/<footer(?![^>]*\brole=)([^>]*)>/gi,
+      (_, attrs) => `<footer role="contentinfo"${attrs}>`)
+    // <nav> without aria-label
+    fixed = fixed.replace(/<nav(?![^>]*\baria-label=)([^>]*)>/gi,
+      (_, attrs) => `<nav aria-label="Site navigation"${attrs}>`)
+    if (fixed !== html) this.appliedFixes.push('Added ARIA landmark roles to header/footer/nav')
+    return fixed
+  }
+
+  /**
+   * Injects <script src="consent.js"> and/or <script src="analytics.js"> into
+   * <head> when those files are present in the site's generated file set.
+   * Both use defer so they don't block rendering.
+   */
+  private injectConsentAndAnalyticsScripts(html: string, siteFiles: Record<string, string>): string {
+    const hasConsent   = 'consent.js'   in siteFiles
+    const hasAnalytics = 'analytics.js' in siteFiles
+    if (!hasConsent && !hasAnalytics) return html
+
+    const hasConsentTag   = html.includes('src="consent.js"')   || html.includes("src='consent.js'")
+    const hasAnalyticsTag = html.includes('src="analytics.js"') || html.includes("src='analytics.js'")
+    if (hasConsentTag && hasAnalyticsTag) return html
+
+    const tags: string[] = []
+    if (hasConsent   && !hasConsentTag)   tags.push('  <script src="consent.js" defer></script>')
+    if (hasAnalytics && !hasAnalyticsTag) tags.push('  <script src="analytics.js" defer></script>')
+    if (tags.length === 0) return html
+
+    this.appliedFixes.push(`Injected ${tags.map((t) => t.includes('consent') ? 'consent.js' : 'analytics.js').join(', ')}`)
+    return html.replace(/<\/head>/i, tags.join('\n') + '\n</head>')
   }
 
   private fixMissingMetaDescription(html: string): string {

@@ -7,12 +7,14 @@ interface DeployButtonProps {
   projectId: string
   projectName: string
   size?: 'sm' | 'md' | 'lg' | 'icon'
+  onSuccess?: (publicUrl: string) => void
 }
 
-export default function DeployButton({ 
-  projectId, 
+export default function DeployButton({
+  projectId,
   projectName,
-  size = 'md'
+  size = 'md',
+  onSuccess,
 }: DeployButtonProps) {
   const [deploying, setDeploying] = useState(false)
   const [status, setStatus] = useState<'idle' | 'deploying' | 'success' | 'error'>('idle')

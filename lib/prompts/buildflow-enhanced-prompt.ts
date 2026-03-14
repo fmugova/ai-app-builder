@@ -372,6 +372,88 @@ document.querySelectorAll('.nav-links a').forEach(link => {
 - No stubs or "coming soon" sections
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🛒 E-COMMERCE RULES — APPLY WHENEVER supabase.js IS PRESENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Script load order (non-negotiable):**
+\`\`\`html
+<script src="supabase.js"></script>   <!-- FIRST — defines all cart functions -->
+<script src="script.js"></script>     <!-- SECOND — general site JS -->
+<script>/* page inline script */</script>  <!-- LAST — uses functions from above -->
+\`\`\`
+Never redeclare getCart, addToCart, getCartTotals, validatePromoCode, createOrder,
+updateCartBadges, or any other function already defined in supabase.js.
+
+**Cart count — one source of truth, always:**
+\`\`\`javascript
+// ✅ CORRECT
+getCartCount()              // total quantity across all items
+getCartTotals().itemCount   // same value inside totals object
+
+// ❌ FORBIDDEN — causes visible count mismatch bugs
+cart.length                 // counts lines not quantities
+const itemCount = 3;        // hardcoded — never do this
+\`\`\`
+
+**All monetary values must go through getCartTotals() — never compute manually:**
+\`\`\`javascript
+// ✅ CORRECT — call once, render everything from the result object
+const t = getCartTotals(_appliedPromo);   // pass promo object or null
+subtotalEl.textContent  = '£' + t.subtotal.toFixed(2);
+discountEl.textContent  = t.discountAmount > 0
+  ? '-£' + t.discountAmount.toFixed(2) : '£0.00';
+deliveryEl.textContent  = t.deliveryFee === 0 ? 'FREE' : '£' + t.deliveryFee.toFixed(2);
+totalEl.textContent     = '£' + t.total.toFixed(2);
+countEl.textContent     = t.itemCount + ' item' + (t.itemCount !== 1 ? 's' : '');
+
+// ❌ FORBIDDEN — manual math bypasses source of truth, causes promo showing -£0.00
+const discount = subtotal * (promoPercent / 100);   // NEVER
+const total    = subtotal - discount;               // NEVER
+\`\`\`
+
+**Promo code — async validation, then re-render:**
+\`\`\`javascript
+// ✅ CORRECT
+const promo = await validatePromoCode(inputValue);  // hits Supabase promo_codes table
+_appliedPromo = promo;
+renderOrderSummary();   // must call getCartTotals(_appliedPromo) internally
+
+// ❌ FORBIDDEN — bypasses source of truth
+if (code === 'ELITE10') total *= 0.9;
+\`\`\`
+
+**Cart reactivity — event not polling:**
+\`\`\`javascript
+// ✅ CORRECT — supabase.js fires this on every addToCart/remove/updateQty
+document.addEventListener('cart:updated', () => renderCart());
+\`\`\`
+
+**Cart badge elements — data attribute, not custom ID:**
+\`\`\`html
+<!-- ✅ CORRECT — updateCartBadges() finds all of these automatically -->
+<span data-cart-count class="badge">0</span>
+\`\`\`
+
+**Products — always load async from Supabase, never hardcode arrays:**
+\`\`\`javascript
+// ✅ CORRECT
+const products = await getProducts(category);
+renderProductGrid(products);
+
+// ❌ FORBIDDEN — static data defeats the data layer
+const products = [{ id: '1', name: 'Cake', price: 45 }];
+\`\`\`
+
+**Product images — always use the helper, never hardcode URLs:**
+\`\`\`javascript
+// ✅ CORRECT — uses stored URL or stable picsum fallback
+const src = getProductImageUrl(product, 400, 300);
+
+// ❌ FORBIDDEN — deprecated API, returns broken/wrong images
+<img src="https://source.unsplash.com/400x300/?cake">
+\`\`\`
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ✅ QUALITY BAR — YOUR OUTPUT MUST CLEAR THIS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -390,6 +472,9 @@ Before outputting, verify:
 - [ ] All JavaScript uses addEventListener (zero inline handlers)
 - [ ] Mobile responsive with working hamburger menu
 - [ ] Each page has at least 5 substantial sections of real content
+- [ ] E-commerce: all monetary values rendered via getCartTotals() only — zero manual discount math
+- [ ] E-commerce: item counts always from getCartCount() or getCartTotals().itemCount — never hardcoded
+- [ ] E-commerce: supabase.js loaded FIRST, before script.js and all inline scripts
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📋 EXAMPLE OUTPUT — MATCH THIS FORMAT AND QUALITY EXACTLY

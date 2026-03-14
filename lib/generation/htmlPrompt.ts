@@ -144,8 +144,55 @@ When generating shop, cart, or checkout functionality:
   addToCart: increment qty if product already exists; only push new entry if not found.
   removeFromCart: filter by id, then updateCartBadges().
 
-**If a data.js file is provided in context:** use the PRODUCTS array and cart helpers from that file
-  instead of re-declaring them inline. Include <script src="data.js"></script> BEFORE your page script.
+**If a supabase.js file is provided in context:** it is the SINGLE SOURCE OF TRUTH for all cart and
+data operations. Include <script src="supabase.js"></script> as the FIRST script in <head>.
+Never redeclare getCart, addToCart, getCartTotals, validatePromoCode, createOrder, or any other
+function already defined in supabase.js.
+
+### E-commerce rules — apply whenever supabase.js is present
+
+**Script load order (non-negotiable):**
+  <script src="supabase.js"></script>   ← FIRST — defines all cart/data functions
+  <script src="script.js"></script>     ← SECOND
+  <script>/* inline page script */</script>  ← LAST
+Never reverse this order. Never redeclare functions already in supabase.js.
+
+**Cart count — one source of truth:**
+  ✓ getCartCount()                 total quantity across all items
+  ✓ getCartTotals().itemCount      same value, inside totals object
+  ✗ cart.length                    counts lines not quantities — FORBIDDEN
+  ✗ const itemCount = 3            hardcoded — FORBIDDEN
+
+**All monetary values through getCartTotals() only — never compute manually:**
+  ✓ const t = getCartTotals(_appliedPromo);  // pass promo object or null
+    subtotalEl.textContent  = '£' + t.subtotal.toFixed(2);
+    discountEl.textContent  = t.discountAmount > 0 ? '-£' + t.discountAmount.toFixed(2) : '£0.00';
+    deliveryEl.textContent  = t.deliveryFee === 0 ? 'FREE' : '£' + t.deliveryFee.toFixed(2);
+    totalEl.textContent     = '£' + t.total.toFixed(2);
+    countEl.textContent     = t.itemCount + ' item' + (t.itemCount !== 1 ? 's' : '');
+  ✗ const discount = subtotal * (promoPercent / 100);  FORBIDDEN — causes promo -£0.00 bug
+  ✗ const total = subtotal - discount;                  FORBIDDEN
+
+**Promo code — async validation, then re-render:**
+  ✓ const promo = await validatePromoCode(inputValue);  // hits Supabase promo_codes table
+    _appliedPromo = promo;
+    renderOrderSummary();  // must call getCartTotals(_appliedPromo) internally
+  ✗ if (code === 'ELITE10') total *= 0.9;  FORBIDDEN — bypasses source of truth
+
+**Cart reactivity — event, not polling:**
+  ✓ document.addEventListener('cart:updated', () => renderCart());
+    supabase.js fires cart:updated on every addToCart/removeFromCart/updateCartQuantity
+
+**Cart badge elements — data-cart-count attribute:**
+  ✓ <span data-cart-count class="badge">0</span>  updateCartBadges() finds these automatically
+
+**Products — always load async from Supabase, never hardcode arrays:**
+  ✓ const products = await getProducts(category);
+  ✗ const products = [{ id: '1', name: 'Cake', price: 45 }];  FORBIDDEN
+
+**Product images — use the helper, never hardcode URLs:**
+  ✓ const src = getProductImageUrl(product, 400, 300);  // stored URL or picsum fallback
+  ✗ <img src="https://source.unsplash.com/400x300/?cake">  deprecated API — FORBIDDEN
 
 ### Images
 - If a "SITE-SPECIFIC IMAGE PALETTE" block appears in the user message, use ONLY those Unsplash URLs
