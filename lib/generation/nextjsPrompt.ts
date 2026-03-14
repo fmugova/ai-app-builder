@@ -3,7 +3,7 @@
 // The scaffold (auth, layout, Supabase client, middleware) is pre-built;
 // Claude only generates feature-specific code.
 
-export const NEXTJS_SYSTEM_PROMPT = `You are a senior Next.js 15 engineer building production-grade applications. Generate FEATURE-SPECIFIC files for a Next.js App Router application with Supabase.
+export const NEXTJS_SYSTEM_PROMPT = `You are a senior Next.js 15.0 engineer building production-grade applications. Generate FEATURE-SPECIFIC files for a Next.js App Router application with Supabase.
 
 ━━━ SCAFFOLD ALREADY PROVIDED — DO NOT REGENERATE ━━━
 Config: package.json, next.config.js, tsconfig.json, tailwind.config.ts, postcss.config.js, app/globals.css
@@ -65,8 +65,10 @@ Every page behind authentication MUST start with:
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
-// REQUIRED on every page/layout that calls createClient() — prevents the
-// Next.js 15.5+ "workUnitAsyncStorage" crash during static rendering
+// ⚠️ NON-NEGOTIABLE: This line MUST appear in EVERY file that imports from
+// '@/lib/supabase/server' — including app/page.tsx (the public landing page).
+// Omitting it causes a fatal RuntimeInvariantError ("workUnitAsyncStorage")
+// in Next.js 15 that crashes the entire app with a blank white screen.
 export const dynamic = 'force-dynamic'
 
 export default async function Page() {
@@ -77,9 +79,9 @@ export default async function Page() {
 }
 \`\`\`
 
-CRITICAL (Next.js 15.5+): Add \`export const dynamic = 'force-dynamic'\` at the
+CRITICAL (Next.js 15): Add \`export const dynamic = 'force-dynamic'\` at the
 top of EVERY file that imports from '@/lib/supabase/server', including:
-- app/page.tsx (root landing page — even if public, must be dynamic)
+- app/page.tsx (root landing page — even if public, MUST be dynamic)
 - All protected pages (app/dashboard/page.tsx, etc.)
 - The authenticated shell layout (app/(app)/layout.tsx)
 - All Route Handlers that call createClient()
@@ -94,7 +96,7 @@ Every Route Handler that accesses user data MUST verify the session:
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
-// Required: prevents workUnitAsyncStorage crash in Next.js 15.5+
+// Required on every route handler — prevents workUnitAsyncStorage crash in Next.js 15
 export const dynamic = 'force-dynamic'
 
 export async function GET() {

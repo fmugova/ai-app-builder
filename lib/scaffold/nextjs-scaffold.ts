@@ -14,7 +14,11 @@ export const NEXTJS_SCAFFOLD_FILES: Record<string, string> = {
       lint: 'next lint',
     },
     dependencies: {
-      next: '^15.0.0',
+      // Pinned to 15.0.x — the 15.3+ releases introduced a workUnitAsyncStorage
+      // invariant that crashes any page calling cookies()/headers() in StackBlitz
+      // when the page doesn't explicitly export dynamic = 'force-dynamic'.
+      // 15.0.x is fully stable App-Router and avoids that issue entirely.
+      next: '15.0.4',
       react: '^18.3.0',
       'react-dom': '^18.3.0',
       '@supabase/supabase-js': '^2.43.0',
@@ -32,14 +36,17 @@ export const NEXTJS_SCAFFOLD_FILES: Record<string, string> = {
       postcss: '^8',
       tailwindcss: '^3.4.4',
       eslint: '^9',
-      'eslint-config-next': '^15.0.0',
+      'eslint-config-next': '15.0.4',
     },
   }, null, 2),
 
   'next.config.js': `/** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    domains: ['images.unsplash.com', 'picsum.photos', 'avatars.githubusercontent.com'],
+    // Allow common external image hosts used in generated apps
+    domains: ['images.unsplash.com', 'picsum.photos', 'avatars.githubusercontent.com', 'api.dicebear.com'],
+    // Use unoptimized images in StackBlitz (no image optimisation server available)
+    unoptimized: true,
   },
 };
 
@@ -493,6 +500,43 @@ export default function RootLayout({
   'components/ui/toaster.tsx': `'use client'
 export { Toaster } from 'sonner'
 export { toast } from 'sonner'
+`,
+
+  // Safe fallback root page — Claude's generated app/page.tsx always overwrites this.
+  // It exists so that if generation is incomplete the app still boots without a 500.
+  'app/page.tsx': `// THIS FILE IS A SCAFFOLD FALLBACK.
+// Claude's generated app/page.tsx (the real landing page) replaces this entirely.
+// It exists so the app boots without a 500 when generation is still in progress.
+import Link from 'next/link'
+
+// Required: prevents Next.js 15.3+ workUnitAsyncStorage invariant on static render
+export const dynamic = 'force-dynamic'
+
+export default function Page() {
+  return (
+    <main className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-8 text-center">
+      <h1 className="text-4xl font-bold text-gray-900 mb-4">App Generated</h1>
+      <p className="text-gray-600 mb-8 max-w-md">
+        Your application was generated successfully. Add your Supabase credentials to the{' '}
+        <code className="bg-gray-100 px-1 rounded">.env</code> file to enable authentication.
+      </p>
+      <div className="flex gap-4">
+        <Link
+          href="/login"
+          className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition"
+        >
+          Sign In
+        </Link>
+        <Link
+          href="/signup"
+          className="border border-indigo-600 text-indigo-600 px-6 py-3 rounded-lg font-medium hover:bg-indigo-50 transition"
+        >
+          Sign Up
+        </Link>
+      </div>
+    </main>
+  )
+}
 `,
 
   'README.md': `# Generated App
