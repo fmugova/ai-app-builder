@@ -136,7 +136,7 @@ ${userPrompt}
 
 Remember:
 - Output ONLY the feature-specific files in === FILE: path === format
-- The scaffold is already provided: auth pages, Supabase clients, middleware, globals.css, package.json, app/layout.tsx, components/ui/toaster.tsx${dashboardScaffoldNote}
+- The scaffold is already provided: auth pages, Supabase clients, middleware, globals.css, package.json, app/layout.tsx, components/ui/toaster.tsx, lib/utils.ts (cn() with clsx + tailwind-merge — DO NOT regenerate it)${dashboardScaffoldNote}
 - Generate: app/page.tsx, feature pages, API routes, ALL components you reference, types, and the Supabase SQL migration
 - CRITICAL: Every import from '@/components/...' or '@/lib/...' or '@/hooks/...' that you write MUST have a corresponding === FILE: === block in your output
 - Make it real and complete — no placeholders or TODOs`;
@@ -181,6 +181,7 @@ Remember:
     'app/layout.tsx',
     'lib/supabase/server.ts',
     'lib/supabase/client.ts',
+    'lib/utils.ts',
     'middleware.ts',
   ];
   for (const path of PROTECTED_SCAFFOLD_FILES) {

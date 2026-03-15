@@ -25,6 +25,7 @@ export const NEXTJS_SCAFFOLD_FILES: Record<string, string> = {
       '@supabase/ssr': '^0.5.0',
       'lucide-react': '^0.400.0',
       'clsx': '^2.1.1',
+      'tailwind-merge': '^2.3.0',
       'sonner': '^1.5.0',
     },
     devDependencies: {
@@ -500,6 +501,16 @@ export default function RootLayout({
   'components/ui/toaster.tsx': `'use client'
 export { Toaster } from 'sonner'
 export { toast } from 'sonner'
+`,
+
+  // cn() utility — pre-provided so Claude doesn't need to generate it and
+  // tailwind-merge is guaranteed to be installed (it's in package.json).
+  'lib/utils.ts': `import { clsx, type ClassValue } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+
+export function cn(...inputs: ClassValue[]): string {
+  return twMerge(clsx(inputs))
+}
 `,
 
   // Safe fallback root page — Claude's generated app/page.tsx always overwrites this.
