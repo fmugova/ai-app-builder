@@ -110,6 +110,38 @@ Auth form JavaScript pattern (use this EXACTLY in the signup/login page inline s
     }
   }
 
+### BuildFlow Data API (for app pages — task managers, lists, notes, bookings, etc.)
+When the site needs to READ or WRITE persistent data (not just form submissions), use the public data API:
+
+- List records:   GET    /api/public/data/BUILDFLOW_PROJECT_ID?collection=COLLECTION_NAME
+  Optional filters: &limit=50&offset=0&field=value  → returns { data: [...] }
+- Create record:  POST   /api/public/data/BUILDFLOW_PROJECT_ID?collection=COLLECTION_NAME
+  Body: { data: { field: value, ... } }  → returns { data: { id, ...fields } }
+- Update record:  PATCH  /api/public/data/BUILDFLOW_PROJECT_ID?collection=COLLECTION_NAME&id=RECORD_ID
+  Body: { data: { field: newValue } }
+- Delete record:  DELETE /api/public/data/BUILDFLOW_PROJECT_ID?collection=COLLECTION_NAME&id=RECORD_ID
+
+All requests must include the auth header if the user is logged in:
+  { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('auth_token') }
+
+Collection names: alphanumeric + hyphens/underscores, max 64 chars (e.g. 'tasks', 'bookings', 'notes').
+
+### BuildFlow Upload API (for file/image uploads)
+- Upload file: POST /api/public/upload/BUILDFLOW_PROJECT_ID with FormData, field 'file'
+  Returns: { url: "https://..." } (public CDN URL). Supported: images, PDF, CSV. Max 4.5 MB.
+  \`\`\`js
+  async function uploadFile(file) {
+    var fd = new FormData();
+    fd.append('file', file);
+    var res = await fetch('/api/public/upload/BUILDFLOW_PROJECT_ID', {
+      method: 'POST', body: fd,
+      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('auth_token') }
+    });
+    var data = await res.json();
+    return data.url;  // use this URL in <img src="..."> or store in data API
+  }
+  \`\`\`
+
 ### JavaScript
 - Vanilla JS only — addEventListener, querySelector, fetch for APIs
 - Animations: CSS transitions + IntersectionObserver for scroll reveal

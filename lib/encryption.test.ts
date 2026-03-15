@@ -1,0 +1,128 @@
+// lib/encryption.test.ts
+// ENCRYPTION_KEY is set in jest.setup.js before modules load.
+// Each test overrides / restores the env var as needed.
+
+import { encrypt, decrypt, maskValue } from './encryption'
+
+const TEST_KEY = 'test-encryption-key-for-jest-only'
+
+describe('encrypt / decrypt', () => {
+  beforeEach(() => {
+    process.env.ENCRYPTION_KEY = TEST_KEY
+  })
+
+  afterEach(() => {
+    process.env.ENCRYPTION_KEY = TEST_KEY // restore for next test
+  })
+
+  // ── Round-trip ────────────────────────────────────────────────────────────────
+  describe('round-trip correctness', () => {
+    it('decrypts to the original plaintext', () => {
+      const plaintext = 'super-secret-value'
+      expect(decrypt(encrypt(plaintext))).toBe(plaintext)
+    })
+
+    it('round-trips an empty string', () => {
+      expect(decrypt(encrypt(''))).toBe('')
+    })
+
+    it('round-trips a long string', () => {
+      const long = 'x'.repeat(10_000)
+      expect(decrypt(encrypt(long))).toBe(long)
+    })
+
+    it('round-trips unicode characters', () => {
+      const unicode = '🔑 pässwörd £¥€'
+      expect(decrypt(encrypt(unicode))).toBe(unicode)
+    })
+
+    it('round-trips JSON-like content', () => {
+      const json = JSON.stringify({ apiKey: 'sk-1234', secret: 'abc' })
+      expect(decrypt(encrypt(json))).toBe(json)
+    })
+  })
+
+  // ── Ciphertext format ─────────────────────────────────────────────────────────
+  describe('ciphertext format', () => {
+    it('returns a string with exactly 3 colon-separated parts', () => {
+      const ciphertext = encrypt('hello')
+      const parts = ciphertext.split(':')
+      expect(parts).toHaveLength(3)
+    })
+
+    it('each part is a non-empty hex string', () => {
+      const [iv, authTag, encrypted] = encrypt('hello').split(':')
+      expect(iv).toMatch(/^[0-9a-f]+$/i)
+      expect(authTag).toMatch(/^[0-9a-f]+$/i)
+      expect(encrypted.length).toBeGreaterThan(0)
+    })
+
+    it('produces different ciphertexts for same plaintext (random IV)', () => {
+      const ct1 = encrypt('same-value')
+      const ct2 = encrypt('same-value')
+      expect(ct1).not.toBe(ct2)
+    })
+  })
+
+  // ── Auth-tag integrity (GCM tamper detection) ─────────────────────────────────
+  describe('authentication tag verification', () => {
+    it('throws when ciphertext is tampered', () => {
+      const ciphertext = encrypt('secret')
+      const [iv, authTag, encrypted] = ciphertext.split(':')
+      // Flip first byte of encrypted payload
+      const tampered = `${iv}:${authTag}:ff${encrypted.slice(2)}`
+      expect(() => decrypt(tampered)).toThrow()
+    })
+
+    it('throws when authTag is tampered', () => {
+      const ciphertext = encrypt('secret')
+      const [iv, , encrypted] = ciphertext.split(':')
+      const badTag = 'deadbeefdeadbeefdeadbeefdeadbeef'
+      expect(() => decrypt(`${iv}:${badTag}:${encrypted}`)).toThrow()
+    })
+
+    it('throws for malformed ciphertext (wrong number of parts)', () => {
+      expect(() => decrypt('only-two:parts')).toThrow()
+      expect(() => decrypt('one')).toThrow()
+    })
+  })
+
+  // ── Missing key ───────────────────────────────────────────────────────────────
+  describe('missing ENCRYPTION_KEY', () => {
+    it('encrypt throws when ENCRYPTION_KEY is not set', () => {
+      delete process.env.ENCRYPTION_KEY
+      // encrypt() wraps internal errors as 'Failed to encrypt value'
+      expect(() => encrypt('value')).toThrow('Failed to encrypt value')
+    })
+
+    it('decrypt throws when ENCRYPTION_KEY is not set', () => {
+      const ciphertext = encrypt('value')
+      delete process.env.ENCRYPTION_KEY
+      expect(() => decrypt(ciphertext)).toThrow()
+    })
+  })
+})
+
+describe('maskValue', () => {
+  it('fully masks short values (≤ 8 chars)', () => {
+    expect(maskValue('pass')).toBe('••••')
+    expect(maskValue('12345678')).toBe('••••••••')
+  })
+
+  it('shows first 4 and last 4 chars for longer values', () => {
+    const masked = maskValue('abcdefghijklmnop') // 16 chars
+    expect(masked.startsWith('abcd')).toBe(true)
+    expect(masked.endsWith('mnop')).toBe(true)
+  })
+
+  it('uses bullet characters for middle section', () => {
+    const masked = maskValue('abc1234567xyz') // 13 chars
+    const middle = masked.slice(4, -4)
+    expect(middle).toMatch(/^•+$/)
+  })
+
+  it('preserves original value length in masked output', () => {
+    const value = 'my-api-key-1234567890'
+    expect(maskValue(value).length).toBe(value.length)
+  })
+})

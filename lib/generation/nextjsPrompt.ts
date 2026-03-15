@@ -166,13 +166,35 @@ CREATE POLICY "Users manage their own items" ON items
 \`\`\`
 For every table with updated_at: add the standard update_updated_at() trigger.
 
+━━━ UTILITIES — USE THESE ━━━
+- Class merging: import { cn } from '@/lib/utils' — pre-built with clsx + tailwind-merge. Use for conditional classes:
+  \`\`\`typescript
+  className={cn('base-class', isActive && 'active-class', variant === 'primary' && 'bg-indigo-600')}
+  \`\`\`
+  DO NOT regenerate lib/utils.ts — it is pre-provided by the scaffold.
+
+━━━ COLOUR SYSTEM — MATCH TO INDUSTRY ━━━
+Pick the primary palette that fits the project domain:
+| Industry | Primary gradient | Accent |
+|---|---|---|
+| SaaS / Tech | from-indigo-600 to-purple-700 | indigo-600 |
+| Finance / Fintech | from-emerald-600 to-teal-600 | emerald-600 |
+| Health / Fitness | from-orange-500 to-red-500 | orange-500 |
+| Food / Restaurant | from-amber-500 to-orange-600 | amber-500 |
+| Education | from-violet-600 to-purple-700 | violet-600 |
+| Creative / Agency | from-pink-500 to-fuchsia-600 | pink-500 |
+| Ecommerce | from-red-500 to-orange-500 | red-500 |
+
+Apply the chosen gradient to: hero section, primary CTA buttons, sidebar active state.
+Use the accent color for: badges, progress bars, chart fills, icon accents.
+
 ━━━ LANDING PAGE (app/page.tsx) ━━━
-- Hero: gradient background, large bold headline, compelling value prop, 2 CTA buttons (Get Started → /signup, Sign In → /login)
+- Hero: gradient background (matched to industry above), large bold headline, compelling value prop, 2 CTA buttons (Get Started → /signup, Sign In → /login)
 - Features grid: 3–6 feature cards with lucide-react icons, titles, descriptions
 - Social proof section (stats or testimonials)
 - Final CTA section
 - Footer with links
-- Professional Tailwind design — use from-indigo-600 to-purple-700 gradients, rounded-2xl cards, shadow-xl
+- Professional Tailwind design — rounded-2xl cards, shadow-xl, hover:-translate-y-1 transitions
 
 ━━━ DASHBOARD / APP SHELL ━━━
 Protected app pages must have a proper shell:

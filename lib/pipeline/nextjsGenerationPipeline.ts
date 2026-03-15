@@ -151,10 +151,44 @@ Remember:
       messages: [{ role: 'user', content: userMessage }],
     }) as unknown as Promise<Anthropic.Message>);
 
-    const text = response.content.find((b) => b.type === 'text')?.text ?? '';
+    let text = response.content.find((b) => b.type === 'text')?.text ?? '';
+
+    // ── Truncation detection ───────────────────────────────────────────────────
+    // If Claude hit the token limit, the last === FILE: === block is probably
+    // cut off mid-content. We do one continuation call to recover the rest.
+    if (response.stop_reason === 'max_tokens' && text.trim().length > 0) {
+      warnings.push('Output was truncated at token limit — attempting continuation...');
+      onProgress?.('nextjs-continuing', 'Output truncated — continuing generation...');
+      try {
+        const cont = await (anthropic.messages.create({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 16000,
+          system: systemPrompt,
+          messages: [
+            { role: 'user', content: userMessage },
+            { role: 'assistant', content: text },
+            { role: 'user', content: 'You were cut off. Continue from exactly where you left off — output only the remaining === FILE: === blocks you have not yet emitted. Do not repeat files already written.' },
+          ],
+        }) as unknown as Promise<Anthropic.Message>);
+        const contText = cont.content.find((b) => b.type === 'text')?.text ?? '';
+        if (contText.trim()) {
+          text += '\n' + contText;
+          // Merge continuation files (continuation overrides truncated last file)
+          const contFiles = parseNextjsOutput(contText);
+          featureFiles = { ...parseNextjsOutput(text), ...contFiles };
+        }
+        if (cont.stop_reason === 'max_tokens') {
+          warnings.push('Continuation was also truncated — some files may be incomplete. Consider reducing scope.');
+        }
+      } catch (contErr: unknown) {
+        warnings.push(`Continuation failed: ${contErr instanceof Error ? contErr.message : 'unknown'}`);
+      }
+    }
 
     onProgress?.('nextjs-parsing', 'Parsing generated files...');
-    featureFiles = parseNextjsOutput(text);
+    if (Object.keys(featureFiles).length === 0) {
+      featureFiles = parseNextjsOutput(text);
+    }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Generation failed';
     warnings.push(`Next.js generation error: ${msg}`);

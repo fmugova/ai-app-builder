@@ -12,6 +12,7 @@ import { getToken } from "next-auth/jwt";
 import { createGenerationPlan } from "@/lib/api/planGeneration";
 import { runGenerationPipeline } from "@/lib/pipeline/htmlGenerationPipeline";
 import { runNextjsGenerationPipeline } from "@/lib/pipeline/nextjsGenerationPipeline";
+import { runReactSpaPipeline } from "@/lib/pipeline/reactSpaPipeline";
 import { detectOutputMode } from "@/lib/generation/detectOutputMode";
 import { selectScaffold, scaffoldUsesNextjs } from "@/lib/scaffolds/scaffold-selector";
 import { rateLimiters } from "@/lib/rate-limit";
@@ -21,12 +22,10 @@ import prisma from "@/lib/prisma";
 // HTML is still the default for marketing sites and simple apps (localStorage CRUD).
 // Next.js is reserved for prompts that explicitly request it or that clearly need
 // a backend (auth, database, multi-user, real-time, payments, etc.).
-// React SPA requests also route to Next.js — we have no standalone React SPA
-// pipeline, and Next.js (App Router + React 18) is the modern equivalent.
 function shouldUseNextjs(prompt: string): boolean {
   const detection = detectOutputMode(prompt);
   if (detection.mode === "nextjs") return true; // user said "Next.js", "App Router", etc.
-  if (detection.mode === "react-spa") return true; // user said "React" — route to Next.js (best available)
+  // react-spa no longer routes to Next.js — it has its own pipeline now
 
   // Infer from backend-only keywords — marketing sites and simple apps stay as HTML
   const lower = prompt.toLowerCase();
@@ -41,6 +40,13 @@ function shouldUseNextjs(prompt: string): boolean {
     "supabase", "firebase", "prisma", "drizzle",
   ];
   return BACKEND_SIGNALS.some((k) => lower.includes(k));
+}
+
+// Detect whether the prompt warrants a React SPA (Vite + React Router).
+// Triggers on explicit React/SPA keywords that don't also imply a backend.
+function shouldUseReactSpa(prompt: string): boolean {
+  const detection = detectOutputMode(prompt);
+  return detection.mode === "react-spa";
 }
 
 // Node.js runtime — vercel.json functions.maxDuration:300 applies here.
@@ -141,8 +147,9 @@ async function GETHandler(req: NextRequest) {
         // Scaffold-aware routing: use selectScaffold() for 7-way type detection,
         // fall back to the original keyword-based shouldUseNextjs() for explicit keywords.
         const scaffoldResult = selectScaffold(prompt);
-        const useNextjs =
-          scaffoldUsesNextjs(scaffoldResult.scaffold) || shouldUseNextjs(prompt);
+        const useReactSpa = shouldUseReactSpa(prompt);
+        const useNextjs = !useReactSpa &&
+          (scaffoldUsesNextjs(scaffoldResult.scaffold) || shouldUseNextjs(prompt));
 
         // Resolved scaffold type: prefer explicit param (from wizard) over auto-detected
         const scaffoldType = scaffoldTypeParam || scaffoldResult.scaffold;
@@ -155,6 +162,7 @@ async function GETHandler(req: NextRequest) {
         const plan = await createGenerationPlan(prompt, siteName);
         // Override mode in plan so client knows what was generated
         if (useNextjs) plan.mode = "nextjs";
+        else if (useReactSpa) plan.mode = "react-spa";
         send("plan", plan);
 
         // 2. Execute the appropriate generation pipeline
@@ -182,6 +190,29 @@ async function GETHandler(req: NextRequest) {
               send("file", { path, content });
             },
             scaffoldType
+          );
+
+          // Mark all plan steps done
+          for (const step of plan.steps) {
+            send("step_done", { stepId: step.id });
+          }
+
+        } else if (useReactSpa) {
+          // ── React SPA pipeline ────────────────────────────────────────────────
+          const firstStep = plan.steps[0];
+          if (firstStep) {
+            send("step_start", { stepId: firstStep.id, label: "Generating React SPA…" });
+          }
+
+          result = await runReactSpaPipeline(
+            generationPrompt,
+            siteName,
+            (step, detail) => {
+              if (detail) console.log(`[generate/stream/react-spa] ${step}: ${detail}`);
+            },
+            (path: string, content: string) => {
+              send("file", { path, content });
+            },
           );
 
           // Mark all plan steps done

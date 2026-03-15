@@ -32,7 +32,7 @@ export interface PlanStep {
 export interface GenerationPlan {
   title: string;
   description: string;
-  mode: "html" | "react" | "nextjs";
+  mode: "html" | "react" | "react-spa" | "nextjs";
   estimatedFiles: number;
   estimatedSeconds: number;
   steps: PlanStep[];
@@ -136,7 +136,7 @@ Rules for steps:
 function buildFallbackPlan(
   prompt: string,
   siteName: string,
-  mode: "html" | "react" | "nextjs"
+  mode: "html" | "react" | "react-spa" | "nextjs"
 ): GenerationPlan {
   const lower = prompt.toLowerCase();
 

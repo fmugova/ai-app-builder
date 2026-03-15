@@ -47,12 +47,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
+  // ── Input validation ────────────────────────────────────────────────────────
+
+  // Guard against oversized payloads (50 MB total across all files)
+  const totalSize = Object.values(files).reduce((sum, c) => sum + (typeof c === 'string' ? c.length : 0), 0);
+  if (totalSize > 50_000_000) {
+    return NextResponse.json({ error: "Generated project exceeds maximum allowed size" }, { status: 413 });
+  }
+
+  // Sanitize file paths — strip any entry that tries to traverse directories
+  // or that isn't a clean relative path. This prevents accidental DB storage of
+  // malformed paths that could confuse downstream route generation.
+  const SAFE_PATH_RE = /^[a-zA-Z0-9_\-/.@]+$/;
+  const sanitizedFiles: Record<string, string> = {};
+  for (const [rawPath, content] of Object.entries(files)) {
+    const p = rawPath.replace(/\\/g, '/').replace(/^\/+/, '');  // normalise slashes
+    if (p.includes('..') || p.includes('//') || !SAFE_PATH_RE.test(p)) continue; // skip malformed
+    if (typeof content !== 'string') continue;
+    sanitizedFiles[p] = content;
+  }
+  const safeFiles = sanitizedFiles;
+
   try {
-    const isNextjsProject = Object.keys(files).some(
+    const isNextjsProject = Object.keys(safeFiles).some(
       (p) => p.endsWith(".tsx") || (p.endsWith(".ts") && !p.endsWith(".d.ts") && !p.endsWith("route.ts"))
     );
-    const htmlFiles = Object.entries(files).filter(([p]) => p.endsWith(".html"));
-    const combinedHtml = files["index.html"] ?? htmlFiles[0]?.[1] ?? "";
+    const isReactSpaProject = !isNextjsProject && (
+      "vite.config.js" in safeFiles || "src/main.jsx" in safeFiles || "src/App.jsx" in safeFiles
+    );
+    const htmlFiles = Object.entries(safeFiles).filter(([p]) => p.endsWith(".html") && p !== "_preview/index.html");
+    const combinedHtml = safeFiles["index.html"] ?? htmlFiles[0]?.[1] ?? "";
 
     // Resolve app URL upfront — needed inside the transaction for Page content replacement
     const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://buildflow-ai.app').replace(/\/$/, '')
@@ -64,8 +88,13 @@ export async function POST(req: NextRequest) {
     function applyPlaceholders(content: string, projectId: string, isHtml = true): string {
       let out = content.replaceAll("BUILDFLOW_PROJECT_ID", projectId)
       if (isHtml) {
-        // Single regex replaces all quote + /api/ occurrences (handles both ' and ")
-        out = out.replace(/(['"])\/(api\/)/g, `$1${appUrl}/$2`)
+        // Rewrite relative /api/ to absolute URL so forms and fetch() calls work
+        // when the site is served from Netlify, GitHub Pages, or a custom domain.
+        // Patterns covered:
+        //   fetch('/api/...')   action="/api/..."   href='/api/...'
+        //   fetch(`/api/...`)   action=/api/...
+        out = out.replace(/(['"`])\/(api\/)/g, `$1${appUrl}/$2`)         // quoted
+        out = out.replace(/(action|href|src)=\/(api\/)/g, `$1=${appUrl}/$2`) // unquoted HTML attrs
       }
       return out
     }
@@ -121,14 +150,14 @@ export async function POST(req: NextRequest) {
           userId: dbUser.id,
           name,
           prompt,
-          type: isNextjsProject ? "nextjs" : "html",
-          projectType: isNextjsProject ? "nextjs" : "multi-page-html",
+          type: isNextjsProject ? "nextjs" : isReactSpaProject ? "react-spa" : "html",
+          projectType: isNextjsProject ? "nextjs" : isReactSpaProject ? "react-spa" : "multi-page-html",
           code: combinedHtml,
           html: combinedHtml,
           css: files["style.css"] ?? "",
           javascript: files["script.js"] ?? "",
-          multiPage: isNextjsProject ? true : htmlFiles.length > 1,
-          isMultiFile: isNextjsProject,
+          multiPage: isNextjsProject || isReactSpaProject ? true : htmlFiles.length > 1,
+          isMultiFile: isNextjsProject || isReactSpaProject,
           validationScore: BigInt(Math.round(qualityScore)),
           validationPassed: qualityScore >= 70,
           status: "DRAFT",
@@ -142,7 +171,7 @@ export async function POST(req: NextRequest) {
     // Also rewrite relative /api/ paths to absolute URLs so forms work when
     // the site is published to Netlify or downloaded and opened locally.
     const injectedFiles: Record<string, string> = {};
-    for (const [path, content] of Object.entries(files)) {
+    for (const [path, content] of Object.entries(safeFiles)) {
       injectedFiles[path] = applyPlaceholders(content, project.id, path.endsWith('.html') || path.endsWith('.js'));
     }
 
@@ -168,9 +197,7 @@ export async function POST(req: NextRequest) {
     const prismaCode = (err as { code?: string })?.code;
     const prismaMsg = (err as { message?: string })?.message ?? String(err);
     console.error("[generate/save] DB save failed:", prismaCode, prismaMsg);
-    const clientMsg = prismaCode
-      ? `Database error (${prismaCode}): ${prismaMsg.split('\n')[0]}`
-      : `Database error: ${prismaMsg.split('\n')[0]}`;
-    return NextResponse.json({ error: clientMsg }, { status: 500 });
+    // Return generic client error — never expose raw Prisma messages to the browser
+    return NextResponse.json({ error: "Failed to save project. Please try again." }, { status: 500 });
   }
 }

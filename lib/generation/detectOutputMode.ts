@@ -108,6 +108,27 @@ function detectStack(prompt: string): DetectedStack {
   };
 }
 
+// ── React SPA keyword detection ───────────────────────────────────────────────
+
+const REACT_SPA_KEYWORDS = [
+  // Explicit React mentions
+  'react app', 'react application', 'react spa', 'react component',
+  'react page', 'react website', 'react front',
+  // SPA characteristics
+  'single page app', 'single-page app', 'spa', 'client-side app',
+  // Interactive app types that suit SPA over plain HTML
+  'interactive dashboard', 'interactive calculator', 'multi-step form',
+  'animated site', 'parallax', 'web app', 'progressive web app', 'pwa',
+  // React ecosystem
+  'react router', 'react hooks', 'usestate', 'useeffect',
+  'jsx', 'vite app', 'create react app', 'cra',
+];
+
+export function isReactSpaPrompt(prompt: string): boolean {
+  const lower = prompt.toLowerCase();
+  return REACT_SPA_KEYWORDS.some(k => lower.includes(k));
+}
+
 /**
  * PRIMARY EXPORT — always call this before choosing a generation strategy
  */

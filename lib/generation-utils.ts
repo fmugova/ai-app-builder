@@ -11,7 +11,6 @@ export interface GenerationEstimate {
 
 export function estimateGenerationTime(prompt: string): GenerationEstimate {
   const wordCount = prompt.split(/\s+/).length;
-  const lowerPrompt = prompt.toLowerCase();
 
   // Feature detection
   const features: string[] = [];

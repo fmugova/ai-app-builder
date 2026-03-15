@@ -138,11 +138,21 @@ body {
 
   'lib/supabase/client.ts': `import { createBrowserClient } from '@supabase/ssr'
 
+// Use || (not ??) so empty-string env vars fall back to the placeholder too.
+// An empty string causes createBrowserClient to fetch an invalid URL and throw
+// "TypeError: Failed to fetch" on the signup/login pages.
 export function createClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://placeholder.supabase.co'
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'placeholder-key'
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key'
   return createBrowserClient(url, key)
 }
+
+/** True only when real (non-placeholder) Supabase credentials are present. */
+export const supabaseConfigured = !!(
+  process.env.NEXT_PUBLIC_SUPABASE_URL &&
+  process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://placeholder.supabase.co' &&
+  !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')
+)
 `,
 
   'lib/supabase/server.ts': `import { createServerClient } from '@supabase/ssr'
@@ -161,8 +171,8 @@ export async function createClient() {
     // Return a cookie-less client so the page can still load without crashing.
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://placeholder.supabase.co'
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'placeholder-key'
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key'
 
   return createServerClient(url, key, {
     cookies: {
@@ -238,7 +248,7 @@ export const config = {
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { createClient, supabaseConfigured } from '@/lib/supabase/client'
 import Link from 'next/link'
 
 export default function LoginPage() {
@@ -253,6 +263,12 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+
+    if (!supabaseConfigured) {
+      setError('Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to your .env file to enable authentication.')
+      setLoading(false)
+      return
+    }
 
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
@@ -323,7 +339,7 @@ export default function LoginPage() {
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { createClient, supabaseConfigured } from '@/lib/supabase/client'
 import Link from 'next/link'
 
 export default function SignupPage() {
@@ -339,6 +355,12 @@ export default function SignupPage() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+
+    if (!supabaseConfigured) {
+      setError('Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to your .env file to enable authentication.')
+      setLoading(false)
+      return
+    }
 
     const { error } = await supabase.auth.signUp({
       email,

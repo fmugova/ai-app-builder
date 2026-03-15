@@ -120,7 +120,13 @@ describe('CodeValidator', () => {
 
     it('should warn when missing focus styles', () => {
       const validator = new CodeValidator()
-      const css = '.button { background: blue; }'
+      // CSS must be >200 chars for the focus-style check to fire (avoids false
+      // positives on tiny extracted snippets)
+      const css = [
+        '.button { background: blue; color: white; padding: 10px 20px; border-radius: 4px; cursor: pointer; }',
+        '.nav { display: flex; gap: 16px; align-items: center; }',
+        '.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }',
+      ].join('\n')
       
       validator.validateCSS(css)
       
