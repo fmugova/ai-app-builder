@@ -1,17 +1,23 @@
 // lib/autoDetectEndpoints.ts
-// Scans ProjectFile records for a project and creates ApiEndpoint DB records
-// for any Next.js API route files found. Called after saveProjectFiles().
+// Scans ProjectFile records for a project and creates ApiEndpoint DB records.
+// Detects three patterns:
+//   1. Next.js App Router route files:  app/api/*/route.ts
+//   2. Pages Router API routes:         pages/api/*.ts
+//   3. Server Action files:             any file with 'use server' + exported async functions
 
 import prisma from '@/lib/prisma';
 
-export async function autoDetectAndSaveApiEndpoints(projectId: string): Promise<void> {
-  const endpoints: Array<{
-    projectId: string; name: string; description: string;
-    path: string; method: string; code: string;
-    requiresAuth: boolean; usesDatabase: boolean;
-    isActive: boolean; testsPassed: boolean;
-  }> = [];
+type EndpointRow = {
+  projectId: string; name: string; description: string;
+  path: string; method: string; code: string;
+  requiresAuth: boolean; usesDatabase: boolean;
+  isActive: boolean; testsPassed: boolean;
+};
 
+export async function autoDetectAndSaveApiEndpoints(projectId: string): Promise<number> {
+  const endpoints: EndpointRow[] = [];
+
+  // ── 1. Route files (app/api/**/route.ts + pages/api/**) ─────────────────────
   const apiFiles = await prisma.projectFile.findMany({
     where: {
       projectId,
@@ -49,10 +55,61 @@ export async function autoDetectAndSaveApiEndpoints(projectId: string): Promise<
     }
   }
 
+  // ── 2. Server Actions ('use server' files with exported async functions) ─────
+  const serverActionFiles = await prisma.projectFile.findMany({
+    where: {
+      projectId,
+      OR: [
+        { path: { endsWith: '.ts' } },
+        { path: { endsWith: '.tsx' } },
+      ],
+      // Only files that actually declare server actions
+      content: { contains: "'use server'" },
+    },
+  });
+
+  for (const file of serverActionFiles) {
+    // Skip route files (already handled above)
+    if (/\/api\//.test(file.path)) continue;
+
+    // Extract exported async function names
+    const fnRegex = /export\s+async\s+function\s+(\w+)/g;
+    let fnMatch: RegExpExecArray | null;
+    const actions: string[] = [];
+    while ((fnMatch = fnRegex.exec(file.content)) !== null) {
+      actions.push(fnMatch[1]);
+    }
+    if (actions.length === 0) continue;
+
+    // Derive a logical path from the file location
+    const actionPath = '/actions/' + file.path
+      .replace(/^(?:src\/)?(?:app\/)?/, '')
+      .replace(/\.(ts|tsx)$/, '')
+      .replace(/\[([^\]]+)\]/g, ':$1');
+
+    const requiresAuth = /createClient|getServerSession|getToken|auth\.getUser/.test(file.content);
+    const usesDatabase = /supabase\.|prisma\./.test(file.content);
+
+    endpoints.push({
+      projectId,
+      name: `[auto] SERVER ACTION ${file.path.split('/').pop()?.replace(/\.(ts|tsx)$/, '') ?? 'actions'}`,
+      description: `Server Actions: ${actions.slice(0, 5).join(', ')}${actions.length > 5 ? ` +${actions.length - 5} more` : ''}`,
+      path: actionPath,
+      method: 'SERVER_ACTION',
+      code: file.content.slice(0, 2000),
+      requiresAuth,
+      usesDatabase,
+      isActive: true,
+      testsPassed: false,
+    });
+  }
+
   if (endpoints.length > 0) {
     await prisma.apiEndpoint.deleteMany({ where: { projectId, name: { startsWith: '[auto]' } } });
     await prisma.apiEndpoint.createMany({ data: endpoints, skipDuplicates: true });
   }
+
+  return endpoints.length;
 }
 
 /**

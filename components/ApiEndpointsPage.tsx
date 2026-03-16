@@ -47,6 +47,8 @@ export default function ApiEndpointsPage({ projectId, projectName }: Props) {
   const router = useRouter()
   const [endpoints, setEndpoints] = useState<ApiEndpoint[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isScanning, setIsScanning] = useState(false)
+  const [scanMessage, setScanMessage] = useState<string | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [selectedEndpoint, setSelectedEndpoint] = useState<ApiEndpoint | null>(null)
   const [isCodeModalOpen, setIsCodeModalOpen] = useState(false)
@@ -67,6 +69,25 @@ export default function ApiEndpointsPage({ projectId, projectName }: Props) {
       console.error('Failed to fetch endpoints')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleScanFiles = async () => {
+    setIsScanning(true)
+    setScanMessage(null)
+    try {
+      const res = await fetch(`/api/projects/${projectId}/endpoints/scan`, { method: 'POST' })
+      const data = await res.json()
+      if (data.endpoints) {
+        setEndpoints(data.endpoints)
+        setScanMessage(data.scanned > 0
+          ? `Found ${data.scanned} endpoint${data.scanned !== 1 ? 's' : ''} in project files.`
+          : 'No API routes or Server Actions found in generated files.')
+      }
+    } catch {
+      setScanMessage('Scan failed. Please try again.')
+    } finally {
+      setIsScanning(false)
     }
   }
 
@@ -150,13 +171,26 @@ export default function ApiEndpointsPage({ projectId, projectName }: Props) {
               <p className="text-gray-500 mt-1">{projectName}</p>
             </div>
 
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 shadow-lg font-semibold transition-all hover:scale-105"
-            >
-              <Sparkles className="w-5 h-5" />
-              Generate with AI
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleScanFiles}
+                disabled={isScanning}
+                title="Scan generated files for API routes and Server Actions"
+                className="flex items-center gap-2 px-4 py-3 border border-gray-300 bg-white text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition disabled:opacity-50"
+              >
+                {isScanning
+                  ? <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600" />
+                  : <Code className="w-4 h-4" />}
+                {isScanning ? 'Scanning...' : 'Sync Files'}
+              </button>
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 shadow-lg font-semibold transition-all hover:scale-105"
+              >
+                <Sparkles className="w-5 h-5" />
+                Generate with AI
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -191,16 +225,32 @@ export default function ApiEndpointsPage({ projectId, projectName }: Props) {
             <h3 className="text-xl font-semibold text-gray-700 mb-2">
               No API endpoints yet
             </h3>
-            <p className="text-gray-500 mb-6 max-w-md mx-auto">
-              Generate your first API endpoint using AI. Just describe what you need!
+            <p className="text-gray-500 mb-4 max-w-md mx-auto">
+              If you generated a full-stack app, scan for API routes and Server Actions first. Or generate a new endpoint with AI.
             </p>
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 shadow-lg"
-            >
-              <Sparkles className="w-5 h-5" />
-              Generate First Endpoint
-            </button>
+            {scanMessage && (
+              <p className="text-sm mb-4 text-indigo-600 font-medium">{scanMessage}</p>
+            )}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <button
+                onClick={handleScanFiles}
+                disabled={isScanning}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-white border-2 border-indigo-500 text-indigo-600 rounded-lg hover:bg-indigo-50 font-semibold transition disabled:opacity-50"
+              >
+                {isScanning ? (
+                  <><span className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600" />Scanning...</>
+                ) : (
+                  <><Code className="w-5 h-5" />Scan Project Files</>
+                )}
+              </button>
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 shadow-lg font-semibold"
+              >
+                <Sparkles className="w-5 h-5" />
+                Generate with AI
+              </button>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
