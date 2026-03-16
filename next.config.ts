@@ -77,7 +77,9 @@ const nextConfig: NextConfig = {
     '@prisma/client',
     'bcryptjs',
     'esbuild',
-    'otplib', // Turbopack can't statically analyse otplib's CJS/ESM exports
+    'otplib',       // Turbopack can't statically analyse otplib's CJS/ESM exports
+    'next-auth',    // Turbopack bundling next-auth breaks the [...nextauth] catch-all route handler
+    '@auth/prisma-adapter', // depends on @prisma/client — must be kept external as well
   ],
 
   headers: async () => [
