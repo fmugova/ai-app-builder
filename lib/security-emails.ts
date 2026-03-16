@@ -6,7 +6,18 @@ import { Resend } from 'resend'
  * Send alerts for important security events
  */
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Lazy-initialize to avoid throwing at module load time when RESEND_API_KEY is
+// not set. A module-level `new Resend(undefined)` throws, which crashes the
+// /api/auth route (auth.ts imports this file) → CLIENT_FETCH_ERROR in browser.
+let _resend: Resend | null = null
+function getResend(): Resend {
+  if (!_resend) {
+    const key = process.env.RESEND_API_KEY
+    if (!key) throw new Error('[security-emails] RESEND_API_KEY is not set')
+    _resend = new Resend(key)
+  }
+  return _resend
+}
 
 interface EmailOptions {
   to: string
@@ -20,7 +31,7 @@ interface EmailOptions {
  */
 async function sendEmail(options: EmailOptions): Promise<void> {
   try {
-    await resend.emails.send({
+    await getResend().emails.send({
       from: process.env.RESEND_FROM_EMAIL || 'BuildFlow <noreply@buildflow.ai>',
       to: options.to,
       subject: options.subject,
