@@ -81,7 +81,9 @@ export function generateMissingSpaStubs(files: Record<string, string>): Record<s
 // Multi-phase kicks in for prompts with 5+ detected pages.
 
 function countMentionedPages(prompt: string): number {
-  const pageWords = ['page', 'screen', 'view', 'section', 'route'];
+  // Only count specific page/screen/route words — 'section' and 'view' are
+  // too generic (hero section, view details) and cause false multi-phase triggers.
+  const pageWords = ['page', 'screen', 'route'];
   const count = pageWords.reduce((n, w) => {
     const re = new RegExp(`\\b${w}s?\\b`, 'gi');
     return n + (prompt.match(re)?.length ?? 0);

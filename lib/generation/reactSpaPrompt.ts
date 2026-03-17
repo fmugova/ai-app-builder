@@ -337,24 +337,34 @@ if (items.length === 0) return (
 
 // ── Output parser ─────────────────────────────────────────────────────────────
 // Reuses the same === FILE: === delimiter as the Next.js pipeline.
-// Splitting on this pattern gives us the file map directly.
+
+/**
+ * Fix unescaped apostrophes in single-quoted JSX/JS string literals.
+ * e.g.  'it's working'  →  "it's working"
+ * Mirrors the same function in nextjsPrompt.ts for TS/TSX files.
+ */
+function fixApostrophesInStrings(code: string): string {
+  return code.replace(
+    /'((?:[^'\\]|\\.)*)'/g,
+    (match, inner: string) => {
+      if (!inner.includes("'")) return match;
+      return `"${inner.replace(/"/g, '\\"')}"`;
+    }
+  );
+}
 
 export function parseReactSpaOutput(text: string): Record<string, string> {
   const files: Record<string, string> = {};
-  // Split on === FILE: path === delimiters
-  const blocks = text.split(/={3}\s*FILE:\s*/);
-
-  for (const block of blocks) {
-    if (!block.trim()) continue;
-    // First line is the file path, rest is content
-    const newlineIdx = block.indexOf('\n');
-    if (newlineIdx === -1) continue;
-    const rawPath = block.slice(0, newlineIdx).trim().replace(/\s*={3}\s*$/, '');
-    const content = block.slice(newlineIdx + 1).trimEnd();
-    if (rawPath && content) {
-      files[rawPath] = content;
+  // Use the same robust split pattern as parseNextjsOutput
+  const parts = text.split(/^=== FILE:\s*(.+?)\s*===\s*$/m);
+  // parts: [preamble, path1, content1, path2, content2, ...]
+  for (let i = 1; i < parts.length - 1; i += 2) {
+    const path = parts[i].trim();
+    const content = parts[i + 1]?.trim() ?? '';
+    if (path && content) {
+      const isJsLike = /\.(jsx?|tsx?)$/.test(path);
+      files[path] = isJsLike ? fixApostrophesInStrings(content) : content;
     }
   }
-
   return files;
 }
