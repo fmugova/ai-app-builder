@@ -16,7 +16,7 @@ export async function POST() {
     }
 
     // Get user's Stripe customer ID
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: { email: session.user.email },
       select: { stripeCustomerId: true }
     })

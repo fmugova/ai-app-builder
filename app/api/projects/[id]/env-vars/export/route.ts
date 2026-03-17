@@ -42,7 +42,7 @@ export async function GET(
     }
 
     // Get user for logging
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: { email: session.user.email }
     })
 

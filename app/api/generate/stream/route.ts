@@ -60,7 +60,7 @@ async function GETHandler(req: NextRequest) {
   }
 
   // Enforce per-user AI rate limit based on subscription tier
-  const dbUser = await prisma.user.findUnique({
+  const dbUser = await prisma.user.findFirst({
     where: { email: token.email as string },
     select: { id: true, subscriptionTier: true },
   });

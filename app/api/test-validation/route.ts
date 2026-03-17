@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   if (!session?.user?.email) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  const actor = await prisma.user.findUnique({ where: { email: session.user.email }, select: { role: true } });
+  const actor = await prisma.user.findFirst({ where: { email: session.user.email }, select: { role: true } });
   if (actor?.role !== 'admin') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
   if (!session?.user?.email) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  const actor = await prisma.user.findUnique({ where: { email: session.user.email }, select: { role: true } });
+  const actor = await prisma.user.findFirst({ where: { email: session.user.email }, select: { role: true } });
   if (actor?.role !== 'admin') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }

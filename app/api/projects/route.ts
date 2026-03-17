@@ -57,7 +57,7 @@ export async function POST(req: Request) {
     const body = await req.json()
     const { name, description, type, code } = body
 
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: { email: session.user.email },
     })
 

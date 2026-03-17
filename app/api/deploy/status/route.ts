@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
       console.warn(`[Invalid deploymentId] User: ${session.user?.email} ID: ${deploymentId}`);
       return NextResponse.json({ error: 'Deployment ID required or invalid' }, { status: 400 });
     }
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: { email: session.user.email },
       include: { VercelConnection: true },
     });

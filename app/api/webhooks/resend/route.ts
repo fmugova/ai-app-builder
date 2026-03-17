@@ -210,7 +210,7 @@ async function handleBounce(data: ResendEmailEventData) {
   if (recipient) {
     // Find user by email and record the bounce (best-effort)
     try {
-      const user = await prisma.user.findUnique({ where: { email: recipient } })
+      const user = await prisma.user.findFirst({ where: { email: recipient } })
       if (user) {
         await prisma.activity.create({
           data: {
@@ -235,7 +235,7 @@ async function handleComplaint(data: ResendEmailEventData) {
 
   if (recipient) {
     try {
-      const user = await prisma.user.findUnique({ where: { email: recipient } })
+      const user = await prisma.user.findFirst({ where: { email: recipient } })
       if (user) {
         await prisma.activity.create({
           data: {

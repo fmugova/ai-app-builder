@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const dbUser = await prisma.user.findUnique({
+  const dbUser = await prisma.user.findFirst({
     where: { email: session.user.email },
     select: { id: true },
   });

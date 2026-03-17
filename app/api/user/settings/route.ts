@@ -24,7 +24,7 @@ async function getUserFromSession(
   select?: Prisma.UserSelect
 ) {
   if (!session?.user?.email) return null;
-  return prisma.user.findUnique({ where: { email: session.user.email }, ...(select ? { select } : {}) });
+  return prisma.user.findFirst({ where: { email: session.user.email }, ...(select ? { select } : {}) });
 }
 
 export async function GET() {

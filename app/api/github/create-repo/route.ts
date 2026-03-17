@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
       );
     }
     // Get user's GitHub token from database
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: { email: session.user.email },
       select: { githubAccessToken: true, githubUsername: true },
     });

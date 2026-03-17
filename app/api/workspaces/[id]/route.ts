@@ -45,7 +45,7 @@ import type { Session } from 'next-auth';
 
 async function getUserFromSession(session: Session | null) {
   if (!session?.user?.email) return null;
-  return prisma.user.findUnique({ where: { email: session.user.email } });
+  return prisma.user.findFirst({ where: { email: session.user.email } });
 }
 
 // GET /api/workspaces/[id] - Get workspace details

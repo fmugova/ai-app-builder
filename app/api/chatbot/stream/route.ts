@@ -217,7 +217,7 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
           // Uses sequential per-page API calls instead of a single streaming call.
           // Fixes: JSX-in-HTML, blank pages from token exhaustion, stray > artifact.
           if (isMultiPageHTMLRequest) {
-            const user = await prisma.user.findUnique({
+            const user = await prisma.user.findFirst({
               where: { email: session.user.email },
               select: { id: true },
             })
@@ -405,7 +405,7 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
         });
 
         // Get user
-        const user = await prisma.user.findUnique({
+        const user = await prisma.user.findFirst({
           where: { email: session.user.email },
           select: { id: true },
         });
@@ -767,7 +767,7 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
     if (isMultiPageHTMLRequest) {
       const multiHtml = html // already stripped of markdown fences above
 
-      const user = await prisma.user.findUnique({
+      const user = await prisma.user.findFirst({
         where: { email: session.user.email },
         select: { id: true },
       })
@@ -1092,7 +1092,7 @@ DO NOT MAKE THE SAME MISTAKES AGAIN. Generate corrected code now.`;
           }
 
           // Get user
-          const user = await prisma.user.findUnique({
+          const user = await prisma.user.findFirst({
             where: { email: session.user.email },
             select: { id: true },
           })

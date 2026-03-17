@@ -32,7 +32,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     }
 
     // Get user for logging
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: { email: session.user.email }
     })
 

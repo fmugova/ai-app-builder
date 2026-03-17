@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
-    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
+    const user = await prisma.user.findFirst({ where: { email: session.user.email } });
     if (!user) {
       console.warn(`User not found: ${session.user.email}`);
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user with GitHub credentials
-    const userWithGithub = await prisma.user.findUnique({
+    const userWithGithub = await prisma.user.findFirst({
       where: { email: session.user.email },
       select: {
         id: true,

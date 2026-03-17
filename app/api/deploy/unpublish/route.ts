@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify ownership by userId — avoids loading the full User relation
-    const user = await prisma.user.findUnique({ where: { email: session.user.email! }, select: { id: true } });
+    const user = await prisma.user.findFirst({ where: { email: session.user.email! }, select: { id: true } });
     if (!user || project.userId !== user.id) {
       return NextResponse.json(
         { error: 'Unauthorized - you do not own this project' },

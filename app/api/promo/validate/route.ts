@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already used a promo code
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: { email: session.user.email },
       select: { promoCodeUsed: true },
     })

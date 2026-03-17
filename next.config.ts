@@ -53,6 +53,17 @@ const nextConfig: NextConfig = {
       }
     }
 
+    // Deduplicate React — ensures next-auth (serverExternalPackages), posthog,
+    // and all other packages share the SAME React instance. Without this,
+    // packages that carry their own React reference cause useState to see a null
+    // dispatcher during cold-start SSR, triggering:
+    //   TypeError: Cannot read properties of null (reading 'useState')
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      react: require.resolve('react'),
+      'react-dom': require.resolve('react-dom'),
+    }
+
     // Exclude esbuild binary files from bundling
     config.module.rules.push({
       test: /\.exe$/,

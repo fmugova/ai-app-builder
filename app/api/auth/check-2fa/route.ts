@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get user with 2FA secret
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: { email: session.user.email },
       select: {
         id: true,

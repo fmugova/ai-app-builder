@@ -22,7 +22,7 @@ export async function GET() {
     }
 
     // Double-check against database with error handling
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: { email: session.user.email },
       select: { role: true }
     })

@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Find or create user
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: { email: session.user.email },
     })
 

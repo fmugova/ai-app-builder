@@ -25,7 +25,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       )
     }
 
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: { email: session.user.email }
     });
 

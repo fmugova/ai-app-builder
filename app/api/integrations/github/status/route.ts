@@ -14,7 +14,7 @@ export async function GET() {
       return NextResponse.json({ connected: false })
     }
 
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: { email: session.user.email },
       select: { githubUsername: true, githubAccessToken: true },
     })

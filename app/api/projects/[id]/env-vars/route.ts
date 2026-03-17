@@ -26,7 +26,7 @@ export async function GET(
     }
 
     // Query user once
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: { email: session.user.email }
     })
     if (!user) {
@@ -85,7 +85,7 @@ export async function POST(
     }
 
     // Query user once
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: { email: session.user.email }
     })
     if (!user) {
@@ -244,7 +244,7 @@ export async function PUT(
     }
 
     // Query user once
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: { email: session.user.email }
     })
     if (!user) {

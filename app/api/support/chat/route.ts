@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
 
     // Get user context
     const user = session?.user?.email 
-      ? await prisma.user.findUnique({
+      ? await prisma.user.findFirst({
           where: { email: session.user.email },
           include: { Project: { take: 5, orderBy: { createdAt: 'desc' } } }
         })

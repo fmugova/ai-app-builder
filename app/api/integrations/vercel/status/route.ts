@@ -14,7 +14,7 @@ export async function GET() {
     }
 
     // Get user by email to find their ID
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: { email: session.user.email },
       select: { id: true }
     })
