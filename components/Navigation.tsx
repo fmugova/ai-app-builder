@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { signOut, useSession } from 'next-auth/react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { 
   Menu, X, Home, FolderOpen, User, Mail, LogOut, 
   CreditCard, Shield, Sun, Moon, Users
@@ -15,47 +15,18 @@ interface NavigationProps {
 
 export function Navigation({ variant = 'dashboard' }: NavigationProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [isAdmin, setIsAdmin] = useState(false)
-  const [darkMode, setDarkMode] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const { data: session, status } = useSession()
-  const pathname = usePathname()
-  const router = useRouter()
-
-  useEffect(() => {
-    const checkAdmin = async () => {
-      if (session?.user?.email && status === 'authenticated') {
-        try {
-          setIsLoading(true)
-          const res = await fetch('/api/user/role', {
-            cache: 'no-store'
-          })
-          if (res.ok) {
-            const data = await res.json()
-            setIsAdmin(data.role === 'admin')
-          }
-        } catch (error) {
-          console.error('Failed to check admin status:', error)
-          setIsAdmin(false)
-        } finally {
-          setIsLoading(false)
-        }
-      } else {
-        setIsAdmin(false)
-        setIsLoading(false)
-      }
-    }
-    checkAdmin()
-  }, [session, status])
-
-  // Dark mode toggle
-  useEffect(() => {
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window === 'undefined') return false
     const isDark = localStorage.getItem('darkMode') === 'true'
-    setDarkMode(isDark)
-    if (isDark) {
-      document.documentElement.classList.add('dark')
-    }
-  }, [])
+    if (isDark) document.documentElement.classList.add('dark')
+    return isDark
+  })
+  const { data: session } = useSession()
+  const pathname = usePathname()
+
+  // Role is embedded in the JWT and refreshed from DB every 15 min —
+  // no need to fetch /api/user/role on every render.
+  const isAdmin = (session?.user as { role?: string } | undefined)?.role === 'admin'
 
   const toggleDarkMode = () => {
     const newMode = !darkMode

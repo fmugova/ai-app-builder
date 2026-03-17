@@ -884,10 +884,10 @@
   dependencies:
     webpack-bundle-analyzer "4.10.1"
 
-"@next/env@16.1.6":
-  version "16.1.6"
-  resolved "https://registry.npmjs.org/@next/env/-/env-16.1.6.tgz"
-  integrity sha512-N1ySLuZjnAtN3kFnwhAwPvZah8RJxKasD7x1f8shFqhncnWZn4JMfg37diLNuoHsLAlrDfM3g4mawVdtAG8XLQ==
+"@next/env@16.1.7":
+  version "16.1.7"
+  resolved "https://registry.npmjs.org/@next/env/-/env-16.1.7.tgz"
+  integrity sha512-rJJbIdJB/RQr2F1nylZr/PJzamvNNhfr3brdKP6s/GW850jbtR70QlSfFselvIBbcPUOlQwBakexjFzqLzF6pg==
 
 "@next/eslint-plugin-next@16.1.6":
   version "16.1.6"
@@ -896,10 +896,10 @@
   dependencies:
     fast-glob "3.3.1"
 
-"@next/swc-win32-x64-msvc@16.1.6":
-  version "16.1.6"
-  resolved "https://registry.npmjs.org/@next/swc-win32-x64-msvc/-/swc-win32-x64-msvc-16.1.6.tgz"
-  integrity sha512-NRfO39AIrzBnixKbjuo2YiYhB6o9d8v/ymU9m/Xk8cyVk+k7XylniXkHwjs4s70wedVffc6bQNbufk5v0xEm0A==
+"@next/swc-win32-x64-msvc@16.1.7":
+  version "16.1.7"
+  resolved "https://registry.npmjs.org/@next/swc-win32-x64-msvc/-/swc-win32-x64-msvc-16.1.7.tgz"
+  integrity sha512-mwgtg8CNZGYm06LeEd+bNnOUfwOyNem/rOiP14Lsz+AnUY92Zq/LXwtebtUiaeVkhbroRCQ0c8GlR4UT1U+0yg==
 
 "@next/third-parties@^16.0.8":
   version "16.1.1"
@@ -3239,10 +3239,10 @@ base64-js@0.0.8:
   resolved "https://registry.npmjs.org/base64-js/-/base64-js-0.0.8.tgz"
   integrity sha512-3XSA2cR/h/73EzlXXdU6YNycmYI7+kicTxks4eJg2g39biHR84slg2+des+p7iHYhbRg/udIS4TD53WabcOUkw==
 
-baseline-browser-mapping@^2.8.3, baseline-browser-mapping@^2.9.0:
-  version "2.9.14"
-  resolved "https://registry.npmjs.org/baseline-browser-mapping/-/baseline-browser-mapping-2.9.14.tgz"
-  integrity sha512-B0xUquLkiGLgHhpPBqvl7GWegWBUNuujQ6kXd/r1U38ElPT6Ok8KZ8e+FpUGEc2ZoRQUzq/aUnaKFc/svWUGSg==
+baseline-browser-mapping@^2.9.0, baseline-browser-mapping@^2.9.19:
+  version "2.10.8"
+  resolved "https://registry.npmjs.org/baseline-browser-mapping/-/baseline-browser-mapping-2.10.8.tgz"
+  integrity sha512-PCLz/LXGBsNTErbtB6i5u4eLpHeMfi93aUv5duMmj6caNu6IphS4q6UevDnL36sZQv9lrP11dbPKGMaXPwMKfQ==
 
 bcryptjs@^2.4.3:
   version "2.4.3"
@@ -6304,25 +6304,25 @@ next-themes@^0.4.6:
   integrity sha512-pZvgD5L0IEvX5/9GWyHMf3m8BKiVQwsCMHfoFosXtXBMnaS0ZnIJ9ST4b4NqLVKDEm8QBxoNNGNaBv2JNF6XNA==
 
 next@*, next@^16.1.6:
-  version "16.1.6"
-  resolved "https://registry.npmjs.org/next/-/next-16.1.6.tgz"
-  integrity sha512-hkyRkcu5x/41KoqnROkfTm2pZVbKxvbZRuNvKXLRXxs3VfyO0WhY50TQS40EuKO9SW3rBj/sF3WbVwDACeMZyw==
+  version "16.1.7"
+  resolved "https://registry.npmjs.org/next/-/next-16.1.7.tgz"
+  integrity sha512-WM0L7WrSvKwoLegLYr6V+mz+RIofqQgVAfHhMp9a88ms0cFX8iX9ew+snpWlSBwpkURJOUdvCEt3uLl3NNzvWg==
   dependencies:
-    "@next/env" "16.1.6"
+    "@next/env" "16.1.7"
     "@swc/helpers" "0.5.15"
-    baseline-browser-mapping "^2.8.3"
+    baseline-browser-mapping "^2.9.19"
     caniuse-lite "^1.0.30001579"
     postcss "8.4.31"
     styled-jsx "5.1.6"
   optionalDependencies:
-    "@next/swc-darwin-arm64" "16.1.6"
-    "@next/swc-darwin-x64" "16.1.6"
-    "@next/swc-linux-arm64-gnu" "16.1.6"
-    "@next/swc-linux-arm64-musl" "16.1.6"
-    "@next/swc-linux-x64-gnu" "16.1.6"
-    "@next/swc-linux-x64-musl" "16.1.6"
-    "@next/swc-win32-arm64-msvc" "16.1.6"
-    "@next/swc-win32-x64-msvc" "16.1.6"
+    "@next/swc-darwin-arm64" "16.1.7"
+    "@next/swc-darwin-x64" "16.1.7"
+    "@next/swc-linux-arm64-gnu" "16.1.7"
+    "@next/swc-linux-arm64-musl" "16.1.7"
+    "@next/swc-linux-x64-gnu" "16.1.7"
+    "@next/swc-linux-x64-musl" "16.1.7"
+    "@next/swc-win32-arm64-msvc" "16.1.7"
+    "@next/swc-win32-x64-msvc" "16.1.7"
     sharp "^0.34.4"
 
 node-exports-info@^1.6.0:

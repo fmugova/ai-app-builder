@@ -1,78 +1,75 @@
-"use client";
+// Server Component — data fetching and sanitization happen at request time,
+// so the iframe content is ready on the first HTML response. No client-side
+// fetch waterfall, no loading spinner — the published site paints immediately.
 
-import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
-import DOMPurify from 'isomorphic-dompurify';
+import { notFound } from 'next/navigation'
+import { prisma } from '@/lib/prisma'
+import DOMPurify from 'isomorphic-dompurify'
+import SiteIframe from './SiteIframe'
 
-interface SiteData {
-  id: string;
-  name: string;
-  code: string;
-  type: string;
-  isMultiPage?: boolean;
-  createdAt: string;
-  User: {
-    name: string | null;
-  };
+export const dynamic = 'force-dynamic'
+
+type PageRow = { slug: string; title: string; content: string; isHomepage: boolean }
+type FileRow = { path: string; content: string }
+type ProjectRow = {
+  id: string; name: string; code: string; type: string; createdAt: Date
+  User: { name: string | null } | null
+  Page: PageRow[]
+  ProjectFile: FileRow[]
 }
 
-export default function SitePage() {
-  const params = useParams();
-  const slug = params.slug as string;
-  const [site, setSite] = useState<SiteData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#x27;')
+}
 
-  useEffect(() => {
-    async function loadSite() {
-      try {
-        const res = await fetch(`/api/sites/${slug}`);
-        if (!res.ok) {
-          throw new Error(res.status === 404 ? "Site not found" : "Failed to load site");
-        }
-        const data = await res.json();
-        setSite(data);
-      } catch (err: unknown) {
-        if (err instanceof Error) {
-          setError(err.message);
-        } else {
-          setError("An unknown error occurred");
-        }
-      } finally {
-        setLoading(false);
-      }
+export default async function SitePage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+
+  // ── Fetch from DB directly — no HTTP round-trip to /api/sites/[slug] ──────
+  const project = await (prisma.project.findFirst as (args: unknown) => Promise<ProjectRow | null>)({
+    where: { publicSlug: slug, isPublished: true, publishedAt: { not: null } },
+    include: {
+      User: { select: { name: true } },
+      Page: {
+        where: { isPublished: true },
+        orderBy: { order: 'asc' },
+        select: { slug: true, title: true, content: true, isHomepage: true },
+      },
+      ProjectFile: { select: { path: true, content: true } },
+    },
+  })
+
+  if (!project) notFound()
+
+  // ── Resolve displayable code (mirrors /api/sites/[slug] logic) ────────────
+  const pages = project.Page ?? []
+  const isMultiPage = pages.length > 1
+  let code = project.code
+
+  if (isMultiPage) {
+    const homepage = pages.find(p => p.isHomepage) ?? pages[0]
+    if (homepage) code = homepage.content
+  }
+
+  if (!code) {
+    const files = project.ProjectFile ?? []
+    const indexHtml = files.find(f => f.path === 'index.html' || f.path === 'public/index.html')
+    if (indexHtml) {
+      code = indexHtml.content
+    } else if (files.length > 0) {
+      const safeName = escapeHtml(project.name)
+      code = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${safeName}</title></head><body style="font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f8fafc"><div style="text-align:center;padding:40px"><h1>${safeName}</h1><p>Full-stack app — deploy to Vercel to view live.</p></div></body></html>`
     }
-    loadSite();
-  }, [slug]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading site...</p>
-        </div>
-      </div>
-    );
   }
 
-  if (error || !site) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-red-50 to-pink-100">
-        <div className="text-center p-8 bg-white rounded-lg shadow-lg">
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">Site Not Found</h1>
-          <p className="text-gray-600">{error || "This site does not exist or has been unpublished."}</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Sanitize user-generated HTML while preserving the full document structure
-  // (html/head/body/script tags). Without WHOLE_DOCUMENT:true DOMPurify drops
-  // the <head>, stripping Tailwind CDN and other stylesheet links — leaving the
-  // page completely unstyled. The iframe sandbox (no allow-same-origin) keeps
-  // the content isolated from the parent origin regardless of what scripts run.
-  const sanitizedCode = DOMPurify.sanitize(site.code, {
+  // ── Server-side DOMPurify (isomorphic-dompurify uses jsdom on Node) ───────
+  const sanitized = DOMPurify.sanitize(code ?? '', {
     WHOLE_DOCUMENT: true,
     FORCE_BODY: false,
     ADD_TAGS: ['script', 'style', 'link', 'meta', 'html', 'head', 'body'],
@@ -82,21 +79,15 @@ export default function SitePage() {
       'media', 'async', 'defer', 'crossorigin', 'integrity', 'data-*',
     ],
     FORBID_TAGS: ['iframe', 'object', 'embed', 'base'],
-    FORBID_ATTR: [
-      'onerror', 'onclick', 'onmouseover', 'onfocus', 'onblur',
-      'onsubmit', 'onchange', 'onkeydown', 'onkeyup', 'onresize',
-    ],
-  });
+    FORBID_ATTR: ['onerror', 'onclick', 'onmouseover', 'onfocus', 'onblur',
+      'onsubmit', 'onchange', 'onkeydown', 'onkeyup', 'onresize'],
+  })
 
-  // Inject a form-interceptor script so that any contact/booking forms on the
-  // published site POST their data to BuildFlow's submissions API instead of
-  // navigating away (which would break in the sandboxed iframe anyway).
-  // The script runs in the iframe context — the absolute API URL is needed
-  // because the iframe has no origin (sandbox without allow-same-origin).
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://buildflow-ai.app';
+  // ── Inject form interceptor script ────────────────────────────────────────
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://buildflow-ai.app'
   const formInterceptor = `<script>
 (function(){
-  var API='${appUrl}/api/projects/${site.id}/submissions';
+  var API='${appUrl}/api/projects/${project.id}/submissions';
   function showToast(msg,ok){
     var t=document.createElement('div');
     t.style.cssText='position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:8px;font-size:14px;font-family:system-ui,sans-serif;z-index:99999;box-shadow:0 4px 12px rgba(0,0,0,.2);color:#fff;background:'+(ok?'#10b981':'#ef4444');
@@ -113,30 +104,32 @@ export default function SitePage() {
       .catch(function(){showToast('Failed to send. Please try again.',false);});
   },true);
 })();
-</script>`;
+</script>`
 
-  // Inject before </body> (or </html> as fallback, or append if neither found)
-  let finalCode = sanitizedCode;
+  let finalCode = sanitized
   if (finalCode.includes('</body>')) {
-    finalCode = finalCode.replace('</body>', formInterceptor + '</body>');
+    finalCode = finalCode.replace('</body>', formInterceptor + '</body>')
   } else if (finalCode.includes('</html>')) {
-    finalCode = finalCode.replace('</html>', formInterceptor + '</html>');
+    finalCode = finalCode.replace('</html>', formInterceptor + '</html>')
   } else {
-    finalCode = finalCode + formInterceptor;
+    finalCode = finalCode + formInterceptor
   }
 
   return (
     <div className="relative h-screen w-full overflow-hidden">
-      {/* BuildFlow Banner */}
+      {/* BuildFlow banner */}
       <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-2 px-4 text-sm z-10 shadow-md">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <span className="font-medium">
-            ⚡ Built with <a href="https://buildflow-ai.app" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-200">BuildFlow AI</a>
-            {site.User.name && ` by ${site.User.name}`}
+            ⚡ Built with{' '}
+            <a href="https://buildflow-ai.app" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-200">
+              BuildFlow AI
+            </a>
+            {project.User?.name && ` by ${project.User.name}`}
           </span>
-          <a 
-            href="https://buildflow-ai.app" 
-            target="_blank" 
+          <a
+            href="https://buildflow-ai.app"
+            target="_blank"
             rel="noopener noreferrer"
             className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded text-xs transition-colors"
           >
@@ -145,14 +138,8 @@ export default function SitePage() {
         </div>
       </div>
 
-      {/* Site Content - Sanitized for security */}
-      <iframe
-        srcDoc={finalCode}
-        className="w-full h-full border-0"
-        style={{ marginTop: "40px", height: "calc(100vh - 40px)" }}
-        sandbox="allow-scripts allow-forms allow-popups"
-        title={site.name}
-      />
+      {/* Sandboxed site content — pre-sanitized server-side */}
+      <SiteIframe code={finalCode} title={project.name} />
     </div>
-  );
+  )
 }

@@ -62,6 +62,10 @@ const nextConfig: NextConfig = {
       ...config.resolve.alias,
       react: require.resolve('react'),
       'react-dom': require.resolve('react-dom'),
+      // Replace next-auth/react with an app-bundled shim so SessionProvider
+      // and useSession use the same React instance as the rest of the app,
+      // avoiding the "null dispatcher" crash from the external React copy.
+      'next-auth/react': require.resolve('./lib/next-auth-react-shim'),
     }
 
     // Exclude esbuild binary files from bundling
@@ -88,9 +92,9 @@ const nextConfig: NextConfig = {
     '@prisma/client',
     'bcryptjs',
     'esbuild',
-    'otplib',       // Turbopack can't statically analyse otplib's CJS/ESM exports
-    'next-auth',    // Turbopack bundling next-auth breaks the [...nextauth] catch-all route handler
-    '@auth/prisma-adapter', // depends on @prisma/client — must be kept external as well
+    'otplib',             // Turbopack can't statically analyse otplib's CJS/ESM exports
+    'next-auth',          // Turbopack bundling next-auth breaks the [...nextauth] route handler
+    '@auth/prisma-adapter', // depends on @prisma/client — must stay external
   ],
 
   headers: async () => [
@@ -254,7 +258,16 @@ const nextConfig: NextConfig = {
 
 const config = {
   ...nextConfig,
-  turbopack: {},
+  turbopack: {
+    // Explicitly set project root so Turbopack doesn't infer ./app as the workspace root.
+    // Without this, Next.js 16.1.7+ panics with "couldn't find next/package.json from ./app".
+    root: __dirname,
+    // Same shim as the webpack alias above — replaces next-auth/react hooks with
+    // app-bundled React implementations to prevent the null-dispatcher SSR crash.
+    resolveAlias: {
+      'next-auth/react': './lib/next-auth-react-shim',
+    },
+  },
 }
 
 export default config
