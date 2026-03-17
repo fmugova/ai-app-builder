@@ -170,7 +170,15 @@ export async function POST(
     }
 
     // Encrypt value
-    const encryptedValue = encrypt(value)
+    let encryptedValue: string;
+    try {
+      encryptedValue = encrypt(value);
+    } catch {
+      return NextResponse.json(
+        { error: 'Encryption failed. Ensure ENCRYPTION_KEY is set in your environment.' },
+        { status: 500 }
+      );
+    }
 
     // Create variable
     const variable = await prisma.environmentVariable.create({
@@ -209,9 +217,15 @@ export async function POST(
       }
     })
   } catch (error) {
-    console.error('Create env var error:', error)
+    const msg = error instanceof Error ? error.message : String(error)
+    const code = (error as { code?: string })?.code
+    console.error('Create env var error:', code, msg)
+    // Return a safe but specific message for common Prisma errors
+    if (code === 'P2002') {
+      return NextResponse.json({ error: 'A variable with this key already exists.' }, { status: 400 })
+    }
     return NextResponse.json(
-      { error: 'Failed to create environment variable' },
+      { error: 'Failed to create environment variable. Check server logs.' },
       { status: 500 }
     )
   }

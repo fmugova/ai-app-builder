@@ -137,7 +137,7 @@ export function parseEnvFile(content: string): Array<{ key: string; value: strin
     }
     
     // Parse KEY=value
-    const match = trimmed.match(/^([A-Z][A-Z0-9_]*)=(.*)$/)
+    const match = trimmed.match(/^([A-Z][A-Z0-9_-]*)=(.*)$/)
     
     if (match) {
       const [, key, value] = match
