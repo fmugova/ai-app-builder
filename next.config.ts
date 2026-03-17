@@ -65,7 +65,7 @@ const nextConfig: NextConfig = {
       // Replace next-auth/react with an app-bundled shim so SessionProvider
       // and useSession use the same React instance as the rest of the app,
       // avoiding the "null dispatcher" crash from the external React copy.
-      'next-auth/react': require.resolve('./lib/next-auth-react-shim'),
+      'next-auth/react': require('path').resolve(__dirname, './lib/next-auth-react-shim'),
     }
 
     // Exclude esbuild binary files from bundling

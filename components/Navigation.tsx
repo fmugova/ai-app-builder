@@ -21,7 +21,7 @@ export function Navigation({ variant = 'dashboard' }: NavigationProps) {
     if (isDark) document.documentElement.classList.add('dark')
     return isDark
   })
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const pathname = usePathname()
 
   // Role is embedded in the JWT and refreshed from DB every 15 min —
@@ -232,12 +232,12 @@ export function Navigation({ variant = 'dashboard' }: NavigationProps) {
           Account
         </Link>
         
-        {!isLoading && isAdmin && (
-          <Link 
+        {status === 'authenticated' && isAdmin && (
+          <Link
             href="/admin"
             className={`px-4 py-2 rounded-lg transition flex items-center gap-2 ${
-              isActive('/admin') 
-                ? 'bg-yellow-600 text-white' 
+              isActive('/admin')
+                ? 'bg-yellow-600 text-white'
                 : 'bg-yellow-600/20 text-yellow-400 hover:bg-yellow-600/30'
             }`}
           >
@@ -334,10 +334,10 @@ export function Navigation({ variant = 'dashboard' }: NavigationProps) {
                 <span>Account</span>
               </Link>
 
-              {!isLoading && isAdmin && (
+              {status === 'authenticated' && isAdmin && (
                 <>
                   <div className="my-4 border-t border-gray-700" />
-                  <Link 
+                  <Link
                     href="/admin"
                     onClick={closeMenu}
                     className="w-full flex items-center gap-3 p-3 rounded-lg bg-yellow-600/20 hover:bg-yellow-600/30 transition text-yellow-400"
