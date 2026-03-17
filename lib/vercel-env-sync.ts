@@ -6,7 +6,7 @@ function isValidProjectId(id: string) {
   return /^[a-zA-Z0-9_-]+$/.test(id) && id.length > 0;
 }
 function isValidEnvKey(key: string) {
-  return /^[A-Z0-9_]+$/.test(key) && key.length > 0;
+  return /^[A-Z][A-Z0-9_-]*$/.test(key) && key.length > 0;
 }
 function isValidToken(token: string) {
   return typeof token === 'string' && token.length > 20 && /^[a-zA-Z0-9\-_]+$/.test(token);

@@ -81,8 +81,8 @@ export function maskValue(value: string): string {
  * Validate environment variable key format
  */
 export function isValidEnvKey(key: string): boolean {
-  // Must start with letter, contain only uppercase letters, numbers, and underscores
-  const keyRegex = /^[A-Z][A-Z0-9_]*$/
+  // Must start with letter, contain only uppercase letters, numbers, underscores, and dashes
+  const keyRegex = /^[A-Z][A-Z0-9_-]*$/
   return keyRegex.test(key)
 }
 

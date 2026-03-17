@@ -397,7 +397,7 @@ export default function EnvironmentVariablesPage({ projectId, projectName }: Pro
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Uppercase letters, numbers, and underscores only
+                    Uppercase letters, numbers, underscores, and dashes
                   </p>
                 </div>
 

@@ -128,7 +128,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            'Invalid key format. Must start with a letter and contain only uppercase letters, numbers, and underscores.'
+            'Invalid key format. Must start with a letter and contain only uppercase letters, numbers, underscores, and dashes.'
         },
         { status: 400 }
       )
