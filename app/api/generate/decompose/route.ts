@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { selectScaffold, scaffoldUsesNextjs } from '@/lib/scaffolds/scaffold-selector'
 import { analyzePromptComplexity, decomposePrompt } from '@/lib/generation/prompt-decomposition'
+import { willUseNextjsPipeline } from '@/lib/generation/detectOutputMode'
 
 export async function POST(req: NextRequest) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
@@ -35,6 +36,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     isComplex: complexity.isComplex,
+    usesNextjsPipeline: willUseNextjsPipeline(prompt),
     scaffoldType: scaffoldResult.scaffold,
     scaffoldConfidence: scaffoldResult.confidence,
     scaffoldReasoning: scaffoldResult.reasoning,

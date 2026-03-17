@@ -283,6 +283,29 @@ function dedup(pages: DetectedPage[]): DetectedPage[] {
   return pages.filter((p) => { if (seen.has(p.slug)) return false; seen.add(p.slug); return true; });
 }
 
+// ── Backend signals that force the Next.js pipeline ──────────────────────────
+const BACKEND_SIGNALS = [
+  "sign in", "sign up", "login", "register", "authentication", "oauth",
+  "database", "db", "sql", "postgresql", "mysql", "mongo",
+  "user account", "user profile", "user data", "multi-user", "team",
+  "stripe", "payment", "subscription", "billing", "checkout",
+  "real-time", "realtime", "websocket",
+  "server side", "server-side", "ssr",
+  "api route", "backend", "full-stack", "fullstack",
+  "supabase", "firebase", "prisma", "drizzle",
+] as const;
+
+/**
+ * Returns true if the prompt will trigger the Next.js pipeline.
+ * Used by the decompose route and UI to warn users about setup requirements.
+ */
+export function willUseNextjsPipeline(prompt: string): boolean {
+  const detection = detectOutputMode(prompt);
+  if (detection.mode === "nextjs") return true;
+  const lower = prompt.toLowerCase();
+  return BACKEND_SIGNALS.some((k) => lower.includes(k));
+}
+
 /**
  * Returns a human-readable summary of what was detected.
  * Useful for showing users a "BuildFlow understood:" confirmation.

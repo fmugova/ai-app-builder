@@ -296,6 +296,9 @@ function ChatBuilderContent() {
   const [webContainerFailed, setWebContainerFailed] = useState(false);
   const [showGenExperience, setShowGenExperience] = useState(false);
 
+  // ── Full-stack warning state ──────────────────────────────────────────────
+  const [showNextjsWarning, setShowNextjsWarning] = useState(false);
+
   // ── Phase Wizard state ────────────────────────────────────────────────────
   const [showWizard, setShowWizard] = useState(false);
   const [scaffoldType, setScaffoldType] = useState('marketing');
@@ -1077,6 +1080,7 @@ Please regenerate the complete, fixed code.`;
       if (res.ok) {
         const data = await res.json();
         setScaffoldType(data.scaffoldType || 'marketing');
+        setShowNextjsWarning(!!data.usesNextjsPipeline);
 
         if (data.isComplex && data.decomposition) {
           setDecompositionPlan(data.decomposition);
@@ -1681,7 +1685,7 @@ Please regenerate the complete, fixed code.`;
               
               <textarea
                 value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
+                onChange={(e) => { setPrompt(e.target.value); setShowNextjsWarning(false); }}
                 placeholder="Example: Create a modern CRM dashboard with contacts, deals, and analytics pages..."
                 className="w-full h-32 sm:h-40 p-3 sm:p-4 text-sm sm:text-base text-gray-900 placeholder-gray-500 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
                 disabled={state.isGenerating}
@@ -1811,6 +1815,25 @@ Please regenerate the complete, fixed code.`;
                 )}
               </div>
               
+              {showNextjsWarning && !state.fullCode && (
+                <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-amber-800">Full-stack app detected</p>
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      Your prompt requires a database and authentication. The generated project will need environment variables (database URL, auth secret) before it can run.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowNextjsWarning(false)}
+                    className="text-amber-500 hover:text-amber-700 shrink-0"
+                    aria-label="Dismiss"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
               <button
                 onClick={() => {
                   if (!state.fullCode) {
