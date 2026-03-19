@@ -16,7 +16,7 @@ import {
   createActiveSession,
 } from './security'
 import { computeFingerprint } from './fingerprint'
-import { redis } from './rate-limit'
+import { redis, rateLimiters } from './rate-limit'
 import { totpVerify } from '@/lib/totp'
 
 // Define user roles
@@ -116,7 +116,16 @@ export const authOptions: NextAuthOptions = {
             (req?.headers?.['x-real-ip'] as string) ||
             'unknown'
           const userAgent = (req?.headers?.['user-agent'] as string) || 'unknown'
-          
+
+          // Per-IP rate limit — blocks credential stuffing across many accounts
+          // from the same source (per-email lockout alone doesn't catch this)
+          if (ipAddress !== 'unknown') {
+            const ipRl = await rateLimiters.loginIp.limit(ipAddress)
+            if (!ipRl.success) {
+              throw new Error('Too many login attempts from this IP. Try again later.')
+            }
+          }
+
           // Use comprehensive lockout check from lib/security.ts
           const lockoutCheck = await checkAccountLockout(credentials.email, ipAddress)
           

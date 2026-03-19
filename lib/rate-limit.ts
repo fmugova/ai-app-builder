@@ -117,6 +117,23 @@ export const rateLimiters = {
     analytics: true,
     prefix: 'ratelimit:preview',
   }),
+
+  // Per-IP login rate limit — blocks credential stuffing across many accounts
+  // from the same IP (the per-email+IP lockout in security.ts doesn't catch this)
+  loginIp: new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(20, '15 m'),
+    analytics: true,
+    prefix: 'ratelimit:login:ip',
+  }),
+
+  // Admin campaign bulk-send — max 5 sends per hour to prevent accidental spam
+  campaignSend: new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(5, '1 h'),
+    analytics: true,
+    prefix: 'ratelimit:campaign:send',
+  }),
 }
 
 export type RateLimitType = keyof typeof rateLimiters

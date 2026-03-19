@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { sendEmail } from '@/lib/email'
+import { rateLimiters } from '@/lib/rate-limit'
 import { getPostHogClient } from '@/lib/posthog-server'
 
 export async function POST(
@@ -20,6 +21,15 @@ export async function POST(
 
     if (session.user.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // Rate limit: max 5 campaign sends per hour to prevent accidental mass spam
+    const rl = await rateLimiters.campaignSend.limit(session.user.email!)
+    if (!rl.success) {
+      return NextResponse.json(
+        { error: 'Campaign send rate limit exceeded. Max 5 sends per hour.' },
+        { status: 429 }
+      )
     }
 
     const campaign = await prisma.emailCampaign.findUnique({
