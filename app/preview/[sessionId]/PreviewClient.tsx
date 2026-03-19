@@ -47,13 +47,21 @@ export default function PreviewClient({
   const [iframeError, setIframeError] = useState<string | null>(null);
   const [isLoadingStackBlitz, setIsLoadingStackBlitz] = useState(false);
 
-  // Get HTML files from project files
+  // Get HTML files from project files, excluding the generated 404 page
   const htmlFiles = useMemo(() => {
-    return files.filter(f => f.path.endsWith('.html') || f.path.endsWith('.htm'));
+    return files.filter(f =>
+      (f.path.endsWith('.html') || f.path.endsWith('.htm')) &&
+      !f.path.startsWith('404')
+    );
   }, [files]);
 
+  // Filter out the generated 404 page from the sidebar — it's not a real page
+  const visiblePages = useMemo(() => {
+    return pages.filter(p => p.slug !== '404' && p.slug !== '404-not-found');
+  }, [pages]);
+
   // Determine if we have multiple pages to show
-  const hasMultiplePages = pages.length > 0 || htmlFiles.length > 1;
+  const hasMultiplePages = visiblePages.length > 0 || htmlFiles.length > 1;
 
   // Get current content to display
   const currentContent = useMemo(() => {
@@ -390,7 +398,7 @@ ${sanitized.replace('<!DOCTYPE html>', '').trim()}
           <div className="p-4 border-b">
             <h3 className="font-semibold text-gray-900 mb-1">Pages</h3>
             <p className="text-xs text-gray-500">
-              {pages.length > 0 ? `${pages.length} pages` : `${htmlFiles.length} files`}
+              {visiblePages.length > 0 ? `${visiblePages.length} pages` : `${htmlFiles.length} files`}
             </p>
           </div>
 
@@ -411,7 +419,7 @@ ${sanitized.replace('<!DOCTYPE html>', '').trim()}
             )}
 
             {/* Pages from database */}
-            {pages.map((page) => (
+            {visiblePages.map((page) => (
               <button
                 key={page.id}
                 onClick={() => setCurrentPage(page.slug)}
@@ -431,7 +439,7 @@ ${sanitized.replace('<!DOCTYPE html>', '').trim()}
             ))}
 
             {/* HTML files */}
-            {htmlFiles.length > 0 && pages.length === 0 && (
+            {htmlFiles.length > 0 && visiblePages.length === 0 && (
               <>
                 {htmlFiles.map((file) => (
                   <button
