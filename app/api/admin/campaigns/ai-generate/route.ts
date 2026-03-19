@@ -3,7 +3,6 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { isAdminAsync } from '@/lib/admin'
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,8 +12,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const admin = await isAdminAsync()
-    if (!admin) {
+    if (session.user.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -83,7 +81,7 @@ Only respond with valid JSON, nothing else.`
     })
 
     if (!claudeRes.ok) {
-      console.error('Claude API error:', await claudeRes.text())
+      console.error('Claude API error:', claudeRes.status)
       return NextResponse.json({ error: 'AI generation failed' }, { status: 500 })
     }
 
