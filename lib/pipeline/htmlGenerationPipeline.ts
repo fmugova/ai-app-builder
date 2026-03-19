@@ -724,6 +724,11 @@ Generate FOUR items:
         var nameEl = document.getElementById('nav-user-name');
         if (nameEl && user) nameEl.textContent = user.name || user.email;
       }` : ""}
+   d) INTERACTIVE TOOL LOGIC: If this site includes a calculator, timer, quiz, converter, or other interactive widget, implement ALL JavaScript needed to make it fully work.
+      CRITICAL for calculators — NEVER pass display symbols directly to eval():
+        var safeExpr = expr.replace(/×/g,'*').replace(/÷/g,'/');
+        try { result = eval(safeExpr); } catch(e) { result = 'Error'; }
+      Use data attributes on buttons (e.g. data-key="7", data-action="equals") and event delegation on the calculator container. Never rely on onclick attributes.
 
 3. nav_html: A responsive Tailwind nav with:
    - Logo/site name on left (font-bold text-xl)
@@ -857,6 +862,8 @@ ${page.description || `Create the full ${page.name} page with rich, professional
    <script src="toast.js"></script>
    [ecommerce only: <script src="supabase.js"></script>]
    <script src="script.js"></script>
+   [interactive tools only: add ONE final <script> block with all tool-specific logic — see note 3b]
+3b. Interactive tools (calculator, timer, quiz, game, converter): add a final <script> block AFTER script.js containing ALL the tool logic. Use addEventListener + event delegation (no onclick attributes). For calculators: replace × with * and ÷ with / before any eval(), wrap in try/catch.
 4. NO JSX, NO React, NO <ComponentName /> tags — pure HTML only
 5. Other pages: ${otherPageLinks}
 ${isProtected ? `6. AUTH GUARD REQUIRED — This is a protected page. Add this EXACT inline script as the FIRST script in <head> (before Tailwind):

@@ -8,12 +8,13 @@ import { toast } from 'react-hot-toast';
 import { stripMarkdownCodeFences } from '@/lib/utils';
 import { generateSmartProjectName } from '@/lib/utils/project-name-generator';
 import dynamic from 'next/dynamic';
-import PreviewFrame from '@/components/PreviewFrame'
-import PreviewFrameMultiPage from '@/components/PreviewFrameMultiPage'
-import MediaLibrary from '@/components/MediaLibrary';
-import MonacoCodeEditor from '@/components/MonacoCodeEditor';
-import MultiFileProjectSetup from '@/components/MultiFileProjectSetup';
-import CodeFileViewer from '@/components/CodeFileViewer';
+// Lazy-load heavy components that are only needed after generation or on user action
+const PreviewFrame = dynamic(() => import('@/components/PreviewFrame'), { ssr: false });
+const PreviewFrameMultiPage = dynamic(() => import('@/components/PreviewFrameMultiPage'), { ssr: false });
+const MediaLibrary = dynamic(() => import('@/components/MediaLibrary'), { ssr: false });
+const MonacoCodeEditor = dynamic(() => import('@/components/MonacoCodeEditor'), { ssr: false });
+const MultiFileProjectSetup = dynamic(() => import('@/components/MultiFileProjectSetup'), { ssr: false });
+const CodeFileViewer = dynamic(() => import('@/components/CodeFileViewer'), { ssr: false });
 import PromptTemplates from '@/components/PromptTemplates';
 
 // WebContainerPreview must be client-only (uses SharedArrayBuffer, Service Workers)
@@ -812,8 +813,12 @@ function ChatBuilderContent() {
   }, []);
 
   // Template selection handler for PromptTemplates component
-  const handleTemplateSelect = useCallback((templatePrompt: string) => {
+  const handleTemplateSelect = useCallback((templatePrompt: string, templateType?: string) => {
     setPrompt(templatePrompt);
+    // Map template type to a scaffold hint so the pipeline picks the right mode
+    if (templateType === 'full-stack-app') setScaffoldType('dashboard');
+    else if (templateType === 'simple-website') setScaffoldType('marketing');
+    // 'single-html' and others: leave scaffold auto-detected from prompt
     toast.success('Template loaded! Click Generate to create your app.');
   }, []);
 

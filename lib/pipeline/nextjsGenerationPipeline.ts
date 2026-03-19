@@ -263,6 +263,56 @@ Remember:
     ),
     warnings,
     errors: [],
-    qualityScore: 'app/page.tsx' in featureFiles ? 85 : 40,
+    qualityScore: scoreNextjsOutput(featureFiles, allFiles, stubs, warnings),
   };
+}
+
+/**
+ * Computes a 0–100 quality score for a Next.js generation run.
+ *
+ * Scoring breakdown (starts at 100, deductions apply):
+ *  - No feature files at all:                     → hard 40
+ *  - app/page.tsx absent from allFiles:            -20
+ *  - app/page.tsx only in scaffold (not generated): -5
+ *  - Each auto-stubbed missing import:             -3  (capped at -25)
+ *  - Output was truncated at token limit:          -10
+ *  - Each other warning:                           -2  (capped at -10)
+ *  - No API route files generated (full-stack):    -5
+ */
+function scoreNextjsOutput(
+  featureFiles: Record<string, string>,
+  allFiles: Record<string, string>,
+  stubs: Record<string, string>,
+  warnings: string[],
+): number {
+  const featureCount = Object.keys(featureFiles).length;
+  if (featureCount === 0) return 40;
+
+  let score = 100;
+
+  // Home page presence
+  if (!('app/page.tsx' in allFiles)) {
+    score -= 20;
+  } else if (!('app/page.tsx' in featureFiles)) {
+    score -= 5; // scaffold provided it, AI didn't customize — minor penalty
+  }
+
+  // Stub penalty (each stub = a component the AI forgot to generate)
+  const stubCount = Object.keys(stubs).length;
+  score -= Math.min(25, stubCount * 3);
+
+  // Truncation warning
+  if (warnings.some(w => w.includes('truncated'))) score -= 10;
+
+  // Other (non-stub) warnings
+  const otherWarnings = warnings.filter(
+    w => !w.startsWith('Auto-stubbed') && !w.includes('truncated')
+  );
+  score -= Math.min(10, otherWarnings.length * 2);
+
+  // No API routes in a non-trivial generation — suggests incomplete backend
+  const hasApiRoutes = Object.keys(featureFiles).some(f => f.startsWith('app/api/'));
+  if (!hasApiRoutes && featureCount > 3) score -= 5;
+
+  return Math.max(40, Math.min(100, score));
 }

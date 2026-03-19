@@ -27,25 +27,78 @@ Pages: [list the separate pages, e.g. "Home, About, Services, Contact"]
 Layout: [e.g. "Sidebar navigation, card-based dashboard, data tables"]`;
 
 const QUICK_TEMPLATES = [
+  // ── Simple single-file HTML ───────────────────────────────────────────────
+  {
+    label: '🔢 Calculator',
+    prompt: `Build a beautiful calculator as a single HTML file.
+
+Features:
+- Standard arithmetic: add, subtract, multiply, divide
+- Percentage (%) and sign-toggle (+/-) buttons
+- Decimal point support, keyboard input
+- Calculation history log (last 5 results shown below display)
+- Smooth button press animations
+
+Design: dark charcoal background, electric orange accent buttons, large clear display, modern rounded layout. No dependencies — pure HTML + CSS + JavaScript in one file.`,
+    type: 'single-html',
+  },
+  {
+    label: '🌤️ Weather Card',
+    prompt: `Create a beautiful weather dashboard widget as a single HTML file.
+
+Features:
+- City search input that fetches live weather from the Open-Meteo API (free, no key needed)
+- Current conditions: temperature, feels-like, humidity, wind speed, UV index
+- 5-day forecast strip with icons
+- Dynamic background gradient that changes with weather (sunny/cloudy/rainy/night)
+- Animated weather icons using CSS (sun rays rotate, rain drops fall)
+
+Design: glassmorphism card on a sky-blue gradient, clean sans-serif typography, smooth transitions. Pure HTML + CSS + JavaScript, no libraries.`,
+    type: 'single-html',
+  },
+
+  // ── Multi-page HTML (no backend) ─────────────────────────────────────────
   {
     label: '☕ Coffee Shop',
     prompt: `Create a multi-page website for a coffee shop called "Brew & Bean" with these SEPARATE pages:
 
-1. Home page — hero banner, featured drinks (3 cards), customer testimonials, newsletter signup
-2. Services page — full menu (hot drinks, cold drinks, pastries) with prices and images
-3. About page — brand story, team photos, our values section
-4. Contact page — contact form (name, email, message), store hours, Google Maps placeholder
-5. Basket page — shopping cart with items, quantities, subtotal, checkout button (requires login)
+1. Home — hero banner with call-to-action, 3 featured drink cards, customer testimonials carousel, newsletter signup form
+2. Menu — full menu grid (hot drinks, cold drinks, pastries) with prices, descriptions, and placeholder images
+3. About — brand story section, meet-the-team cards (3 people), "our values" icons strip
+4. Contact — contact form (name, email, message), opening hours table, embedded Google Maps placeholder
 
-Authentication:
-- Email/password login and signup
-- Protected basket/checkout pages (redirect to login if not authenticated)
-- User account dropdown in nav showing name when logged in
-
-Design: warm browns, creams, orange accents. Cozy, modern café aesthetic.
-Tech: Next.js 14 App Router, NextAuth.js, Prisma + PostgreSQL, Tailwind CSS, TypeScript`,
-    type: 'full-stack-app',
+Design: warm browns (#4a2c17), creams (#fdf6ec), orange accents (#e07b39). Cozy, modern café aesthetic. Smooth scroll, sticky nav, hover animations.
+Tech: 4 separate HTML files with shared CSS file and shared nav/footer. Vanilla JavaScript for the carousel and form validation. No backend, no database.`,
+    type: 'simple-website',
   },
+  {
+    label: '💼 Portfolio',
+    prompt: `Create a professional developer portfolio website with 4 separate pages:
+
+1. Home — animated hero with name/tagline, tech stack icon grid, 3 featured project cards, CTA to contact
+2. Projects — filterable grid of 6 project cards (title, description, tech badges, live/GitHub links), filter by category
+3. About — professional bio, work experience timeline, education, skills bars, downloadable CV button
+4. Contact — contact form (name, email, subject, message), social media links, email display
+
+Design: dark theme (#0d1117), electric blue (#58a6ff) and purple (#a371f7) accents, smooth scroll animations, glassmorphism cards, subtle particle background on hero.
+Tech: 4 separate HTML files with shared CSS, vanilla JS for animations, filter logic, and form validation.`,
+    type: 'simple-website',
+  },
+  {
+    label: '🎨 Creative Agency',
+    prompt: `Build a multi-page website for a creative design agency called "Pixel & Craft" with these SEPARATE pages:
+
+1. Home — full-screen video hero (placeholder), services overview strip (branding, web, motion), client logos marquee, awards counter
+2. Work — masonry portfolio grid of 8 case study cards, filterable by type (branding/web/motion), each opens a lightbox
+3. Services — 3 service sections (each with icon, description, process steps 1–4, example outputs)
+4. Contact — split layout: contact form left, office address + map placeholder right, team availability indicator
+
+Design: bold black and white with a single electric yellow (#FFE03B) accent. Oversized typography, asymmetric layouts, hover distortion effects. Clean and editorial.
+Tech: 4 separate HTML files, shared CSS with custom properties, vanilla JS for lightbox, filter, and counter animations.`,
+    type: 'simple-website',
+  },
+
+  // ── Full-stack multi-file ────────────────────────────────────────────────
   {
     label: '✅ Task Manager',
     prompt: `Build a full-stack task management app with:
@@ -56,45 +109,9 @@ Features:
 - Email/password auth with protected routes
 - Create, edit, delete tasks with title, description, status (todo/in-progress/done), due date, priority
 - Filter by status and priority, search by title, sort by due date
-- Dashboard showing task stats (total, completed, overdue)
+- Dashboard showing task stats (total, completed, overdue) with a simple bar chart
 
 Tech: Next.js 14 App Router, NextAuth.js, Prisma + PostgreSQL, TypeScript, Tailwind CSS + shadcn/ui`,
-    type: 'full-stack-app',
-  },
-  {
-    label: '💼 Portfolio',
-    prompt: `Create a professional developer portfolio website with 4 separate pages:
-
-1. Home page — animated hero with name/tagline, tech stack grid, 3 featured project cards, CTA to contact
-2. Projects page — filterable grid of 6 project cards (each with title, description, tech badges, live/GitHub links)
-3. About page — professional bio, work experience timeline, education, downloadable CV button
-4. Contact page — contact form (name, email, subject, message), social media links, email display
-
-Design: dark theme, electric blue/purple accents, smooth scroll animations, glassmorphism cards
-Tech: separate HTML pages with shared CSS, vanilla JS for animations and form validation`,
-    type: 'simple-website',
-  },
-  {
-    label: '🏋️ AI Fitness Coach',
-    prompt: `Build a full-stack AI Fitness & Nutrition Coach app — personalized plans driven by AI.
-
-Pages: Landing, Login/Signup, Onboarding (goals + preferences wizard), Dashboard, Workout Plan, Meal Plan, Progress Tracker, AI Chat Coach, Settings, Subscription/Billing
-
-Core Features:
-- AI-generated workout plans based on goal (weight loss / muscle gain / endurance), fitness level, available equipment
-- AI-generated 7-day meal plans matching calorie/macro targets
-- Habit reminders (push notification opt-in)
-- Progress tracker with weight, measurements, workout completion charts (Recharts)
-- AI Chat Coach — conversational interface powered by Claude API for motivation, plan tweaks, questions
-- Wearable sync placeholder (Fitbit / Apple Health API connection UI)
-
-Monetization:
-- Stripe subscription: Free (basic plan), Pro £9.99/mo (AI chat + custom plans), Elite £19.99/mo (all features)
-- Feature gates based on plan tier
-
-Tech: Next.js 14 App Router, NextAuth.js (Google + email), Prisma + PostgreSQL, Stripe, Anthropic Claude API (claude-sonnet-4-5-20250929), Tailwind CSS + shadcn/ui, Recharts, TypeScript
-
-Database: Users, WorkoutPlans, MealPlans, ProgressEntries, ChatMessages, Subscriptions`,
     type: 'full-stack-app',
   },
   {
@@ -117,11 +134,32 @@ Pages: Home, Product listing (filters + search), Product detail (gallery, review
 Features:
 - Product catalog with categories, price filter, ratings
 - Cart persisted to database for logged-in users
-- Multi-step Stripe checkout
-- Order tracking
-- Admin: manage products, orders, customers, sales analytics
+- Multi-step Stripe checkout (card details, shipping, confirmation)
+- Order tracking with status updates
+- Admin: manage products, orders, customers, sales analytics chart
 
 Tech: Next.js 14 App Router, NextAuth.js, Prisma + PostgreSQL, Stripe, TypeScript, Tailwind CSS`,
+    type: 'full-stack-app',
+  },
+  {
+    label: '🏋️ AI Fitness Coach',
+    prompt: `Build a full-stack AI Fitness & Nutrition Coach app — personalized plans driven by AI.
+
+Pages: Landing, Login/Signup, Onboarding (goals + preferences wizard), Dashboard, Workout Plan, Meal Plan, Progress Tracker, AI Chat Coach, Settings, Subscription/Billing
+
+Core Features:
+- AI-generated workout plans based on goal (weight loss / muscle gain / endurance), fitness level, available equipment
+- AI-generated 7-day meal plans matching calorie/macro targets
+- Progress tracker with weight, measurements, workout completion charts (Recharts)
+- AI Chat Coach — conversational interface powered by Claude API for motivation, plan tweaks, questions
+
+Monetization:
+- Stripe subscription: Free (basic plan), Pro £9.99/mo (AI chat + custom plans), Elite £19.99/mo (all features)
+- Feature gates based on plan tier
+
+Tech: Next.js 14 App Router, NextAuth.js (Google + email), Prisma + PostgreSQL, Stripe, Anthropic Claude API (claude-sonnet-4-6), Tailwind CSS + shadcn/ui, Recharts, TypeScript
+
+Database: Users, WorkoutPlans, MealPlans, ProgressEntries, ChatMessages, Subscriptions`,
     type: 'full-stack-app',
   },
 ];
@@ -202,20 +240,50 @@ export default function PromptTemplates({ onSelect }: PromptTemplatesProps) {
         </div>
       )}
 
-      {/* Quick template buttons */}
-      <div className="grid grid-cols-2 gap-2">
-        {QUICK_TEMPLATES.map((template) => (
-          <Button
-            key={template.label}
-            variant="outline"
-            size="sm"
-            onClick={() => onSelect(template.prompt, template.type)}
-            className="justify-start text-left h-auto py-2"
-          >
-            {template.label}
-          </Button>
-        ))}
-      </div>
+      {/* Quick template buttons — grouped by complexity */}
+      {[
+        {
+          heading: 'Single-page HTML',
+          badge: 'No setup',
+          badgeColor: 'bg-green-100 text-green-700',
+          types: ['single-html'],
+        },
+        {
+          heading: 'Multi-page HTML',
+          badge: 'No setup',
+          badgeColor: 'bg-green-100 text-green-700',
+          types: ['simple-website'],
+        },
+        {
+          heading: 'Full-stack app',
+          badge: 'Needs DB + env vars',
+          badgeColor: 'bg-amber-100 text-amber-700',
+          types: ['full-stack-app'],
+        },
+      ].map((group) => {
+        const items = QUICK_TEMPLATES.filter((t) => group.types.includes(t.type));
+        return (
+          <div key={group.heading} className="mt-3">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{group.heading}</span>
+              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${group.badgeColor}`}>{group.badge}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {items.map((template) => (
+                <Button
+                  key={template.label}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onSelect(template.prompt, template.type)}
+                  className="justify-start text-left h-auto py-2"
+                >
+                  {template.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </Card>
   );
 }

@@ -2,15 +2,10 @@ import './globals.css'
 import UnifiedMobileNav from '@/components/UnifiedMobileNav'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { checkIfAdmin } from '@/lib/admin-check'
 import { Inter } from 'next/font/google'
 import Providers from './providers'
 import { HomePageSchema } from '@/components/JsonLd'
-import SupportChat from '@/components/SupportChat'
-import FeedbackWidget from '@/components/FeedbackWidget'
-import CSPMonitor from '@/components/CSPMonitor'
-import CookieConsent from '@/components/CookieConsent'
-import ConditionalAnalytics from '@/components/ConditionalAnalytics'
+import LazyLayoutWidgets from '@/components/LazyLayoutWidgets'
 import type { Metadata, Viewport } from 'next'
 
 
@@ -172,14 +167,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     // Invalid/expired JWT — user will be signed out on next interaction
   }
 
-  // Check if user is admin with error handling
-  let isAdmin = false
-  try {
-    isAdmin = session?.user?.email ? await checkIfAdmin(session.user.email) : false
-  } catch (error) {
-    console.error('[Layout] Error checking admin status:', error)
-    isAdmin = false
-  }
+  // Use the role already stored in the JWT — avoids a DB query on every request.
+  // The JWT is refreshed from the DB every 15 min (see auth.ts jwt callback).
+  const isAdmin = session?.user?.role === 'admin'
 
   return (
     <html lang="en">
@@ -198,12 +188,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <main className="pt-16">
           <Providers>{children}</Providers>
         </main>
-        {/* Analytics — only loaded after the user accepts all cookies */}
-        <ConditionalAnalytics />
-        <CookieConsent />
-        <SupportChat />
-        <FeedbackWidget />
-        <CSPMonitor />
+        <LazyLayoutWidgets />
 
       </body>
     </html>
