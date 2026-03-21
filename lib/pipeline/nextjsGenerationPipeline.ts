@@ -96,7 +96,8 @@ export async function runNextjsGenerationPipeline(
   siteName: string,
   onProgress?: ProgressCallback,
   onFile?: FileCallback,
-  scaffoldType?: string
+  scaffoldType?: string,
+  supabaseCredentials?: { url: string; anonKey: string }
 ): Promise<PipelineResult> {
   const warnings: string[] = [];
 
@@ -211,6 +212,15 @@ Remember:
     ? getBlogScaffoldFiles()
     : getScaffoldFiles();
   const allFiles = { ...scaffoldFiles, ...featureFiles };
+
+  // Inject real Supabase credentials into .env if the user has a saved connection
+  if (supabaseCredentials?.url && supabaseCredentials?.anonKey) {
+    allFiles['.env'] =
+      `# Supabase credentials — auto-filled from your BuildFlow connection\n` +
+      `NEXT_PUBLIC_SUPABASE_URL=${supabaseCredentials.url}\n` +
+      `NEXT_PUBLIC_SUPABASE_ANON_KEY=${supabaseCredentials.anonKey}\n`;
+    allFiles['.env.example'] = allFiles['.env'];
+  }
 
   // Force-restore scaffold files that must never be overwritten by generated code.
   // app/layout.tsx contains `export const dynamic = 'force-dynamic'` which prevents

@@ -17,6 +17,7 @@ import { detectOutputMode } from "@/lib/generation/detectOutputMode";
 import { selectScaffold, scaffoldUsesNextjs } from "@/lib/scaffolds/scaffold-selector";
 import { rateLimiters } from "@/lib/rate-limit";
 import prisma from "@/lib/prisma";
+import { decrypt } from "@/lib/encryption";
 
 // Detect whether the prompt warrants a Next.js full-stack project.
 // HTML is still the default for marketing sites and simple apps (localStorage CRUD).
@@ -98,15 +99,33 @@ async function GETHandler(req: NextRequest) {
     return new Response("Missing prompt", { status: 400 });
   }
 
-  // Fetch Supabase connection if projectId provided — used to inject real DB into HTML pipeline
+  // Fetch Supabase connection — project-linked first, then fallback to user's most recent.
+  // Used to inject real credentials into the generated .env for Next.js apps.
   let dbConnection: { supabaseUrl: string; supabaseAnonKey: string } | null = null;
-  if (projectId) {
+  {
     const conn = await prisma.databaseConnection.findFirst({
-      where: { projectId, status: "connected" },
+      where: {
+        status: "connected",
+        supabaseUrl: { not: null },
+        supabaseAnonKey: { not: null },
+        ...(projectId
+          ? { OR: [{ projectId }, { userId: dbUser.id }] }
+          : { userId: dbUser.id }),
+      },
+      orderBy: [
+        // Prefer connections explicitly linked to this project
+        { projectId: "asc" },
+        { createdAt: "desc" },
+      ],
       select: { supabaseUrl: true, supabaseAnonKey: true },
     });
     if (conn?.supabaseUrl && conn?.supabaseAnonKey) {
-      dbConnection = { supabaseUrl: conn.supabaseUrl, supabaseAnonKey: conn.supabaseAnonKey };
+      try {
+        const anonKey = decrypt(conn.supabaseAnonKey);
+        dbConnection = { supabaseUrl: conn.supabaseUrl, supabaseAnonKey: anonKey };
+      } catch {
+        // Decryption failed (e.g. key rotation) — skip credential injection
+      }
     }
   }
 
@@ -189,7 +208,10 @@ async function GETHandler(req: NextRequest) {
             (path: string, content: string) => {
               send("file", { path, content });
             },
-            scaffoldType
+            scaffoldType,
+            dbConnection
+              ? { url: dbConnection.supabaseUrl, anonKey: dbConnection.supabaseAnonKey }
+              : undefined
           );
 
           // Mark all plan steps done

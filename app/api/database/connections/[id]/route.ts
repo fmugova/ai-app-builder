@@ -8,6 +8,7 @@ import { z } from 'zod'
 const updateConnectionSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   provider: z.enum(['supabase', 'postgres', 'mysql', 'mongodb', 'sqlite']).optional(),
+  projectId: z.string().nullable().optional(), // allows linking/unlinking a project
   host: z.string().optional(),
   port: z.number().int().min(1).max(65535).optional(),
   database: z.string().optional(),
