@@ -119,6 +119,41 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Each project supports one DB connection (projectId is unique).
+    // If one already exists, upsert it so the user can update credentials.
+    if (reqProjectId) {
+      const existing = await prisma.databaseConnection.findUnique({
+        where: { projectId: reqProjectId },
+        select: { id: true }
+      })
+      if (existing) {
+        const updated = await prisma.databaseConnection.update({
+          where: { id: existing.id },
+          data: {
+            name,
+            provider,
+            connectionString: connectionString ? encrypt(connectionString) : null,
+            config: (config ?? {}) as object,
+            supabaseUrl: supabaseUrl ?? null,
+            supabaseAnonKey: supabaseAnonKey ? encrypt(supabaseAnonKey) : null,
+            supabaseServiceKey: supabaseServiceKey ? encrypt(supabaseServiceKey) : null,
+            host: host ?? null,
+            port: port ?? null,
+            database: database ?? null,
+            username: username ?? null,
+            password: password ? encrypt(password) : null,
+            status: 'connected',
+          },
+          select: { ...SAFE_SELECT, DatabaseTable: true },
+        })
+        const { DatabaseTable, ...safeConn } = updated as typeof updated & { DatabaseTable: unknown[] }
+        return NextResponse.json({
+          connection: { ...safeConn, tables: DatabaseTable },
+          message: 'Connection updated successfully'
+        })
+      }
+    }
+
     const connection = await prisma.databaseConnection.create({
       data: {
         name,
