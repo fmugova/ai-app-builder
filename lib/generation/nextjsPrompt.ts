@@ -265,15 +265,24 @@ function buildTruncationStub(path: string): string {
   return `// Auto-stub: original file was truncated during generation\nexport default function ${PascalName}() { return null }\n`;
 }
 
+/** Strips markdown code fences from file content Claude sometimes wraps output in.
+ *  e.g. ```tsx\n...code...\n``` → ...code...
+ */
+function stripCodeFences(content: string): string {
+  return content.replace(/^```[\w-]*\n?([\s\S]*?)```\s*$/m, '$1').trim();
+}
+
 /** Parses the `=== FILE: path ===` format into a map of path → content */
 export function parseNextjsOutput(text: string): Record<string, string> {
   const files: Record<string, string> = {};
-  // Split on the file delimiter, keeping the path
-  const parts = text.split(/^=== FILE:\s*(.+?)\s*===\s*$/m);
+  // Split on the file delimiter, keeping the path.
+  // Also accept lines where Claude used slight variations like leading/trailing spaces.
+  const parts = text.split(/^[ \t]*=== FILE:\s*(.+?)\s*===[ \t]*$/m);
   // parts: [preamble, path1, content1, path2, content2, ...]
   for (let i = 1; i < parts.length - 1; i += 2) {
     const path = parts[i].trim();
-    const content = parts[i + 1]?.trim() ?? '';
+    // Strip markdown code fences Claude sometimes wraps around file content
+    const content = stripCodeFences(parts[i + 1]?.trim() ?? '');
     if (path && content) {
       const isTsLike = /\.(tsx?|jsx?)$/.test(path);
       if (isTsLike && isTruncated(content)) {

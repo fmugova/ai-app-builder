@@ -30,8 +30,10 @@ export function PostGenerationSummary({
   const [isDownloading, setIsDownloading] = useState(false);
 
   const fileCount = Object.keys(files).filter((p) => !p.startsWith("_")).length;
-  const htmlPageCount = Object.keys(files).filter((p) => p.endsWith(".html")).length;
   const isHtml = mode === "html";
+  const htmlPageCount = isHtml
+    ? Object.keys(files).filter((p) => p.endsWith(".html")).length
+    : Object.keys(files).filter((p) => p.startsWith("app/") && p.endsWith("/page.tsx")).length;
   const ff = "'Geist Mono','IBM Plex Mono',ui-monospace,monospace";
 
   const scoreColor =
@@ -49,6 +51,8 @@ export function PostGenerationSummary({
       ? "Production Ready"
       : qualityScore >= 60
       ? "Needs Review"
+      : qualityScore <= 40 && !isHtml
+      ? "Try Regenerating"
       : "Issues Found";
 
   // Circumference of a circle with r=12: 2πr ≈ 75.4
