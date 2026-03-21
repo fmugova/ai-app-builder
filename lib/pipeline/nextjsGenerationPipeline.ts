@@ -211,16 +211,20 @@ Remember:
     : isBlog
     ? getBlogScaffoldFiles()
     : getScaffoldFiles();
-  const allFiles = { ...scaffoldFiles, ...featureFiles };
-
-  // Inject real Supabase credentials into .env if the user has a saved connection
+  // Inject real Supabase credentials into scaffold .env BEFORE merging so that
+  // the scaffold streaming loop sends the populated file to the client.
+  // (Modifying allFiles after the merge doesn't help because streaming iterates
+  //  scaffoldFiles/featureFiles separately, not allFiles.)
   if (supabaseCredentials?.url && supabaseCredentials?.anonKey) {
-    allFiles['.env'] =
+    const envContent =
       `# Supabase credentials — auto-filled from your BuildFlow connection\n` +
       `NEXT_PUBLIC_SUPABASE_URL=${supabaseCredentials.url}\n` +
       `NEXT_PUBLIC_SUPABASE_ANON_KEY=${supabaseCredentials.anonKey}\n`;
-    allFiles['.env.example'] = allFiles['.env'];
+    scaffoldFiles['.env'] = envContent;
+    scaffoldFiles['.env.example'] = envContent;
   }
+
+  const allFiles = { ...scaffoldFiles, ...featureFiles };
 
   // Force-restore scaffold files that must never be overwritten by generated code.
   // app/layout.tsx contains `export const dynamic = 'force-dynamic'` which prevents
